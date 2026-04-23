@@ -58,7 +58,7 @@
 
 | Path | Type | Role | Touches | Phase(s) | Status | Notes |
 |---|---|---|---|---|---|---|
-| `src/app/listings/[id]/page.tsx` | route (SSR) | reader | listing, messaging | 1, 6, 7 | done_needs_audit | CFM-102 primary CTA switch. |
+| `src/app/listings/[id]/page.tsx` | route (SSR) | reader | listing, messaging | 1, 6, 7 | done_needs_audit | CFM-102 primary CTA switch. Privacy-first public-detail read path is now the only runtime branch. |
 | `src/app/listings/[id]/ListingPageClient.tsx` | client component | reader | listing, messaging | 1, 6, 7, 10 | done_needs_audit | Hosts ContactHostButton and (legacy) BookingForm. CFM-1001 removes legacy paths. |
 | `src/app/listings/[id]/ListingViewTracker.tsx` | client component | reader | analytics | — | done_needs_audit | View telemetry — unaffected. |
 | `src/app/listings/[id]/edit/**` | route | writer (host) | listing | 3, 5 | done_needs_audit | Hosts use dedicated host-managed PATCH. CFM-302 contract + CFM-504 mixed-state guard in place. |
@@ -70,12 +70,12 @@
 | `src/components/listings/ListingCardCarousel.tsx` | client component | reader | listing | 6 | done_needs_audit | Wraps ListingCard; passive. |
 | `src/components/listings/ImageCarousel.tsx` / `RoomPlaceholder.tsx` / `NearMatchSeparator.tsx` / `ImageUploader.tsx` / `ListScrollBridge.tsx` | client component | reader / writer (images) | listing | — | n/a | Unaffected by CFM semantics. |
 | `src/components/ContactHostButton.tsx` | client component | writer (messaging) | messaging | 0, 1, 7 | not_started | Target of CFM-003 dedup precondition. Phase 1 guarantees it is the primary CTA. |
-| `src/components/ReviewForm.tsx` | client component | writer (review) | review | 7 | not_started | Gated by CFM-702 eligibility alignment. |
+| `src/components/ReviewForm.tsx` | client component | writer (review) | review | 7 | ✅ done | Listing review UI now consumes `reviewEligibility` directly and uses confirmed-stay copy. |
 | `src/components/DeleteListingButton.tsx` | client component | writer | listing | — | done_needs_audit | Uses `can-delete` pre-flight. |
 | `src/components/ListingFreshnessCheck.tsx` | client component | writer | listing | 3, 8 | done_needs_audit | Host-triggered reconfirm — feeds CFM-303 / CFM-801. |
 | `src/hooks/useAvailability.ts` | hook | reader | availability | 1, 4, 6 | done_needs_audit | Replaced by `publicAvailability` reads post-CFM-603. |
-| `src/app/api/listings/[id]/viewer-state/route.ts` | API route | reader | listing, availability | 1, 7 | done_needs_audit | CFM-103 dual-shape compatibility. Hard observability gate (Phase 1). |
-| `src/app/api/listings/[id]/status/route.ts` | API route | writer | listing | 3, 5 | done_needs_audit | Status transitions; gated by host-managed validation. |
+| `src/app/api/listings/[id]/viewer-state/route.ts` | API route | reader | listing, availability | 1, 7 | done_needs_audit | CFM-103 dual-shape compatibility. Privacy-first viewer contract is now canonical; compat booking fields remain frozen until CFM-1002-C. Hard observability gate (Phase 1). |
+| `src/app/api/listings/[id]/status/route.ts` | API route | writer | listing | 3, 5 | done_needs_audit | Status transitions; gated by host-managed validation. Guest/manager privacy-first status split is now canonical. |
 | `src/app/api/listings/[id]/availability/route.ts` | API route | reader | availability | 4, 6 | done_needs_audit | Already exists; audit target for CFM-404/CFM-603. |
 
 ### 2.3 Search, map, facets, response shaping (phase 4, 6)
@@ -130,11 +130,10 @@
 
 | Path | Type | Role | Touches | Phase(s) | Status | Notes |
 |---|---|---|---|---|---|---|
-| `src/app/bookings/page.tsx` | route (SSR) | reader | booking | 1, 9 | not_started | CFM-104 keeps interactive only for legacy rows; CFM-901 converts to history-first. |
-| `src/app/bookings/BookingsClient.tsx` | client component | reader / writer (legacy) | booking | 1, 9, 10 | not_started | CFM-1001 final UI cleanup. |
+| `src/app/bookings/page.tsx` | route (SSR) | reader | booking | 1, 9 | ✅ done | Permanently history-first; no `/bookings` escape hatch remains. |
+| `src/app/bookings/BookingsClient.tsx` | client component | reader | booking | 1, 9, 10 | ✅ done | Read-only history UI; remaining CFM-1001 cleanup is outside the page/client branch. |
 | `src/app/bookings/error.tsx` / `loading.tsx` | route shell | — | — | — | n/a | Unaffected. |
-| `src/components/BookingCalendar.tsx` | client component | reader | booking | 9, 10 | not_started | History-only view by CFM-902. |
-| `src/components/bookings/HoldCountdown.tsx` | client component | reader | hold | 1, 9 | not_started | Only relevant until CFM-101 freeze; becomes non-rendering afterwards. |
+| `src/components/BookingCalendar.tsx` | client component | reader | booking | 9, 10 | done_needs_audit | Retained as the read-only history calendar view. |
 | `src/app/api/bookings/[id]/audit/route.ts` | API route | history-only | booking audit | retained | done_needs_audit | BookingAuditLog reader; Invariant #4 retained. |
 
 ### 2.6 Notifications, emails & cron (phase 8, 9)
@@ -168,7 +167,7 @@
 | Path | Type | Role | Touches | Phase(s) | Status | Notes |
 |---|---|---|---|---|---|---|
 | `src/app/api/reviews/route.ts` | API route | writer | review | 7 | partially_done | CFM-405c: POST/PATCH/DELETE wrapped in `$transaction` with `markListingDirtyInTx`. Eligibility bound to accepted-booking history. |
-| `src/components/ReviewForm.tsx` | client component | writer (UI) | review | 7 | not_started | CFM-702 copy + eligibility alignment. |
+| `src/components/ReviewForm.tsx` | client component | writer (UI) | review | 7 | ✅ done | CFM-702 complete; contact-only listing viewers stay on the public-review gate and private-feedback path. |
 | `src/components/ReviewList.tsx` / `ReviewCard.tsx` / `ReviewResponseForm.tsx` | client component | reader | review | 7 | done_needs_audit | Passive presenters + host-response writer. |
 | `src/app/actions/review-response.ts` | server action | writer | review | 7 | done_needs_audit | Host responses to reviews. |
 | `src/app/api/listings/[id]/viewer-state/route.ts` | API route | reader | review, listing | 1, 7 | done_needs_audit | Review eligibility emitted here too — Invariant #4. |
@@ -271,7 +270,7 @@ Direct `depends_on` edges from `.claude/task-tracker.json` (2026-04-16 snapshot)
 | CFM-603 | 6 | CFM-404 | ✅ done |
 | CFM-604 | 6 | CFM-401 | not_started |
 | CFM-701 | 7 | CFM-603 | not_started |
-| CFM-702 | 7 | CFM-103 | not_started |
+| CFM-702 | 7 | CFM-103 | ✅ done |
 | CFM-703 | 7 | CFM-702 | not_started |
 | CFM-801 | 8 | CFM-303, CFM-304 | not_started |
 | CFM-802 | 8 | CFM-801 | not_started |

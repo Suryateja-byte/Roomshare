@@ -51,6 +51,8 @@ import {
   recordSearchV2Fallback,
   recordSearchZeroResults,
 } from "@/lib/search/search-telemetry";
+import { V2MapDataSetter } from "@/components/search/V2MapDataSetter";
+import type { SearchV2Response } from "@/lib/search/types";
 
 type SearchPageSearchParams = {
   q?: string;
@@ -240,9 +242,7 @@ export async function generateMetadata({
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   const requestStartTime = performance.now();
   const rawParams = await searchParams;
-  for (const alias of detectLegacyUrlAliases(rawParams, {
-    includeWhere: false,
-  })) {
+  for (const alias of detectLegacyUrlAliases(rawParams)) {
     recordLegacyUrlUsage({ alias, surface: "ssr" });
   }
   const normalizedQuery = normalizeSearchQuery(rawParams as RawSearchParams);
@@ -406,6 +406,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     | PaginatedResult<ListingData>
     | PaginatedResultHybrid<ListingData>
     | undefined;
+  let v2Response: SearchV2Response | null = null;
   let v2NextCursor: string | null = null;
   let vibeAdvisory: string | undefined;
 
@@ -461,6 +462,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       if (v2Result.response && v2Result.paginatedResult) {
         // V2 succeeded - use its data
         usedV2 = true;
+        v2Response = v2Result.response;
         paginatedResult = v2Result.paginatedResult;
         v2NextCursor = v2Result.response.list.nextCursor ?? null;
         if (v2Result.response.meta.warnings?.includes("VIBE_SOFT_FALLBACK")) {
@@ -548,7 +550,15 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const displayLocation = locationLabel || q || "";
   const responseMeta = createSearchResponseMeta(
     normalizedQuery,
-    usedV2 ? "v2" : "v1-fallback"
+    usedV2 ? "v2" : "v1-fallback",
+    usedV2 && v2Response
+      ? {
+          querySnapshotId: v2Response.meta.querySnapshotId,
+          projectionVersion: v2Response.meta.projectionVersion,
+          embeddingVersion: v2Response.meta.embeddingVersion,
+          rankerProfileVersion: v2Response.meta.rankerProfileVersion,
+        }
+      : undefined
   );
   if (hasConfirmedZeroResults) {
     recordSearchZeroResults({
@@ -597,6 +607,16 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
         <SearchResultsLoadingWrapper>
           <SearchResultsErrorBoundary>
+            {usedV2 && v2Response && features.searchSnapshotContract ? (
+              <V2MapDataSetter
+                data={{
+                  ...v2Response.map,
+                  mode: v2Response.meta.mode,
+                  queryHash: v2Response.meta.queryHash,
+                  querySnapshotId: v2Response.meta.querySnapshotId,
+                }}
+              />
+            ) : null}
             <SearchResultsClient
               key={normalizedKeyString}
               initialListings={listings}
@@ -615,6 +635,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
               initialResponseMeta={responseMeta}
               initialStateKind={initialStateKind}
               clientSideSearchEnabled={features.clientSideSearch}
+              unifiedV2ClientEnabled={usedV2 && features.searchSnapshotContract}
             />
           </SearchResultsErrorBoundary>
         </SearchResultsLoadingWrapper>

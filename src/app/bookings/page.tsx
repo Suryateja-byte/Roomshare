@@ -2,24 +2,22 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getMyBookings } from "@/app/actions/manage-booking";
 import BookingsClient from "./BookingsClient";
-import { features } from "@/lib/env";
 import { logger } from "@/lib/logger";
 
 export const metadata = {
   title: "My Bookings | RoomShare",
-  description: "Manage your booking requests",
+  description: "Review your booking history",
 };
 
 export default async function BookingsPage() {
   const session = await auth();
-  const isHistoryFirstMode = features.bookingsHistoryFirst;
 
   if (!session?.user?.id) {
     redirect("/login");
   }
 
   logger.sync.info("cfm.booking.history_first_view_count", {
-    mode: isHistoryFirstMode ? "history_first" : "escape_hatch",
+    mode: "history_first",
   });
 
   const { sentBookings, receivedBookings, error } = await getMyBookings();
@@ -44,7 +42,6 @@ export default async function BookingsPage() {
 
   return (
     <BookingsClient
-      isHistoryFirstMode={isHistoryFirstMode}
       sentBookings={(sentBookings || []).map(convertBooking)}
       receivedBookings={(receivedBookings || []).map(convertBooking)}
     />

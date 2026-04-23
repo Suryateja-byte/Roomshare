@@ -7,12 +7,15 @@
 import {
   encodeKeysetCursor,
   decodeKeysetCursor,
+  encodeSnapshotCursor,
+  decodeSnapshotCursor,
   buildCursorFromRow,
   decodeCursorAny,
   decodeLegacyCursor,
   SORT_OPTIONS,
   type KeysetCursor,
   type CursorRowData,
+  type SearchPaginationSnapshot,
 } from "@/lib/search/cursor";
 
 describe("search/cursor", () => {
@@ -28,6 +31,13 @@ describe("search/cursor", () => {
   });
 
   describe("encodeKeysetCursor / decodeKeysetCursor roundtrip", () => {
+    const snapshot: SearchPaginationSnapshot = {
+      engine: "searchdoc-keyset",
+      responseVersion: "searchdoc-keyset.v1",
+      projectionVersion: 3,
+      embeddingVersion: null,
+    };
+
     it("should encode and decode recommended cursor", () => {
       const cursor: KeysetCursor = {
         v: 1,
@@ -40,6 +50,62 @@ describe("search/cursor", () => {
       const decoded = decodeKeysetCursor(encoded);
 
       expect(decoded).toEqual(cursor);
+    });
+
+    it("should encode and decode version-pinned cursor", () => {
+      const cursor: KeysetCursor = {
+        v: 2,
+        s: "newest",
+        k: ["2024-01-15T10:00:00.000Z"],
+        id: "clxversioned",
+        snapshot,
+      };
+
+      const encoded = encodeKeysetCursor(cursor);
+      const decoded = decodeKeysetCursor(encoded);
+
+      expect(decoded).toEqual(cursor);
+    });
+
+    it("should encode and decode snapshot cursor", () => {
+      const cursor = {
+        v: 3 as const,
+        snapshotId: "snapshot-123",
+        offset: 24,
+        limit: 12,
+        queryHash: "abcdef1234567890",
+        responseVersion: "2026-04-19.search-contract-v2",
+      };
+
+      const encoded = encodeSnapshotCursor(cursor);
+      const decoded = decodeSnapshotCursor(encoded);
+
+      expect(decoded).toEqual(cursor);
+      expect(decodeCursorAny(encoded, "recommended")).toEqual({
+        type: "snapshot",
+        cursor,
+      });
+    });
+
+    it("should encode and decode Phase 04 snapshot cursor v4", () => {
+      const cursor = {
+        v: 4 as const,
+        snapshotId: "snapshot-phase04",
+        page: 2,
+        pageSize: 24,
+        queryHash: "abcdef1234567890",
+        responseVersion: "2026-04-19.search-contract-v2",
+        snapshotVersion: "phase04-unit-v1",
+      };
+
+      const encoded = encodeSnapshotCursor(cursor);
+      const decoded = decodeSnapshotCursor(encoded);
+
+      expect(decoded).toEqual(cursor);
+      expect(decodeCursorAny(encoded, "recommended")).toEqual({
+        type: "snapshot",
+        cursor,
+      });
     });
 
     it("should encode and decode newest cursor", () => {
@@ -143,7 +209,7 @@ describe("search/cursor", () => {
     it("should return null for wrong version", () => {
       const wrongVersion = Buffer.from(
         JSON.stringify({
-          v: 2, // Wrong version
+          v: 3, // Wrong version
           s: "newest",
           k: ["2024-01-15T10:00:00.000Z"],
           id: "clxtest",
@@ -323,6 +389,12 @@ describe("search/cursor", () => {
       avg_rating: "4.50",
       review_count: "10",
     };
+    const snapshot: SearchPaginationSnapshot = {
+      engine: "searchdoc-keyset",
+      responseVersion: "searchdoc-keyset.v1",
+      projectionVersion: 3,
+      embeddingVersion: null,
+    };
 
     it("should build recommended cursor with correct keys", () => {
       const cursor = buildCursorFromRow(baseRow, "recommended");
@@ -397,6 +469,18 @@ describe("search/cursor", () => {
 
         expect(decoded).toEqual(cursor);
       }
+    });
+
+    it("should build a version-pinned cursor when a snapshot is provided", () => {
+      const cursor = buildCursorFromRow(baseRow, "recommended", snapshot);
+
+      expect(cursor).toEqual({
+        v: 2,
+        s: "recommended",
+        k: ["85.50", "2024-01-15T10:00:00.000Z"],
+        id: "clxtestlisting",
+        snapshot,
+      });
     });
   });
 

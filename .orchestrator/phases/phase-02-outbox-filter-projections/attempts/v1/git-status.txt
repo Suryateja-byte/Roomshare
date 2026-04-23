@@ -1,0 +1,10 @@
+Scoped status at Phase 02 v1 closeout:
+
+M  .orchestrator/state.json
+?? .orchestrator/phases/phase-02-outbox-filter-projections/
+?? src/__tests__/integration/phase02-outbox-to-projection.test.ts
+?? src/__tests__/integration/phase02-source-version-ordering.test.ts
+?? src/__tests__/lib/outbox/handlers.test.ts
+?? src/lib/outbox/handlers.ts
+
+Note: the repository already had a broad dirty/untracked worktree when this slice started. Existing unrelated changes were preserved and not reverted.

@@ -110,9 +110,10 @@ Translation rules (applied by `normalizeSearchFilters`):
 | `minBudget` | `minPrice` | Both accepted; canonical wins when both provided. |
 | `maxBudget` | `maxPrice` | Same as above. |
 | `minAvailableSlots` | `minSlots` | URL form is `minSlots`; internal object field remains `minAvailableSlots`. |
+| `locationLabel` | `locationLabel` | Canonical display-only location label on write. |
 | `pageNumber` | `page` | Legacy pagination alias. |
 | `cursorStack` | `cursor` | Legacy pagination alias. |
-| `where` | `locationLabel` | Legacy URL; still parsed but no hard filter effect. |
+| `where` | `locationLabel` | Legacy URL alias; still parsed and counted in legacy telemetry, but canonical writers emit `locationLabel`. |
 
 Unknown param names (e.g., leftover legacy keys not listed above) are ignored
 without error. This is intentional: old shared URLs should still open without
@@ -315,7 +316,7 @@ removal phases:
 | `startDate` | Translated to `moveInDate`. | Yes (since CFM-001). | `cfm.search.legacy_url_count{alias="startDate",surface}` | After CFM-604 lock + telemetry. |
 | `minBudget` / `maxBudget` | Translated to `minPrice` / `maxPrice`. | Yes. | `cfm.search.legacy_url_count{alias="minBudget"\|"maxBudget",surface}` | Same as above. |
 | `minAvailableSlots` (URL-side) | Alias of `minSlots`. Internal filter field remains `minAvailableSlots`. | Soft-deprecated. | `cfm.search.legacy_url_count{alias="minAvailableSlots",surface}` | Keep URL alias indefinitely for link compatibility; normalize on write. |
-| `where` | Parsed as `locationLabel`; no hard filter. | Yes. | Reserved in the telemetry allowlist; not emitted while canonical serialization still writes `where`. | Can be removed after CFM-603 confirms no UI emits it. |
+| `where` | Parsed as `locationLabel`; no hard filter. Canonical writers emit `locationLabel`. | Yes. | `cfm.search.legacy_url_count{alias="where",surface}` now reflects real SSR/SPA/saved-search traffic. | Can be removed after the CFM-1002-B operator gate and a fresh caller sweep confirm only compatibility readers remain. |
 | `pageNumber` | Alias of `page`. | Yes. | `cfm.search.legacy_url_count{alias="pageNumber",surface}` | Can be removed when no shared links carry it. |
 | `cursorStack` | Alias of `cursor`. | Yes. | `cfm.search.legacy_url_count{alias="cursorStack",surface}` | Same as above. |
 

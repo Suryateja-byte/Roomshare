@@ -95,6 +95,7 @@ jest.mock("@/lib/rate-limit", () => ({
 
 jest.mock("@/lib/env", () => ({
   features: {
+    bookingRetirementFreeze: false,
     contactFirstListings: false,
     multiSlotBooking: true,
     softHoldsEnabled: true,
@@ -118,6 +119,7 @@ import { markListingsDirtyInTx } from "@/lib/search/search-doc-dirty";
 import { features } from "@/lib/env";
 
 const mockedFeatures = features as {
+  bookingRetirementFreeze: boolean;
   contactFirstListings: boolean;
   multiSlotBooking: boolean;
   softHoldsEnabled: boolean;
@@ -255,9 +257,59 @@ describe("booking freeze gate", () => {
     });
     (logBookingAudit as jest.Mock).mockResolvedValue(undefined);
     (markListingsDirtyInTx as jest.Mock).mockResolvedValue(undefined);
+    mockedFeatures.bookingRetirementFreeze = false;
     mockedFeatures.contactFirstListings = false;
     mockedFeatures.multiSlotBooking = true;
     mockedFeatures.softHoldsEnabled = true;
+  });
+
+  it("returns LEGACY_DRAIN_COMPLETE for createBooking before auth when retirement freeze is on", async () => {
+    mockedFeatures.bookingRetirementFreeze = true;
+    mockedFeatures.contactFirstListings = true;
+    (auth as jest.Mock).mockResolvedValue(null);
+
+    const result = await createBooking(
+      "listing-123",
+      futureStart,
+      futureEnd,
+      1200
+    );
+
+    expect(result).toEqual({
+      success: false,
+      error: "Booking requests are disabled. Contact the host instead.",
+      code: "LEGACY_DRAIN_COMPLETE",
+    });
+    expect(auth).not.toHaveBeenCalled();
+    expect(checkSuspension).not.toHaveBeenCalled();
+    expect(checkEmailVerified).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(logger.sync.info).toHaveBeenCalledWith(
+      "cfm.booking.create_blocked_count",
+      { reason: "retirement_freeze", kind: "booking" }
+    );
+  });
+
+  it("returns LEGACY_DRAIN_COMPLETE for createHold before auth when retirement freeze is on", async () => {
+    mockedFeatures.bookingRetirementFreeze = true;
+    mockedFeatures.contactFirstListings = true;
+    (auth as jest.Mock).mockResolvedValue(null);
+
+    const result = await createHold("listing-123", futureStart, futureEnd, 1200);
+
+    expect(result).toEqual({
+      success: false,
+      error: "Booking requests are disabled. Contact the host instead.",
+      code: "LEGACY_DRAIN_COMPLETE",
+    });
+    expect(auth).not.toHaveBeenCalled();
+    expect(checkSuspension).not.toHaveBeenCalled();
+    expect(checkEmailVerified).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(logger.sync.info).toHaveBeenCalledWith(
+      "cfm.booking.create_blocked_count",
+      { reason: "retirement_freeze", kind: "hold" }
+    );
   });
 
   it("returns CONTACT_ONLY for createBooking before auth when freeze is on and no session exists", async () => {

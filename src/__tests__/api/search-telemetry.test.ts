@@ -69,6 +69,24 @@ describe("POST /api/metrics/search", () => {
     expect(getSearchTelemetrySnapshot().clientAbortTotal).toBe(0);
   });
 
+  it("records a snapshot-expired client metric", async () => {
+    const req = new Request("http://localhost/api/metrics/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        metric: "search_snapshot_expired_total",
+        route: "search-results-client",
+        queryHash: "hash-1",
+        reason: "snapshot_expired",
+      }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    expect(getSearchTelemetrySnapshot().snapshotExpiredTotal).toBe(1);
+  });
+
   it("accepts grouped-card panel open metrics", async () => {
     const req = new Request("http://localhost/api/metrics/search", {
       method: "POST",

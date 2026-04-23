@@ -37,6 +37,37 @@ jest.mock("@/app/actions/listing-status", () => ({
   recoverHostManagedListing: jest.fn(),
 }));
 
+function buildManagedSnapshot(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "listing-123",
+    canManage: true,
+    version: 12,
+    availabilitySource: "HOST_MANAGED",
+    status: "ACTIVE",
+    statusReason: null,
+    publicStatus: "AVAILABLE",
+    searchEligible: true,
+    freshnessBucket: "REMINDER",
+    lastConfirmedAt: "2026-04-01T12:00:00.000Z",
+    staleAt: "2026-04-22T12:00:00.000Z",
+    autoPauseAt: "2026-05-01T12:00:00.000Z",
+    contactDisabledReason: null,
+    ...overrides,
+  };
+}
+
+function buildPublicSnapshot(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "listing-123",
+    canManage: false,
+    availabilitySource: "HOST_MANAGED",
+    publicStatus: "PAUSED",
+    searchEligible: false,
+    contactDisabledReason: "LISTING_UNAVAILABLE",
+    ...overrides,
+  };
+}
+
 describe("ListingFreshnessCheck", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -46,23 +77,11 @@ describe("ListingFreshnessCheck", () => {
       headers: {
         get: () => "application/json",
       },
-      json: async () => ({
-        id: "listing-123",
-        version: 12,
-        availabilitySource: "HOST_MANAGED",
-        status: "ACTIVE",
-        statusReason: null,
-        publicStatus: "AVAILABLE",
-        searchEligible: true,
-        freshnessBucket: "REMINDER",
-        lastConfirmedAt: "2026-04-01T12:00:00.000Z",
-        staleAt: "2026-04-22T12:00:00.000Z",
-        autoPauseAt: "2026-05-01T12:00:00.000Z",
-      }),
+      json: async () => buildManagedSnapshot(),
     }) as jest.Mock;
   });
 
-  it("renders freshness state from the status snapshot for managed listings", async () => {
+  it("renders freshness diagnostics from the managed snapshot", async () => {
     render(<ListingFreshnessCheck listingId="listing-123" canManage={true} />);
 
     await waitFor(() => {
@@ -72,55 +91,66 @@ describe("ListingFreshnessCheck", () => {
     expect(screen.getByText("Available")).toBeInTheDocument();
     expect(screen.getByText("Reminder due")).toBeInTheDocument();
     expect(screen.getByText("Search eligible")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Still available" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Still available" })
+    ).toBeInTheDocument();
   });
 
-  it("shows host recovery controls but not for non-owners", async () => {
-    const ownerView = render(
-      <ListingFreshnessCheck
-        listingId="listing-123"
-        canManage={true}
-        reviewHref="/listings/listing-123/edit"
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Still available" })).toBeInTheDocument();
-    });
-
-    ownerView.unmount();
-
+  it("shows the generic public unavailable overlay without diagnostics for guests", async () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
       status: 200,
       headers: {
         get: () => "application/json",
       },
-      json: async () => ({
-        id: "listing-123",
-        version: 12,
-        availabilitySource: "HOST_MANAGED",
-        status: "PAUSED",
-        statusReason: "STALE_AUTO_PAUSE",
-        publicStatus: "NEEDS_RECONFIRMATION",
-        searchEligible: false,
-        freshnessBucket: "AUTO_PAUSE_DUE",
-        lastConfirmedAt: "2026-03-01T12:00:00.000Z",
-        staleAt: "2026-03-22T12:00:00.000Z",
-        autoPauseAt: "2026-03-31T12:00:00.000Z",
-      }),
+      json: async () =>
+        buildPublicSnapshot({
+          contactDisabledReason: "MODERATION_LOCKED",
+        }),
     });
 
-    render(
-      <ListingFreshnessCheck listingId="listing-123" />
-    );
+    render(<ListingFreshnessCheck listingId="listing-123" />);
 
     await waitFor(() => {
-      expect(screen.getByText("Listing Currently Unavailable")).toBeInTheDocument();
+      expect(
+        screen.getByText("Listing Currently Unavailable")
+      ).toBeInTheDocument();
     });
 
     expect(
+      screen.getByText("This listing is temporarily unavailable right now.")
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Availability freshness")
+    ).not.toBeInTheDocument();
+    expect(
       screen.queryByRole("button", { name: "Still available" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("downgrades safely when the prop says manage but the server says public", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: {
+        get: () => "application/json",
+      },
+      json: async () =>
+        buildPublicSnapshot({
+          contactDisabledReason: "MIGRATION_REVIEW",
+        }),
+    });
+
+    render(<ListingFreshnessCheck listingId="listing-123" canManage={true} />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Listing Currently Unavailable")
+      ).toBeInTheDocument();
+    });
+
+    expect(
+      screen.queryByText("Availability freshness")
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("link", { name: "Review and reopen" })

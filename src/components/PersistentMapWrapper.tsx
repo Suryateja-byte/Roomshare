@@ -41,6 +41,7 @@ import {
 import {
   useV2MapData,
   useIsV2Enabled,
+  usePendingV2QueryHash,
   type V2MapData,
 } from "@/contexts/SearchV2DataContext";
 import { useActivePanBoundsState } from "@/contexts/ActivePanBoundsContext";
@@ -48,7 +49,7 @@ import { useSearchTestScenario } from "@/contexts/SearchTestScenarioContext";
 import { MapErrorBoundary } from "@/components/map/MapErrorBoundary";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
-import { sanitizeMapListings } from "@/lib/maps/sanitize-map-listings";
+import { searchV2MapToListings } from "@/lib/search/v2-map-data";
 import {
   MAP_FETCH_MAX_LAT_SPAN,
   MAP_FETCH_MAX_LNG_SPAN,
@@ -361,48 +362,7 @@ function MapDataLoadingBar() {
  * - tier: for differentiated pin styling (primary = larger, mini = smaller)
  */
 export function v2MapDataToListings(v2MapData: V2MapData): MapListingData[] {
-  // Build lookup map from pins for tier data (O(1) lookups)
-  const pinTierMap = new Map<string, "primary" | "mini">();
-  if (v2MapData.pins) {
-    for (const pin of v2MapData.pins) {
-      if (pin.tier) {
-        pinTierMap.set(pin.id, pin.tier);
-      }
-    }
-  }
-
-  // P2-3 FIX: Filter out malformed features before accessing coordinates
-  return sanitizeMapListings(
-    v2MapData.geojson.features
-      .filter((feature) => {
-        const coordinates = feature.geometry?.coordinates;
-        if (!Array.isArray(coordinates) || coordinates.length < 2) return false;
-        const [lng, lat] = coordinates;
-        return (
-          Number.isFinite(lng) &&
-          Number.isFinite(lat) &&
-          lat >= -90 &&
-          lat <= 90 &&
-          lng >= -180 &&
-          lng <= 180
-        );
-      })
-      .map((feature) => {
-        const [lng, lat] = feature.geometry.coordinates;
-        return {
-          id: feature.properties.id,
-          title: feature.properties.title ?? "",
-          price: feature.properties.price,
-          availableSlots: feature.properties.availableSlots,
-          publicAvailability: feature.properties.publicAvailability,
-          groupContext: feature.properties.groupContext ?? null,
-          images: feature.properties.image ? [feature.properties.image] : [],
-          location: { lng, lat },
-          // Add tier from pins lookup (defaults to undefined if not in pins mode)
-          tier: pinTierMap.get(feature.properties.id),
-        };
-      })
-  );
+  return searchV2MapToListings(v2MapData);
 }
 
 interface PersistentMapWrapperProps {
@@ -441,6 +401,7 @@ export default function PersistentMapWrapper({
   // Check for v2 data from context (injected by page.tsx via V2MapDataSetter)
   const v2MapData = useV2MapData();
   const { isV2Enabled, setIsV2Enabled } = useIsV2Enabled();
+  const pendingV2QueryHash = usePendingV2QueryHash();
   const cacheContractKey = `${SEARCH_RESPONSE_VERSION}:${isV2Enabled ? "v2" : "v1"}`;
   // P2-FIX (#124): Use state instead of ref for last V2 data to ensure memo dependencies are correct
   // Using a ref in useMemo causes stale data because refs aren't tracked by React
@@ -459,10 +420,25 @@ export default function PersistentMapWrapper({
     transitionContext?.pendingReason === "map-pan";
   const isListTransitioning =
     transitionContext?.isPending === true && !isMapPanTransition;
-  // Only trust V2 data when V2 mode is explicitly enabled.
-  // This prevents stale context data from masking fresh V1 filtered results.
-  const hasV2Data = isV2Enabled && v2MapData !== null;
-  const hasAnyV2Data = isV2Enabled && (hasV2Data || lastV2Data !== null);
+  const searchParamsString = searchParams.toString();
+  const currentQueryHash = useMemo(
+    () =>
+      getSearchQueryHash(
+        normalizeSearchQuery(new URLSearchParams(searchParamsString))
+      ),
+    [searchParamsString]
+  );
+  const matchingV2Data =
+    isV2Enabled && v2MapData?.queryHash === currentQueryHash ? v2MapData : null;
+  const matchingLastV2Data =
+    isV2Enabled && lastV2Data?.queryHash === currentQueryHash
+      ? lastV2Data
+      : null;
+  const hasV2Data = matchingV2Data !== null;
+  const hasAnyV2Data =
+    matchingV2Data !== null || matchingLastV2Data !== null;
+  const isAwaitingCurrentV2Data =
+    isV2Enabled && pendingV2QueryHash === currentQueryHash;
 
   // P2-FIX (#115): Mark data path as determined when we receive any signal
   // Check if URL has bounds (indicates V1 path with known location)
@@ -516,7 +492,7 @@ export default function PersistentMapWrapper({
     // P2-FIX (#124): Use lastV2Data state (not ref) so memo properly recalculates
     // We strictly use V2 data ONLY if it's the active source (not overridden by recent client fetch)
     const activeV2Data =
-      isV2Enabled && mapSource === "v2" ? (v2MapData ?? lastV2Data) : null;
+      mapSource === "v2" ? (matchingV2Data ?? matchingLastV2Data) : null;
     if (activeV2Data) {
       return v2MapDataToListings(activeV2Data).slice(0, MAX_MAP_MARKERS);
     }
@@ -554,10 +530,9 @@ export default function PersistentMapWrapper({
     }
     return listings.slice(0, MAX_MAP_MARKERS);
   }, [
-    isV2Enabled,
     mapSource,
-    v2MapData,
-    lastV2Data,
+    matchingV2Data,
+    matchingLastV2Data,
     listings,
     isFetchingMapData,
   ]);
@@ -601,11 +576,6 @@ export default function PersistentMapWrapper({
   // doesn't hide the loading bar during the retry delay.
   const isRetryScheduledRef = useRef<boolean>(false);
   const latestMapRequestRef = useRef<string | null>(null);
-  const searchParamsString = searchParams.toString();
-  const currentQueryHash = useMemo(
-    () => getSearchQueryHash(normalizeSearchQuery(new URLSearchParams(searchParamsString))),
-    [searchParamsString]
-  );
   const abortFetchController = useCallback(
     (
       controller: AbortController | null,
@@ -919,7 +889,7 @@ export default function PersistentMapWrapper({
     // This prevents double-fetch and flicker.
     // P1-3 NOTE: Error state set during viewport validation above is preserved
     // through this early return - the cleanup doesn't clear error state.
-    if (isV2Enabled && !hasV2Data) {
+    if (isV2Enabled && !hasAnyV2Data && !isAwaitingCurrentV2Data) {
       const raceGuardTimeout = setTimeout(() => {
         // V2 data didn't arrive in time — disable v2 to fall back to v1 fetch.
         // This triggers a re-render, the effect re-runs, skips this guard,
@@ -930,7 +900,7 @@ export default function PersistentMapWrapper({
     }
 
     // Skip v1 fetch entirely if v2 data is provided via context
-    if (hasV2Data) {
+    if (hasAnyV2Data || isAwaitingCurrentV2Data) {
       return;
     }
 
@@ -1023,7 +993,16 @@ export default function PersistentMapWrapper({
       abortFetchController(searchAbortRef.current, "cleanup");
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional dependency omission to prevent infinite loops
-  }, [abortFetchController, currentQueryHash, searchParams, fetchListings, shouldRenderMap, isV2Enabled, hasV2Data]);
+  }, [
+    abortFetchController,
+    currentQueryHash,
+    searchParams,
+    fetchListings,
+    shouldRenderMap,
+    isV2Enabled,
+    hasAnyV2Data,
+    isAwaitingCurrentV2Data,
+  ]);
 
   // Proactive fetching during map pan (triggered via activePanBounds)
   useEffect(() => {
@@ -1119,8 +1098,9 @@ export default function PersistentMapWrapper({
   // P2-FIX (#115): Also show placeholder when data path hasn't been determined yet.
   // This prevents the brief empty map flash between mount and v2 signal.
   const showInitialPlaceholder =
-    !dataPathDetermined || (isV2Enabled && !hasAnyV2Data);
-  const showV2LoadingOverlay = isV2Enabled && !hasV2Data && hasAnyV2Data;
+    !dataPathDetermined || isAwaitingCurrentV2Data || (isV2Enabled && !hasAnyV2Data);
+  const showV2LoadingOverlay =
+    isAwaitingCurrentV2Data || (isV2Enabled && !hasV2Data && hasAnyV2Data);
 
   // CRITICAL: Don't render map component if shouldRenderMap is false
   // This prevents MapLibre GL JS from loading until needed

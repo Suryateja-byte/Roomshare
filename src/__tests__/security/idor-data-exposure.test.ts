@@ -123,6 +123,7 @@ describe("IDOR & Data Exposure Prevention — Phase 2", () => {
       expect(mockPrisma.savedSearch.update).toHaveBeenCalledWith({
         where: { id: "bob-search-id", userId: "alice-id" },
         data: { alertEnabled: true },
+        select: { alertEnabled: true },
       });
     });
 

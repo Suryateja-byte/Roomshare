@@ -35,6 +35,8 @@ import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { withRetry } from "@/lib/retry";
 import { validateCronAuth } from "@/lib/cron-auth";
 import { headers } from "next/headers";
+import { isPhase02ProjectionWritesEnabled } from "@/lib/flags/phase02";
+import { drainOutboxOnce } from "@/lib/outbox/drain";
 
 interface TaskResult {
   task: string;
@@ -179,6 +181,42 @@ export async function GET(request: NextRequest) {
     "/api/cron/refresh-search-docs",
     cronSecret
   );
+
+  // Phase 02: outbox drain — all priority lanes every 15 min
+  if (isPhase02ProjectionWritesEnabled()) {
+    await runTask(results, "outbox-drain", async () => {
+      const result = await drainOutboxOnce({ maxBatch: 50, maxTickMs: 9000, priorityMax: 100 });
+      return result as unknown as Record<string, unknown>;
+    });
+  } else {
+    markSkippedTask(results, "outbox-drain", "phase02_disabled");
+  }
+
+  if (features.contactRestorationAutomation) {
+    await runDelegatedTask(
+      results,
+      "contact-restoration-ghost-sla",
+      "/api/cron/contact-restoration/ghost-sla",
+      cronSecret
+    );
+    await runDelegatedTask(
+      results,
+      "contact-restoration-mass-deactivation",
+      "/api/cron/contact-restoration/mass-deactivation",
+      cronSecret
+    );
+  } else {
+    markSkippedTask(
+      results,
+      "contact-restoration-ghost-sla",
+      "feature_disabled"
+    );
+    markSkippedTask(
+      results,
+      "contact-restoration-mass-deactivation",
+      "feature_disabled"
+    );
+  }
 
   // --- Daily-only tasks ---
   if (shouldRunDailyTasks) {

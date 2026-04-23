@@ -45,6 +45,7 @@ describe("ListingStatusToggle", () => {
         listingId="listing-123"
         currentStatus="ACTIVE"
         currentVersion={7}
+        moderationWriteLocksEnabled={true}
       />
     );
 
@@ -90,6 +91,7 @@ describe("ListingStatusToggle", () => {
         listingId="listing-123"
         currentStatus="ACTIVE"
         currentVersion={7}
+        moderationWriteLocksEnabled={true}
       />
     );
 
@@ -112,6 +114,7 @@ describe("ListingStatusToggle", () => {
         listingId="listing-123"
         currentStatus="PAUSED"
         currentVersion={8}
+        moderationWriteLocksEnabled={true}
       />
     );
 
@@ -129,6 +132,49 @@ describe("ListingStatusToggle", () => {
         "RENTED",
         8
       );
+    });
+  });
+
+  it("disables the toggle immediately when the loaded row is moderation-locked", () => {
+    render(
+      <ListingStatusToggle
+        listingId="listing-123"
+        currentStatus="PAUSED"
+        currentVersion={7}
+        currentStatusReason="ADMIN_PAUSED"
+        moderationWriteLocksEnabled={true}
+      />
+    );
+
+    expect(screen.getByRole("button", { name: /Paused/i })).toBeDisabled();
+    expect(updateListingStatus).not.toHaveBeenCalled();
+  });
+
+  it("handles LISTING_LOCKED responses with generic copy and a refresh", async () => {
+    (updateListingStatus as jest.Mock).mockResolvedValueOnce({
+      error: "This listing is locked while under review.",
+      code: "LISTING_LOCKED",
+      lockReason: "SUPPRESSED",
+    });
+
+    render(
+      <ListingStatusToggle
+        listingId="listing-123"
+        currentStatus="ACTIVE"
+        currentVersion={7}
+        moderationWriteLocksEnabled={true}
+      />
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /Active/i }));
+    await userEvent.click(screen.getByRole("button", { name: /Paused/i }));
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(
+        "This listing is locked while under review."
+      );
+      expect(mockRouter.refresh).toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: /Active/i })).toBeDisabled();
     });
   });
 });

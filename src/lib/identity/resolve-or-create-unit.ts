@@ -95,6 +95,32 @@ export async function resolveOrCreateUnit(
     unitIdentityEpoch: unit.unitIdentityEpoch,
   });
 
+  // Phase 02 addition: on new unit creation, enqueue GEOCODE_NEEDED so the
+  // geocode worker resolves lat/lng and transitions inventories from
+  // PENDING_GEOCODE → PENDING_PROJECTION. This is additive — Phase 01 tests
+  // still pass because UNIT_UPSERTED is always appended first.
+  if (created) {
+    const fullAddress = [
+      canonical.canonicalAddressHash,
+      canonical.canonicalUnit !== "_none_" ? canonical.canonicalUnit : null,
+    ]
+      .filter(Boolean)
+      .join(" ");
+    await appendOutboxEvent(tx, {
+      aggregateType: "PHYSICAL_UNIT",
+      aggregateId: unit.id,
+      kind: "GEOCODE_NEEDED",
+      payload: {
+        address: fullAddress,
+        canonicalAddressHash: canonical.canonicalAddressHash,
+        requestId: input.requestId ?? null,
+      },
+      sourceVersion: unit.sourceVersion,
+      unitIdentityEpoch: unit.unitIdentityEpoch,
+      priority: 100,
+    });
+  }
+
   await recordAuditEvent(tx, {
     kind: created ? "CANONICAL_UNIT_CREATED" : "CANONICAL_UNIT_RESOLVED",
     actor: input.actor,

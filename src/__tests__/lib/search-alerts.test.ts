@@ -10,6 +10,8 @@ jest.mock("@/lib/prisma", () => ({
     },
     listing: {
       count: jest.fn(),
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
     },
     notification: {
       create: jest.fn(),
@@ -33,6 +35,12 @@ jest.mock("@/lib/logger", () => ({
   sanitizeErrorMessage: jest.fn((error: unknown) =>
     error instanceof Error ? error.message : "Unknown error"
   ),
+}));
+
+const mockGetUsersWithUnlockedSearchAlerts = jest.fn();
+jest.mock("@/lib/payments/search-alert-paywall", () => ({
+  getUsersWithUnlockedSearchAlerts: (...args: unknown[]) =>
+    mockGetUsersWithUnlockedSearchAlerts(...args),
 }));
 
 import { processSearchAlerts, triggerInstantAlerts } from "@/lib/search-alerts";
@@ -59,9 +67,38 @@ describe("search-alerts", () => {
     user: mockUser,
   };
 
+  function buildPublicListing(id = "listing-123") {
+    return {
+      id,
+      ownerId: "host-123",
+      status: "ACTIVE",
+      statusReason: null,
+      needsMigrationReview: false,
+      availabilitySource: "LEGACY_BOOKING",
+      availableSlots: 1,
+      totalSlots: 1,
+      openSlots: 1,
+      moveInDate: null,
+      availableUntil: null,
+      minStayMonths: 1,
+      lastConfirmedAt: new Date("2026-04-20T00:00:00.000Z"),
+    };
+  }
+
   beforeEach(() => {
     jest.clearAllMocks();
     (sendNotificationEmail as jest.Mock).mockResolvedValue({ success: true });
+    (prisma.listing.findMany as jest.Mock).mockResolvedValue(
+      Array.from({ length: 5 }, (_, index) =>
+        buildPublicListing(`listing-${index + 1}`)
+      )
+    );
+    (prisma.listing.findUnique as jest.Mock).mockResolvedValue(
+      buildPublicListing()
+    );
+    mockGetUsersWithUnlockedSearchAlerts.mockImplementation(
+      async (userIds: string[]) => new Set(userIds)
+    );
   });
 
   describe("processSearchAlerts", () => {
@@ -227,6 +264,26 @@ describe("search-alerts", () => {
         expect(sendNotificationEmail).not.toHaveBeenCalled();
       });
 
+      it("drops matching daily alert targets that are no longer publicly visible", async () => {
+        (prisma.savedSearch.findMany as jest.Mock).mockResolvedValue([
+          mockSavedSearch,
+        ]);
+        (prisma.listing.count as jest.Mock).mockResolvedValue(1);
+        (prisma.listing.findMany as jest.Mock).mockResolvedValue([
+          {
+            ...buildPublicListing("listing-hidden"),
+            status: "PAUSED",
+            statusReason: "SUPPRESSED",
+          },
+        ]);
+        (prisma.savedSearch.update as jest.Mock).mockResolvedValue({});
+
+        const result = await processSearchAlerts();
+
+        expect(result.alertsSent).toBe(0);
+        expect(sendNotificationEmail).not.toHaveBeenCalled();
+      });
+
       it("creates in-app notification when listings match", async () => {
         (prisma.savedSearch.findMany as jest.Mock).mockResolvedValue([
           mockSavedSearch,
@@ -258,6 +315,20 @@ describe("search-alerts", () => {
           where: { id: mockSavedSearch.id },
           data: { lastAlertAt: expect.any(Date) },
         });
+      });
+
+      it("suppresses delivery when alerts are locked for the user", async () => {
+        mockGetUsersWithUnlockedSearchAlerts.mockResolvedValue(new Set());
+        (prisma.savedSearch.findMany as jest.Mock).mockResolvedValue([
+          mockSavedSearch,
+        ]);
+
+        const result = await processSearchAlerts();
+
+        expect(result.alertsSent).toBe(0);
+        expect(sendNotificationEmail).not.toHaveBeenCalled();
+        expect(prisma.notification.create).not.toHaveBeenCalled();
+        expect(prisma.savedSearch.update).not.toHaveBeenCalled();
       });
     });
 
@@ -386,6 +457,22 @@ describe("search-alerts", () => {
         expect(sendNotificationEmail).toHaveBeenCalled();
       });
 
+      it("drops matching instant alert targets that are no longer publicly visible", async () => {
+        (prisma.savedSearch.findMany as jest.Mock).mockResolvedValue([
+          instantSearch,
+        ]);
+        (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
+          ...buildPublicListing(newListing.id),
+          status: "PAUSED",
+          statusReason: "SUPPRESSED",
+        });
+
+        const result = await triggerInstantAlerts(newListing);
+
+        expect(result.sent).toBe(0);
+        expect(sendNotificationEmail).not.toHaveBeenCalled();
+      });
+
       it("does not send alert when price below minPrice", async () => {
         const searchWithHighMinPrice = {
           ...instantSearch,
@@ -511,6 +598,20 @@ describe("search-alerts", () => {
           where: { id: instantSearch.id },
           data: { lastAlertAt: expect.any(Date) },
         });
+      });
+
+      it("suppresses instant delivery when alerts are locked for the user", async () => {
+        mockGetUsersWithUnlockedSearchAlerts.mockResolvedValue(new Set());
+        (prisma.savedSearch.findMany as jest.Mock).mockResolvedValue([
+          instantSearch,
+        ]);
+
+        const result = await triggerInstantAlerts(newListing);
+
+        expect(result.sent).toBe(0);
+        expect(sendNotificationEmail).not.toHaveBeenCalled();
+        expect(prisma.notification.create).not.toHaveBeenCalled();
+        expect(prisma.savedSearch.update).not.toHaveBeenCalled();
       });
     });
 

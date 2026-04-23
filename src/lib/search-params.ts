@@ -109,6 +109,7 @@ export function hasActiveFilters(params: FilterParams): boolean {
 
 export interface RawSearchParams {
   q?: string | string[];
+  locationLabel?: string | string[];
   where?: string | string[];
   what?: string | string[];
   minPrice?: string | string[];
@@ -176,6 +177,7 @@ interface NormalizeSearchFiltersOptions {
 type SearchFilterNormalizationInput = {
   query?: unknown;
   locationLabel?: unknown;
+  where?: unknown;
   vibeQuery?: unknown;
   minPrice?: unknown;
   maxPrice?: unknown;
@@ -588,7 +590,7 @@ export function normalizeSearchFilters(
 
   const query = normalizeTextField(getFirstInputValue(input.query), overlongText);
   const locationLabel = normalizeTextField(
-    getFirstInputValue(input.locationLabel),
+    getFirstInputValue(input.locationLabel ?? input.where),
     overlongText
   );
   const vibeQuery = normalizeTextField(
@@ -787,7 +789,9 @@ function buildCanonicalFilterSearchParams(
 
 export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
   const q = normalizeTextField(getFirstValue(raw.q));
-  const explicitLocationLabel = normalizeTextField(getFirstValue(raw.where));
+  const explicitLocationLabel = normalizeTextField(
+    getFirstValue(raw.locationLabel) ?? getFirstValue(raw.where)
+  );
   const what = normalizeTextField(getFirstValue(raw.what));
 
   const requestedPage = safeParseInt(

@@ -16,8 +16,7 @@ export function SearchUrlCanonicalizer() {
 
   useEffect(() => {
     const legacyAliases = detectLegacyUrlAliases(
-      new URLSearchParams(searchParamsString),
-      { includeWhere: false }
+      new URLSearchParams(searchParamsString)
     );
     for (const alias of legacyAliases) {
       emitSearchClientMetric({

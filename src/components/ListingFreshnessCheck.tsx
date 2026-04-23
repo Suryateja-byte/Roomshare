@@ -15,6 +15,12 @@ import {
   recoverHostManagedListing,
   type HostManagedRecoveryMode,
 } from "@/app/actions/listing-status";
+import type { ContactDisabledReason } from "@/lib/listings/public-contact-contract";
+import type {
+  FreshnessBucket,
+  PublicAvailabilitySource,
+  PublicStatus,
+} from "@/lib/search/public-availability";
 
 interface ListingFreshnessCheckProps {
   listingId: string;
@@ -23,19 +29,39 @@ interface ListingFreshnessCheckProps {
   reviewHref?: string;
 }
 
-interface ListingStatusSnapshot {
+type PublicContactDisabledReason = Extract<
+  ContactDisabledReason,
+  "LISTING_UNAVAILABLE" | "MIGRATION_REVIEW" | "MODERATION_LOCKED"
+>;
+
+interface PublicListingStatusSnapshot {
   id: string;
-  version?: number;
-  availabilitySource?: "LEGACY_BOOKING" | "HOST_MANAGED";
+  canManage: false;
+  availabilitySource: PublicAvailabilitySource;
+  publicStatus: PublicStatus;
+  searchEligible: boolean;
+  contactDisabledReason: PublicContactDisabledReason | null;
+}
+
+interface ManagedListingStatusSnapshot {
+  id: string;
+  canManage: true;
+  version: number;
+  availabilitySource: PublicAvailabilitySource;
   status: "ACTIVE" | "PAUSED" | "RENTED";
   statusReason: string | null;
-  publicStatus: string;
+  publicStatus: PublicStatus;
   searchEligible: boolean;
-  freshnessBucket: string;
+  freshnessBucket: FreshnessBucket;
   lastConfirmedAt: string | null;
   staleAt: string | null;
   autoPauseAt: string | null;
+  contactDisabledReason: PublicContactDisabledReason | null;
 }
+
+type ListingStatusSnapshot =
+  | PublicListingStatusSnapshot
+  | ManagedListingStatusSnapshot;
 
 const MAX_BACKOFF_INTERVAL = 300000;
 const BACKOFF_MULTIPLIER = 2;
@@ -66,6 +92,12 @@ const publicStatusLabels: Record<string, string> = {
   PAUSED: "Paused",
   NEEDS_RECONFIRMATION: "Needs reconfirmation",
 };
+
+function getPublicUnavailableMessage(
+  _reason: PublicContactDisabledReason | null
+): string {
+  return "This listing is temporarily unavailable right now.";
+}
 
 function formatDateTime(value: string | null): string {
   if (!value) {
@@ -115,11 +147,10 @@ function SnapshotRow({
 export default function ListingFreshnessCheck({
   listingId,
   checkInterval = 30000,
-  canManage = false,
+  canManage: initialCanManage = false,
   reviewHref,
 }: ListingFreshnessCheckProps) {
   const [isDeleted, setIsDeleted] = useState(false);
-  const [isUnavailable, setIsUnavailable] = useState(false);
   const [snapshot, setSnapshot] = useState<ListingStatusSnapshot | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isRecovering, setIsRecovering] =
@@ -180,14 +211,6 @@ export default function ListingFreshnessCheck({
 
       setSnapshot(data);
       setIsDeleted(false);
-
-      if (!canManage) {
-        if (data.status === "PAUSED" || data.status === "RENTED") {
-          setIsUnavailable(true);
-        } else {
-          setIsUnavailable(false);
-        }
-      }
     } catch {
       failureCountRef.current += 1;
       const newInterval = Math.min(
@@ -200,7 +223,7 @@ export default function ListingFreshnessCheck({
         scheduleNextCheck(newInterval);
       }
     }
-  }, [canManage, checkInterval, listingId, scheduleNextCheck]);
+  }, [checkInterval, listingId, scheduleNextCheck]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -228,7 +251,7 @@ export default function ListingFreshnessCheck({
   }, [checkInterval, checkListingStatus, scheduleNextCheck]);
 
   const handleRecovery = async (mode: HostManagedRecoveryMode) => {
-    if (!snapshot || typeof snapshot.version !== "number") {
+    if (!snapshot || snapshot.canManage !== true) {
       toast.error("Could not load the latest listing version. Reload and try again.");
       return;
     }
@@ -263,7 +286,13 @@ export default function ListingFreshnessCheck({
     setIsRecovering(null);
   };
 
-  if (!canManage) {
+  const hasServerManageAccess = snapshot?.canManage === true;
+  const shouldRenderPublicBranch =
+    snapshot?.canManage === false || (!snapshot && !initialCanManage);
+  const publicUnavailableReason =
+    snapshot?.canManage === false ? snapshot.contactDisabledReason : null;
+
+  if (shouldRenderPublicBranch) {
     if (isDeleted) {
       return (
         <div className="fixed top-20 left-0 right-0 z-50 mx-4 sm:mx-auto sm:max-w-lg animate-in slide-in-from-top-4 fade-in duration-300">
@@ -293,7 +322,7 @@ export default function ListingFreshnessCheck({
       );
     }
 
-    if (isUnavailable) {
+    if (publicUnavailableReason !== null) {
       return (
         <div className="fixed top-20 left-0 right-0 z-50 mx-4 sm:mx-auto sm:max-w-lg animate-in slide-in-from-top-4 fade-in duration-300">
           <div className="bg-amber-50 border border-outline-variant/20 rounded-xl p-4 shadow-ambient">
@@ -306,7 +335,7 @@ export default function ListingFreshnessCheck({
                   Listing Currently Unavailable
                 </h3>
                 <p className="text-sm text-amber-700 mt-1">
-                  The host has paused or marked this listing as rented.
+                  {getPublicUnavailableMessage(publicUnavailableReason)}
                 </p>
                 <button
                   onClick={() => router.refresh()}
@@ -335,7 +364,11 @@ export default function ListingFreshnessCheck({
     );
   }
 
-  if (!snapshot || snapshot.availabilitySource !== "HOST_MANAGED") {
+  if (!hasServerManageAccess || !snapshot) {
+    return null;
+  }
+
+  if (snapshot.availabilitySource !== "HOST_MANAGED") {
     return null;
   }
 

@@ -272,10 +272,13 @@ export default function ListingList({
                             <Eye className="w-3 h-3" />
                             {listing.viewCount} views
                           </span>
-                          <span className="flex items-center gap-1">
+                          <Link
+                            href={`/admin/bookings?listingId=${listing.id}`}
+                            className="flex items-center gap-1 text-primary hover:underline"
+                          >
                             <Calendar className="w-3 h-3" />
                             {listing._count.bookings} bookings
-                          </span>
+                          </Link>
                         </div>
                         <p className="text-xs text-on-surface-variant mt-1">
                           Owner: {listing.owner.name || "Unknown"} (

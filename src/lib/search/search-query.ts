@@ -210,7 +210,7 @@ export function serializeSearchQuery(
 
   if (normalizedFilters.query) params.set("q", normalizedFilters.query);
   if (normalizedFilters.locationLabel) {
-    params.set("where", normalizedFilters.locationLabel);
+    params.set("locationLabel", normalizedFilters.locationLabel);
   }
   if (normalizedFilters.vibeQuery) params.set("what", normalizedFilters.vibeQuery);
   if (normalizedFilters.minPrice !== undefined) {

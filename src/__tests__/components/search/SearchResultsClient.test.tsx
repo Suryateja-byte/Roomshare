@@ -15,6 +15,9 @@ import type { ListingData } from "@/lib/data";
 import { getFilterSuggestions } from "@/app/actions/filter-suggestions";
 import { findSplitStays } from "@/lib/search/split-stay";
 import { buildPublicAvailability } from "@/lib/search/public-availability";
+import { emitSearchClientMetric } from "@/lib/search/search-telemetry-client";
+
+const mockRouterRefresh = jest.fn();
 
 const mockListingCard = jest.fn(
   ({
@@ -46,6 +49,17 @@ jest.mock("@/app/search/actions", () => ({
 
 jest.mock("@/app/actions/filter-suggestions", () => ({
   getFilterSuggestions: jest.fn(async () => []),
+}));
+
+jest.mock("@/lib/search/search-telemetry-client", () => ({
+  emitSearchClientMetric: jest.fn(),
+}));
+
+jest.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams("q=test"),
+  useRouter: () => ({
+    refresh: mockRouterRefresh,
+  }),
 }));
 
 // Mock next/link
@@ -201,6 +215,7 @@ const defaultProps = {
 describe("SearchResultsClient", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (fetchMoreListings as jest.Mock).mockReset();
     Object.keys(mockSessionStorage).forEach(
       (key) => delete mockSessionStorage[key]
     );
@@ -209,6 +224,7 @@ describe("SearchResultsClient", () => {
       json: async () => ({ savedIds: [] }),
     });
     (getFilterSuggestions as jest.Mock).mockResolvedValue([]);
+    mockRouterRefresh.mockReset();
   });
 
   describe("rendering", () => {
@@ -684,6 +700,49 @@ describe("SearchResultsClient", () => {
         expect(
           screen.getByRole("button", { name: /try again/i })
         ).toBeInTheDocument();
+      });
+    });
+
+    it("refreshes the search and clears appended listings when load more returns snapshotExpired", async () => {
+      const mockFetch = fetchMoreListings as jest.Mock;
+      mockFetch
+        .mockResolvedValueOnce({
+          items: [createMockListing("3")],
+          nextCursor: "cursor-2",
+          hasNextPage: true,
+        })
+        .mockResolvedValueOnce({
+          items: [],
+          nextCursor: null,
+          hasNextPage: false,
+          snapshotExpired: {
+            queryHash: "query-hash-1",
+            reason: "search_contract_changed",
+          },
+        });
+
+      render(<SearchResultsClient {...defaultProps} />);
+
+      fireEvent.click(screen.getByRole("button", { name: /show more/i }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("listing-3")).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: /show more/i }));
+
+      await waitFor(() => {
+        expect(mockRouterRefresh).toHaveBeenCalledTimes(1);
+        expect(
+          screen.getByText(/Results refreshed to keep ordering accurate/i)
+        ).toBeInTheDocument();
+        expect(screen.queryByTestId("listing-3")).not.toBeInTheDocument();
+        expect(emitSearchClientMetric).toHaveBeenCalledWith({
+          metric: "search_snapshot_expired_total",
+          route: "search-results-client",
+          queryHash: expect.any(String),
+          reason: "search_contract_changed",
+        });
       });
     });
 

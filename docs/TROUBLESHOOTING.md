@@ -197,6 +197,21 @@ npx prisma generate   # Regenerate the client
 npx prisma migrate dev # Apply any pending migrations
 ```
 
+### Homepage or search crashes with `Database query failed: getListingsPaginated`
+
+**Symptoms**: The homepage or search page throws a `QueryError` or `SchemaMismatchError`, often with a nested message like `column "openSlots" does not exist`.
+
+**Cause**: Your local database is behind the repo's Prisma migrations, so `getListingsPaginated` is querying fields that are present in code but not in the connected schema yet.
+
+**Solution**:
+
+```bash
+pnpm prisma migrate deploy
+pnpm prisma migrate status
+```
+
+After `migrate status` reports no pending migrations, restart `pnpm dev` and reload the page.
+
 ### Connection pool exhaustion
 
 **Symptoms**: `Timed out fetching a new connection from the connection pool` in production or under load.

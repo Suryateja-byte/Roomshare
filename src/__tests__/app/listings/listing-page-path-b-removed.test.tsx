@@ -227,7 +227,7 @@ describe("listing detail public CTA cleanup", () => {
   });
 
   it.each([false, true])(
-    "never renders the booking CTA copy for legacy availability when the flag is %s",
+    "ignores contradictory viewer-state booking compatibility fields when the flag is %s",
     (contactFirstEnabled) => {
       render(
         <ListingPageClient

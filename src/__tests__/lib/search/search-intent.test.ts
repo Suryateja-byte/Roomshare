@@ -50,7 +50,7 @@ describe("search-intent helpers", () => {
 
     expect(params.get("sort")).toBeNull();
     expect(params.get("amenities")).toBe("Wifi");
-    expect(params.get("where")).toBe("San Francisco");
+    expect(params.get("locationLabel")).toBe("San Francisco");
     expect(params.get("what")).toBe("quiet roommates");
     expect(params.get("lat")).toBe("37.7749");
     expect(params.get("lng")).toBe("-122.4194");
@@ -72,7 +72,7 @@ describe("search-intent helpers", () => {
       }
     );
 
-    expect(params.get("where")).toBeNull();
+    expect(params.get("locationLabel")).toBeNull();
     expect(params.get("lat")).toBeNull();
     expect(params.get("lng")).toBeNull();
     expect(params.get("minLng")).toBeNull();

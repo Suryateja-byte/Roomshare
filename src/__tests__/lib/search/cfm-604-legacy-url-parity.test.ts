@@ -38,9 +38,9 @@ const LEGACY_PARITY_CASES = [
     canonical: "/search?cursor=cursor-token",
   },
   {
-    name: "where stays byte-identical",
+    name: "where rewrites to canonical locationLabel",
     legacy: "where=Austin",
-    canonical: "/search?where=Austin",
+    canonical: "/search?locationLabel=Austin",
   },
   {
     name: "combined legacy aliases collapse to one canonical string",

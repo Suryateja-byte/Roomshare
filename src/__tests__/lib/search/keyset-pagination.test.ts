@@ -178,7 +178,11 @@ describe("Keyset Pagination Integration", () => {
 
       expect(getSearchDocListingsWithKeyset).toHaveBeenCalledWith(
         expect.any(Object),
-        cursor
+        cursor,
+        expect.objectContaining({
+          engine: "searchdoc-keyset",
+          embeddingVersion: null,
+        })
       );
       expect(result.response?.list.nextCursor).toBe(mockNextCursor);
     });

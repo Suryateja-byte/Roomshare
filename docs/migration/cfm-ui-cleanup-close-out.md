@@ -25,6 +25,16 @@ The following viewer-state fields remain intentionally retained for compatibilit
 
 These stay in `src/app/api/listings/[id]/viewer-state/route.ts` so older client bundles keep a stable response shape while contact-first remains enforced.
 
+Stage 1 status on 2026-04-22:
+
+- `src/app/listings/[id]/ListingPageClient.tsx` no longer consumes these fields.
+- The fields remain route-only during the required soak window before CFM-1002-C removes them from `/api/listings/[id]/viewer-state`.
+
+Privacy-first contract status on 2026-04-23:
+
+- Listing detail, messaging contactability, `viewer-state`, and `/api/listings/[id]/status` now use the privacy-first contract unconditionally.
+- The retired rollout flags do not change runtime behavior anymore; only the CFM-1002-B/C gated cleanup remains in this family.
+
 ## Verification Sweep
 
 Commands rerun on `2026-04-17` at the current `codex/contact-first-multislot` HEAD.

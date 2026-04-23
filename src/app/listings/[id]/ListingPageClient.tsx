@@ -15,7 +15,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { PUBLIC_CACHE_INVALIDATED_EVENT } from "@/lib/public-cache/client";
 import { getAmenityIcon } from "@/lib/amenityIcons";
 import { getLanguageName } from "@/lib/languages";
 import { formatPrice } from "@/lib/format";
@@ -40,6 +42,13 @@ import { SlotBadge } from "@/components/listings/SlotBadge";
 import { Badge } from "@/components/ui/badge";
 import type { AvailabilitySnapshot } from "@/lib/availability";
 import { useSession } from "next-auth/react";
+import {
+  coerceViewerContactFields,
+  type ContactDisabledReason,
+  type PrimaryCta,
+  type ViewerContactFields,
+} from "@/lib/listings/public-contact-contract";
+import type { PublicAvailabilitySource as AvailabilitySource } from "@/lib/search/public-availability";
 import ListingViewTracker from "./ListingViewTracker";
 
 // Lazy-load NearbyPlacesSection (MapLibre GL + Radar) to avoid loading ~150KB+ on initial page load
@@ -90,6 +99,7 @@ interface ListingPageClientProps {
     availabilitySource: AvailabilitySource;
     bookingMode: string;
     status: string;
+    statusReason?: string | null;
     viewCount: number;
     genderPreference: string | null;
     householdGender: string | null;
@@ -119,13 +129,15 @@ interface ListingPageClientProps {
   } | null;
   holdEnabled?: boolean;
   coordinates: { lat: number; lng: number } | null;
+  canViewExactLocation?: boolean;
   similarListings?: Listing[];
   viewToken?: string;
-  initialStartDate?: string;
-  initialEndDate?: string;
-  initialAvailability?: AvailabilitySnapshot | null;
-  contactFirstEnabled?: boolean;
-}
+    initialStartDate?: string;
+    initialEndDate?: string;
+    initialAvailability?: AvailabilitySnapshot | null;
+    contactFirstEnabled?: boolean;
+    moderationWriteLocksEnabled?: boolean;
+  }
 
 type ReviewEligibilityReason =
   | "LOGIN_REQUIRED"
@@ -133,21 +145,27 @@ type ReviewEligibilityReason =
   | "ALREADY_REVIEWED"
   | "ACCEPTED_BOOKING_REQUIRED";
 
-type PrimaryCta =
-  | "EDIT_LISTING"
-  | "CONTACT_HOST"
-  | "LOGIN_TO_MESSAGE"
-  | "VERIFY_EMAIL_TO_MESSAGE";
+interface PaywallOffer {
+  productCode: "CONTACT_PACK_3" | "MOVERS_PASS_30D";
+  label: string;
+  priceDisplay: string;
+  description: string;
+}
 
-type AvailabilitySource = "LEGACY_BOOKING" | "HOST_MANAGED";
-
-type BookingDisabledReason =
-  | "CONTACT_ONLY"
-  | "LOGIN_REQUIRED"
-  | "EMAIL_VERIFICATION_REQUIRED"
-  | "OWNER_VIEW"
-  | "LISTING_UNAVAILABLE"
-  | null;
+interface PaywallSummary {
+  enabled: boolean;
+  mode:
+    | "OPEN"
+    | "METERED"
+    | "PASS_ACTIVE"
+    | "PAYWALL_REQUIRED"
+    | "MIGRATION_BYPASS";
+  freeContactsRemaining: number;
+  packContactsRemaining: number;
+  activePassExpiresAt: string | null;
+  requiresPurchase: boolean;
+  offers: PaywallOffer[];
+}
 
 interface ReviewEligibility {
   canPublicReview: boolean;
@@ -162,12 +180,35 @@ interface ViewerState {
   existingReview: ListingPageClientProps["userExistingReview"];
   primaryCta: PrimaryCta;
   canContact: boolean;
+  contactDisabledReason: ContactDisabledReason | null;
   availabilitySource: AvailabilitySource;
-  canBook: boolean;
-  canHold: boolean;
-  bookingDisabledReason: BookingDisabledReason;
+  paywallSummary: PaywallSummary | null;
   reviewEligibility: ReviewEligibility;
   loaded: boolean;
+}
+
+interface CheckoutReturnNotice {
+  tone: "info" | "success" | "error";
+  message: string;
+}
+
+interface CheckoutSessionStatusPayload {
+  sessionId: string;
+  listingId: string;
+  productCode: "CONTACT_PACK_3" | "MOVERS_PASS_30D";
+  checkoutStatus: "OPEN" | "COMPLETE" | "EXPIRED";
+  paymentStatus: "PAID" | "UNPAID";
+  fulfillmentStatus: "PENDING" | "FULFILLED" | "FAILED" | "CANCELED";
+  requiresViewerStateRefresh: boolean;
+}
+
+type CheckoutReturnPhase = "IDLE" | "POLLING" | "PENDING_TIMEOUT";
+
+function removeCheckoutQueryParams(searchParamsString: string) {
+  const nextSearchParams = new URLSearchParams(searchParamsString);
+  nextSearchParams.delete("contactCheckout");
+  nextSearchParams.delete("session_id");
+  return nextSearchParams.toString();
 }
 
 function buildFallbackReviewEligibility(options: {
@@ -205,61 +246,39 @@ function buildFallbackViewerState(options: {
   isListingActive: boolean;
   hasBookingHistory: boolean;
   existingReview: ListingPageClientProps["userExistingReview"];
-  contactFirstEnabled: boolean;
-  holdEnabled: boolean;
   availabilitySource: AvailabilitySource;
 }): ViewerState {
-  const primaryCta: PrimaryCta = options.isOwner
-    ? "EDIT_LISTING"
-    : !options.isLoggedIn
-      ? "LOGIN_TO_MESSAGE"
-      : !options.isEmailVerified
-        ? "VERIFY_EMAIL_TO_MESSAGE"
-        : "CONTACT_HOST";
-
-  const canContact =
-    !options.isOwner &&
-    options.isLoggedIn &&
-    options.isEmailVerified &&
-    options.isListingActive;
-
-  const canBook =
-    options.availabilitySource !== "HOST_MANAGED" &&
-    !options.contactFirstEnabled &&
-    !options.isOwner &&
-    options.isLoggedIn &&
-    options.isEmailVerified &&
-    options.isListingActive;
-
-  let bookingDisabledReason: BookingDisabledReason = null;
-  if (!canBook) {
-    if (options.availabilitySource === "HOST_MANAGED") {
-      bookingDisabledReason = options.isListingActive
-        ? "CONTACT_ONLY"
-        : "LISTING_UNAVAILABLE";
-    } else if (options.contactFirstEnabled) {
-      bookingDisabledReason = "CONTACT_ONLY";
-    } else if (options.isOwner) {
-      bookingDisabledReason = "OWNER_VIEW";
-    } else if (!options.isListingActive) {
-      bookingDisabledReason = "LISTING_UNAVAILABLE";
-    } else if (!options.isLoggedIn) {
-      bookingDisabledReason = "LOGIN_REQUIRED";
-    } else if (!options.isEmailVerified) {
-      bookingDisabledReason = "EMAIL_VERIFICATION_REQUIRED";
-    }
-  }
+  const contactFields: ViewerContactFields = {
+    primaryCta: options.isOwner
+      ? "EDIT_LISTING"
+      : !options.isLoggedIn
+        ? "LOGIN_TO_MESSAGE"
+        : !options.isEmailVerified
+          ? "VERIFY_EMAIL_TO_MESSAGE"
+          : "CONTACT_HOST",
+    canContact:
+      !options.isOwner &&
+      options.isLoggedIn &&
+      options.isEmailVerified &&
+      options.isListingActive,
+    contactDisabledReason: options.isOwner
+      ? "OWNER_VIEW"
+      : !options.isLoggedIn
+        ? "LOGIN_REQUIRED"
+        : !options.isEmailVerified
+          ? "EMAIL_VERIFICATION_REQUIRED"
+          : options.isListingActive
+            ? null
+            : "LISTING_UNAVAILABLE",
+    availabilitySource: options.availabilitySource,
+  };
 
   return {
     isLoggedIn: options.isLoggedIn,
     hasBookingHistory: options.hasBookingHistory,
     existingReview: options.existingReview,
-    primaryCta,
-    canContact,
-    availabilitySource: options.availabilitySource,
-    canBook,
-    canHold: canBook && options.holdEnabled,
-    bookingDisabledReason,
+    ...contactFields,
+    paywallSummary: null,
     reviewEligibility: buildFallbackReviewEligibility({
       isLoggedIn: options.isLoggedIn,
       hasBookingHistory: options.hasBookingHistory,
@@ -273,29 +292,20 @@ function mergeViewerState(
   fallbackState: ViewerState,
   data: Partial<Omit<ViewerState, "loaded">>
 ): ViewerState {
-  const primaryCta: PrimaryCta =
-    data.primaryCta === "EDIT_LISTING" ||
-    data.primaryCta === "CONTACT_HOST" ||
-    data.primaryCta === "LOGIN_TO_MESSAGE" ||
-    data.primaryCta === "VERIFY_EMAIL_TO_MESSAGE"
-      ? data.primaryCta
-      : fallbackState.primaryCta;
-
-  const availabilitySource: AvailabilitySource =
-    data.availabilitySource === "HOST_MANAGED" ||
-    data.availabilitySource === "LEGACY_BOOKING"
-      ? data.availabilitySource
-      : fallbackState.availabilitySource;
-
-  const bookingDisabledReason: BookingDisabledReason =
-    data.bookingDisabledReason === "CONTACT_ONLY" ||
-    data.bookingDisabledReason === "LOGIN_REQUIRED" ||
-    data.bookingDisabledReason === "EMAIL_VERIFICATION_REQUIRED" ||
-    data.bookingDisabledReason === "OWNER_VIEW" ||
-    data.bookingDisabledReason === "LISTING_UNAVAILABLE" ||
-    data.bookingDisabledReason === null
-      ? data.bookingDisabledReason
-      : fallbackState.bookingDisabledReason;
+  const contactFields = coerceViewerContactFields(
+    {
+      primaryCta: fallbackState.primaryCta,
+      canContact: fallbackState.canContact,
+      contactDisabledReason: fallbackState.contactDisabledReason,
+      availabilitySource: fallbackState.availabilitySource,
+    },
+    {
+      primaryCta: data.primaryCta,
+      canContact: data.canContact,
+      contactDisabledReason: data.contactDisabledReason,
+      availabilitySource: data.availabilitySource,
+    }
+  );
 
   const reviewEligibility =
     data.reviewEligibility &&
@@ -305,6 +315,13 @@ function mergeViewerState(
     typeof data.reviewEligibility.canLeavePrivateFeedback === "boolean"
       ? (data.reviewEligibility as ReviewEligibility)
       : fallbackState.reviewEligibility;
+  const paywallSummary =
+    data.paywallSummary &&
+    typeof data.paywallSummary === "object" &&
+    Array.isArray(data.paywallSummary.offers) &&
+    typeof data.paywallSummary.requiresPurchase === "boolean"
+      ? (data.paywallSummary as PaywallSummary)
+      : fallbackState.paywallSummary;
 
   return {
     ...fallbackState,
@@ -320,17 +337,8 @@ function mergeViewerState(
       data.existingReview === null || data.existingReview
         ? data.existingReview
         : fallbackState.existingReview,
-    primaryCta,
-    canContact:
-      typeof data.canContact === "boolean"
-        ? data.canContact
-        : fallbackState.canContact,
-    availabilitySource,
-    canBook:
-      typeof data.canBook === "boolean" ? data.canBook : fallbackState.canBook,
-    canHold:
-      typeof data.canHold === "boolean" ? data.canHold : fallbackState.canHold,
-    bookingDisabledReason,
+    ...contactFields,
+    paywallSummary,
     reviewEligibility,
     loaded: true,
   };
@@ -427,6 +435,10 @@ function ContactFirstSidebarCard({
   effectiveAvailableSlots,
   primaryCta,
   canContact,
+  contactDisabledReason,
+  paywallSummary,
+  ctaDisabled,
+  ctaDisabledLabel,
 }: {
   listingId: string;
   price: number;
@@ -435,6 +447,10 @@ function ContactFirstSidebarCard({
   effectiveAvailableSlots: number;
   primaryCta: PrimaryCta;
   canContact: boolean;
+  contactDisabledReason: ContactDisabledReason | null;
+  paywallSummary: PaywallSummary | null;
+  ctaDisabled: boolean;
+  ctaDisabledLabel: string;
 }) {
   const isWholeUnit = bookingMode === "WHOLE_UNIT";
   const availabilityLabel =
@@ -485,6 +501,10 @@ function ContactFirstSidebarCard({
             listingId={listingId}
             primaryCta={primaryCta}
             canContact={canContact}
+            contactDisabledReason={contactDisabledReason}
+            paywallSummary={paywallSummary}
+            disabled={ctaDisabled}
+            disabledLabel={ctaDisabledLabel}
           />
         </div>
 
@@ -500,15 +520,36 @@ function MessagingCta({
   listingId,
   primaryCta,
   canContact,
+  contactDisabledReason,
+  paywallSummary,
+  disabled = false,
+  disabledLabel,
   className,
 }: {
   listingId: string;
   primaryCta: PrimaryCta;
   canContact: boolean;
+  contactDisabledReason: ContactDisabledReason | null;
+  paywallSummary: PaywallSummary | null;
+  disabled?: boolean;
+  disabledLabel?: string;
   className?: string;
 }) {
-  if (primaryCta === "CONTACT_HOST" && canContact) {
-    return <ContactHostButton listingId={listingId} />;
+  const requiresUnlock =
+    contactDisabledReason === "PAYWALL_REQUIRED" &&
+    !!paywallSummary?.requiresPurchase;
+
+  if (primaryCta === "CONTACT_HOST" && (canContact || requiresUnlock)) {
+    return (
+      <ContactHostButton
+        listingId={listingId}
+        paywallSummary={paywallSummary}
+        requiresUnlock={requiresUnlock}
+        disabled={disabled}
+        disabledLabel={disabledLabel}
+        className={className}
+      />
+    );
   }
 
   if (primaryCta === "LOGIN_TO_MESSAGE") {
@@ -549,16 +590,27 @@ export default function ListingPageClient({
   isLoggedIn,
   userHasBooking,
   userExistingReview,
-  holdEnabled,
   coordinates,
+  canViewExactLocation = false,
   similarListings,
   viewToken,
   initialAvailability,
-  contactFirstEnabled = false,
+  moderationWriteLocksEnabled = false,
 }: ListingPageClientProps) {
   const { data: session, status: sessionStatus } = useSession();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const searchParamsString = searchParams.toString();
+  const contactCheckoutParam = searchParams.get("contactCheckout");
+  const checkoutSessionIdParam = searchParams.get("session_id");
   const [hasHydrated, setHasHydrated] = useState(false);
   const [privateFeedbackOpen, setPrivateFeedbackOpen] = useState(false);
+  const [checkoutNotice, setCheckoutNotice] =
+    useState<CheckoutReturnNotice | null>(null);
+  const [checkoutReturnPhase, setCheckoutReturnPhase] =
+    useState<CheckoutReturnPhase>("IDLE");
+  const [viewerStateRefreshNonce, setViewerStateRefreshNonce] = useState(0);
   const hasImages = listing.images && listing.images.length > 0;
   const resolvedUserId = session?.user?.id ?? null;
   const resolvedIsOwner = isOwner || resolvedUserId === listing.ownerId;
@@ -577,16 +629,17 @@ export default function ListingPageClient({
       isListingActive: listing.status === "ACTIVE",
       hasBookingHistory: userHasBooking,
       existingReview: userExistingReview,
-      contactFirstEnabled,
-      holdEnabled: holdEnabled === true,
       availabilitySource: listing.availabilitySource,
     })
   );
   const effectiveAvailableSlots =
     initialAvailability?.effectiveAvailableSlots ??
     listing.availableSlots;
-  const reviewBookingHistory =
-    viewerState.reviewEligibility.hasLegacyAcceptedBooking;
+  const checkoutCtaDisabled = checkoutReturnPhase !== "IDLE";
+  const checkoutCtaDisabledLabel =
+    checkoutReturnPhase === "PENDING_TIMEOUT"
+      ? "Unlock Pending"
+      : "Finalizing Purchase...";
 
   // Format gender preference for display
   const formatGenderPreference = (pref: string | null) => {
@@ -623,6 +676,220 @@ export default function ListingPageClient({
   }, []);
 
   useEffect(() => {
+    if (!canRenderGuestControls) {
+      return;
+    }
+
+    const contactCheckout = contactCheckoutParam;
+    const checkoutSessionId = checkoutSessionIdParam;
+    if (!contactCheckout) {
+      return;
+    }
+
+    const replaceWithoutCheckoutParams = () => {
+      const cleanedQuery = removeCheckoutQueryParams(searchParamsString);
+      router.replace(cleanedQuery ? `${pathname}?${cleanedQuery}` : pathname, {
+        scroll: false,
+      });
+    };
+
+    if (contactCheckout === "cancelled") {
+      setCheckoutReturnPhase("IDLE");
+      setCheckoutNotice({
+        tone: "info",
+        message: "Checkout cancelled. You can unlock contact anytime.",
+      });
+      replaceWithoutCheckoutParams();
+      return;
+    }
+
+    if (contactCheckout !== "success") {
+      return;
+    }
+
+    if (!checkoutSessionId) {
+      setCheckoutReturnPhase("IDLE");
+      setCheckoutNotice({
+        tone: "error",
+        message: "We couldn’t verify this checkout session.",
+      });
+      replaceWithoutCheckoutParams();
+      return;
+    }
+
+    let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let attempts = 0;
+    const controller = new AbortController();
+
+    const pollCheckoutSession = async () => {
+      if (cancelled) {
+        return;
+      }
+
+      setCheckoutReturnPhase("POLLING");
+      setCheckoutNotice({
+        tone: "info",
+        message: "Finalizing purchase...",
+      });
+
+      try {
+        const response = await fetch(
+          `/api/payments/checkout-session?session_id=${encodeURIComponent(checkoutSessionId)}&listing_id=${encodeURIComponent(listing.id)}`,
+          {
+            cache: "no-store",
+            signal: controller.signal,
+          }
+        );
+
+        if (cancelled) {
+          return;
+        }
+
+        if (response.status === 401) {
+          setCheckoutReturnPhase("IDLE");
+          setCheckoutNotice({
+            tone: "error",
+            message: "Sign in again to finish unlocking contact.",
+          });
+          replaceWithoutCheckoutParams();
+          return;
+        }
+
+        if (response.status === 404) {
+          setCheckoutReturnPhase("IDLE");
+          setCheckoutNotice({
+            tone: "error",
+            message: "We couldn’t verify this checkout session.",
+          });
+          replaceWithoutCheckoutParams();
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error("Failed to load checkout session status");
+        }
+
+        const payload = (await response.json()) as CheckoutSessionStatusPayload;
+
+        switch (payload.fulfillmentStatus) {
+          case "FULFILLED":
+            setViewerState((current) => ({
+              ...current,
+              canContact: true,
+              contactDisabledReason: null,
+              paywallSummary: current.paywallSummary
+                ? {
+                    ...current.paywallSummary,
+                    mode:
+                      current.paywallSummary.mode === "PAYWALL_REQUIRED"
+                        ? "METERED"
+                        : current.paywallSummary.mode,
+                    requiresPurchase: false,
+                  }
+                : current.paywallSummary,
+            }));
+            if (payload.requiresViewerStateRefresh) {
+              setViewerStateRefreshNonce((value) => value + 1);
+            }
+            setCheckoutReturnPhase("IDLE");
+            setCheckoutNotice({
+              tone: "success",
+              message: "Contact unlocked. You can message the host now.",
+            });
+            replaceWithoutCheckoutParams();
+            return;
+          case "FAILED":
+            setCheckoutReturnPhase("IDLE");
+            setCheckoutNotice({
+              tone: "error",
+              message: "Payment failed. Try checkout again.",
+            });
+            replaceWithoutCheckoutParams();
+            return;
+          case "CANCELED":
+            setCheckoutReturnPhase("IDLE");
+            setCheckoutNotice({
+              tone: "info",
+              message:
+                payload.checkoutStatus === "EXPIRED"
+                  ? "Checkout expired. Try again to unlock contact."
+                  : "Checkout cancelled. You can unlock contact anytime.",
+            });
+            replaceWithoutCheckoutParams();
+            return;
+          case "PENDING":
+          default:
+            attempts += 1;
+            if (attempts >= 15) {
+              setCheckoutReturnPhase("PENDING_TIMEOUT");
+              setCheckoutNotice({
+                tone: "info",
+                message:
+                  "Payment received, still finalizing. Refresh or try again shortly.",
+              });
+              return;
+            }
+            timeoutId = setTimeout(() => {
+              void pollCheckoutSession();
+            }, 2000);
+        }
+      } catch (error) {
+        if ((error as Error).name === "AbortError" || cancelled) {
+          return;
+        }
+
+        setCheckoutReturnPhase("IDLE");
+        setCheckoutNotice({
+          tone: "error",
+          message: "We couldn’t verify your checkout just now. Refresh and try again.",
+        });
+        replaceWithoutCheckoutParams();
+      }
+    };
+
+    void pollCheckoutSession();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [
+    canRenderGuestControls,
+    listing.id,
+    pathname,
+    router,
+    searchParamsString,
+    contactCheckoutParam,
+    checkoutSessionIdParam,
+  ]);
+
+  useEffect(() => {
+    if (!canRenderGuestControls) {
+      return;
+    }
+
+    const handlePublicCacheInvalidated = () => {
+      router.refresh();
+    };
+
+    window.addEventListener(
+      PUBLIC_CACHE_INVALIDATED_EVENT,
+      handlePublicCacheInvalidated
+    );
+
+    return () => {
+      window.removeEventListener(
+        PUBLIC_CACHE_INVALIDATED_EVENT,
+        handlePublicCacheInvalidated
+      );
+    };
+  }, [canRenderGuestControls, router]);
+
+  useEffect(() => {
     const fallbackViewerState = buildFallbackViewerState({
       isLoggedIn: resolvedIsLoggedIn,
       isOwner: resolvedIsOwner,
@@ -630,8 +897,6 @@ export default function ListingPageClient({
       isListingActive: listing.status === "ACTIVE",
       hasBookingHistory: userHasBooking,
       existingReview: userExistingReview,
-      contactFirstEnabled,
-      holdEnabled: holdEnabled === true,
       availabilitySource: listing.availabilitySource,
     });
 
@@ -667,7 +932,9 @@ export default function ListingPageClient({
           throw new Error("Failed to load listing viewer state");
         }
 
-        const data = (await response.json()) as Partial<Omit<ViewerState, "loaded">>;
+        const data = (await response.json()) as Partial<
+          Omit<ViewerState, "loaded">
+        >;
 
         setViewerState(mergeViewerState(fallbackViewerState, data));
       } catch (error) {
@@ -680,12 +947,10 @@ export default function ListingPageClient({
           loaded: true,
         });
       }
-    })();
+  })();
 
-    return () => controller.abort();
+  return () => controller.abort();
   }, [
-    contactFirstEnabled,
-    holdEnabled,
     listing.id,
     listing.availabilitySource,
     listing.status,
@@ -695,6 +960,7 @@ export default function ListingPageClient({
     sessionStatus,
     userExistingReview,
     userHasBooking,
+    viewerStateRefreshNonce,
   ]);
 
   return (
@@ -799,6 +1065,23 @@ export default function ListingPageClient({
             </div>
           </div>
 
+          {checkoutNotice && canRenderGuestControls && (
+            <div
+              data-testid="checkout-return-banner"
+              className={cn(
+                "mb-6 rounded-2xl border px-4 py-3 text-sm font-medium",
+                checkoutNotice.tone === "success" &&
+                  "border-green-200 bg-green-50 text-green-800",
+                checkoutNotice.tone === "error" &&
+                  "border-red-200 bg-red-50 text-red-800",
+                checkoutNotice.tone === "info" &&
+                  "border-blue-200 bg-blue-50 text-blue-800"
+              )}
+            >
+              {checkoutNotice.message}
+            </div>
+          )}
+
           {/* Hero Gallery */}
           <div className="mb-12">
             {hasImages ? (
@@ -827,6 +1110,8 @@ export default function ListingPageClient({
                         listing.status as "ACTIVE" | "PAUSED" | "RENTED"
                       }
                       currentVersion={listing.version}
+                      currentStatusReason={listing.statusReason ?? null}
+                      moderationWriteLocksEnabled={moderationWriteLocksEnabled}
                     />
                     <div className="h-4 w-[1px] bg-outline-variant/20" />
                   </>
@@ -898,7 +1183,8 @@ export default function ListingPageClient({
               )}
 
               {/* Nearby Places Section (Radar + MapLibre) */}
-              {process.env.NEXT_PUBLIC_NEARBY_ENABLED === "true" &&
+              {canViewExactLocation &&
+                process.env.NEXT_PUBLIC_NEARBY_ENABLED === "true" &&
                 coordinates && (
                   <NearbyPlacesSection
                     listingLat={coordinates.lat}
@@ -1014,6 +1300,10 @@ export default function ListingPageClient({
                           listingId={listing.id}
                           primaryCta={viewerState.primaryCta}
                           canContact={viewerState.canContact}
+                          contactDisabledReason={viewerState.contactDisabledReason}
+                          paywallSummary={viewerState.paywallSummary}
+                          disabled={checkoutCtaDisabled}
+                          disabledLabel={checkoutCtaDisabledLabel}
                         />
                       </div>
                     )}
@@ -1039,7 +1329,7 @@ export default function ListingPageClient({
                     listingId={listing.id}
                     isLoggedIn={viewerState.isLoggedIn}
                     hasExistingReview={!!viewerState.existingReview}
-                    hasBookingHistory={reviewBookingHistory}
+                    reviewEligibility={viewerState.reviewEligibility}
                     existingReview={viewerState.existingReview || undefined}
                   />
                 )}
@@ -1099,6 +1389,8 @@ export default function ListingPageClient({
                           listing.status as "ACTIVE" | "PAUSED" | "RENTED"
                         }
                         currentVersion={listing.version}
+                        currentStatusReason={listing.statusReason ?? null}
+                        moderationWriteLocksEnabled={moderationWriteLocksEnabled}
                       />
                     </div>
 
@@ -1190,6 +1482,10 @@ export default function ListingPageClient({
                     effectiveAvailableSlots={effectiveAvailableSlots}
                     primaryCta={viewerState.primaryCta}
                     canContact={viewerState.canContact}
+                    contactDisabledReason={viewerState.contactDisabledReason}
+                    paywallSummary={viewerState.paywallSummary}
+                    ctaDisabled={checkoutCtaDisabled}
+                    ctaDisabledLabel={checkoutCtaDisabledLabel}
                   />
                 )}
               </div>

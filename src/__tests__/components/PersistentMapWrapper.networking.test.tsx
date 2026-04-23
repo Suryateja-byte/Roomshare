@@ -30,10 +30,12 @@ const mockV2MapData = {
     features: [],
   },
   mode: "geojson" as const,
+  queryHash: "",
 };
 
 let mockIsV2Enabled = false;
 let mockHasV2Data = false;
+let mockPendingV2QueryHash: string | null = null;
 let mockTransitionPending = false;
 let mockPendingReason: "search-submit" | "filter" | "sort" | "map-pan" | null =
   null;
@@ -87,13 +89,16 @@ jest.mock("@/contexts/SearchV2DataContext", () => ({
   useSearchV2Data: () => ({
     v2MapData: mockHasV2Data ? mockV2MapData : null,
     isV2Enabled: mockIsV2Enabled,
+    pendingQueryHash: mockPendingV2QueryHash,
     setIsV2Enabled: jest.fn(),
+    setPendingQueryHash: jest.fn(),
   }),
   useV2MapData: () => (mockHasV2Data ? mockV2MapData : null),
   useIsV2Enabled: () => ({
     isV2Enabled: mockIsV2Enabled,
     setIsV2Enabled: jest.fn(),
   }),
+  usePendingV2QueryHash: () => mockPendingV2QueryHash,
 }));
 
 // Mock SearchTransitionContext
@@ -110,7 +115,15 @@ global.fetch = mockFetch;
 
 // Import component after mocks
 import PersistentMapWrapper from "@/components/PersistentMapWrapper";
+import { getSearchQueryHash } from "@/lib/search/search-response";
+import { normalizeSearchQuery } from "@/lib/search/search-query";
 const MAP_FETCH_DEBOUNCE_MS = 250;
+
+function getCurrentQueryHash() {
+  return getSearchQueryHash(
+    normalizeSearchQuery(new URLSearchParams(mockSearchParams.toString()))
+  );
+}
 
 describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
   beforeEach(() => {
@@ -120,6 +133,7 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
     // Reset mocks
     mockIsV2Enabled = false;
     mockHasV2Data = false;
+    mockPendingV2QueryHash = null;
     mockTransitionPending = false;
     mockPendingReason = null;
 
@@ -132,6 +146,7 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
     mockSearchParams.set("maxLng", "-122.0");
     mockSearchParams.set("minLat", "37.5");
     mockSearchParams.set("maxLat", "38.0");
+    mockV2MapData.queryHash = getCurrentQueryHash();
 
     // Default successful response
     mockFetch.mockImplementation(
@@ -386,6 +401,20 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
       ).toBeInTheDocument();
 
       // Should NOT have made API call (waiting for v2 data)
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("does not fall back to v1 fetch while the current v2 query is still pending", async () => {
+      mockIsV2Enabled = true;
+      mockHasV2Data = false;
+      mockPendingV2QueryHash = getCurrentQueryHash();
+
+      render(<PersistentMapWrapper shouldRenderMap={true} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(5000);
+      });
+
       expect(mockFetch).not.toHaveBeenCalled();
     });
 

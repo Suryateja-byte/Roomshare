@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { features } from "@/lib/env";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
+import { getBookingAuditEntries } from "@/lib/bookings/admin-evidence";
 import * as Sentry from "@sentry/nextjs";
 
 export async function GET(
@@ -53,20 +54,7 @@ export async function GET(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const auditLogs = await prisma.bookingAuditLog.findMany({
-      where: { bookingId: id },
-      orderBy: { createdAt: "asc" },
-      select: {
-        id: true,
-        action: true,
-        previousStatus: true,
-        newStatus: true,
-        actorType: true,
-        details: true,
-        createdAt: true,
-        // actorId intentionally excluded — PII protection
-      },
-    });
+    const auditLogs = await getBookingAuditEntries(id);
 
     return NextResponse.json({
       bookingId: id,

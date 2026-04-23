@@ -32,6 +32,8 @@ import {
   MAP_FETCH_MAX_LAT_SPAN,
   MAP_FETCH_MAX_LNG_SPAN,
 } from "@/lib/constants";
+import { isPhase04ProjectionReadsEnabled } from "@/lib/flags/phase04";
+import { getProjectionSearchCount } from "@/lib/search/projection-search";
 
 // Disable static caching - counts must be fresh
 export const dynamic = "force-dynamic";
@@ -85,6 +87,35 @@ export async function GET(request: NextRequest) {
           {
             headers: {
               "Cache-Control": "private, no-store",
+            },
+          }
+        );
+      }
+
+      if (isPhase04ProjectionReadsEnabled()) {
+        const projectionCount = await getProjectionSearchCount({
+          parsed,
+          rawParams,
+        });
+        if (!projectionCount.ok) {
+          return NextResponse.json(
+            {
+              error: "admission_rejected",
+              admissionError: projectionCount.error,
+            },
+            {
+              status: projectionCount.error.status,
+              headers: {
+                "Cache-Control": "private, no-store",
+              },
+            }
+          );
+        }
+        return NextResponse.json(
+          { count: projectionCount.count },
+          {
+            headers: {
+              "Cache-Control": "public, s-maxage=15, stale-while-revalidate=30",
             },
           }
         );

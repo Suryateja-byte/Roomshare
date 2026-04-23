@@ -64,6 +64,7 @@ export default async function EditListingPage({ params }: PageProps) {
           }}
           migrationReview={migrationReview}
           enableWholeUnitMode={features.wholeUnitMode}
+          moderationWriteLocksEnabled={features.moderationWriteLocks}
         />
       </div>
     </div>

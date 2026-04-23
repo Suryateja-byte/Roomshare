@@ -30,6 +30,17 @@ jest.mock("@/lib/timeout-wrapper", () => ({
 // Mock search-params — route calls buildRawParamsFromSearchParams
 jest.mock("@/lib/search-params", () => ({
   buildRawParamsFromSearchParams: jest.fn().mockReturnValue({}),
+  parseSearchParams: jest.fn().mockReturnValue({
+    q: undefined,
+    locationLabel: undefined,
+    what: undefined,
+    requestedPage: 1,
+    sortOption: "recommended",
+    boundsRequired: false,
+    browseMode: false,
+    filterParams: {},
+  }),
+  normalizeSearchFilters: jest.fn((value: unknown) => value),
 }));
 
 // Mock rate limiting to return null (allow request)

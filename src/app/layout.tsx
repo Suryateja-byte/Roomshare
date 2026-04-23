@@ -14,6 +14,7 @@ import AccountNoticeHost from "@/components/AccountNoticeHost";
 import CustomScrollContainer from "@/components/ui/CustomScrollContainer";
 import BottomNavBar from "@/components/BottomNavBar";
 import { WebVitals } from "@/components/WebVitals";
+import { features } from "@/lib/env";
 
 const newsreader = Newsreader({
   subsets: ["latin"],
@@ -121,7 +122,9 @@ export default async function RootLayout({
           </CustomScrollContainer>
           <BottomNavBar />
           <OfflineIndicator />
-          <ServiceWorkerRegistration />
+          <ServiceWorkerRegistration
+            publicCacheCoherenceEnabled={features.publicCacheCoherence}
+          />
           <WebVitals />
         </Providers>
       </body>

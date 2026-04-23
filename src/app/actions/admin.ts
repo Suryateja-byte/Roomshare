@@ -23,6 +23,7 @@ import {
   executeLockedListingMigrationReview,
   fetchLockedListingMigrationReviewRecord,
 } from "@/lib/migration/review";
+import { restoreConsumptionsForHostBan } from "@/lib/payments/contact-restoration";
 
 // Helper to check admin status — exported for use in other admin action files (verification.ts etc.)
 export async function requireAdmin() {
@@ -241,6 +242,10 @@ export async function suspendUser(userId: string, suspend: boolean) {
       where: { id: userId },
       data: { isSuspended: suspend },
     });
+
+    if (suspend) {
+      await restoreConsumptionsForHostBan(userId);
+    }
 
     // Audit log
     await logAdminAction({

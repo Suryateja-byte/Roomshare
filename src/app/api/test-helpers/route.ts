@@ -9,6 +9,7 @@
 import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { normalizeAddress } from "@/lib/search/normalize-address";
 
 function isEnabled(): boolean {
   // Block in actual Vercel production deployments, not CI production builds.
@@ -405,6 +406,154 @@ export async function POST(request: NextRequest) {
           bookingId: booking.id,
           heldUntil: heldUntil.toISOString(),
           slotsRequested,
+        });
+      }
+
+      case "seedCollisionListings": {
+        const owner = await prisma.user.findUnique({
+          where: { email: params.ownerEmail },
+          select: { id: true },
+        });
+        if (!owner) {
+          return NextResponse.json(
+            { error: "Owner not found" },
+            { status: 404 }
+          );
+        }
+
+        const count = Math.max(1, Number(params.count) || 1);
+        const address = String(params.address || "");
+        const city = String(params.city || "");
+        const state = String(params.state || "");
+        const zip = String(params.zip || "");
+        const title = String(params.title || "E2E Collision Seed");
+        const description = String(
+          params.description || "Seed listing for collision-flow e2e coverage."
+        );
+        const price = Number(params.price) || 1200;
+        const totalSlots = Math.max(1, Number(params.totalSlots) || 2);
+        const availableSlots = Math.max(
+          0,
+          Math.min(totalSlots, Number(params.availableSlots) || 1)
+        );
+        const roomType = String(params.roomType || "Private Room");
+        const createdAtOffsetsHours = Array.isArray(params.createdAtOffsetsHours)
+          ? params.createdAtOffsetsHours
+          : [];
+        const moveInDateOffsetsDays = Array.isArray(params.moveInDateOffsetsDays)
+          ? params.moveInDateOffsetsDays
+          : [];
+        const normalizedAddress = normalizeAddress({
+          address,
+          city,
+          state,
+          zip,
+        });
+
+        const listingIds: string[] = [];
+
+        for (let index = 0; index < count; index += 1) {
+          const createdAtOffsetHours = Number(createdAtOffsetsHours[index] ?? index);
+          const moveInOffsetDays = Number(moveInDateOffsetsDays[index] ?? -1);
+
+          const createdAt = new Date(Date.now() - createdAtOffsetHours * 60 * 60 * 1000);
+          const moveInDate = new Date();
+          moveInDate.setUTCHours(12, 0, 0, 0);
+          moveInDate.setUTCDate(moveInDate.getUTCDate() + moveInOffsetDays);
+
+          const listing = await prisma.listing.create({
+            data: {
+              id: `e2e-collision-${crypto.randomUUID()}`,
+              ownerId: owner.id,
+              title,
+              description,
+              price,
+              roomType,
+              amenities: ["Wifi", "Kitchen"],
+              houseRules: ["No Smoking"],
+              householdLanguages: ["en"],
+              totalSlots,
+              availableSlots,
+              moveInDate,
+              createdAt,
+              images: [
+                "https://qolpgfdmkqvxraafucvu.supabase.co/storage/v1/object/public/images/listings/e2e-collision-seed.jpg",
+              ],
+              location: {
+                create: {
+                  address,
+                  city,
+                  state,
+                  zip,
+                },
+              },
+            },
+            select: { id: true },
+          });
+
+          await prisma.$executeRaw`
+            UPDATE "Listing"
+            SET "normalizedAddress" = ${normalizedAddress}
+            WHERE id = ${listing.id}
+          `;
+
+          listingIds.push(listing.id);
+        }
+
+        return NextResponse.json({ listingIds });
+      }
+
+      case "deleteListings": {
+        const listingIds = Array.isArray(params.listingIds)
+          ? params.listingIds.filter(
+              (value: unknown): value is string => typeof value === "string"
+            )
+          : [];
+
+        if (listingIds.length === 0) {
+          return NextResponse.json(
+            { error: "listingIds is required" },
+            { status: 400 }
+          );
+        }
+
+        const result = await prisma.listing.deleteMany({
+          where: {
+            id: { in: listingIds },
+          },
+        });
+
+        return NextResponse.json({ deleted: result.count });
+      }
+
+      case "getListingCollisionState": {
+        const [listing] = await prisma.$queryRaw<
+          Array<{
+            id: string;
+            normalizedAddress: string | null;
+            needsMigrationReview: boolean | null;
+          }>
+        >`
+          SELECT
+            id,
+            "normalizedAddress",
+            "needsMigrationReview"
+          FROM "Listing"
+          WHERE id = ${params.listingId}
+          LIMIT 1
+        `;
+
+        if (!listing) {
+          return NextResponse.json(
+            { error: "Listing not found" },
+            { status: 404 }
+          );
+        }
+
+        return NextResponse.json({
+          id: listing.id,
+          normalizedAddress: listing.normalizedAddress,
+          needsMigrationReview: listing.needsMigrationReview === true,
         });
       }
 

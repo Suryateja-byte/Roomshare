@@ -157,9 +157,9 @@ For every P0/P1 failure mode in the plan doc, at least one observable signal exi
 | Failure mode | Signal | Threshold | Alert channel | Runbook |
 |---|---|---|---|---|
 | Legacy bookings still open past drain deadline | `cfm.booking.legacy_open_count` (gauge, daily) | **static count for 3 days** | email | §7.11 |
-| `/bookings` views emitted with history-first mode labels | `cfm.booking.history_first_view_count{mode=history_first\|escape_hatch}` (counter; emitted from `src/app/bookings/page.tsx`) | informational; expect monotonic growth in `mode=history_first` after flag flip | dashboard | §7.11 |
-| `/bookings` reads served from history-first path | `cfm.booking.history_first_serve_ratio` (gauge) | `< 1.0` after CFM-902 | dashboard | §7.11 |
-| Flag off: legacy booking mutation correctly blocked or admin-bypassed | `cfm.booking.legacy_mutation_blocked_count{action,role,reason}` (counter; `action ∈ {accept,reject,cancel,other}`, `role ∈ {admin,non_admin}`, `reason ∈ {flag_off,admin_bypass}`) | informational; steady-state `role=non_admin,reason=flag_off > 0` is expected after the flip | dashboard only | §7.11 |
+| `/bookings` views emitted from the permanent history-first surface | `cfm.booking.history_first_view_count{mode=history_first}` (counter; emitted from `src/app/bookings/page.tsx`) | informational; monotonic growth expected after the cleanup | dashboard | §7.11 |
+| `/bookings` reads served from history-first path | `cfm.booking.history_first_serve_ratio` (gauge) | `= 1.0` after the history-first cleanup | dashboard | §7.11 |
+| Legacy booking mutation attempt correctly blocked or admin-bypassed | `cfm.booking.legacy_mutation_blocked_count{action,role,reason}` (counter; `action ∈ {accept,reject,cancel,other}`, `role ∈ {admin,non_admin}`, `reason ∈ {flag_off,admin_bypass}`) | informational; steady-state `role=non_admin,reason=flag_off > 0` is the permanent expected signal | dashboard only | §7.11 |
 | Flag off: legacy sweep cron correctly skips all work | `cfm.cron.legacy_sweep_skipped_count{reason}` (counter; `reason ∈ {flag_off}`) | informational; steady-state `reason=flag_off` every 5 min is expected after the flip | dashboard only | §7.11 |
 | Flag off: legacy reconcile cron correctly skips all work | `cfm.cron.legacy_reconcile_skipped_count{reason}` (counter; `reason ∈ {flag_off}`) | informational; ~96/day post-flip (driven by `daily-maintenance/route.ts` invoking reconcile every 15 min) — runbook: `docs/migration/cfm-904-cron-retirement-runbook.md` | dashboard only | §7.11 |
 
@@ -464,7 +464,7 @@ Every non-negotiable invariant and cross-cutting acceptance gate from the plan d
 | 1 | One authoritative availability model per listing | `cfm.availability.source_flip_count{from,to}` (forbidden flips); query 6.2 (terminal/non-terminal mix) | — |
 | 2 | `HOST_MANAGED` never derives from bookings | `cfm.cron.host_managed_clobber_count` | — |
 | 3 | No post-freeze bookings/holds | `cfm.booking.post_freeze_write_count` | — |
-| 4 | Historical accepted bookings remain review-eligible | `cfm.review.unauthorized_create_count` (inverse: positive signal via dashboard panel of eligible reviews) | partial — needs CFM-904 positive-signal counter `cfm.review.legacy_eligible_count` |
+| 4 | Historical accepted bookings remain review-eligible | `cfm.review.unauthorized_create_count` + `cfm.review.legacy_eligible_count` | — |
 | 5 | Search/map/facets/card/detail/saved-search share one contract | `cfm.search.query_hash_version_mismatch_count`, existing `search_map_list_mismatch_total` | — |
 | 6 | `0 <= openSlots <= totalSlots` | query 6.3 → `cfm.listing.host_managed_invariant_violation_count{invariant=slots_exceed_total}` | — |
 | 7 | `availableUntil` null or ≥ `moveInDate` | query 6.3 → `{invariant=until_before_movein}` | — |
@@ -531,3 +531,4 @@ Each signal above has a concrete verification path that can be executed before r
 | 2026-04-16 | Initial version (CFM-004). Defines metric namespace, log dimensions, failure-mode matrix, dashboards, divergence SQL, invariant/gate coverage, and phase exit gates. |
 | 2026-04-17 | Added the CFM-502 `cfm.backfill.*` structured-log events, the runbook link for §7.9, and the search-dashboard overlay reference for cohort backfill monitoring. |
 | 2026-04-17 | CFM-803 wired `cfm.search.doc.divergence_count`, `cfm.search.dirty_queue_age_seconds`, and `cfm.search.doc.repaired_count` into `/api/metrics/ops`, and added the bounded dirty-doc rescan plus CAS-safe repair loop. |
+| 2026-04-23 | CFM-904 closed the remaining trust/freshness observability gaps by wiring `cfm.listing.freshness_bucket_count`, `cfm.listing.stale_in_search_count`, `cfm.listing.stale_still_active_count`, `cfm.listing.freshness_recovered_count`, `cfm.review.unauthorized_create_count`, `cfm.review.contact_only_attempt_count`, and `cfm.review.legacy_eligible_count` into `/api/metrics/ops`. |

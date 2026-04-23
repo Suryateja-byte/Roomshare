@@ -84,6 +84,9 @@ jest.mock("@/lib/env", () => ({
     semanticSearch: false,
     wholeUnitMode: true,
     searchDoc: true,
+    get moderationWriteLocks() {
+      return process.env.FEATURE_MODERATION_WRITE_LOCKS === "true";
+    },
   },
 }));
 
@@ -269,12 +272,24 @@ function makeTransaction(queryRawMock: jest.Mock, updateMock: jest.Mock) {
 }
 
 describe("PATCH /api/listings/[id] host-managed contract", () => {
+  const originalModerationWriteLocks =
+    process.env.FEATURE_MODERATION_WRITE_LOCKS;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    delete process.env.FEATURE_MODERATION_WRITE_LOCKS;
     (auth as jest.Mock).mockResolvedValue(ownerSession);
     (getAvailability as jest.Mock).mockResolvedValue(null);
     (getFuturePeakReservedLoad as jest.Mock).mockResolvedValue(0);
     (syncFutureInventoryTotalSlots as jest.Mock).mockResolvedValue(undefined);
+  });
+
+  afterAll(() => {
+    if (originalModerationWriteLocks === undefined) {
+      delete process.env.FEATURE_MODERATION_WRITE_LOCKS;
+    } else {
+      process.env.FEATURE_MODERATION_WRITE_LOCKS = originalModerationWriteLocks;
+    }
   });
 
   it("uses prepareHostManagedListingWrite data for dedicated availability edits", async () => {
@@ -370,6 +385,42 @@ describe("PATCH /api/listings/[id] host-managed contract", () => {
     await expect(response.json()).resolves.toEqual({
       error: "This listing was updated elsewhere. Reload and try again.",
       code: "VERSION_CONFLICT",
+    });
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 423 LISTING_LOCKED for dedicated writes on admin-paused rows", async () => {
+    process.env.FEATURE_MODERATION_WRITE_LOCKS = "true";
+    (prisma.listing.findUnique as jest.Mock).mockResolvedValue(
+      makeHostManagedListing()
+    );
+    const queryRawMock = jest.fn().mockResolvedValue([
+      makeLockedHostManagedListing({
+        status: "PAUSED",
+        statusReason: "ADMIN_PAUSED",
+      }),
+    ]);
+    const updateMock = jest.fn();
+    (prisma.$transaction as jest.Mock).mockImplementation(
+      makeTransaction(queryRawMock, updateMock)
+    );
+
+    const response = await PATCH(
+      new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify({
+          expectedVersion: 3,
+          openSlots: 1,
+        }),
+      }),
+      { params: Promise.resolve({ id: "listing-abc" }) }
+    );
+
+    expect(response.status).toBe(423);
+    await expect(response.json()).resolves.toEqual({
+      error: "This listing is locked while under review.",
+      code: "LISTING_LOCKED",
+      lockReason: "ADMIN_PAUSED",
     });
     expect(updateMock).not.toHaveBeenCalled();
   });
@@ -561,6 +612,50 @@ describe("PATCH /api/listings/[id] host-managed contract", () => {
     expect(getAvailability).not.toHaveBeenCalled();
     expect(getFuturePeakReservedLoad).not.toHaveBeenCalled();
     expect(syncFutureInventoryTotalSlots).not.toHaveBeenCalled();
+  });
+
+  it("returns 423 LISTING_LOCKED for metadata-only edits on suppressed rows", async () => {
+    process.env.FEATURE_MODERATION_WRITE_LOCKS = "true";
+    (prisma.listing.findUnique as jest.Mock).mockResolvedValue(
+      makeHostManagedListing()
+    );
+    const queryRawMock = jest.fn().mockResolvedValue([
+      makeLockedHostManagedListing({
+        status: "PAUSED",
+        statusReason: "SUPPRESSED",
+      }),
+    ]);
+    const updateMock = jest.fn();
+    (prisma.$transaction as jest.Mock).mockImplementation(
+      makeTransaction(queryRawMock, updateMock)
+    );
+
+    const response = await PATCH(
+      new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify({
+          title: "Updated Title",
+          description: "Updated description",
+          price: "1200",
+          totalSlots: "2",
+          address: "123 Main St",
+          city: "San Francisco",
+          state: "CA",
+          zip: "94102",
+          moveInDate: "2026-05-01T00:00:00.000Z",
+          bookingMode: "SHARED",
+        }),
+      }),
+      { params: Promise.resolve({ id: "listing-abc" }) }
+    );
+
+    expect(response.status).toBe(423);
+    await expect(response.json()).resolves.toEqual({
+      error: "This listing is locked while under review.",
+      code: "LISTING_LOCKED",
+      lockReason: "SUPPRESSED",
+    });
+    expect(updateMock).not.toHaveBeenCalled();
   });
 
   it("persists legacy review-fix fields without opening an alternate host-managed path", async () => {

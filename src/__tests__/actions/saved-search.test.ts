@@ -22,6 +22,15 @@ jest.mock("next/cache", () => ({
   revalidatePath: jest.fn(),
 }));
 
+const mockEvaluateSavedSearchAlertPaywall = jest.fn();
+jest.mock("@/lib/payments/search-alert-paywall", () => ({
+  evaluateSavedSearchAlertPaywall: (...args: unknown[]) =>
+    mockEvaluateSavedSearchAlertPaywall(...args),
+  resolveSavedSearchEffectiveAlertState: jest.requireActual(
+    "@/lib/payments/search-alert-paywall"
+  ).resolveSavedSearchEffectiveAlertState,
+}));
+
 import {
   saveSearch,
   getMySavedSearches,
@@ -48,6 +57,13 @@ describe("Saved Search Actions", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (auth as jest.Mock).mockResolvedValue(mockSession);
+    mockEvaluateSavedSearchAlertPaywall.mockResolvedValue({
+      enabled: false,
+      mode: "PASS_ACTIVE",
+      activePassExpiresAt: null,
+      requiresPurchase: false,
+      offers: [],
+    });
   });
 
   describe("saveSearch", () => {
@@ -74,6 +90,7 @@ describe("Saved Search Actions", () => {
       (prisma.savedSearch.count as jest.Mock).mockResolvedValue(5);
       (prisma.savedSearch.create as jest.Mock).mockResolvedValue({
         id: "search-123",
+        alertEnabled: true,
       });
 
       const result = await saveSearch({
@@ -98,13 +115,18 @@ describe("Saved Search Actions", () => {
         },
       });
       expect(revalidatePath).toHaveBeenCalledWith("/saved-searches");
-      expect(result).toEqual({ success: true, searchId: "search-123" });
+      expect(result).toEqual({
+        success: true,
+        searchId: "search-123",
+        effectiveAlertState: "ACTIVE",
+      });
     });
 
     it("defaults alertEnabled to true", async () => {
       (prisma.savedSearch.count as jest.Mock).mockResolvedValue(0);
       (prisma.savedSearch.create as jest.Mock).mockResolvedValue({
         id: "search-123",
+        alertEnabled: true,
       });
 
       await saveSearch({ name: "Test", filters: mockFilters });
@@ -117,6 +139,29 @@ describe("Saved Search Actions", () => {
           }),
         })
       );
+    });
+
+    it("returns LOCKED when alerts are enabled but no active pass exists", async () => {
+      (prisma.savedSearch.count as jest.Mock).mockResolvedValue(0);
+      (prisma.savedSearch.create as jest.Mock).mockResolvedValue({
+        id: "search-123",
+        alertEnabled: true,
+      });
+      mockEvaluateSavedSearchAlertPaywall.mockResolvedValue({
+        enabled: true,
+        mode: "PAYWALL_REQUIRED",
+        activePassExpiresAt: null,
+        requiresPurchase: true,
+        offers: [],
+      });
+
+      const result = await saveSearch({ name: "Test", filters: mockFilters });
+
+      expect(result).toEqual({
+        success: true,
+        searchId: "search-123",
+        effectiveAlertState: "LOCKED",
+      });
     });
 
     it("handles database errors", async () => {
@@ -141,8 +186,8 @@ describe("Saved Search Actions", () => {
 
     it("returns user saved searches", async () => {
       const mockSearches = [
-        { id: "s1", name: "Search 1", filters: {} },
-        { id: "s2", name: "Search 2", filters: {} },
+        { id: "s1", name: "Search 1", filters: {}, alertEnabled: true },
+        { id: "s2", name: "Search 2", filters: {}, alertEnabled: false },
       ];
       (prisma.savedSearch.findMany as jest.Mock).mockResolvedValue(
         mockSearches
@@ -154,7 +199,10 @@ describe("Saved Search Actions", () => {
         where: { userId: "user-123" },
         orderBy: { createdAt: "desc" },
       });
-      expect(result).toEqual(mockSearches);
+      expect(result).toEqual([
+        { id: "s1", name: "Search 1", filters: {}, alertEnabled: true, effectiveAlertState: "ACTIVE" },
+        { id: "s2", name: "Search 2", filters: {}, alertEnabled: false, effectiveAlertState: "DISABLED" },
+      ]);
     });
 
     it("returns empty array on error", async () => {
@@ -213,7 +261,9 @@ describe("Saved Search Actions", () => {
     });
 
     it("enables alert", async () => {
-      (prisma.savedSearch.update as jest.Mock).mockResolvedValue({});
+      (prisma.savedSearch.update as jest.Mock).mockResolvedValue({
+        alertEnabled: true,
+      });
 
       const result = await toggleSearchAlert("search-123", true);
 
@@ -223,12 +273,18 @@ describe("Saved Search Actions", () => {
           userId: "user-123",
         },
         data: { alertEnabled: true },
+        select: { alertEnabled: true },
       });
-      expect(result).toEqual({ success: true });
+      expect(result).toEqual({
+        success: true,
+        effectiveAlertState: "ACTIVE",
+      });
     });
 
     it("disables alert", async () => {
-      (prisma.savedSearch.update as jest.Mock).mockResolvedValue({});
+      (prisma.savedSearch.update as jest.Mock).mockResolvedValue({
+        alertEnabled: false,
+      });
 
       const result = await toggleSearchAlert("search-123", false);
 
@@ -238,8 +294,32 @@ describe("Saved Search Actions", () => {
           userId: "user-123",
         },
         data: { alertEnabled: false },
+        select: { alertEnabled: true },
       });
-      expect(result).toEqual({ success: true });
+      expect(result).toEqual({
+        success: true,
+        effectiveAlertState: "DISABLED",
+      });
+    });
+
+    it("returns LOCKED when enabling alerts without an active pass", async () => {
+      (prisma.savedSearch.update as jest.Mock).mockResolvedValue({
+        alertEnabled: true,
+      });
+      mockEvaluateSavedSearchAlertPaywall.mockResolvedValue({
+        enabled: true,
+        mode: "PAYWALL_REQUIRED",
+        activePassExpiresAt: null,
+        requiresPurchase: true,
+        offers: [],
+      });
+
+      const result = await toggleSearchAlert("search-123", true);
+
+      expect(result).toEqual({
+        success: true,
+        effectiveAlertState: "LOCKED",
+      });
     });
 
     it("handles database errors", async () => {

@@ -66,7 +66,7 @@ const SAVED_SEARCH_LEGACY_CASES = [
     alias: "where",
     legacyFilters: { where: "Austin" },
     expectedCanonicalFilters: { locationLabel: "Austin" },
-    expectedCanonicalUrl: "/search?where=Austin",
+    expectedCanonicalUrl: "/search?locationLabel=Austin",
   },
 ] as const;
 
@@ -99,6 +99,7 @@ describe("saved search reopen canonicalization", () => {
           id: "legacy-search",
           name: "Legacy Search",
           createdAt: new Date("2026-04-17T00:00:00.000Z"),
+          alertEnabled: true,
           filters: legacyFilters,
         },
       ]);

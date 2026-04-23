@@ -27,11 +27,15 @@ jest.mock("@/lib/prisma", () => {
   };
   const listingMock = { findUnique: jest.fn() };
   const bookingMock = { findFirst: jest.fn() };
+  const conversationMock = { findFirst: jest.fn() };
+  const reportMock = { findFirst: jest.fn() };
   const userMock = { findUnique: jest.fn() };
   const txClient = {
     review: reviewMock,
     listing: listingMock,
     booking: bookingMock,
+    conversation: conversationMock,
+    report: reportMock,
     user: userMock,
     $executeRaw: jest.fn(),
   };
@@ -40,6 +44,8 @@ jest.mock("@/lib/prisma", () => {
       review: reviewMock,
       listing: listingMock,
       booking: bookingMock,
+      conversation: conversationMock,
+      report: reportMock,
       user: userMock,
       $transaction: jest.fn((fn: (tx: typeof txClient) => unknown) =>
         fn(txClient)
@@ -91,6 +97,11 @@ jest.mock("@/lib/search/search-doc-dirty", () => ({
   markListingsDirtyInTx: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock("@/lib/metrics/cfm-ops-telemetry", () => ({
+  recordUnauthorizedReviewCreate: jest.fn(),
+  recordContactOnlyReviewAttempt: jest.fn(),
+}));
+
 // Mock pagination-schema
 jest.mock("@/lib/pagination-schema", () => ({
   parsePaginationParams: jest
@@ -110,6 +121,10 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { createInternalNotification } from "@/lib/notifications";
 import { sendNotificationEmailWithPreference } from "@/lib/email";
+import {
+  recordContactOnlyReviewAttempt,
+  recordUnauthorizedReviewCreate,
+} from "@/lib/metrics/cfm-ops-telemetry";
 
 describe("/api/reviews", () => {
   const mockSession = {
@@ -155,6 +170,8 @@ describe("/api/reviews", () => {
       (prisma.booking.findFirst as jest.Mock).mockResolvedValue({
         id: "booking-123",
       });
+      (prisma.conversation.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.report.findFirst as jest.Mock).mockResolvedValue(null);
       (prisma.review.create as jest.Mock).mockResolvedValue(mockReview);
     });
 
@@ -375,8 +392,13 @@ describe("/api/reviews", () => {
 
         expect(response.status).toBe(403);
         expect(data.error).toBe(
-          "Only past guests with a confirmed stay can review this listing"
+          "Only past guests with a confirmed stay can leave a public review."
         );
+        expect(recordUnauthorizedReviewCreate).toHaveBeenCalledWith({
+          listingId: "listing-123",
+          reviewerId: "user-123",
+          scope: "listing",
+        });
       });
 
       it("BIZ-02 regression: HELD booking does not unlock listing reviews", async () => {
@@ -394,7 +416,7 @@ describe("/api/reviews", () => {
 
         expect(response.status).toBe(403);
         expect(data.error).toBe(
-          "Only past guests with a confirmed stay can review this listing"
+          "Only past guests with a confirmed stay can leave a public review."
         );
         expect(prisma.booking.findFirst).toHaveBeenCalledWith({
           where: {
@@ -420,7 +442,7 @@ describe("/api/reviews", () => {
 
         expect(response.status).toBe(403);
         expect(data.error).toBe(
-          "Only past guests with a confirmed stay can review this listing"
+          "Only past guests with a confirmed stay can leave a public review."
         );
       });
 
@@ -439,7 +461,7 @@ describe("/api/reviews", () => {
 
         expect(response.status).toBe(403);
         expect(data.error).toBe(
-          "Only past guests with a confirmed stay can review this listing"
+          "Only past guests with a confirmed stay can leave a public review."
         );
         expect(prisma.booking.findFirst).toHaveBeenCalledWith({
           where: {
@@ -506,6 +528,38 @@ describe("/api/reviews", () => {
         expect(data.error).toBe(
           "You can only review users you have a completed booking with"
         );
+        expect(recordUnauthorizedReviewCreate).toHaveBeenCalledWith({
+          reviewerId: "user-123",
+          targetUserId: "target-456",
+          scope: "user",
+        });
+      });
+
+      it("records contact-only telemetry when a denied listing review still qualifies for private feedback", async () => {
+        (prisma.review.findFirst as jest.Mock).mockResolvedValue(null);
+        (prisma.booking.findFirst as jest.Mock).mockResolvedValue(null);
+        (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
+          ownerId: "owner-456",
+        });
+        (prisma.conversation.findFirst as jest.Mock).mockResolvedValue({
+          id: "conversation-123",
+        });
+        (prisma.report.findFirst as jest.Mock).mockResolvedValue(null);
+
+        const response = await POST(
+          createRequest({
+            listingId: "listing-123",
+            rating: 4,
+            comment: "We already chatted",
+          })
+        );
+
+        expect(response.status).toBe(403);
+        expect(recordContactOnlyReviewAttempt).toHaveBeenCalledWith({
+          listingId: "listing-123",
+          reviewerId: "user-123",
+          targetUserId: "owner-456",
+        });
       });
 
       it("BIZ-03 happy: allows review when interaction exists", async () => {

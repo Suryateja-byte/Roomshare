@@ -92,7 +92,7 @@ describe("MapEmptyState", () => {
     // Should preserve location context and coords but remove maxPrice
     expect(mockPush).toHaveBeenCalledTimes(1);
     const pushedUrl = mockPush.mock.calls[0][0];
-    expect(pushedUrl).toContain("where=Austin");
+    expect(pushedUrl).toContain("locationLabel=Austin");
     expect(pushedUrl).toContain("lat=30");
     expect(pushedUrl).toContain("minLat=");
     expect(pushedUrl).toContain("maxLng=");

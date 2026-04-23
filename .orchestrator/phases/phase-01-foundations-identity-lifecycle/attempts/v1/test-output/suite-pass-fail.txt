@@ -1,0 +1,30 @@
+FAIL src/__tests__/actions/booking-slots-validation.test.ts
+FAIL src/__tests__/actions/booking-whole-unit.test. ● cr› auto-sets slotsRequested tWHOLE_UNIsti   pect(rved).toBe(expected) // Object.is equality
+FAIL src/__tests__/actions/booking-whole-unit.test.ts
+FAIL src/__tests__/actions/booking.test.ts
+FAIL src/__tests__/actions/chat-dedup.test.ts
+FAIL src/__tests__/actions/manage-booking-whole-unit.test.ts
+FAIL src/__tests__/api/map-listings-route.test.ts
+FAIL src/__tests__/api/messages-pagination.test.ts
+FAIL src/__tests__/api/private-feedback-no-public-bleed.test.ts
+FAIL src/__tests__/api/search/facets/route.test.ts
+FAIL src/__tests__/app/search/layout.test.tsx
+FAIL src/__tests__/booking/multi-slot-boundaries.test.ts
+FAIL src/__tests__/booking/multi-slot-feature-flags.test.ts
+FAIL src/__tests__/booking/race-condition.test.ts
+FAIL src/__tests__/booking/whole-unit-concurrent.test.ts
+FAIL src/__tests__/components/PersistentMapWrapper.sanitization.test.tsx
+FAIL src/__tests__/components/SlotBadge.test.tsx
+FAIL src/__tests__/components/search/InlineFilterStrip.test.tsx
+FAIL src/__tests__/db/query-patterns.test.ts
+FAIL src/__tests__/db/transaction-integrity.test.ts
+FAIL src/__tests__/integration/phase01-read-path-isolation.test.ts
+FAIL src/__tests__/lib/data.test.ts
+FAIL src/__tests__/lib/listings/collision-detector-test-utils.ts
+FAIL src/__tests__/lib/migration/backfill.test.ts
+FAIL src/__tests__/lib/search/keyset-pagination.test.ts
+FAIL src/__tests__/lib/search/legacy-url-alias-registry.test.ts
+FAIL src/__tests__/lib/search/transform.test.ts
+FAIL src/__tests__/lib/search/unbounded-browse-protection.test.ts
+FAIL src/__tests__/security/idor-coests › BoorotedateBookingStatus IDalloner (Bob) to accept booking
+FAIL src/__tests__/security/idor-comprehensive.test.ts

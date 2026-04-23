@@ -1,0 +1,40 @@
+FAIL src/__tests__/integration/phase01-read-path-isolation.test.ts
+  ● Phase 01 read-path isolation › keeps new table references out of app and component read paths
+
+    spawnSync /bin/sh EPERM
+
+      2 |
+      3 | function grep(term: string): string[] {
+    > 4 |   const output = execSync(`git grep -n "${term}" -- src prisma .orchestrator`, {
+        |                          ^
+      5 |     cwd: process.cwd(),
+      6 |     encoding: "utf8",
+      7 |   }).trim();
+
+      at grep (src/__tests__/integration/phase01-read-path-isolation.test.ts:4:26)
+      at Object.grep (src/__tests__/integration/phase01-read-path-isolation.test.ts:29:20)
+
+  ● Phase 01 read-path isolation › keeps Listing.physical_unit_id unread by app and component code
+
+    spawnSync /bin/sh EPERM
+
+      2 |
+      3 | function grep(term: string): string[] {
+    > 4 |   const output = execSync(`git grep -n "${term}" -- src prisma .orchestrator`, {
+        |                          ^
+      5 |     cwd: process.cwd(),
+      6 |     encoding: "utf8",
+      7 |   }).trim();
+
+      at grep (src/__tests__/integration/phase01-read-path-isolation.test.ts:4:26)
+      at Object.grep (src/__tests__/integration/phase01-read-path-isolation.test.ts:38:18)
+
+--
+FAIL src/__tests__/integration/phase01-read-path-isolation.test.ts
+  ● Phase 01 read-path isolation › keeps new table references out of app and component read paths
+
+    spawnSync /bin/sh EPERM
+
+      2 |
+      3 | function grep(term: string): string[] {
+    > 4 |   const output = execSync(`git grep -n "${term}" -- src prisma .orchestrator`, {

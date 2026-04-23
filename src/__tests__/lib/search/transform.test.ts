@@ -115,6 +115,8 @@ describe("search/transform", () => {
           availableSlots: 1,
           totalSlots: 1,
         }),
+        groupSummary: null,
+        groupContext: null,
       });
     });
 

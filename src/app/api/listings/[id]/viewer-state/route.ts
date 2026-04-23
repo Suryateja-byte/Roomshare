@@ -15,9 +15,16 @@ import {
   canLeavePrivateFeedback,
 } from "@/lib/reports/private-feedback";
 import {
-  resolvePublicAvailability,
   type ResolvedPublicAvailability,
 } from "@/lib/search/public-availability";
+import {
+  buildPrivacyFirstViewerContract,
+  type ContactDisabledReason,
+} from "@/lib/listings/public-contact-contract";
+import {
+  evaluateMessageStartPaywall,
+  type PaywallSummary,
+} from "@/lib/payments/contact-paywall";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -28,22 +35,6 @@ type ReviewEligibilityReason =
   | "ELIGIBLE"
   | "ALREADY_REVIEWED"
   | "ACCEPTED_BOOKING_REQUIRED";
-
-type PrimaryCta =
-  | "EDIT_LISTING"
-  | "CONTACT_HOST"
-  | "LOGIN_TO_MESSAGE"
-  | "VERIFY_EMAIL_TO_MESSAGE";
-
-type AvailabilitySource = "LEGACY_BOOKING" | "HOST_MANAGED";
-
-type BookingDisabledReason =
-  | "CONTACT_ONLY"
-  | "LOGIN_REQUIRED"
-  | "EMAIL_VERIFICATION_REQUIRED"
-  | "OWNER_VIEW"
-  | "LISTING_UNAVAILABLE"
-  | null;
 
 function buildReviewEligibility(options: {
   isLoggedIn: boolean;
@@ -81,75 +72,6 @@ function buildReviewEligibility(options: {
   };
 }
 
-function buildViewerContract(options: {
-  isLoggedIn: boolean;
-  isOwner: boolean;
-  isEmailVerified: boolean;
-  isListingPubliclyAvailable: boolean;
-  isListingSearchEligible: boolean;
-  availabilitySource: AvailabilitySource;
-}): {
-  primaryCta: PrimaryCta;
-  canContact: boolean;
-  availabilitySource: AvailabilitySource;
-  canBook: boolean;
-  canHold: boolean;
-  bookingDisabledReason: BookingDisabledReason;
-} {
-  const primaryCta: PrimaryCta = options.isOwner
-    ? "EDIT_LISTING"
-    : !options.isLoggedIn
-      ? "LOGIN_TO_MESSAGE"
-      : !options.isEmailVerified
-        ? "VERIFY_EMAIL_TO_MESSAGE"
-        : "CONTACT_HOST";
-
-  const canContact =
-    !options.isOwner &&
-    options.isLoggedIn &&
-    options.isEmailVerified &&
-    options.isListingSearchEligible;
-
-  const canBook =
-    options.availabilitySource !== "HOST_MANAGED" &&
-    !features.contactFirstListings &&
-    !options.isOwner &&
-    options.isLoggedIn &&
-    options.isEmailVerified &&
-    options.isListingPubliclyAvailable;
-
-  const canHold = canBook && features.softHoldsEnabled;
-
-  let bookingDisabledReason: BookingDisabledReason = null;
-  if (!canBook) {
-    if (options.availabilitySource === "HOST_MANAGED") {
-      bookingDisabledReason =
-        options.isListingPubliclyAvailable && options.isListingSearchEligible
-        ? "CONTACT_ONLY"
-        : "LISTING_UNAVAILABLE";
-    } else if (features.contactFirstListings) {
-      bookingDisabledReason = "CONTACT_ONLY";
-    } else if (options.isOwner) {
-      bookingDisabledReason = "OWNER_VIEW";
-    } else if (!options.isListingPubliclyAvailable) {
-      bookingDisabledReason = "LISTING_UNAVAILABLE";
-    } else if (!options.isLoggedIn) {
-      bookingDisabledReason = "LOGIN_REQUIRED";
-    } else if (!options.isEmailVerified) {
-      bookingDisabledReason = "EMAIL_VERIFICATION_REQUIRED";
-    }
-  }
-
-  return {
-    primaryCta,
-    canContact,
-    availabilitySource: options.availabilitySource,
-    canBook,
-    canHold,
-    bookingDisabledReason,
-  };
-}
-
 export async function GET(request: Request, { params }: RouteContext) {
   // SEC-007 FIX: Rate limit to prevent enumeration/abuse
   const rateLimitResponse = await withRateLimit(request, {
@@ -174,38 +96,43 @@ export async function GET(request: Request, { params }: RouteContext) {
       lastConfirmedAt: true,
       statusReason: true,
       needsMigrationReview: true,
+      physicalUnitId: true,
     },
   });
 
   const isOwner = !!session?.user?.id && listing?.ownerId === session.user.id;
   const isEmailVerified = !!session?.user?.emailVerified;
-  const resolvedAvailability: ResolvedPublicAvailability | null = listing
-    ? resolvePublicAvailability(listing)
-    : null;
-  const availabilitySource: AvailabilitySource =
-    resolvedAvailability?.availabilitySource ?? "LEGACY_BOOKING";
-  const isListingPubliclyAvailable =
-    resolvedAvailability?.isPubliclyAvailable ?? false;
-  const isListingSearchEligible = resolvedAvailability?.searchEligible ?? false;
   const needsMigrationReview = listing?.needsMigrationReview === true;
-  const publicAvailability: ResolvedPublicAvailability | null =
-    resolvedAvailability;
+  const paywallSummaryPromise = listing
+    ? evaluateMessageStartPaywall({
+        userId: session?.user?.id ?? null,
+        physicalUnitId: listing.physicalUnitId,
+      }).then((evaluation) => evaluation.summary)
+    : Promise.resolve<PaywallSummary | null>(null);
 
   if (!session?.user?.id) {
-    const viewerContract = buildViewerContract({
+    const paywallSummary = await paywallSummaryPromise;
+    const rawViewerContract = buildPrivacyFirstViewerContract({
       isLoggedIn: false,
       isOwner: false,
       isEmailVerified: false,
-      isListingPubliclyAvailable,
-      isListingSearchEligible,
-      availabilitySource,
+      listing,
     });
+    const {
+      publicAvailability: viewerPublicAvailability,
+      availabilityGateReason: _availabilityGateReason,
+      ...viewerContract
+    } = rawViewerContract as typeof rawViewerContract & {
+      publicAvailability?: ResolvedPublicAvailability | null;
+      availabilityGateReason?: unknown;
+    };
     const response = NextResponse.json({
       isLoggedIn: false,
       hasBookingHistory: false,
       existingReview: null,
       ...viewerContract,
-      publicAvailability,
+      publicAvailability: viewerPublicAvailability,
+      paywallSummary,
       needsMigrationReview,
       reviewEligibility: buildReviewEligibility({
         isLoggedIn: false,
@@ -222,7 +149,13 @@ export async function GET(request: Request, { params }: RouteContext) {
   }
 
   try {
-    const [existingReview, bookingExists, conversationExists, existingPrivateFeedback] =
+    const [
+      existingReview,
+      bookingExists,
+      conversationExists,
+      existingPrivateFeedback,
+      paywallSummary,
+    ] =
       await Promise.all([
       prisma.review.findFirst({
         where: {
@@ -270,16 +203,36 @@ export async function GET(request: Request, { params }: RouteContext) {
               select: { id: true },
             })
           : Promise.resolve(null),
+        paywallSummaryPromise,
       ]);
 
-    const viewerContract = buildViewerContract({
+    const rawViewerContract = buildPrivacyFirstViewerContract({
       isLoggedIn: true,
       isOwner,
       isEmailVerified,
-      isListingPubliclyAvailable,
-      isListingSearchEligible,
-      availabilitySource,
+      listing,
     });
+    const {
+      publicAvailability: viewerPublicAvailability,
+      availabilityGateReason: _availabilityGateReason,
+      ...baseViewerContract
+    } = rawViewerContract as typeof rawViewerContract & {
+      publicAvailability?: ResolvedPublicAvailability | null;
+      availabilityGateReason?: unknown;
+    };
+    const viewerContract =
+      paywallSummary &&
+      features.contactPaywallEnforcement &&
+      !isOwner &&
+      baseViewerContract.primaryCta === "CONTACT_HOST" &&
+      baseViewerContract.canContact &&
+      paywallSummary.requiresPurchase
+        ? {
+            ...baseViewerContract,
+            canContact: false,
+            contactDisabledReason: "PAYWALL_REQUIRED" as ContactDisabledReason,
+          }
+        : baseViewerContract;
 
     const response = NextResponse.json({
       isLoggedIn: true,
@@ -293,7 +246,8 @@ export async function GET(request: Request, { params }: RouteContext) {
           }
         : null,
       ...viewerContract,
-      publicAvailability,
+      publicAvailability: viewerPublicAvailability,
+      paywallSummary,
       needsMigrationReview,
       reviewEligibility: buildReviewEligibility({
         isLoggedIn: true,
@@ -314,20 +268,44 @@ export async function GET(request: Request, { params }: RouteContext) {
       error: sanitizeErrorMessage(error),
     });
 
+    const paywallSummary = await paywallSummaryPromise.catch(() => null);
+    const rawViewerContract = buildPrivacyFirstViewerContract({
+      isLoggedIn: true,
+      isOwner,
+      isEmailVerified,
+      listing,
+    });
+    const {
+      publicAvailability: viewerPublicAvailability,
+      availabilityGateReason: _availabilityGateReason,
+      ...viewerContract
+    } = rawViewerContract as typeof rawViewerContract & {
+      publicAvailability?: ResolvedPublicAvailability | null;
+      availabilityGateReason?: unknown;
+    };
+    const fallbackViewerContract =
+      paywallSummary &&
+      features.contactPaywallEnforcement &&
+      !isOwner &&
+      viewerContract.primaryCta === "CONTACT_HOST" &&
+      viewerContract.canContact &&
+      paywallSummary.requiresPurchase
+        ? {
+            ...viewerContract,
+            canContact: false,
+            contactDisabledReason:
+              "PAYWALL_REQUIRED" as ContactDisabledReason,
+          }
+        : viewerContract;
+
     return NextResponse.json(
       {
         isLoggedIn: true,
         hasBookingHistory: false,
         existingReview: null,
-        ...buildViewerContract({
-          isLoggedIn: true,
-          isOwner,
-          isEmailVerified,
-          isListingPubliclyAvailable,
-          isListingSearchEligible,
-          availabilitySource,
-        }),
-        publicAvailability,
+        ...fallbackViewerContract,
+        publicAvailability: viewerPublicAvailability,
+        paywallSummary,
         needsMigrationReview,
         reviewEligibility: buildReviewEligibility({
           isLoggedIn: true,

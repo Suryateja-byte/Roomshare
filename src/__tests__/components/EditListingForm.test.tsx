@@ -552,6 +552,21 @@ describe("EditListingForm — PATCH submission", () => {
     expect(callBody).not.toHaveProperty("images");
   });
 
+  it("disables host-managed write controls immediately when the loaded listing is moderation-locked", () => {
+    render(
+      <EditListingForm
+        listing={{ ...hostManagedListing, statusReason: "ADMIN_PAUSED" }}
+        moderationWriteLocksEnabled={true}
+      />
+    );
+
+    expect(screen.getByText("Listing locked")).toBeInTheDocument();
+    expect(screen.getByText("This listing is locked while under review.")).toBeInTheDocument();
+    expect(screen.getByTestId("listing-save-button")).toBeDisabled();
+    expect(screen.getByLabelText("Open Slots")).toBeDisabled();
+    expect(screen.getByLabelText("Available Until")).toBeDisabled();
+  });
+
   it("rehydrates the latest host-managed snapshot after reload is requested", async () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: false,
@@ -726,5 +741,42 @@ describe("EditListingForm — PATCH submission", () => {
     expect(callBody).toHaveProperty("description", "A great place to live");
     expect(callBody).toHaveProperty("price", "1500");
     expect(callBody).not.toHaveProperty("expectedVersion");
+  });
+
+  it("preserves legacy edits and disables saving after a LISTING_LOCKED response", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      status: 423,
+      json: () =>
+        Promise.resolve({
+          error: "This listing is locked while under review.",
+          code: "LISTING_LOCKED",
+          lockReason: "SUPPRESSED",
+        }),
+    });
+
+    render(
+      <EditListingForm
+        listing={defaultListing}
+        moderationWriteLocksEnabled={true}
+      />
+    );
+
+    await userEvent.type(
+      screen.getByTestId("listing-title-input"),
+      " updated"
+    );
+    await userEvent.click(screen.getByText("Add Image"));
+    await userEvent.click(screen.getByText("Save Changes"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Listing locked")).toBeInTheDocument();
+      expect(screen.getByTestId("listing-save-button")).toBeDisabled();
+    });
+
+    expect(
+      (screen.getByTestId("listing-title-input") as HTMLInputElement).value
+    ).toContain("updated");
+    expect(mockRouter.push).not.toHaveBeenCalled();
   });
 });

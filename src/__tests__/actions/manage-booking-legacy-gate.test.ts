@@ -82,7 +82,7 @@ jest.mock("@/lib/booking-state-machine", () => ({
 
 jest.mock("@/lib/env", () => ({
   features: {
-    legacyBookingMutations: true,
+    bookingRetirementFreeze: false,
   },
 }));
 
@@ -101,11 +101,8 @@ import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { checkSuspension } from "@/app/actions/suspension";
-import { features } from "@/lib/env";
 import { validateTransition } from "@/lib/booking-state-machine";
 import { applyInventoryDeltas, getAvailability } from "@/lib/availability";
-
-const mockedFeatures = features as { legacyBookingMutations: boolean };
 
 describe("updateBookingStatus legacy mutations gate (CFM-902)", () => {
   const ownerSession = {
@@ -253,7 +250,6 @@ describe("updateBookingStatus legacy mutations gate (CFM-902)", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedFeatures.legacyBookingMutations = true;
     (auth as jest.Mock).mockResolvedValue(ownerSession);
     (checkRateLimit as jest.Mock).mockResolvedValue({
       success: true,
@@ -276,35 +272,34 @@ describe("updateBookingStatus legacy mutations gate (CFM-902)", () => {
 
   it.each([
     {
-      label: 'blocks non-admin host ACCEPTED when flag is "off"',
+      label: "blocks non-admin host ACCEPTED",
       session: ownerSession,
       status: "ACCEPTED" as const,
       action: "accept" as const,
       userId: "owner-123",
     },
     {
-      label: 'blocks non-admin host REJECTED when flag is "off"',
+      label: "blocks non-admin host REJECTED",
       session: ownerSession,
       status: "REJECTED" as const,
       action: "reject" as const,
       userId: "owner-123",
     },
     {
-      label: 'blocks non-admin tenant CANCELLED when flag is "off"',
+      label: "blocks non-admin tenant CANCELLED",
       session: tenantSession,
       status: "CANCELLED" as const,
       action: "cancel" as const,
       userId: "tenant-123",
     },
     {
-      label: 'blocks non-admin EXPIRED when flag is "off"',
+      label: "blocks non-admin EXPIRED",
       session: ownerSession,
       status: "EXPIRED" as const,
       action: "other" as const,
       userId: "owner-123",
     },
   ])("$label", async ({ session, status, action, userId }) => {
-    mockedFeatures.legacyBookingMutations = false;
     (auth as jest.Mock).mockResolvedValue(session);
 
     const result = await updateBookingStatus("booking-123", status);
@@ -329,7 +324,7 @@ describe("updateBookingStatus legacy mutations gate (CFM-902)", () => {
 
   it.each([
     {
-      label: 'allows admin-owner ACCEPTED through when flag is "off"',
+      label: "allows admin-owner ACCEPTED through",
       session: adminOwnerSession,
       status: "ACCEPTED" as const,
       action: "accept" as const,
@@ -337,7 +332,7 @@ describe("updateBookingStatus legacy mutations gate (CFM-902)", () => {
       setupTransaction: mockAcceptedTransaction,
     },
     {
-      label: 'allows admin-owner REJECTED through when flag is "off"',
+      label: "allows admin-owner REJECTED through",
       session: adminOwnerSession,
       status: "REJECTED" as const,
       action: "reject" as const,
@@ -345,7 +340,7 @@ describe("updateBookingStatus legacy mutations gate (CFM-902)", () => {
       setupTransaction: mockRejectedTransaction,
     },
     {
-      label: 'allows admin-tenant CANCELLED through when flag is "off"',
+      label: "allows admin-tenant CANCELLED through",
       session: adminTenantSession,
       status: "CANCELLED" as const,
       action: "cancel" as const,
@@ -353,7 +348,6 @@ describe("updateBookingStatus legacy mutations gate (CFM-902)", () => {
       setupTransaction: mockCancelledTransaction,
     },
   ])("$label", async ({ session, status, action, booking, setupTransaction }) => {
-    mockedFeatures.legacyBookingMutations = false;
     (auth as jest.Mock).mockResolvedValue(session);
     (prisma.booking.findUnique as jest.Mock).mockResolvedValue(booking);
     setupTransaction();
@@ -380,49 +374,7 @@ describe("updateBookingStatus legacy mutations gate (CFM-902)", () => {
     expect(prisma.$transaction).toHaveBeenCalled();
   });
 
-  it('allows non-admin ACCEPTED through when flag is "on" (explicit default)', async () => {
-    mockedFeatures.legacyBookingMutations = true;
-    (auth as jest.Mock).mockResolvedValue(ownerSession);
-    mockAcceptedTransaction();
-
-    const result = await updateBookingStatus("booking-123", "ACCEPTED");
-
-    expect(result).toEqual({ success: true });
-    expect(logger.sync.info).not.toHaveBeenCalledWith(
-      "cfm.booking.legacy_mutation_blocked_count",
-      expect.anything()
-    );
-    expect(checkRateLimit).toHaveBeenCalled();
-    expect(prisma.$transaction).toHaveBeenCalled();
-  });
-
-  it('allows non-admin ACCEPTED through when flag is unset (missing env = on)', async () => {
-    const originalValue = process.env.ENABLE_LEGACY_BOOKING_MUTATIONS;
-    delete process.env.ENABLE_LEGACY_BOOKING_MUTATIONS;
-    // Emulate env-based default by leaving mockedFeatures at getter truthy
-    mockedFeatures.legacyBookingMutations = true;
-    (auth as jest.Mock).mockResolvedValue(ownerSession);
-    mockAcceptedTransaction();
-
-    try {
-      const result = await updateBookingStatus("booking-123", "ACCEPTED");
-
-      expect(result).toEqual({ success: true });
-      expect(logger.sync.info).not.toHaveBeenCalledWith(
-        "cfm.booking.legacy_mutation_blocked_count",
-        expect.anything()
-      );
-      expect(checkRateLimit).toHaveBeenCalled();
-      expect(prisma.$transaction).toHaveBeenCalled();
-    } finally {
-      if (originalValue !== undefined) {
-        process.env.ENABLE_LEGACY_BOOKING_MUTATIONS = originalValue;
-      }
-    }
-  });
-
-  it('lets admin-owner reach the existing EXPIRED guard when flag is "off"', async () => {
-    mockedFeatures.legacyBookingMutations = false;
+  it("lets admin-owner reach the existing EXPIRED guard", async () => {
     (auth as jest.Mock).mockResolvedValue(adminOwnerSession);
 
     const result = await updateBookingStatus("booking-123", "EXPIRED");

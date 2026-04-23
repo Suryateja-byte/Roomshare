@@ -1,0 +1,19 @@
+Test Suites: 9 passed, 9 total
+Tests:       44 passed, 44 total
+Snapshots:   0 total
+Time:        5.675 s
+--
+Test Suites: 17 passed, 17 total
+Tests:       64 passed, 64 total
+Snapshots:   0 total
+Time:        28.244 s
+--
+Test Suites: 17 passed, 17 total
+Tests:       66 passed, 66 total
+Snapshots:   0 total
+Time:        16.153 s
+--
+Test Suites: 27 failed, 2 skipped, 400 passed, 427 of 429 total
+Tests:       127 failed, 8 skipped, 7633 passed, 7768 total
+Snapshots:   0 total
+Time:        23.571 s, estimated 24 s

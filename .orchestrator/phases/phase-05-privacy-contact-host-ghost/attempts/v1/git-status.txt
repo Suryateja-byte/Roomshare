@@ -1,0 +1,24 @@
+Scoped Phase 05 status:
+
+ M prisma/schema.prisma
+ M src/__tests__/actions/chat.test.ts
+ M src/app/actions/chat.ts
+ M src/lib/env.ts
+ M src/lib/rate-limit.ts
+?? .orchestrator/phases/phase-05-privacy-contact-host-ghost/
+?? prisma/migrations/20260505000000_phase05_privacy_contact_host_ghost/
+?? src/__tests__/api/phone-reveal-route.test.ts
+?? src/__tests__/db/phase05-schema.test.ts
+?? src/__tests__/lib/contact/
+?? src/__tests__/lib/geocoding/public-autocomplete.test.ts
+?? src/__tests__/lib/messaging/outbound-content-guard.test.ts
+?? src/__tests__/lib/payments/contact-restoration.test.ts
+?? src/__tests__/lib/privacy/public-read-contract.test.ts
+?? src/__tests__/utils/pglite-phase05.ts
+?? src/app/api/phone-reveal/route.ts
+?? src/lib/contact/
+?? src/lib/messaging/outbound-content-guard.ts
+?? src/lib/privacy/public-read-contract.ts
+
+The wider worktree contains many unrelated pre-existing tracked and untracked changes.
+Those were preserved and not reverted.

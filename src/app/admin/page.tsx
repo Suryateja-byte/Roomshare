@@ -12,6 +12,7 @@ import {
   MessageSquare,
   TrendingUp,
   Shield,
+  ScrollText,
 } from "lucide-react";
 
 export const metadata: Metadata = {
@@ -134,6 +135,7 @@ export default async function AdminDashboard() {
     },
     { label: "User Management", href: "/admin/users", icon: Users },
     { label: "Listing Moderation", href: "/admin/listings", icon: Home },
+    { label: "Bookings", href: "/admin/bookings", icon: ScrollText },
     {
       label: "Reports",
       href: "/admin/reports",

@@ -312,7 +312,7 @@ describe("SearchForm", () => {
 
       const pushCall = mockPush.mock.calls[0]?.[0] ?? "";
       expect(pushCall).toContain("what=sunny+room");
-      expect(pushCall).toContain("where=San+Francisco");
+      expect(pushCall).toContain("locationLabel=San+Francisco");
       expect(pushCall).toContain("minPrice=900");
       expect(pushCall).toContain("maxPrice=1500");
       expect(pushCall).toContain("lat=37.7749");
@@ -774,7 +774,7 @@ describe("SearchForm", () => {
       jest.advanceTimersByTime(500);
 
       const pushCall = mockPush.mock.calls[0][0];
-      expect(pushCall).toContain("where=downtown");
+      expect(pushCall).toContain("locationLabel=downtown");
     });
 
     it("only includes a canonical location label when a selection exists", async () => {
@@ -790,6 +790,7 @@ describe("SearchForm", () => {
 
       const pushCall = mockPush.mock.calls[0][0];
       expect(pushCall).not.toContain("q=");
+      expect(pushCall).not.toContain("locationLabel=");
       expect(pushCall).not.toContain("where=");
     });
 

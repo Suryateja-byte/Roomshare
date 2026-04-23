@@ -15,37 +15,24 @@ import {
   Home,
   DollarSign,
   List,
-  Loader2,
-  WifiOff,
   Filter,
-  AlertTriangle,
   Bell,
   PauseCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
-import {
-  updateBookingStatus,
-  BookingStatus,
-} from "@/app/actions/manage-booking";
 import UserAvatar from "@/components/UserAvatar";
 import BookingCalendar from "@/components/BookingCalendar";
-import HoldCountdown from "@/components/bookings/HoldCountdown";
-import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { parseISODateAsLocal } from "@/lib/utils";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 
 type AvailabilitySource = "LEGACY_BOOKING" | "HOST_MANAGED";
+type BookingStatus =
+  | "PENDING"
+  | "ACCEPTED"
+  | "REJECTED"
+  | "CANCELLED"
+  | "HELD"
+  | "EXPIRED";
 
 type Booking = {
   id: string;
@@ -81,7 +68,6 @@ type Booking = {
 interface BookingsClientProps {
   sentBookings: Booking[];
   receivedBookings: Booking[];
-  isHistoryFirstMode?: boolean;
 }
 
 const statusConfig = {
@@ -143,55 +129,14 @@ function formatDate(date: Date | string) {
 function BookingCard({
   booking,
   type,
-  onStatusUpdate,
-  isOffline,
-  isHistoryFirstMode = false,
 }: {
   booking: Booking;
   type: "sent" | "received";
-  onStatusUpdate: (
-    bookingId: string,
-    status: BookingStatus,
-    rejectionReason?: string
-  ) => Promise<void>;
-  isOffline: boolean;
-  isHistoryFirstMode?: boolean;
 }) {
-  const [updatingStatus, setUpdatingStatus] = useState<BookingStatus | null>(
-    null
-  );
-  const [showCancelDialog, setShowCancelDialog] = useState(false);
-  const [showRejectDialog, setShowRejectDialog] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState("");
-
-  const handleStatusUpdate = async (status: BookingStatus, reason?: string) => {
-    if (isOffline) {
-      toast.error("You're offline", {
-        description:
-          "Please check your internet connection to update booking status.",
-      });
-      return;
-    }
-    setUpdatingStatus(status);
-    await onStatusUpdate(booking.id, status, reason);
-    setUpdatingStatus(null);
-  };
-
-  const isUpdating = updatingStatus !== null;
-
   const locationText = booking.listing.location
     ? `${booking.listing.location.city}, ${booking.listing.location.state}`
     : "Location not specified";
   const isLegacyRow = booking.listing.availabilitySource === "HOST_MANAGED";
-
-  const showActions =
-    !isHistoryFirstMode &&
-    type === "received" &&
-    ["PENDING", "HELD"].includes(booking.status);
-  const showCancelButton =
-    !isHistoryFirstMode &&
-    type === "sent" &&
-    ["PENDING", "ACCEPTED", "HELD"].includes(booking.status);
 
   return (
     <div
@@ -226,16 +171,6 @@ function BookingCard({
                 </Badge>
               )}
             </div>
-            {booking.status === "HELD" && booking.heldUntil && (
-              <HoldCountdown
-                heldUntil={
-                  typeof booking.heldUntil === "string"
-                    ? booking.heldUntil
-                    : booking.heldUntil.toISOString()
-                }
-                onExpired={() => window.location.reload()}
-              />
-            )}
           </div>
         </div>
 
@@ -304,192 +239,8 @@ function BookingCard({
             )}
           </div>
         </div>
-
-        {(showActions || showCancelButton) && (
-          <div className="flex gap-3 mt-4">
-            {showActions && (
-              <>
-                <Button
-                  onClick={() => handleStatusUpdate("ACCEPTED")}
-                  disabled={isUpdating}
-                  className="flex-1"
-                >
-                  {updatingStatus === "ACCEPTED" ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Accepting...
-                    </>
-                  ) : (
-                    "Accept"
-                  )}
-                </Button>
-                <Button
-                  onClick={() => setShowRejectDialog(true)}
-                  disabled={isUpdating}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  {updatingStatus === "REJECTED" ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Rejecting...
-                    </>
-                  ) : (
-                    "Reject"
-                  )}
-                </Button>
-              </>
-            )}
-            {showCancelButton && (
-              <Button
-                onClick={() => setShowCancelDialog(true)}
-                disabled={isUpdating}
-                variant="destructive"
-                className="flex-1"
-              >
-                {updatingStatus === "CANCELLED" ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Cancelling...
-                  </>
-                ) : (
-                  "Cancel Booking"
-                )}
-              </Button>
-            )}
-          </div>
-        )}
-
-        {!isHistoryFirstMode && (
-          <>
-            {/* Cancel Confirmation Dialog */}
-            <AlertDialog
-              open={showCancelDialog}
-              onOpenChange={setShowCancelDialog}
-            >
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-                      <AlertTriangle className="w-5 h-5 text-red-600" />
-                    </div>
-                    <AlertDialogTitle>Cancel this booking?</AlertDialogTitle>
-                  </div>
-                  <AlertDialogDescription className="text-left">
-                    <span className="block mb-2">
-                      You&apos;re about to cancel your booking for:
-                    </span>
-                    <span className="block font-semibold text-on-surface">
-                      {booking.listing.title}
-                    </span>
-                    <span className="block text-sm mt-1">
-                      {formatDate(booking.startDate)} —{" "}
-                      {formatDate(booking.endDate)}
-                    </span>
-                    <span className="block text-sm mt-3 text-red-600">
-                      This action cannot be undone.
-                    </span>
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel disabled={isUpdating}>
-                    Keep Booking
-                  </AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => {
-                      setShowCancelDialog(false);
-                      handleStatusUpdate("CANCELLED");
-                    }}
-                    disabled={isUpdating}
-                    className="bg-red-600 hover:bg-red-700 text-white"
-                  >
-                    {isUpdating ? "Cancelling..." : "Yes, Cancel Booking"}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-
-            {/* Reject Booking Dialog */}
-            <AlertDialog
-              open={showRejectDialog}
-              onOpenChange={(open) => {
-                setShowRejectDialog(open);
-                if (!open) setRejectionReason("");
-              }}
-            >
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-                      <XCircle className="w-5 h-5 text-amber-600" />
-                    </div>
-                    <AlertDialogTitle>
-                      Reject this booking request?
-                    </AlertDialogTitle>
-                  </div>
-                  <AlertDialogDescription className="text-left">
-                    <span className="block mb-2">
-                      You&apos;re about to reject the booking request from:
-                    </span>
-                    <span className="block font-semibold text-on-surface">
-                      {booking.tenant?.name || "Tenant"}
-                    </span>
-                    <span className="block text-sm mt-1">
-                      For: {booking.listing.title}
-                    </span>
-                    <span className="block text-sm">
-                      {formatDate(booking.startDate)} —{" "}
-                      {formatDate(booking.endDate)}
-                    </span>
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-
-                <div className="py-2">
-                  <label
-                    htmlFor="rejection-reason"
-                    className="block text-sm font-medium text-on-surface-variant mb-2"
-                  >
-                    Reason for rejection (optional)
-                  </label>
-                  <textarea
-                    id="rejection-reason"
-                    value={rejectionReason}
-                    onChange={(e) => setRejectionReason(e.target.value)}
-                    placeholder="Let the tenant know why you're declining their request..."
-                    className="w-full px-3 py-2 text-sm border border-outline-variant/20 rounded-lg bg-surface-container-lowest text-on-surface placeholder-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                    rows={3}
-                    maxLength={500}
-                    disabled={isUpdating}
-                  />
-                  <p className="text-xs text-on-surface-variant mt-1 text-right">
-                    {rejectionReason.length}/500
-                  </p>
-                </div>
-
-                <AlertDialogFooter>
-                  <AlertDialogCancel disabled={isUpdating}>
-                    Cancel
-                  </AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => {
-                      const reason = rejectionReason.trim() || undefined;
-                      setShowRejectDialog(false);
-                      setRejectionReason("");
-                      handleStatusUpdate("REJECTED", reason);
-                    }}
-                    disabled={isUpdating}
-                    className="bg-amber-600 hover:bg-amber-700 text-white"
-                  >
-                    {isUpdating ? "Rejecting..." : "Reject Booking"}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </>
-        )}
-
         <p className="text-xs text-on-surface-variant mt-4">
-          Requested on {formatDate(booking.createdAt)}
+          Recorded on {formatDate(booking.createdAt)}
         </p>
       </div>
     </div>
@@ -499,64 +250,20 @@ function BookingCard({
 export default function BookingsClient({
   sentBookings,
   receivedBookings,
-  isHistoryFirstMode = false,
 }: BookingsClientProps) {
   const [activeTab, setActiveTab] = useState<"sent" | "received">("received");
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
   const [statusFilter, setStatusFilter] = useState<BookingStatus | "ALL">(
     "ALL"
   );
-  const [bookings, setBookings] = useState({
-    sent: sentBookings,
-    received: receivedBookings,
-  });
-  const { isOffline } = useNetworkStatus();
-
-  const handleStatusUpdate = async (
-    bookingId: string,
-    status: BookingStatus,
-    rejectionReason?: string
-  ) => {
-    // Store previous state for rollback
-    const previousBookings = { ...bookings };
-
-    // Optimistically update local state immediately
-    setBookings((prev) => ({
-      sent: prev.sent.map((b) => (b.id === bookingId ? { ...b, status } : b)),
-      received: prev.received.map((b) =>
-        b.id === bookingId ? { ...b, status } : b
-      ),
-    }));
-
-    // Then make the API call
-    const result = await updateBookingStatus(
-      bookingId,
-      status,
-      rejectionReason
-    );
-
-    if (result.error) {
-      // Revert to previous state on error
-      setBookings(previousBookings);
-      toast.error(result.error);
-      return;
-    }
-
-    // Show success feedback
-    toast.success(`Booking ${status.toLowerCase()}`);
-  };
-
-  const allBookings = activeTab === "sent" ? bookings.sent : bookings.received;
+  const allBookings = activeTab === "sent" ? sentBookings : receivedBookings;
   const currentBookings =
     statusFilter === "ALL"
       ? allBookings
       : allBookings.filter((b) => b.status === statusFilter);
-  const hasLegacyBookings = [...bookings.sent, ...bookings.received].some(
+  const hasLegacyBookings = [...sentBookings, ...receivedBookings].some(
     (booking) => booking.listing.availabilitySource === "HOST_MANAGED"
   );
-  const pendingReceivedCount = bookings.received.filter(
-    (b) => b.status === "PENDING" || b.status === "HELD"
-  ).length;
 
   // Status filter options with counts
   const statusOptions: {
@@ -607,9 +314,7 @@ export default function BookingsClient({
               My Bookings
             </h1>
             <p className="text-on-surface-variant mt-2">
-              {isHistoryFirstMode
-                ? "Your booking history (read-only)."
-                : "Manage your booking requests and reservations"}
+              Your booking history.
             </p>
           </div>
           <Link
@@ -621,24 +326,12 @@ export default function BookingsClient({
           </Link>
         </div>
 
-        {/* Offline Banner */}
-        {isOffline && (
-          <div className="mb-6 p-4 rounded-xl bg-surface-container-high flex items-center gap-3">
-            <WifiOff className="w-5 h-5 text-on-surface-variant flex-shrink-0" />
-            <p className="text-sm text-on-surface-variant">
-              You&apos;re offline. Booking actions are disabled until you
-              reconnect.
-            </p>
-          </div>
-        )}
-
         {hasLegacyBookings && (
           <div className="mb-6 flex items-start gap-3 rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-4">
             <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-on-surface-variant" />
             <p className="text-sm text-on-surface-variant">
-              {isHistoryFirstMode
-                ? "This is your booking history. To start a new conversation with a host, use Messages."
-                : "New bookings are paused. You can still manage existing requests and holds here. To start a new conversation with a host, use Messages."}
+              This page shows your booking history. To start a new
+              conversation with a host, use Messages.
             </p>
           </div>
         )}
@@ -657,11 +350,6 @@ export default function BookingsClient({
               <span className="flex items-center gap-2">
                 <Home className="w-4 h-4" />
                 Received
-                {pendingReceivedCount > 0 && (
-                  <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
-                    {pendingReceivedCount}
-                  </span>
-                )}
               </span>
             </button>
             <button
@@ -749,10 +437,10 @@ export default function BookingsClient({
             className="animate-in fade-in slide-in-from-bottom-2 duration-200"
           >
             <BookingCalendar
-              bookings={bookings.received.map((b) => ({
+              bookings={receivedBookings.map((b) => ({
                 id: b.id,
-                startDate: b.startDate, // BookingCalendar now handles Date | string
-                endDate: b.endDate, // BookingCalendar now handles Date | string
+                startDate: b.startDate,
+                endDate: b.endDate,
                 status: b.status,
                 tenant: {
                   id: b.tenant?.id || "",
@@ -788,15 +476,17 @@ export default function BookingsClient({
                 </div>
                 <h3 className="text-lg font-semibold text-on-surface mb-2">
                   {activeTab === "received"
-                    ? "No booking requests yet"
-                    : "No bookings made yet"}
+                    ? "No hosted stays yet"
+                    : "No booking history yet"}
                 </h3>
                 <p className="text-on-surface-variant mb-6">
                   {activeTab === "received"
-                    ? "When tenants request to book your listings, they will appear here."
-                    : "When you request to book a room, it will appear here."}
+                    ? "Guest stay history for your listings will appear here."
+                    : "Past stay history and legacy booking records will appear here."}
                 </p>
-                <Link href="/search">
+                <Link
+                  href={activeTab === "received" ? "/listings/create" : "/search"}
+                >
                   <Button>
                     {activeTab === "received" ? "List a Room" : "Find a Room"}
                     <ChevronRight className="w-4 h-4 ml-1" />
@@ -810,9 +500,6 @@ export default function BookingsClient({
                     key={booking.id}
                     booking={booking}
                     type={activeTab}
-                    onStatusUpdate={handleStatusUpdate}
-                    isOffline={isOffline}
-                    isHistoryFirstMode={isHistoryFirstMode}
                   />
                 ))}
               </div>

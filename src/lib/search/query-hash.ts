@@ -18,6 +18,10 @@ export interface HashableSearchQuery {
   bookingMode?: string;
   minAvailableSlots?: number;
   nearMatches?: boolean;
+  projectionEpoch?: string | number | bigint | null;
+  embeddingVersion?: string | null;
+  rankerProfileVersion?: string | null;
+  unitIdentityEpochFloor?: number | null;
   bounds?: {
     minLat: number;
     maxLat: number;
@@ -58,6 +62,22 @@ function normalizeHashableSearchQuery(query: HashableSearchQuery) {
       invalidRange: "drop",
     }
   );
+  const versionTokens: Record<string, string | number | null> = {};
+  if ("projectionEpoch" in query) {
+    versionTokens.projectionEpoch =
+      query.projectionEpoch !== null && query.projectionEpoch !== undefined
+        ? String(query.projectionEpoch)
+        : null;
+  }
+  if ("embeddingVersion" in query) {
+    versionTokens.embeddingVersion = query.embeddingVersion ?? null;
+  }
+  if ("rankerProfileVersion" in query) {
+    versionTokens.rankerProfileVersion = query.rankerProfileVersion ?? null;
+  }
+  if ("unitIdentityEpochFloor" in query) {
+    versionTokens.unitIdentityEpochFloor = query.unitIdentityEpochFloor ?? null;
+  }
 
   return {
     v: SEARCH_QUERY_HASH_VERSION,
@@ -77,6 +97,7 @@ function normalizeHashableSearchQuery(query: HashableSearchQuery) {
     bookingMode: (normalized.bookingMode ?? "").toLowerCase(),
     minAvailableSlots: normalized.minAvailableSlots ?? null,
     nearMatches: normalized.nearMatches ?? false,
+    ...versionTokens,
     bounds: normalized.bounds
       ? {
           minLat: quantizeBound(normalized.bounds.minLat),

@@ -28,6 +28,7 @@ import { markListingsDirtyInTx } from "@/lib/search/search-doc-dirty";
 import { waitForTestBarrier } from "@/lib/test-barriers";
 import { features } from "@/lib/env";
 import { hashIdForLog } from "@/lib/messaging/cfm-messaging-telemetry";
+import { getLegacyBookingRetirementResult } from "@/lib/bookings/retirement-freeze";
 
 // Booking result type for structured error handling
 export type BookingResult = {
@@ -449,6 +450,10 @@ export async function createBooking(
       error: "Too many requests. Please wait.",
       code: "RATE_LIMITED",
     };
+  }
+
+  if (features.bookingRetirementFreeze) {
+    return getLegacyBookingRetirementResult("booking");
   }
 
   if (features.contactFirstListings) {
@@ -1079,6 +1084,10 @@ export async function createHold(
       error: "Too many requests. Please wait.",
       code: "RATE_LIMITED",
     };
+  }
+
+  if (features.bookingRetirementFreeze) {
+    return getLegacyBookingRetirementResult("hold");
   }
 
   if (features.contactFirstListings) {

@@ -11,15 +11,50 @@ import {
 import { getCachedResults, setCachedResults } from "@/lib/geocoding-cache";
 import { FetchTimeoutError } from "@/lib/fetch-with-timeout";
 import { searchPhoton } from "@/lib/geocoding/photon";
+import { searchPublicAutocomplete } from "@/lib/geocoding/public-autocomplete";
+import { getPublicCacheStatePayload } from "@/lib/public-cache/state";
+import { withRateLimit } from "@/lib/with-rate-limit";
+import { features } from "@/lib/env";
+import { logger } from "@/lib/logger";
+import { recordPublicAutocompleteRequest } from "@/lib/geocoding/public-autocomplete-telemetry";
 
 function jsonError(code: LocationAutocompleteErrorCode, status: number) {
-  return NextResponse.json<LocationAutocompleteErrorResponse>(
+  const response = NextResponse.json<LocationAutocompleteErrorResponse>(
     { code },
     { status }
   );
+  response.headers.set("Cache-Control", "no-store");
+  return response;
+}
+
+function jsonSuccess(data: LocationAutocompleteSuccessResponse) {
+  const response = NextResponse.json<LocationAutocompleteSuccessResponse>(data);
+  response.headers.set("Cache-Control", "no-store");
+  return response;
+}
+
+async function getPublicAutocompleteCacheVersion(): Promise<string> {
+  try {
+    const { cacheFloorToken } = await getPublicCacheStatePayload();
+    return `public:${cacheFloorToken}`;
+  } catch (error) {
+    logger.sync.warn("Public autocomplete cache floor unavailable", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return "public:none";
+  }
 }
 
 export async function GET(request: Request) {
+  const rateLimitResponse = await withRateLimit(request, {
+    type: "publicAutocomplete",
+    endpoint: "/api/geocoding/autocomplete",
+  });
+  if (rateLimitResponse) {
+    rateLimitResponse.headers.set("Cache-Control", "no-store");
+    return rateLimitResponse;
+  }
+
   const url = new URL(request.url);
   const rawQuery = url.searchParams.get("q") ?? "";
   const query = sanitizeAutocompleteQuery(rawQuery);
@@ -32,22 +67,38 @@ export async function GET(request: Request) {
     return jsonError("INVALID_QUERY", 422);
   }
 
-  const cachedResults = await getCachedResults(query);
+  recordPublicAutocompleteRequest(
+    features.publicAutocompleteContract ? "public_contract" : "legacy"
+  );
+
+  const cacheOptions = features.publicAutocompleteContract
+    ? {
+        cacheVersion: await getPublicAutocompleteCacheVersion(),
+        ttlSeconds: 15 * 60,
+      }
+    : undefined;
+
+  const cachedResults = await getCachedResults(query, cacheOptions);
   if (cachedResults) {
-    return NextResponse.json<LocationAutocompleteSuccessResponse>({
+    return jsonSuccess({
       results: cachedResults,
     });
   }
 
   try {
-    const results = await searchPhoton(query, { limit });
-    await setCachedResults(query, results);
+    const results = features.publicAutocompleteContract
+      ? await searchPublicAutocomplete(query, { limit })
+      : await searchPhoton(query, { limit });
+    await setCachedResults(query, results, cacheOptions);
 
-    return NextResponse.json<LocationAutocompleteSuccessResponse>({
+    return jsonSuccess({
       results,
     });
   } catch (error) {
-    if (error instanceof FetchTimeoutError) {
+    if (
+      !features.publicAutocompleteContract &&
+      error instanceof FetchTimeoutError
+    ) {
       return jsonError("TIMEOUT", 504);
     }
 

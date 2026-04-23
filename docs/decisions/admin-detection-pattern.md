@@ -34,9 +34,9 @@ Rationale:
 
 No forced migration of existing call sites is planned. New code should prefer session-based unless one of the exceptions above applies.
 
-## Compatibility with CFM Migration Flags
+## Compatibility with CFM Migration Lockdown
 
-- `ENABLE_LEGACY_BOOKING_MUTATIONS=off` gate in `updateBookingStatus` uses session-based `session.user.isAdmin === true`. If session revocation matters operationally (e.g., revoking an admin mid-incident), this is known: the change takes effect on the admin's next login or session refresh. Given the flag is only set during coordinated drain completion, this is acceptable.
+- The permanent non-admin gate in `updateBookingStatus` uses session-based `session.user.isAdmin === true` to preserve the existing admin bypass. If session revocation matters operationally (e.g., revoking an admin mid-incident), this is known: the change takes effect on the admin's next login or session refresh. Given the path now exists only for admin-only legacy cleanup/support work, this is acceptable.
 
 ## Future Work
 

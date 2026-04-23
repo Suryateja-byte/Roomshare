@@ -11,6 +11,7 @@ import { generateViewToken } from "@/app/api/metrics/hmac";
 import { getAvailability } from "@/lib/availability";
 import { resolveListingDetailDateParams } from "@/lib/search/listing-detail-link";
 import { resolvePublicAvailability } from "@/lib/search/public-availability";
+import { getPublicListingDetail } from "@/lib/listings/public-detail";
 import ListingPageClient from "./ListingPageClient";
 
 const getListingWithLocation = cache(async (id: string) => {
@@ -128,7 +129,8 @@ export async function generateMetadata({
 
   let listing;
   try {
-    listing = await getListingWithLocation(id);
+    const publicDetail = await getPublicListingDetail(id);
+    listing = publicDetail?.listing ?? null;
   } catch {
     return { title: "Listing | RoomShare" };
   }
@@ -172,23 +174,32 @@ export default async function ListingPage({ params, searchParams }: PageProps) {
   const rawSearchParams = searchParams ? await searchParams : undefined;
   const initialAvailabilityRange =
     resolveInitialAvailabilityRange(rawSearchParams);
-  const listing = await getListingWithLocation(id);
+  const session = await auth();
+  let isOwner = false;
+  const isAdmin = session?.user?.isAdmin === true;
+  let canViewExactLocation = false;
+  let publicDetail:
+    | Awaited<ReturnType<typeof getPublicListingDetail>>
+    | null = null;
+  let listing = null;
 
-  if (!listing) {
+  publicDetail = await getPublicListingDetail(id, {
+    userId: session?.user?.id ?? null,
+    isAdmin,
+  });
+
+  if (!publicDetail) {
     notFound();
   }
 
-  let session = null;
-  let isOwner = false;
-  let isAdmin = false;
+  isOwner = publicDetail.isOwner;
+  canViewExactLocation = publicDetail.isOwner || publicDetail.isAdmin;
+  listing = canViewExactLocation
+    ? await getListingWithLocation(id)
+    : publicDetail.listing;
 
-  if (listing.status !== "ACTIVE") {
-    session = await auth();
-    isOwner = session?.user?.id === listing.ownerId;
-    isAdmin = session?.user?.isAdmin === true;
-    if (!isOwner && !isAdmin) {
-      notFound();
-    }
+  if (!listing) {
+    notFound();
   }
 
   // Start similar listings fetch early (runs in parallel with remaining queries)
@@ -206,7 +217,7 @@ export default async function ListingPage({ params, searchParams }: PageProps) {
 
   const [coordinates, reviews, legacyAvailability] = await Promise.all([
     (async () => {
-      if (!listing.location) {
+      if (!canViewExactLocation || !listing.location) {
         return null;
       }
 
@@ -355,6 +366,7 @@ export default async function ListingPage({ params, searchParams }: PageProps) {
           availabilitySource: resolvedAvailability.availabilitySource,
           bookingMode: listing.bookingMode ?? "SHARED",
           status: listing.status,
+          statusReason: listing.statusReason,
           viewCount: listing.viewCount,
           genderPreference: listing.genderPreference,
           householdGender: listing.householdGender,
@@ -381,12 +393,14 @@ export default async function ListingPage({ params, searchParams }: PageProps) {
         userExistingReview={null}
         holdEnabled={features.softHoldsEnabled}
         coordinates={coordinates}
+        canViewExactLocation={canViewExactLocation}
         similarListings={similarListings}
         viewToken={generateViewToken(listing.id)}
         initialStartDate={initialAvailabilityRange.initialStartDate}
         initialEndDate={initialAvailabilityRange.initialEndDate}
         initialAvailability={availability}
         contactFirstEnabled={features.contactFirstListings}
+        moderationWriteLocksEnabled={features.moderationWriteLocks}
       />
     </>
   );

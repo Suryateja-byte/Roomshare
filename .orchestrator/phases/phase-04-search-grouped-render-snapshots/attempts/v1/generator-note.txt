@@ -1,0 +1,35 @@
+Phase 04 v1 implementation closeout
+
+Role sequence:
+- Workflow Orchestrator: accepted the user-provided Phase 04 plan and explicit implementation request for additive migration work.
+- Planning agent: produced spec.md and scoped the phase to a FEATURE_PHASE04_PROJECTION_READS flagged read cutover.
+- Generating agent: implemented the schema, contracts, projection search engine, route/UI wiring, tests, and telemetry.
+- Critic: reviewed the completed slice and approved it after validation, with unrelated broader-search failures documented as deferred.
+
+Implemented changes:
+- Added an expand-only Phase 04 migration for grouped public card/map projection fields and query snapshot v4 fields.
+- Added Prisma schema fields for unit_public_projection and query_snapshots while keeping ordered_listing_ids for legacy TTL compatibility.
+- Added Phase 04 feature/kill-switch helpers: FEATURE_PHASE04_PROJECTION_READS, KILL_SWITCH_FORCE_LIST_ONLY, and KILL_SWITCH_FORCE_CLUSTERS_ONLY.
+- Added SearchSpec admission/normalization with requested occupants, max_gap_days, radius/bounds, and deep-paging guards.
+- Added version-pinned query hashing for projection_epoch, embedding_version, ranker_profile_version, and unit_identity_epoch_floor without changing legacy hashes.
+- Added v4 snapshot cursors keyed by query_snapshot_id/page/page_size/snapshot_version while legacy v3/v4 mismatches return snapshot_expired.
+- Added projection-search reads over inventory_search_projection + unit_public_projection, with semantic candidate joins pinned to getReadEmbeddingVersion() when semantic search is enabled.
+- Added grouped one-card-per-unit result adaptation, map payload generation, snapshot creation/hydration, tombstone/missing-unit hole backfill, and snapshot_hole_ratio telemetry.
+- Wired /api/search/v2, /api/search/listings, /api/map-listings, and /api/search-count to the Phase 04 projection path under the flag.
+- Added snapshot-expired client telemetry while preserving the existing SearchResultsClient refresh cue.
+- Kept fallback safe: FEATURE_PHASE04_PROJECTION_READS=false continues using the existing search-doc path.
+- Made unit_public_projection rebuild schema-adaptive so Phase 02/03 PGlite fixtures still exercise legacy table shape while Phase 04 schemas populate new fields.
+
+Validation:
+- Phase 04 targeted Jest set: PASS, 16 suites / 231 tests.
+- SearchResultsClient snapshot-expired refresh cue component test: PASS, 1 suite / 33 tests.
+- Phase 02 focused Jest set: PASS, 20 suites / 165 tests.
+- Phase 03 targeted Jest set: PASS, 3 suites / 14 tests.
+- Existing embedding Jest set: PASS, 9 suites / 140 tests.
+- pnpm exec prisma validate: PASS.
+- pnpm typecheck: PASS.
+- pnpm lint: PASS with 0 errors and 43 existing warnings.
+
+Deferred:
+- A broader search sweep was attempted. After fixing the Phase 04-caused query-hash compatibility issue and nearby stale expectations, the remaining failures were outside the Phase 04 cutover target: api/search/facets route tests failing on the existing raw where-clause security guard, unbounded-browse protection fixture mismatch, and search-v2-service.test.ts heap exhaustion. search-v2-service.test.ts also exhausted heap with NODE_OPTIONS=--max-old-space-size=8192, matching the repo's prior broad-test heap/OOM risk.
+- Optional full pnpm test --runInBand was not rerun because prior phase artifacts and this phase's focused search sweep both hit unrelated heap/OOM behavior.

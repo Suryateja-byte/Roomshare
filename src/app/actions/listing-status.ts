@@ -17,10 +17,13 @@ import {
   type HostManagedListingWriteCurrent,
   prepareHostManagedListingWrite,
 } from "@/lib/listings/host-managed-write";
+import { features } from "@/lib/env";
+import { getModerationWriteLockResult } from "@/lib/listings/moderation-write-lock";
 import {
   executeLockedListingMigrationReview,
   fetchLockedListingMigrationReviewRecord,
 } from "@/lib/migration/review";
+import { recordFreshnessRecovered } from "@/lib/metrics/cfm-ops-telemetry";
 // Basic listingId format check — rejects empty/absurdly long strings
 // without being as strict as CUID/UUID validation (allows test IDs)
 const isReasonableId = (id: string) =>
@@ -103,6 +106,20 @@ export async function updateListingStatus(
         }
 
         const currentListing = rows[0];
+        const writeLock = features.moderationWriteLocks
+          ? getModerationWriteLockResult({
+              actor: "host",
+              statusReason: currentListing.statusReason,
+            })
+          : null;
+
+        if (writeLock) {
+          return {
+            error: writeLock.error,
+            code: writeLock.code,
+            lockReason: writeLock.lockReason,
+          } as const;
+        }
 
         if (currentListing.version !== expectedVersion) {
           return {
@@ -356,6 +373,20 @@ export async function recoverHostManagedListing(
         }
 
         const currentListing = rows[0];
+        const writeLock = features.moderationWriteLocks
+          ? getModerationWriteLockResult({
+              actor: "host",
+              statusReason: currentListing.statusReason,
+            })
+          : null;
+
+        if (writeLock) {
+          return {
+            error: writeLock.error,
+            code: writeLock.code,
+            lockReason: writeLock.lockReason,
+          } as const;
+        }
 
         if (currentListing.availabilitySource !== "HOST_MANAGED") {
           return {
@@ -408,6 +439,12 @@ export async function recoverHostManagedListing(
     if ("error" in result) {
       return result;
     }
+
+    recordFreshnessRecovered({
+      listingId,
+      ownerId: session.user.id,
+      mode,
+    });
 
     revalidatePath(`/listings/${listingId}`);
     revalidatePath(`/listings/${listingId}/edit`);

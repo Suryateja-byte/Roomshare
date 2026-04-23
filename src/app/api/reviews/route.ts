@@ -9,6 +9,15 @@ import { withRateLimit } from "@/lib/with-rate-limit";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { captureApiError } from "@/lib/api-error-handler";
 import { validateCsrf } from "@/lib/csrf";
+import {
+  ACTIVE_REPORT_STATUSES,
+  canLeavePrivateFeedback,
+} from "@/lib/reports/private-feedback";
+import {
+  recordContactOnlyReviewAttempt,
+  recordUnauthorizedReviewCreate,
+} from "@/lib/metrics/cfm-ops-telemetry";
+import { PUBLIC_REVIEW_CONFIRMED_STAY_MESSAGE } from "@/lib/reviews/public-review-copy";
 import { z } from "zod";
 import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 import {
@@ -115,10 +124,64 @@ export async function POST(request: Request) {
 
       // Require booking history before allowing review (prevents fake reviews)
       if (!hasBooking) {
+        recordUnauthorizedReviewCreate({
+          listingId,
+          reviewerId: session.user.id,
+          scope: "listing",
+        });
+
+        const listing = await prisma.listing.findUnique({
+          where: { id: listingId },
+          select: { ownerId: true },
+        });
+
+        if (
+          listing
+        ) {
+          const [priorConversation, existingPrivateFeedback] =
+            await Promise.all([
+              prisma.conversation.findFirst({
+                where: {
+                  listingId,
+                  AND: [
+                    { participants: { some: { id: session.user.id } } },
+                    { participants: { some: { id: listing.ownerId } } },
+                  ],
+                  messages: { some: { senderId: session.user.id } },
+                },
+                select: { id: true },
+              }),
+              prisma.report.findFirst({
+                where: {
+                  reporterId: session.user.id,
+                  listingId,
+                  kind: "PRIVATE_FEEDBACK",
+                  status: { in: [...ACTIVE_REPORT_STATUSES] },
+                },
+                select: { id: true },
+              }),
+            ]);
+
+          if (
+            canLeavePrivateFeedback({
+              isLoggedIn: true,
+              isOwner: listing.ownerId === session.user.id,
+              isEmailVerified: true,
+              hasPriorConversation: Boolean(priorConversation),
+              hasAcceptedBooking: false,
+              hasExistingPrivateFeedback: Boolean(existingPrivateFeedback),
+            })
+          ) {
+            recordContactOnlyReviewAttempt({
+              listingId,
+              reviewerId: session.user.id,
+              targetUserId: listing.ownerId,
+            });
+          }
+        }
+
         return NextResponse.json(
-          {
-            error: "Only past guests with a confirmed stay can review this listing",
-          },
+          { error: PUBLIC_REVIEW_CONFIRMED_STAY_MESSAGE },
           { status: 403 }
         );
       }
@@ -148,6 +211,11 @@ export async function POST(request: Request) {
       });
 
       if (!hasInteraction) {
+        recordUnauthorizedReviewCreate({
+          reviewerId: session.user.id,
+          targetUserId,
+          scope: "user",
+        });
         return NextResponse.json(
           {
             error:

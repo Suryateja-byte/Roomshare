@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The CFM freeze gate is the global stop for new public booking and hold creation during the contact-first migration. When enabled, `createBooking` and `createHold` apply a coarse IP-only pre-gate rate limit and then short-circuit at action entry with a stable `CONTACT_ONLY` domain response before auth, suspension, email, or transaction work. The freeze does not mutate existing booking rows, does not disable `/bookings` lifecycle actions for legacy rows, and does not replace per-listing `HOST_MANAGED_BOOKING_FORBIDDEN` checks when the global flag is off. The flag is flipped by the release operator or on-call owner during cutover.
+The CFM freeze gate is the global stop for new public booking and hold creation during the contact-first migration. When enabled, `createBooking` and `createHold` apply a coarse IP-only pre-gate rate limit and then short-circuit at action entry with a stable `CONTACT_ONLY` domain response before auth, suspension, email, or transaction work. The freeze does not mutate existing booking rows, does not replace per-listing `HOST_MANAGED_BOOKING_FORBIDDEN` checks when the global flag is off, and is separate from the permanent non-admin legacy mutation lockdown in `updateBookingStatus`. The flag is flipped by the release operator or on-call owner during cutover.
 
 ## Flag Name And Location
 
@@ -83,19 +83,13 @@ This is intentionally IP-only because the freeze path does not authenticate. Hig
 
 ## What Remains Enabled During Freeze
 
-- `/bookings` interactive lifecycle on existing rows remains enabled through [`src/app/actions/manage-booking.ts`](/home/surya/roomshare/src/app/actions/manage-booking.ts:88).
 - Hold expiry and cleanup remain enabled through [`src/app/api/cron/sweep-expired-holds/route.ts`](/home/surya/roomshare/src/app/api/cron/sweep-expired-holds/route.ts:1).
-- Legacy drain remains enabled through `manage-booking.ts::updateBookingStatus`, including accept, reject, cancel, and expiry handling for rows that already exist.
+- Legacy admin cleanup remains enabled through `manage-booking.ts::updateBookingStatus`, but only for admin callers. Non-admin legacy mutation attempts are permanently blocked.
 - Search doc dirtying and other read-model maintenance continue normally; the freeze only blocks new public create paths.
 
 ## Known Non-Frozen Paths
 
-Public create callers:
-
-- [`src/components/BookingForm.tsx`](/home/surya/roomshare/src/components/BookingForm.tsx:519) calls `createBooking`.
-- [`src/components/BookingForm.tsx`](/home/surya/roomshare/src/components/BookingForm.tsx:1066) calls `createHold`.
-
-These public callers are frozen by the gate because they go through the server actions directly.
+There is no current active-product caller for `createBooking` or `createHold`. The old booking UI surface has been removed, so the remaining callers are test/support tooling and any direct/manual server-action invocation.
 
 Intentional bypasses that do not call `createBooking` or `createHold`:
 
@@ -116,5 +110,5 @@ Operational notes:
 - Verify `HOST_MANAGED_BOOKING_FORBIDDEN` is unchanged and still fires when the global freeze is off.
 - Verify blocked create paths emit `cfm.booking.create_blocked_count` with `reason` and `kind`.
 - Verify successful row creation logs `cfm.booking.post_freeze_write_count` with `kind`, `availabilitySource`, `contactFirstFlag`, and `bookingIdHash`, and only after the transaction commits.
-- Verify `/bookings` lifecycle actions, sweeper cron, and legacy drain paths remain untouched by the freeze patch.
+- Verify the permanent non-admin legacy mutation lockdown remains separate from the freeze gate, and that sweeper cron plus admin-only legacy cleanup paths remain untouched by the freeze patch.
 - Verify the new freeze tests cover unauthenticated and authenticated freeze-on calls plus freeze-off host-managed rejection for both actions.

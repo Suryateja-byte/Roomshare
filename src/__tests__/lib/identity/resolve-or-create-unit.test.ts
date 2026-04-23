@@ -38,7 +38,10 @@ describe("resolveOrCreateUnit", () => {
     expect(result.created).toBe(true);
     expect(result.unitId).toBe("unit-1");
     expect(tx.physicalUnit.upsert).toHaveBeenCalledTimes(1);
-    expect(tx.outboxEvent.create).toHaveBeenCalledTimes(1);
+    // Phase 02: on new unit creation, two outbox events are emitted:
+    // 1. UNIT_UPSERTED (always)
+    // 2. GEOCODE_NEEDED (only for newly created units, so geocoder can resolve lat/lng)
+    expect(tx.outboxEvent.create).toHaveBeenCalledTimes(2);
     expect(tx.auditEvent.create).toHaveBeenCalledTimes(1);
   });
 

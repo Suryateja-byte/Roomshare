@@ -19,6 +19,12 @@ jest.mock("@/lib/env", () => ({
   features: { searchV2: true },
 }));
 
+jest.mock("@/lib/search/search-telemetry", () => ({
+  recordSearchLoadMoreError: jest.fn(),
+  recordSearchRequestLatency: jest.fn(),
+  recordSearchV2Fallback: jest.fn(),
+}));
+
 // Mock search-params helpers
 jest.mock("@/lib/search-params", () => ({
   parseSearchParams: jest.fn((raw: { q?: string }) => ({
@@ -50,6 +56,27 @@ jest.mock("@/lib/search-params", () => ({
     },
   })),
   buildRawParamsFromSearchParams: jest.fn().mockReturnValue({ q: "test" }),
+  normalizeSearchFilters: jest.fn((raw: { q?: string; query?: string }) => ({
+    query: raw.query ?? raw.q,
+    locationLabel: undefined,
+    vibeQuery: undefined,
+    minPrice: undefined,
+    maxPrice: undefined,
+    amenities: undefined,
+    moveInDate: undefined,
+    endDate: undefined,
+    leaseDuration: undefined,
+    houseRules: undefined,
+    languages: undefined,
+    roomType: undefined,
+    genderPreference: undefined,
+    householdGender: undefined,
+    bookingMode: undefined,
+    bounds: undefined,
+    minAvailableSlots: undefined,
+    nearMatches: undefined,
+    sort: "recommended",
+  })),
 }));
 
 // Mock V2 search service
@@ -167,6 +194,32 @@ describe("fetchMoreListings", () => {
         items: [{ id: "a" }, { id: "b" }],
         nextCursor: "next",
         hasNextPage: true,
+      })
+    );
+    expect(result.meta).toBeTruthy();
+  });
+
+  it("returns a structured snapshotExpired result when the pinned search cursor is stale", async () => {
+    mockExecuteSearchV2.mockResolvedValue({
+      response: null,
+      paginatedResult: null,
+      snapshotExpired: {
+        queryHash: "query-hash-1",
+        reason: "search_contract_changed",
+      },
+    });
+
+    const result = await fetchMoreListings("cursor-1", { q: "test" });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        items: [],
+        nextCursor: null,
+        hasNextPage: false,
+        snapshotExpired: {
+          queryHash: "query-hash-1",
+          reason: "search_contract_changed",
+        },
       })
     );
     expect(result.meta).toBeTruthy();

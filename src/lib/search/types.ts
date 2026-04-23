@@ -10,6 +10,7 @@ import type { PublicAvailability } from "./public-availability";
 import type {
   GroupContextPresentation,
   GroupSummary,
+  ListingData,
 } from "@/lib/search-types";
 
 // ============================================================================
@@ -98,10 +99,24 @@ export interface SearchV2DebugSignals {
 export interface SearchV2Meta {
   /** 16-char SHA256 hash of query params (bounds quantized with BOUNDS_EPSILON) */
   queryHash: string;
+  /** Durable snapshot id used to replay list/map results for pagination stability */
+  querySnapshotId?: string;
   /** ISO timestamp when response was generated */
   generatedAt: string;
   /** Mode based on mapListings.length: 'geojson' if >= 50, 'pins' if < 50 */
   mode: SearchV2Mode;
+  /** Search projection version when list or map reads use projection-backed search docs */
+  projectionVersion?: number;
+  /** Projection epoch pinned into a query snapshot. Serialized as string to preserve bigint precision. */
+  projectionEpoch?: string;
+  /** Embedding model/version when semantic search powered the list response */
+  embeddingVersion?: string;
+  /** Ranker profile version pinned into the snapshot contract */
+  rankerProfileVersion?: string;
+  /** Lowest active unit identity epoch included in the snapshot contract */
+  unitIdentityEpochFloor?: number;
+  /** Snapshot contract version used by the response */
+  snapshotVersion?: string;
   /** Ranking version (debug only, when ?debugRank=1) */
   rankingVersion?: string;
   /** Whether ranking was applied (debug only) */
@@ -115,6 +130,8 @@ export interface SearchV2Meta {
 /** List section of the response */
 export interface SearchV2List {
   items: SearchV2ListItem[];
+  /** Full-fidelity card payload for first-party web clients */
+  fullItems?: ListingData[];
   /** Base64url encoded cursor for next page, null if no more pages */
   nextCursor: string | null;
   /** Exact total if ≤100, null if >100 (hybrid count optimization) */

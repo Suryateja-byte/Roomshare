@@ -28,6 +28,8 @@ import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { createInternalNotification } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
+import { isPhase02ProjectionWritesEnabled } from "@/lib/flags/phase02";
+import { drainOutboxOnce } from "@/lib/outbox/drain";
 
 interface ExpiredHoldRow {
   id: string;
@@ -365,6 +367,20 @@ export async function GET(request: NextRequest) {
       );
     } else {
       logSweepSummary("info", "[sweep-expired-holds] Sweep complete", summary);
+    }
+
+    // Phase 02 tail-call: drain priority=0 (tombstone fast lane) on every sweep tick
+    // This keeps TOMBSTONE/SUPPRESSION/PAUSE events processing at 5-min cadence
+    // without needing a dedicated cron (Hobby plan 2-cron limit).
+    if (isPhase02ProjectionWritesEnabled()) {
+      try {
+        await drainOutboxOnce({ maxBatch: 10, maxTickMs: 2000, priorityMax: 0 });
+      } catch (drainErr) {
+        // Log but don't fail the sweep — sweep is the primary purpose of this route
+        logger.sync.error("[sweep-expired-holds] outbox priority=0 drain failed", {
+          error: sanitizeErrorMessage(drainErr),
+        });
+      }
     }
 
     return NextResponse.json({

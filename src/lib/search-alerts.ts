@@ -8,6 +8,8 @@ import { buildSearchUrl, type SearchFilters } from "./search-utils";
 import { validateSearchFilters } from "./search-params";
 import { logger, sanitizeErrorMessage } from "./logger";
 import { parseLocalDate } from "./utils";
+import { getUsersWithUnlockedSearchAlerts } from "@/lib/payments/search-alert-paywall";
+import { resolvePublicListingVisibilityState } from "@/lib/listings/public-contact-contract";
 
 /**
  * Validate alert filters from DB. Uses validateSearchFilters for common fields
@@ -88,6 +90,25 @@ type SavedSearchForAlerts = {
 // L2 fix: Use shared parseLocalDate from @/lib/utils
 const parseDateOnly = parseLocalDate;
 const SEARCH_ALERT_BATCH_SIZE = 100;
+const ALERT_LISTING_SELECT = {
+  id: true,
+  ownerId: true,
+  status: true,
+  statusReason: true,
+  needsMigrationReview: true,
+  availabilitySource: true,
+  availableSlots: true,
+  totalSlots: true,
+  openSlots: true,
+  moveInDate: true,
+  availableUntil: true,
+  minStayMonths: true,
+  lastConfirmedAt: true,
+} satisfies Prisma.ListingSelect;
+
+type AlertListing = Prisma.ListingGetPayload<{
+  select: typeof ALERT_LISTING_SELECT;
+}>;
 
 function isSearchAlertsEnabled(notificationPreferences: unknown): boolean {
   if (!notificationPreferences || typeof notificationPreferences !== "object") {
@@ -95,6 +116,35 @@ function isSearchAlertsEnabled(notificationPreferences: unknown): boolean {
   }
   const prefs = notificationPreferences as { emailSearchAlerts?: unknown };
   return prefs.emailSearchAlerts !== false;
+}
+
+function isDeliverableAlertListing(listing: AlertListing | null | undefined) {
+  return resolvePublicListingVisibilityState(listing).isPubliclyVisible;
+}
+
+async function countDeliverableAlertListings(
+  where: Prisma.ListingWhereInput,
+  expectedCount: number
+) {
+  if (expectedCount <= 0) {
+    return 0;
+  }
+
+  const listings = await prisma.listing.findMany({
+    where,
+    select: ALERT_LISTING_SELECT,
+  });
+
+  return listings.filter(isDeliverableAlertListing).length;
+}
+
+async function isInstantAlertListingStillDeliverable(listingId: string) {
+  const listing = await prisma.listing.findUnique({
+    where: { id: listingId },
+    select: ALERT_LISTING_SELECT,
+  });
+
+  return isDeliverableAlertListing(listing);
 }
 
 export async function processSearchAlerts(): Promise<ProcessResult> {
@@ -130,6 +180,7 @@ export async function processSearchAlerts(): Promise<ProcessResult> {
 
     let processedCandidates = 0;
     let cursorId: string | null = null;
+    const unlockedAlertUsers = new Map<string, boolean>();
 
     while (true) {
       const savedSearches: SavedSearchForAlerts[] =
@@ -157,6 +208,21 @@ export async function processSearchAlerts(): Promise<ProcessResult> {
       processedCandidates += savedSearches.length;
       cursorId = savedSearches[savedSearches.length - 1].id;
 
+      const uncachedUserIds = Array.from(
+        new Set(
+          savedSearches
+            .map((savedSearch) => savedSearch.user.id)
+            .filter((userId) => !unlockedAlertUsers.has(userId))
+        )
+      );
+      if (uncachedUserIds.length > 0) {
+        const unlockedIds =
+          await getUsersWithUnlockedSearchAlerts(uncachedUserIds);
+        for (const userId of uncachedUserIds) {
+          unlockedAlertUsers.set(userId, unlockedIds.has(userId));
+        }
+      }
+
       for (const savedSearch of savedSearches) {
         result.processed++;
 
@@ -173,6 +239,11 @@ export async function processSearchAlerts(): Promise<ProcessResult> {
 
           if (!savedSearch.user.email) {
             result.details.push(`Skipping ${savedSearch.id} - no user email`);
+            continue;
+          }
+
+          if (!unlockedAlertUsers.get(savedSearch.user.id)) {
+            result.details.push(`Skipping ${savedSearch.id} - alerts locked`);
             continue;
           }
 
@@ -278,9 +349,13 @@ export async function processSearchAlerts(): Promise<ProcessResult> {
           }
 
           // Count matching listings
-          const newListingsCount = await prisma.listing.count({
+          const candidateListingsCount = await prisma.listing.count({
             where: whereClause,
           });
+          const newListingsCount = await countDeliverableAlertListings(
+            whereClause,
+            candidateListingsCount
+          );
 
           if (newListingsCount > 0) {
             // Send email notification
@@ -523,6 +598,9 @@ export async function triggerInstantAlerts(
       action: "triggerInstantAlerts",
       subscriptions: instantSearches.length,
     });
+    const unlockedIds = await getUsersWithUnlockedSearchAlerts(
+      instantSearches.map((savedSearch) => savedSearch.user.id)
+    );
 
     for (const savedSearch of instantSearches) {
       try {
@@ -535,6 +613,10 @@ export async function triggerInstantAlerts(
           continue;
         }
 
+        if (!unlockedIds.has(savedSearch.user.id)) {
+          continue;
+        }
+
         // S-02 FIX: Validate filters from DB instead of raw cast
         const filters = parseFiltersForAlerts(savedSearch.filters);
         if (!filters) {
@@ -543,6 +625,15 @@ export async function triggerInstantAlerts(
 
         // Check if the new listing matches this saved search
         if (!matchesFilters(newListing, filters)) {
+          continue;
+        }
+
+        if (!(await isInstantAlertListingStillDeliverable(newListing.id))) {
+          logger.sync.info("Instant alert target dropped before delivery", {
+            action: "triggerInstantAlerts",
+            savedSearchId: savedSearch.id,
+            listingId: newListing.id,
+          });
           continue;
         }
 

@@ -127,7 +127,21 @@ describe("search-query", () => {
     );
 
     expect(url).toBe(
-      "/search?amenities=Parking&amenities=Wifi&what=quiet+roommates&where=San+Francisco"
+      "/search?amenities=Parking&amenities=Wifi&locationLabel=San+Francisco&what=quiet+roommates"
+    );
+  });
+
+  it("prefers locationLabel over where during normalization", () => {
+    const query = normalizeSearchQuery(
+      new URLSearchParams("locationLabel=Dallas&where=Austin&lat=32.7767&lng=-96.797")
+    );
+
+    expect(query.locationLabel).toBe("Dallas");
+    expect(buildCanonicalSearchUrl(query, { includePagination: false })).toContain(
+      "locationLabel=Dallas"
+    );
+    expect(buildCanonicalSearchUrl(query, { includePagination: false })).not.toContain(
+      "where="
     );
   });
 

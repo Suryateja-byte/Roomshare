@@ -52,6 +52,10 @@ import ListingFreshnessCheck from "@/components/ListingFreshnessCheck";
 import ListingMigrationReviewPanel from "@/components/ListingMigrationReviewPanel";
 import { ImageIcon } from "lucide-react";
 import type { ListingMigrationReviewState } from "@/lib/migration/review";
+import {
+  getModerationWriteLockReason,
+  LISTING_LOCKED_ERROR_MESSAGE,
+} from "@/lib/listings/moderation-write-lock";
 
 interface ImageObject {
   file?: File;
@@ -105,6 +109,7 @@ interface EditListingFormProps {
   listing: Listing;
   migrationReview?: ListingMigrationReviewState | null;
   enableWholeUnitMode?: boolean;
+  moderationWriteLocksEnabled?: boolean;
 }
 
 interface EditListingFormData {
@@ -146,9 +151,20 @@ const formatDateForInput = (date: Date | string | null | undefined) => {
   return `${year}-${month}-${day}`;
 };
 
+function resolveInitialWriteLock(options: {
+  moderationWriteLocksEnabled?: boolean;
+  statusReason?: string | null;
+}) {
+  return (
+    options.moderationWriteLocksEnabled === true &&
+    getModerationWriteLockReason(options.statusReason) !== null
+  );
+}
+
 function HostManagedEditListingForm({
   listing,
   migrationReview = null,
+  moderationWriteLocksEnabled = false,
 }: EditListingFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -170,6 +186,12 @@ function HostManagedEditListingForm({
   );
   const [reloadSuggested, setReloadSuggested] = useState(false);
   const [pendingReload, setPendingReload] = useState(false);
+  const [isWriteLocked, setIsWriteLocked] = useState(() =>
+    resolveInitialWriteLock({
+      moderationWriteLocksEnabled,
+      statusReason: listing.statusReason,
+    })
+  );
   const formRef = useRef<HTMLFormElement>(null);
   const submitAbortRef = useRef<AbortController | null>(null);
   const previousSnapshotKeyRef = useRef<string | null>(null);
@@ -178,7 +200,8 @@ function HostManagedEditListingForm({
     formModified && !loading && !pendingReload,
     "You have unsaved changes. Leave without saving?"
   );
-  const isFormDisabled = loading || pendingReload;
+  const isFormDisabled = loading || pendingReload || isWriteLocked;
+  const isNavigationDisabled = loading || pendingReload;
 
   const latestSnapshot = useMemo(
     () => ({
@@ -238,6 +261,15 @@ function HostManagedEditListingForm({
   }, []);
 
   useEffect(() => {
+    setIsWriteLocked(
+      resolveInitialWriteLock({
+        moderationWriteLocksEnabled,
+        statusReason: listing.statusReason,
+      })
+    );
+  }, [listing.statusReason, moderationWriteLocksEnabled]);
+
+  useEffect(() => {
     const previousSnapshotKey = previousSnapshotKeyRef.current;
     previousSnapshotKeyRef.current = latestSnapshotKey;
 
@@ -276,7 +308,7 @@ function HostManagedEditListingForm({
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (pendingReload) {
+    if (pendingReload || isWriteLocked) {
       return;
     }
 
@@ -309,6 +341,15 @@ function HostManagedEditListingForm({
       const json = await res.json();
 
       if (!res.ok) {
+        if (json.code === "LISTING_LOCKED") {
+          setIsWriteLocked(true);
+          setError("");
+          setFieldErrors({});
+          setReloadSuggested(false);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
+
         if (json.fields) {
           setFieldErrors(json.fields);
         }
@@ -381,7 +422,40 @@ function HostManagedEditListingForm({
         <ListingFreshnessCheck listingId={listing.id} canManage={true} />
       </div>
 
-      {error && (
+      {isWriteLocked && (
+        <div className="bg-amber-50 border border-amber-100 px-4 py-4 rounded-xl mb-8">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-amber-900">
+                  Listing locked
+                </p>
+                <p className="text-sm text-amber-700 mt-1">
+                  {LISTING_LOCKED_ERROR_MESSAGE}
+                </p>
+                <p className="text-xs text-amber-700 mt-2">
+                  Your unsaved edits are still on the page. Reload when you want
+                  to check for an updated listing state.
+                </p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => router.refresh()}
+              disabled={loading}
+              className="flex-shrink-0 text-amber-700 border-outline-variant/20 hover:bg-amber-100"
+            >
+              <RefreshCcw className="w-4 h-4 mr-1" />
+              Reload page
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {!isWriteLocked && error && (
         <div className="bg-red-50 border border-red-100 px-4 py-4 rounded-xl mb-8">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
@@ -416,7 +490,7 @@ function HostManagedEditListingForm({
         </div>
       )}
 
-      {!error && reloadSuggested && (
+      {!isWriteLocked && !error && reloadSuggested && (
         <div className="bg-amber-50 border border-amber-100 px-4 py-4 rounded-xl mb-8">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
@@ -570,7 +644,7 @@ function HostManagedEditListingForm({
             type="button"
             variant="outline"
             onClick={() => router.push(`/listings/${listing.id}`)}
-            disabled={isFormDisabled}
+            disabled={isNavigationDisabled}
             size="lg"
             className="flex-1 h-14 rounded-xl"
           >
@@ -623,6 +697,7 @@ function LegacyEditListingForm({
   listing,
   migrationReview = null,
   enableWholeUnitMode = false,
+  moderationWriteLocksEnabled = false,
 }: EditListingFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -635,6 +710,12 @@ function LegacyEditListingForm({
   const formRef = useRef<HTMLFormElement>(null);
   const [showDraftBanner, setShowDraftBanner] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
+  const [isWriteLocked, setIsWriteLocked] = useState(() =>
+    resolveInitialWriteLock({
+      moderationWriteLocksEnabled,
+      statusReason: listing.statusReason,
+    })
+  );
 
   const submitAbortRef = useRef<AbortController | null>(null);
 
@@ -709,6 +790,17 @@ function LegacyEditListingForm({
     formModified && !loading,
     "You have unsaved changes. Leave without saving?"
   );
+  const isFieldDisabled = loading || isWriteLocked;
+  const isNavigationDisabled = loading;
+
+  useEffect(() => {
+    setIsWriteLocked(
+      resolveInitialWriteLock({
+        moderationWriteLocksEnabled,
+        statusReason: listing.statusReason,
+      })
+    );
+  }, [listing.statusReason, moderationWriteLocksEnabled]);
 
   // Show draft banner when we have a draft and haven't restored yet
   useEffect(() => {
@@ -964,6 +1056,9 @@ function LegacyEditListingForm({
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (isWriteLocked) {
+      return;
+    }
     setLoading(true);
     setError("");
     setFieldErrors({});
@@ -1005,6 +1100,14 @@ function LegacyEditListingForm({
 
       if (!res.ok) {
         const json = await res.json();
+        if (json.code === "LISTING_LOCKED") {
+          setIsWriteLocked(true);
+          setError("");
+          setFieldErrors({});
+          saveData(collectFormData());
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
         // Handle field-level errors if provided
         if (json.fields) {
           setFieldErrors(json.fields);
@@ -1059,7 +1162,40 @@ function LegacyEditListingForm({
         />
       </div>
 
-      {error && (
+      {isWriteLocked && (
+        <div className="bg-amber-50 border border-amber-100 px-4 py-4 rounded-xl mb-8">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-amber-900">
+                  Listing locked
+                </p>
+                <p className="text-sm text-amber-700 mt-1">
+                  {LISTING_LOCKED_ERROR_MESSAGE}
+                </p>
+                <p className="text-xs text-amber-700 mt-2">
+                  Your unsaved edits remain available locally. Reload when you
+                  want to check for an updated listing state.
+                </p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => router.refresh()}
+              disabled={loading}
+              className="flex-shrink-0 text-amber-700 border-outline-variant/20 hover:bg-amber-100"
+            >
+              <RefreshCcw className="w-4 h-4 mr-1" />
+              Reload page
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {!isWriteLocked && error && (
         <div className="bg-red-50 border border-red-100 px-4 py-4 rounded-xl mb-8">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
@@ -1167,7 +1303,7 @@ function LegacyEditListingForm({
               maxLength={100}
               defaultValue={listing.title}
               placeholder="e.g. Sun-drenched Loft in Arts District"
-              disabled={loading}
+              disabled={isFieldDisabled}
               data-testid="listing-title-input"
             />
             <FieldError field="title" />
@@ -1183,7 +1319,7 @@ function LegacyEditListingForm({
               maxLength={1000}
               className="w-full bg-surface-canvas hover:bg-surface-container-high focus:bg-surface-container-lowest border border-outline-variant/20 rounded-xl px-4 py-3.5 text-on-surface placeholder:text-on-surface-variant outline-none focus:ring-2 focus:ring-on-surface/5 focus:border-on-surface transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 resize-none leading-relaxed"
               placeholder="What makes your place special? Describe the vibe, the light, and the lifestyle..."
-              disabled={loading}
+              disabled={isFieldDisabled}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               data-testid="listing-description-input"
@@ -1203,7 +1339,7 @@ function LegacyEditListingForm({
                 required
                 defaultValue={listing.price}
                 placeholder="2400"
-                disabled={loading}
+                disabled={isFieldDisabled}
                 data-testid="listing-price-input"
               />
               <FieldError field="price" />
@@ -1220,7 +1356,7 @@ function LegacyEditListingForm({
                 min="1"
                 max="20"
                 step="1"
-                disabled={loading}
+                disabled={isFieldDisabled}
               />
               <FieldError field="totalSlots" />
             </div>
@@ -1279,7 +1415,7 @@ function LegacyEditListingForm({
               maxLength={200}
               defaultValue={listing.location?.address || ""}
               placeholder="123 Boulevard St"
-              disabled={loading}
+              disabled={isFieldDisabled}
             />
             <FieldError field="address" />
           </div>
@@ -1293,7 +1429,7 @@ function LegacyEditListingForm({
                 maxLength={100}
                 defaultValue={listing.location?.city || ""}
                 placeholder="San Francisco"
-                disabled={loading}
+                disabled={isFieldDisabled}
               />
             </div>
             <div>
@@ -1305,7 +1441,7 @@ function LegacyEditListingForm({
                 maxLength={100}
                 defaultValue={listing.location?.state || ""}
                 placeholder="CA"
-                disabled={loading}
+                disabled={isFieldDisabled}
               />
             </div>
             <div>
@@ -1317,7 +1453,7 @@ function LegacyEditListingForm({
                 maxLength={20}
                 defaultValue={listing.location?.zip || ""}
                 placeholder="94103"
-                disabled={loading}
+                disabled={isFieldDisabled}
               />
             </div>
           </div>
@@ -1338,7 +1474,7 @@ function LegacyEditListingForm({
               name="amenities"
               defaultValue={listing.amenities.join(", ")}
               placeholder="Wifi, Gym, Washer/Dryer, Roof Deck..."
-              disabled={loading}
+              disabled={isFieldDisabled}
             />
             <p className="text-xs text-on-surface-variant mt-2 pl-1">
               Separate amenities with commas
@@ -1352,6 +1488,7 @@ function LegacyEditListingForm({
               value={moveInDate}
               onChange={setMoveInDate}
               placeholder="Select move-in date"
+              disabled={isFieldDisabled}
             />
             <p className="text-xs text-on-surface-variant mt-2 pl-1">
               When can tenants move in? (Optional)
@@ -1367,7 +1504,7 @@ function LegacyEditListingForm({
                   value={availableUntil}
                   onChange={setAvailableUntil}
                   placeholder="Select availability end date"
-                  disabled={loading}
+                  disabled={isFieldDisabled}
                 />
                 <p className="text-xs text-on-surface-variant mt-2 pl-1">
                   Keep this blank for open-ended availability, or choose a
@@ -1385,7 +1522,7 @@ function LegacyEditListingForm({
                   step="1"
                   value={minStayMonths}
                   onChange={(e) => setMinStayMonths(e.target.value)}
-                  disabled={loading}
+                  disabled={isFieldDisabled}
                 />
                 <p className="text-xs text-on-surface-variant mt-2 pl-1">
                   Host-managed listings require a minimum stay of at least 1
@@ -1402,7 +1539,7 @@ function LegacyEditListingForm({
               <Select
                 value={leaseDuration}
                 onValueChange={setLeaseDuration}
-                disabled={loading}
+                disabled={isFieldDisabled}
               >
                 <SelectTrigger id="leaseDuration" className="w-full mt-1">
                   <SelectValue placeholder="Select duration..." />
@@ -1424,7 +1561,7 @@ function LegacyEditListingForm({
                   userChangedRoomType.current = true;
                   setRoomType(val);
                 }}
-                disabled={loading}
+                disabled={isFieldDisabled}
               >
                 <SelectTrigger id="roomType" className="w-full mt-1">
                   <SelectValue placeholder="Select type..." />
@@ -1440,7 +1577,7 @@ function LegacyEditListingForm({
 
           {/* Booking Mode Selector (behind feature flag) */}
           {enableWholeUnitMode && (
-            <fieldset className="space-y-3" disabled={loading}>
+            <fieldset className="space-y-3" disabled={isFieldDisabled}>
               <legend className="text-sm font-medium text-on-surface">
                 Booking Mode
               </legend>
@@ -1458,6 +1595,7 @@ function LegacyEditListingForm({
                     value="SHARED"
                     checked={bookingMode === "SHARED"}
                     onChange={(e) => setBookingMode(e.target.value)}
+                    disabled={isFieldDisabled}
                     className="mt-0.5"
                   />
                   <div>
@@ -1482,6 +1620,7 @@ function LegacyEditListingForm({
                     value="WHOLE_UNIT"
                     checked={bookingMode === "WHOLE_UNIT"}
                     onChange={(e) => setBookingMode(e.target.value)}
+                    disabled={isFieldDisabled}
                     className="mt-0.5"
                   />
                   <div>
@@ -1512,7 +1651,7 @@ function LegacyEditListingForm({
                     key={code}
                     type="button"
                     onClick={() => toggleLanguage(code)}
-                    disabled={loading}
+                    disabled={isFieldDisabled}
                     className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-on-surface text-white disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {getLanguageName(code)}
@@ -1529,7 +1668,7 @@ function LegacyEditListingForm({
               value={languageSearch}
               onChange={(e) => setLanguageSearch(e.target.value)}
               className="mb-3"
-              disabled={loading}
+              disabled={isFieldDisabled}
             />
 
             {/* Language chips */}
@@ -1541,7 +1680,7 @@ function LegacyEditListingForm({
                     key={code}
                     type="button"
                     onClick={() => toggleLanguage(code)}
-                    disabled={loading}
+                    disabled={isFieldDisabled}
                     className="px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 bg-surface-container-high text-on-surface-variant hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {getLanguageName(code)}
@@ -1569,7 +1708,7 @@ function LegacyEditListingForm({
               <Select
                 value={genderPreference}
                 onValueChange={setGenderPreference}
-                disabled={loading}
+                disabled={isFieldDisabled}
               >
                 <SelectTrigger id="genderPreference" className="w-full">
                   <SelectValue placeholder="Select preference..." />
@@ -1595,7 +1734,7 @@ function LegacyEditListingForm({
               <Select
                 value={householdGender}
                 onValueChange={setHouseholdGender}
-                disabled={loading}
+                disabled={isFieldDisabled}
               >
                 <SelectTrigger id="householdGender" className="w-full">
                   <SelectValue placeholder="Select composition..." />
@@ -1617,7 +1756,7 @@ function LegacyEditListingForm({
               rows={3}
               className="w-full bg-surface-canvas hover:bg-surface-container-high focus:bg-surface-container-lowest border border-outline-variant/20 rounded-xl px-4 py-3.5 text-on-surface placeholder:text-on-surface-variant outline-none focus:ring-2 focus:ring-on-surface/5 focus:border-on-surface transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 resize-none"
               placeholder="No smoking, quiet hours after 10pm, no pets..."
-              disabled={loading}
+              disabled={isFieldDisabled}
               defaultValue={listing.houseRules.join(", ")}
             />
           </div>
@@ -1629,7 +1768,7 @@ function LegacyEditListingForm({
             type="button"
             variant="outline"
             onClick={() => router.push(`/listings/${listing.id}`)}
-            disabled={loading}
+            disabled={isNavigationDisabled}
             size="lg"
             className="flex-1 h-14 rounded-xl"
           >
@@ -1637,7 +1776,9 @@ function LegacyEditListingForm({
           </Button>
           <Button
             type="submit"
-            disabled={loading || isAnyImageUploading || images.length === 0}
+            disabled={
+              isFieldDisabled || isAnyImageUploading || images.length === 0
+            }
             size="lg"
             className="flex-1 h-14 rounded-xl shadow-ambient-lg shadow-on-surface/10 text-lg"
             data-testid="listing-save-button"

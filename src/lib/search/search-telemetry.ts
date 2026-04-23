@@ -29,6 +29,9 @@ interface SearchTelemetryStore {
   v2FallbackTotal: number;
   mapListMismatchTotal: number;
   loadMoreErrorTotal: number;
+  snapshotExpiredTotal: number;
+  snapshotHoleResponsesTotal: number;
+  snapshotHoleRatioSum: number;
   zeroResultsTotal: number;
   clientAbortTotal: number;
   dedupAppliedTotal: number;
@@ -48,10 +51,17 @@ function createLegacyUrlCounts(): Record<
   LegacyUrlSurface,
   Record<LegacyUrlAlias, number>
 > {
+  const surfaces = Array.isArray(LEGACY_URL_SURFACES)
+    ? LEGACY_URL_SURFACES
+    : [];
+  const aliases = Array.isArray(LEGACY_URL_ALIASES)
+    ? LEGACY_URL_ALIASES
+    : [];
+
   return Object.fromEntries(
-    LEGACY_URL_SURFACES.map((surface) => [
+    surfaces.map((surface) => [
       surface,
-      Object.fromEntries(LEGACY_URL_ALIASES.map((alias) => [alias, 0])),
+      Object.fromEntries(aliases.map((alias) => [alias, 0])),
     ])
   ) as Record<LegacyUrlSurface, Record<LegacyUrlAlias, number>>;
 }
@@ -71,6 +81,9 @@ const telemetryStore: SearchTelemetryStore = {
   v2FallbackTotal: 0,
   mapListMismatchTotal: 0,
   loadMoreErrorTotal: 0,
+  snapshotExpiredTotal: 0,
+  snapshotHoleResponsesTotal: 0,
+  snapshotHoleRatioSum: 0,
   zeroResultsTotal: 0,
   clientAbortTotal: 0,
   dedupAppliedTotal: 0,
@@ -213,6 +226,24 @@ export function recordSearchLoadMoreError({
   });
 }
 
+export function recordSearchSnapshotExpired({
+  route,
+  queryHash,
+  reason,
+}: {
+  route: Extract<SearchTelemetryRoute, "search-client" | "search-load-more">;
+  queryHash?: string;
+  reason: "search_contract_changed" | "snapshot_missing" | "snapshot_expired";
+}): void {
+  telemetryStore.snapshotExpiredTotal += 1;
+  logger.sync.warn("search_snapshot_expired_total", {
+    route,
+    queryHash,
+    reason,
+    total: telemetryStore.snapshotExpiredTotal,
+  });
+}
+
 export function recordSearchZeroResults({
   route,
   queryHash,
@@ -228,6 +259,36 @@ export function recordSearchZeroResults({
     queryHash,
     backendSource,
     total: telemetryStore.zeroResultsTotal,
+  });
+}
+
+export function recordSearchSnapshotHoleRatio({
+  route,
+  queryHash,
+  querySnapshotId,
+  holeCount,
+  consideredCount,
+}: {
+  route: Exclude<SearchTelemetryRoute, "search-client" | "search-map-client">;
+  queryHash?: string;
+  querySnapshotId?: string;
+  holeCount: number;
+  consideredCount: number;
+}): void {
+  const ratio =
+    consideredCount > 0
+      ? Math.max(0, Math.min(1, holeCount / consideredCount))
+      : 0;
+  telemetryStore.snapshotHoleResponsesTotal += 1;
+  telemetryStore.snapshotHoleRatioSum += ratio;
+  logger.sync.info("snapshot_hole_ratio", {
+    route,
+    queryHash,
+    querySnapshotId,
+    holeCount,
+    consideredCount,
+    ratio,
+    total: telemetryStore.snapshotHoleResponsesTotal,
   });
 }
 
@@ -412,6 +473,13 @@ export function getSearchTelemetrySnapshot() {
     v2FallbackTotal: telemetryStore.v2FallbackTotal,
     mapListMismatchTotal: telemetryStore.mapListMismatchTotal,
     loadMoreErrorTotal: telemetryStore.loadMoreErrorTotal,
+    snapshotExpiredTotal: telemetryStore.snapshotExpiredTotal,
+    snapshotHoleResponsesTotal: telemetryStore.snapshotHoleResponsesTotal,
+    snapshotHoleRatioAverage:
+      telemetryStore.snapshotHoleResponsesTotal > 0
+        ? telemetryStore.snapshotHoleRatioSum /
+          telemetryStore.snapshotHoleResponsesTotal
+        : 0,
     zeroResultsTotal: telemetryStore.zeroResultsTotal,
     clientAbortTotal: telemetryStore.clientAbortTotal,
     dedupAppliedTotal: telemetryStore.dedupAppliedTotal,
@@ -445,6 +513,9 @@ export function resetSearchTelemetryForTests(): void {
   telemetryStore.v2FallbackTotal = 0;
   telemetryStore.mapListMismatchTotal = 0;
   telemetryStore.loadMoreErrorTotal = 0;
+  telemetryStore.snapshotExpiredTotal = 0;
+  telemetryStore.snapshotHoleResponsesTotal = 0;
+  telemetryStore.snapshotHoleRatioSum = 0;
   telemetryStore.zeroResultsTotal = 0;
   telemetryStore.clientAbortTotal = 0;
   telemetryStore.dedupAppliedTotal = 0;

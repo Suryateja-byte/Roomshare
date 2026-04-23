@@ -1,0 +1,8 @@
+{
+  "slice": "03-contact-host-contract",
+  "critic": "Codex GPT-5 in-thread Critic",
+  "verdict": "approved",
+  "findings": [],
+  "rationale": "The contact-host path now records durable attempts inside the existing serializable transaction, avoids block disclosure, and fails stale unit epochs before entitlement consumption. Focused chat and helper tests pass.",
+  "required_next_action": "Proceed to Slice 04: phone reveal route, audit path, kill switch, and tests."
+}

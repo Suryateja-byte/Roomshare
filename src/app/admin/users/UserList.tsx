@@ -17,6 +17,7 @@ import {
   Mail,
   MoreVertical,
 } from "lucide-react";
+import Link from "next/link";
 
 interface User {
   id: string;
@@ -198,10 +199,13 @@ export default function UserList({
                         <Home className="w-3 h-3" />
                         {user._count.listings} listings
                       </span>
-                      <span className="flex items-center gap-1">
+                      <Link
+                        href={`/admin/bookings?tenantId=${user.id}`}
+                        className="flex items-center gap-1 text-primary hover:underline"
+                      >
                         <Calendar className="w-3 h-3" />
                         {user._count.bookings} bookings
-                      </span>
+                      </Link>
                       <span className="flex items-center gap-1">
                         <Star className="w-3 h-3" />
                         {user._count.reviewsWritten} reviews

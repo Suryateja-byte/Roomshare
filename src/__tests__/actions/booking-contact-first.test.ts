@@ -64,6 +64,7 @@ jest.mock("@/lib/rate-limit", () => ({
 
 jest.mock("@/lib/env", () => ({
   features: {
+    bookingRetirementFreeze: false,
     contactFirstListings: true,
     multiSlotBooking: true,
     softHoldsEnabled: true,
@@ -77,6 +78,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { features } from "@/lib/env";
 
 const mockedFeatures = features as {
+  bookingRetirementFreeze: boolean;
   contactFirstListings: boolean;
   multiSlotBooking: boolean;
   softHoldsEnabled: boolean;
@@ -97,6 +99,7 @@ describe("booking actions when contact-first listings are enabled", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (auth as jest.Mock).mockResolvedValue(mockSession);
+    mockedFeatures.bookingRetirementFreeze = false;
     mockedFeatures.contactFirstListings = true;
     mockedFeatures.multiSlotBooking = true;
     mockedFeatures.softHoldsEnabled = true;

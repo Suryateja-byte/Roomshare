@@ -9,6 +9,16 @@ const AuditEventKindSchema = z.enum([
   "MODERATION_LOCKED_REJECTED",
   "HOST_CLAIM_UPSERTED",
   "INVENTORY_UPSERTED",
+  "REFUND_RECORDED",
+  "DISPUTE_OPENED",
+  "DISPUTE_RESOLVED",
+  "ENTITLEMENT_FROZEN",
+  "ENTITLEMENT_RESTORED",
+  "ENTITLEMENT_REVOKED",
+  "PAYMENT_AMOUNT_MISMATCH",
+  "PAYMENT_FRAUD_FLAGGED",
+  "EMERGENCY_GRANT",
+  "FRAUD_AUDIT_SCHEDULED",
 ]);
 
 const AuditAggregateTypeSchema = z.enum([
@@ -16,6 +26,13 @@ const AuditAggregateTypeSchema = z.enum([
   "host_unit_claims",
   "listing_inventories",
   "identity_mutations",
+  "payments",
+  "refunds",
+  "payment_disputes",
+  "entitlement_grants",
+  "stripe_events",
+  "contact_consumption",
+  "fraud_audit_jobs",
 ]);
 
 const PII_BLOCKLIST =

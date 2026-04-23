@@ -67,4 +67,27 @@ describe("SearchUrlCanonicalizer", () => {
 
     expect(mockEmitSearchClientMetric).not.toHaveBeenCalled();
   });
+
+  it("counts and rewrites legacy where URLs", async () => {
+    const replaceStateSpy = jest
+      .spyOn(window.history, "replaceState")
+      .mockImplementation(() => undefined);
+    mockSearchParams.mockReturnValue(new URLSearchParams("where=Austin"));
+
+    render(<SearchUrlCanonicalizer />);
+
+    await waitFor(() => {
+      expect(replaceStateSpy).toHaveBeenCalledWith(
+        null,
+        "",
+        "/search?locationLabel=Austin"
+      );
+    });
+
+    expect(mockEmitSearchClientMetric).toHaveBeenCalledWith({
+      metric: "cfm.search.legacy_url_count",
+      alias: "where",
+      surface: "spa",
+    });
+  });
 });

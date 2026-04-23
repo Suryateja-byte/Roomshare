@@ -29,7 +29,7 @@ Run these before setting the flag to `off`:
      ```
    - Expect `0` for 7 days running. If non-zero, trigger one last manual sweep (see `/api/cron/sweep-expired-holds` with the standard cron auth) to drain stale holds, then re-check.
 
-2. **Verify `cfm.booking.legacy_mutation_blocked_count{role=non_admin,reason=flag_off}` is monotonic** for the prior 24 h (proves CFM-902 is enforced; no caller is bypassing server-side).
+2. **Verify `cfm.booking.legacy_mutation_blocked_count{role=non_admin,reason=flag_off}` is monotonic** for the prior 24 h (proves the permanent CFM-902 non-admin lockdown is enforced; no caller is bypassing server-side).
 
 3. **Confirm observability dashboards are registered** for:
    - `cfm.cron.legacy_sweep_skipped_count`
@@ -58,7 +58,7 @@ Watch the following for regression:
 | `cfm.cron.legacy_sweep_skipped_count{reason=flag_off}` | ~288/day | If 0: cron stopped firing. Check Vercel cron logs. If > 288/day: spurious invocations — investigate. |
 | `cfm.cron.legacy_reconcile_skipped_count{reason=flag_off}` | ~96/day | Same thresholds scaled to 1/15 min. |
 | `cfm.booking.legacy_open_count` | `0` | If > 0: some path is creating new bookings. Roll back the flag. |
-| `cfm.booking.legacy_mutation_blocked_count{role=non_admin}` | monotonic | If drops to 0: CFM-902 also disabled; investigate. |
+| `cfm.booking.legacy_mutation_blocked_count{role=non_admin}` | monotonic | If it unexpectedly drops to 0, investigate for a missing caller path, telemetry breakage, or an unexpected code regression in the permanent lockdown. |
 
 Note: `daily-maintenance/route.ts`'s summary counter reports reconcile as `succeeded: true` when the gate skips (its `runDelegatedTask` helper does not currently promote `detail.skipped === true` to the top-level `skipped` field). This is cosmetic — the skipped-count log is the source of truth. A future follow-up (CFM-904-F2, optional) can promote the `skipped` field for cleaner summary semantics.
 

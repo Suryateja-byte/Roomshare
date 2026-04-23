@@ -6,6 +6,11 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import type { FilterSuggestion } from "@/lib/data";
 import { LAT_OFFSET_DEGREES } from "@/lib/constants";
+import {
+  buildCanonicalSearchUrl,
+  normalizeSearchQuery,
+} from "@/lib/search/search-query";
+import { clearAllFilters } from "@/components/filters/filter-chip-utils";
 
 /**
  * Nearby area suggestions for zero-result searches.
@@ -126,6 +131,7 @@ export default function ZeroResultsSuggestions({
               params.delete("minLng");
               params.delete("maxLng");
               params.delete("q");
+              params.delete("locationLabel");
               params.delete("where");
             }
             break;
@@ -163,6 +169,7 @@ export default function ZeroResultsSuggestions({
 
           // Last-resort fallback: avoid invalid q-without-bounds state.
           params.delete("q");
+          params.delete("locationLabel");
           params.delete("where");
           params.delete("lat");
           params.delete("lng");
@@ -180,27 +187,12 @@ export default function ZeroResultsSuggestions({
     params.delete("cursorStack");
     params.delete("pageNumber");
 
-    router.push(`/search?${params.toString()}`);
+    router.push(buildCanonicalSearchUrl(normalizeSearchQuery(params)));
   };
 
   const handleClearAll = () => {
-    const params = new URLSearchParams();
-    for (const key of [
-      "q",
-      "where",
-      "lat",
-      "lng",
-      "minLat",
-      "maxLat",
-      "minLng",
-      "maxLng",
-      "sort",
-    ] as const) {
-      const value = searchParams.get(key);
-      if (value) params.set(key, value);
-    }
-    const qs = params.toString();
-    router.push(`/search${qs ? `?${qs}` : ""}`);
+    const cleared = clearAllFilters(new URLSearchParams(searchParams.toString()));
+    router.push(`/search${cleared ? `?${cleared}` : ""}`);
   };
 
   if (suggestions.length === 0) {

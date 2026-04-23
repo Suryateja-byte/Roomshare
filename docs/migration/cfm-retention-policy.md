@@ -125,7 +125,7 @@ Two surfaces formally become read-only without the underlying tables going anywh
 
 - Route retained. Component tree switches from mixed create/edit/cancel UX to a read-only list of past participations.
 - Underlying `Booking` / `BookingAuditLog` reads unchanged.
-- `CFM-104` keeps the interactive path alive only for legacy rows that were created before the freeze and still need lifecycle transitions; CFM-901 retires even that, leaving the page as a pure history view.
+- `CFM-901` retired the last interactive `/bookings` path, leaving the page as a pure history view for both host and renter perspectives.
 - **Forbidden**: deleting `Booking` rows in response to CFM-901 rollout.
 
 ### 5.2 `ListingDayInventory` → host-managed-only read (CFM-904)

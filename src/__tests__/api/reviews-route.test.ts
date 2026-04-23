@@ -232,7 +232,7 @@ describe("Reviews API Route", () => {
       expect(res.status).toBe(403);
       const body = await res.json();
       expect(body.error).toBe(
-        "Only past guests with a confirmed stay can review this listing"
+        "Only past guests with a confirmed stay can leave a public review."
       );
     });
 

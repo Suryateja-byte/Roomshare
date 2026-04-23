@@ -23,6 +23,8 @@ import {
   getAutoPauseCronTelemetrySnapshot,
   getFreshnessCronTelemetrySnapshot,
 } from "@/lib/freshness/freshness-cron-telemetry";
+import { getFreshnessOpsMetricsSnapshot } from "@/lib/freshness/ops-metrics";
+import { getCfmOpsTelemetrySnapshot } from "@/lib/metrics/cfm-ops-telemetry";
 import {
   PRIVATE_FEEDBACK_CATEGORIES,
   PRIVATE_FEEDBACK_DENIAL_REASONS,
@@ -88,6 +90,8 @@ export async function GET(request: Request) {
   const feedbackTelemetry = getPrivateFeedbackTelemetrySnapshot();
   const freshnessTelemetry = getFreshnessCronTelemetrySnapshot();
   const autoPauseTelemetry = getAutoPauseCronTelemetrySnapshot();
+  const cfmOpsTelemetry = getCfmOpsTelemetrySnapshot();
+  const freshnessOpsMetrics = await getFreshnessOpsMetricsSnapshot();
   const searchDocCronTelemetry = getSearchDocCronTelemetrySnapshot();
   const searchTelemetry = getSearchTelemetrySnapshot();
 
@@ -168,6 +172,18 @@ export async function GET(request: Request) {
     `# TYPE search_load_more_error_total counter`,
     `search_load_more_error_total ${searchTelemetry.loadMoreErrorTotal}`,
     ``,
+    `# HELP search_snapshot_expired_total Total number of expired or mismatched search snapshots observed by clients`,
+    `# TYPE search_snapshot_expired_total counter`,
+    `search_snapshot_expired_total ${searchTelemetry.snapshotExpiredTotal}`,
+    ``,
+    `# HELP search_snapshot_hole_ratio_average Average ratio of missing or tombstoned unit keys during snapshot hydration`,
+    `# TYPE search_snapshot_hole_ratio_average gauge`,
+    `search_snapshot_hole_ratio_average ${searchTelemetry.snapshotHoleRatioAverage}`,
+    ``,
+    `# HELP search_snapshot_hole_responses_total Total number of snapshot hydration responses sampled for hole ratio`,
+    `# TYPE search_snapshot_hole_responses_total counter`,
+    `search_snapshot_hole_responses_total ${searchTelemetry.snapshotHoleResponsesTotal}`,
+    ``,
     `# HELP search_zero_results_total Total number of zero-result search responses`,
     `# TYPE search_zero_results_total counter`,
     `search_zero_results_total ${searchTelemetry.zeroResultsTotal}`,
@@ -198,6 +214,37 @@ export async function GET(request: Request) {
       (reason) =>
         `cfm_feedback_denied_count{reason="${reason}"} ${feedbackTelemetry.deniedCounts[reason]}`
     ),
+    ``,
+    `# HELP cfm_listing_freshness_bucket_count Current count of confirmed host-managed listings by freshness bucket`,
+    `# TYPE cfm_listing_freshness_bucket_count gauge`,
+    `cfm_listing_freshness_bucket_count{bucket="normal"} ${freshnessOpsMetrics.freshnessBucketCounts.normal}`,
+    `cfm_listing_freshness_bucket_count{bucket="reminder"} ${freshnessOpsMetrics.freshnessBucketCounts.reminder}`,
+    `cfm_listing_freshness_bucket_count{bucket="warning"} ${freshnessOpsMetrics.freshnessBucketCounts.warning}`,
+    `cfm_listing_freshness_bucket_count{bucket="auto_paused"} ${freshnessOpsMetrics.freshnessBucketCounts.auto_paused}`,
+    ``,
+    `# HELP cfm_listing_stale_in_search_count Current count of stale host-managed listings that still satisfy the public-search predicate`,
+    `# TYPE cfm_listing_stale_in_search_count gauge`,
+    `cfm_listing_stale_in_search_count ${freshnessOpsMetrics.staleInSearchCount}`,
+    ``,
+    `# HELP cfm_listing_stale_still_active_count Current count of 30-day stale host-managed listings that are still ACTIVE`,
+    `# TYPE cfm_listing_stale_still_active_count gauge`,
+    `cfm_listing_stale_still_active_count ${freshnessOpsMetrics.staleStillActiveCount}`,
+    ``,
+    `# HELP cfm_review_legacy_eligible_count Current count of accepted-booking listing review pairs that remain reviewable`,
+    `# TYPE cfm_review_legacy_eligible_count gauge`,
+    `cfm_review_legacy_eligible_count ${freshnessOpsMetrics.legacyEligibleCount}`,
+    ``,
+    `# HELP cfm_review_unauthorized_create_count Total number of denied public review attempts without an accepted booking`,
+    `# TYPE cfm_review_unauthorized_create_count counter`,
+    `cfm_review_unauthorized_create_count ${cfmOpsTelemetry.unauthorizedCreateCount}`,
+    ``,
+    `# HELP cfm_review_contact_only_attempt_count Total number of listing-review attempts that qualified only for private feedback`,
+    `# TYPE cfm_review_contact_only_attempt_count counter`,
+    `cfm_review_contact_only_attempt_count ${cfmOpsTelemetry.contactOnlyAttemptCount}`,
+    ``,
+    `# HELP cfm_listing_freshness_recovered_count Total number of successful host-managed freshness recoveries`,
+    `# TYPE cfm_listing_freshness_recovered_count counter`,
+    `cfm_listing_freshness_recovered_count ${cfmOpsTelemetry.freshnessRecoveredCount}`,
     ``,
     `# HELP ${toPrometheusMetricName(FRESHNESS_CRON_ELIGIBLE_METRIC)} Total number of due listings selected in the latest freshness cron run`,
     `# TYPE ${toPrometheusMetricName(FRESHNESS_CRON_ELIGIBLE_METRIC)} gauge`,

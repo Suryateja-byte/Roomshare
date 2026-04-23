@@ -36,6 +36,7 @@ import {
   useV2MapData,
   useV2MapDataSetter,
   useIsV2Enabled,
+  usePendingV2QueryHash,
   useDataVersion,
 } from "@/contexts/SearchV2DataContext";
 import type { V2MapData } from "@/contexts/SearchV2DataContext";
@@ -73,6 +74,11 @@ describe("SearchV2DataContext", () => {
     it("provides dataVersion as 0 initially", () => {
       const { result } = renderHook(() => useSearchV2Data(), { wrapper });
       expect(result.current.dataVersion).toBe(0);
+    });
+
+    it("provides pendingQueryHash as null initially", () => {
+      const { result } = renderHook(() => useSearchV2Data(), { wrapper });
+      expect(result.current.pendingQueryHash).toBeNull();
     });
   });
 
@@ -157,6 +163,31 @@ describe("SearchV2DataContext", () => {
       });
 
       expect(result.current.data).toEqual(testData);
+    });
+  });
+
+  describe("usePendingV2QueryHash", () => {
+    it("returns null initially", () => {
+      const { result } = renderHook(() => usePendingV2QueryHash(), {
+        wrapper,
+      });
+      expect(result.current).toBeNull();
+    });
+
+    it("tracks the current in-flight V2 query hash", () => {
+      const { result } = renderHook(
+        () => ({
+          full: useSearchV2Data(),
+          pendingQueryHash: usePendingV2QueryHash(),
+        }),
+        { wrapper }
+      );
+
+      act(() => {
+        result.current.full.setPendingQueryHash("abc123");
+      });
+
+      expect(result.current.pendingQueryHash).toBe("abc123");
     });
   });
 
@@ -251,9 +282,11 @@ describe("SearchV2DataContext", () => {
 
       expect(result.current.v2MapData).toBeNull();
       expect(result.current.isV2Enabled).toBe(false);
+      expect(result.current.pendingQueryHash).toBeNull();
       expect(result.current.dataVersion).toBe(0);
       expect(typeof result.current.setV2MapData).toBe("function");
       expect(typeof result.current.setIsV2Enabled).toBe("function");
+      expect(typeof result.current.setPendingQueryHash).toBe("function");
     });
 
     it("useV2MapData returns null outside provider", () => {

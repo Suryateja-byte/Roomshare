@@ -365,7 +365,21 @@ export async function POST(request: Request) {
       where: { id: conversationId },
       include: {
         participants: { select: { id: true } },
-        listing: { select: { status: true } },
+        listing: {
+          select: {
+            status: true,
+            statusReason: true,
+            needsMigrationReview: true,
+            availabilitySource: true,
+            availableSlots: true,
+            totalSlots: true,
+            openSlots: true,
+            moveInDate: true,
+            availableUntil: true,
+            minStayMonths: true,
+            lastConfirmedAt: true,
+          },
+        },
       },
     });
 

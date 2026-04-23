@@ -2,6 +2,13 @@ import React from "react";
 import { render, screen } from "@testing-library/react";
 import ReviewForm from "@/components/ReviewForm";
 
+const defaultReviewEligibility = {
+  canPublicReview: true,
+  hasLegacyAcceptedBooking: true,
+  canLeavePrivateFeedback: false,
+  reason: "ELIGIBLE" as const,
+};
+
 jest.mock("next/navigation", () => ({
   useRouter: () => ({
     refresh: jest.fn(),
@@ -37,7 +44,7 @@ describe("ReviewForm", () => {
         listingId="listing-123"
         isLoggedIn={true}
         hasExistingReview={false}
-        hasBookingHistory={true}
+        reviewEligibility={defaultReviewEligibility}
         {...props}
       />
     );
@@ -47,7 +54,14 @@ describe("ReviewForm", () => {
   });
 
   it("does not render booking-request review gate phrases", () => {
-    renderReviewForm({ hasBookingHistory: false });
+    renderReviewForm({
+      reviewEligibility: {
+        ...defaultReviewEligibility,
+        canPublicReview: false,
+        hasLegacyAcceptedBooking: false,
+        reason: "ACCEPTED_BOOKING_REQUIRED",
+      },
+    });
 
     const forbiddenGateCopy = [
       /request\s+a\s+booking/i,
@@ -61,12 +75,19 @@ describe("ReviewForm", () => {
   });
 
   it("shows the confirmed-stay gate text when the viewer lacks an accepted booking", () => {
-    renderReviewForm({ hasBookingHistory: false });
+    renderReviewForm({
+      reviewEligibility: {
+        ...defaultReviewEligibility,
+        canPublicReview: false,
+        hasLegacyAcceptedBooking: false,
+        reason: "ACCEPTED_BOOKING_REQUIRED",
+      },
+    });
 
     expect(screen.getByText("Past stay required")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Only past guests with a confirmed stay at this listing can leave a public review."
+        "Only past guests with a confirmed stay can leave a public review."
       )
     ).toBeInTheDocument();
   });
@@ -80,10 +101,32 @@ describe("ReviewForm", () => {
   });
 
   it("shows the sign-in CTA when the viewer is logged out", () => {
-    renderReviewForm({ isLoggedIn: false });
+    renderReviewForm({
+      isLoggedIn: false,
+      reviewEligibility: {
+        ...defaultReviewEligibility,
+        canPublicReview: false,
+        hasLegacyAcceptedBooking: false,
+        reason: "LOGIN_REQUIRED",
+      },
+    });
 
     expect(
       screen.getByRole("link", { name: "Sign in to review" })
     ).toBeInTheDocument();
+  });
+
+  it("shows the existing review fallback when viewer-state marks the user as already reviewed", () => {
+    renderReviewForm({
+      reviewEligibility: {
+        ...defaultReviewEligibility,
+        canPublicReview: false,
+        hasLegacyAcceptedBooking: false,
+        reason: "ALREADY_REVIEWED",
+      },
+      hasExistingReview: true,
+    });
+
+    expect(screen.getByText("Thanks for your review!")).toBeInTheDocument();
   });
 });

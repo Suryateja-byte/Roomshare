@@ -41,6 +41,9 @@ jest.mock("@/lib/prisma", () => {
       findUnique: jest.fn(),
       findMany: jest.fn(),
     },
+    physicalUnit: {
+      findUnique: jest.fn(),
+    },
     $transaction: jest.fn(),
     $executeRaw: jest.fn().mockResolvedValue(undefined),
   };
@@ -83,6 +86,15 @@ jest.mock("@/lib/email", () => ({
     .mockResolvedValue({ success: true }),
 }));
 
+const mockConsumeMessageStartEntitlement = jest.fn();
+const mockAttachConsumptionToConversation = jest.fn();
+jest.mock("@/lib/payments/contact-paywall", () => ({
+  consumeMessageStartEntitlement: (...args: unknown[]) =>
+    mockConsumeMessageStartEntitlement(...args),
+  attachConsumptionToConversation: (...args: unknown[]) =>
+    mockAttachConsumptionToConversation(...args),
+}));
+
 import {
   startConversation,
   sendMessage,
@@ -95,6 +107,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { checkBlockBeforeAction } from "@/app/actions/block";
 
 describe("Chat Actions", () => {
   const mockSession = {
@@ -114,7 +127,18 @@ describe("Chat Actions", () => {
     const mockListing = {
       id: "listing-123",
       ownerId: "owner-456",
+      physicalUnitId: "unit-123",
       status: "ACTIVE" as const,
+      statusReason: null,
+      needsMigrationReview: false,
+      availabilitySource: "LEGACY_BOOKING" as const,
+      availableSlots: 1,
+      totalSlots: 1,
+      openSlots: null,
+      moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+      availableUntil: null,
+      minStayMonths: 1,
+      lastConfirmedAt: null,
     };
 
     beforeEach(() => {
@@ -125,8 +149,29 @@ describe("Chat Actions", () => {
         emailVerified: new Date(),
         isSuspended: false,
       });
+      mockConsumeMessageStartEntitlement.mockResolvedValue({
+        ok: true,
+        summary: {
+          enabled: false,
+          mode: "OPEN",
+          freeContactsRemaining: 2,
+          packContactsRemaining: 0,
+          activePassExpiresAt: null,
+          requiresPurchase: false,
+          offers: [],
+        },
+        unitId: "unit-123",
+        unitIdentityEpoch: 1,
+        source: "ENFORCEMENT_DISABLED",
+        consumptionId: null,
+      });
+      mockAttachConsumptionToConversation.mockResolvedValue(undefined);
       (prisma.conversationDeletion.deleteMany as jest.Mock).mockResolvedValue({
         count: 0,
+      });
+      (prisma.physicalUnit.findUnique as jest.Mock).mockResolvedValue({
+        unitIdentityEpoch: 1,
+        supersededByUnitId: null,
       });
     });
 
@@ -153,7 +198,7 @@ describe("Chat Actions", () => {
     });
 
     it.each(["PAUSED", "RENTED"] as const)(
-      "blocks new conversation when listing is %s (stale-tab guard)",
+      "blocks new conversation when listing is %s with LISTING_UNAVAILABLE",
       async (status) => {
         (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
           ...mockListing,
@@ -163,12 +208,33 @@ describe("Chat Actions", () => {
         const result = await startConversation("listing-123");
 
         expect(result).toEqual({
-          error: "This listing is no longer active. New messages are paused.",
-          code: "LISTING_INACTIVE",
+          error: "This listing is not available for new messages right now.",
+          code: "LISTING_UNAVAILABLE",
         });
         expect(prisma.conversation.create).not.toHaveBeenCalled();
       },
     );
+
+    it("blocks new conversation with MIGRATION_REVIEW", async () => {
+      (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
+        ...mockListing,
+        availabilitySource: "HOST_MANAGED",
+        openSlots: 1,
+        availableUntil: new Date("2026-12-01T00:00:00.000Z"),
+        lastConfirmedAt: new Date("2026-04-10T12:00:00.000Z"),
+        statusReason: "MIGRATION_REVIEW",
+        needsMigrationReview: true,
+      });
+
+      const result = await startConversation("listing-123");
+
+      expect(result).toEqual({
+        error:
+          "This listing is temporarily unavailable while it completes migration review.",
+        code: "MIGRATION_REVIEW",
+      });
+      expect(prisma.conversation.create).not.toHaveBeenCalled();
+    });
 
     it("returns error when trying to chat with self", async () => {
       (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
@@ -195,6 +261,7 @@ describe("Chat Actions", () => {
           userId: "user-123",
         },
       });
+      expect(mockConsumeMessageStartEntitlement).not.toHaveBeenCalled();
       expect(prisma.conversation.create).not.toHaveBeenCalled();
     });
 
@@ -215,6 +282,88 @@ describe("Chat Actions", () => {
           },
         },
       });
+      expect(mockConsumeMessageStartEntitlement).toHaveBeenCalledWith(
+        prisma,
+        expect.objectContaining({
+          userId: "user-123",
+          listingId: "listing-123",
+          physicalUnitId: "unit-123",
+        })
+      );
+      expect(
+        (prisma.$executeRaw as jest.Mock).mock.calls.some((call) =>
+          String(call[0]).includes("contact_attempts")
+        )
+      ).toBe(true);
+    });
+
+    it("returns a neutral contact response when the host has blocked the viewer", async () => {
+      (checkBlockBeforeAction as jest.Mock).mockResolvedValueOnce({
+        allowed: false,
+        message: "This user has blocked you",
+      });
+
+      const result = await startConversation("listing-123");
+
+      expect(result).toEqual({
+        error: "This host is not accepting contact right now.",
+        code: "HOST_NOT_ACCEPTING_CONTACT",
+      });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(
+        (prisma.$executeRaw as jest.Mock).mock.calls.some((call) =>
+          String(call[0]).includes("contact_attempts")
+        )
+      ).toBe(false);
+    });
+
+    it("rejects a stale observed unit epoch before consuming contact entitlement", async () => {
+      (prisma.physicalUnit.findUnique as jest.Mock).mockResolvedValueOnce({
+        unitIdentityEpoch: 2,
+        supersededByUnitId: null,
+      });
+
+      const result = await startConversation({
+        listingId: "listing-123",
+        clientIdempotencyKey: "idem-stale",
+        unitIdentityEpochObserved: 1,
+      });
+
+      expect(result).toEqual({
+        error: "Please refresh this listing before contacting the host.",
+        code: "UNIT_EPOCH_STALE",
+      });
+      expect(mockConsumeMessageStartEntitlement).not.toHaveBeenCalled();
+      expect(prisma.conversation.create).not.toHaveBeenCalled();
+    });
+
+    it("blocks new conversation when paywall enforcement requires purchase", async () => {
+      (prisma.conversation.findFirst as jest.Mock).mockResolvedValue(null);
+      mockConsumeMessageStartEntitlement.mockResolvedValue({
+        ok: false,
+        summary: {
+          enabled: true,
+          mode: "PAYWALL_REQUIRED",
+          freeContactsRemaining: 0,
+          packContactsRemaining: 0,
+          activePassExpiresAt: null,
+          requiresPurchase: true,
+          offers: [],
+        },
+        unitId: "unit-123",
+        unitIdentityEpoch: 1,
+        code: "PAYWALL_REQUIRED",
+        message: "Unlock contact to message this host.",
+      });
+
+      const result = await startConversation("listing-123");
+
+      expect(result).toEqual({
+        error: "Unlock contact to message this host.",
+        code: "PAYWALL_REQUIRED",
+      });
+      expect(prisma.conversation.create).not.toHaveBeenCalled();
+      expect(mockAttachConsumptionToConversation).not.toHaveBeenCalled();
     });
 
     it("returns error when rate limited (A5.1)", async () => {
@@ -264,7 +413,19 @@ describe("Chat Actions", () => {
         { id: "user-123", name: "Test User", email: "test@example.com" },
         { id: "other-456", name: "Other User", email: "other@example.com" },
       ],
-      listing: { status: "ACTIVE" as const },
+      listing: {
+        status: "ACTIVE" as const,
+        statusReason: null,
+        needsMigrationReview: false,
+        availabilitySource: "LEGACY_BOOKING" as const,
+        availableSlots: 1,
+        totalSlots: 1,
+        openSlots: null,
+        moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+        availableUntil: null,
+        minStayMonths: 1,
+        lastConfirmedAt: null,
+      },
     };
 
     const mockMessage = {
@@ -333,7 +494,7 @@ describe("Chat Actions", () => {
     });
 
     it.each(["PAUSED", "RENTED"] as const)(
-      "blocks message-send when listing is %s (stale-tab guard)",
+      "blocks message-send when listing is %s with LISTING_UNAVAILABLE",
       async (status) => {
         (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
           ...mockConversation,
@@ -343,12 +504,36 @@ describe("Chat Actions", () => {
         const result = await sendMessage("conv-123", "Hello!");
 
         expect(result).toEqual({
-          error: "This listing is no longer active. New messages are paused.",
-          code: "LISTING_INACTIVE",
+          error: "This listing is not available for new messages right now.",
+          code: "LISTING_UNAVAILABLE",
         });
         expect(prisma.message.create).not.toHaveBeenCalled();
       },
     );
+
+    it("blocks outbound messages with MODERATION_LOCKED", async () => {
+      (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
+        ...mockConversation,
+        listing: {
+          ...mockConversation.listing,
+          status: "PAUSED",
+          availabilitySource: "HOST_MANAGED",
+          openSlots: 1,
+          availableUntil: new Date("2026-12-01T00:00:00.000Z"),
+          lastConfirmedAt: new Date("2026-04-10T12:00:00.000Z"),
+          statusReason: "ADMIN_PAUSED",
+        },
+      });
+
+      const result = await sendMessage("conv-123", "Hello!");
+
+      expect(result).toEqual({
+        error:
+          "This listing is temporarily unavailable while it is under review.",
+        code: "MODERATION_LOCKED",
+      });
+      expect(prisma.message.create).not.toHaveBeenCalled();
+    });
   });
 
   describe("getConversations", () => {

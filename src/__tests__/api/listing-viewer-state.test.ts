@@ -47,11 +47,19 @@ jest.mock("@/lib/env", () => ({
     contactFirstListings: false,
     softHoldsEnabled: true,
     privateFeedback: false,
+    contactPaywall: false,
+    contactPaywallEnforcement: false,
   },
 }));
 
 jest.mock("@/lib/with-rate-limit", () => ({
   withRateLimit: jest.fn().mockResolvedValue(null),
+}));
+
+const mockEvaluateMessageStartPaywall = jest.fn();
+jest.mock("@/lib/payments/contact-paywall", () => ({
+  evaluateMessageStartPaywall: (...args: unknown[]) =>
+    mockEvaluateMessageStartPaywall(...args),
 }));
 
 import { GET } from "@/app/api/listings/[id]/viewer-state/route";
@@ -63,6 +71,8 @@ const mockedFeatures = features as {
   contactFirstListings: boolean;
   softHoldsEnabled: boolean;
   privateFeedback: boolean;
+  contactPaywall: boolean;
+  contactPaywallEnforcement: boolean;
 };
 
 describe("GET /api/listings/[id]/viewer-state", () => {
@@ -108,6 +118,19 @@ describe("GET /api/listings/[id]/viewer-state", () => {
     mockedFeatures.contactFirstListings = false;
     mockedFeatures.softHoldsEnabled = true;
     mockedFeatures.privateFeedback = false;
+    mockedFeatures.contactPaywall = false;
+    mockedFeatures.contactPaywallEnforcement = false;
+    mockEvaluateMessageStartPaywall.mockResolvedValue({
+      summary: {
+        enabled: false,
+        mode: "OPEN",
+        freeContactsRemaining: 2,
+        packContactsRemaining: 0,
+        activePassExpiresAt: null,
+        requiresPurchase: false,
+        offers: [],
+      },
+    });
   });
 
   afterEach(() => {
@@ -152,9 +175,9 @@ describe("GET /api/listings/[id]/viewer-state", () => {
     expect(data.primaryCta).toBe("CONTACT_HOST");
     expect(data.canContact).toBe(true);
     expect(data.availabilitySource).toBe("LEGACY_BOOKING");
-    expect(data.canBook).toBe(true);
-    expect(data.canHold).toBe(true);
-    expect(data.bookingDisabledReason).toBeNull();
+    expect(data.canBook).toBe(false);
+    expect(data.canHold).toBe(false);
+    expect(data.bookingDisabledReason).toBe("CONTACT_ONLY");
     expect(data.reviewEligibility).toEqual({
       canPublicReview: true,
       hasLegacyAcceptedBooking: true,
@@ -171,8 +194,8 @@ describe("GET /api/listings/[id]/viewer-state", () => {
 
     expect(response.status).toBe(200);
     expect(data.hasBookingHistory).toBe(false);
-    expect(data.canBook).toBe(true);
-    expect(data.canHold).toBe(true);
+    expect(data.canBook).toBe(false);
+    expect(data.canHold).toBe(false);
     expect(data.reviewEligibility).toEqual({
       canPublicReview: false,
       hasLegacyAcceptedBooking: false,
@@ -356,8 +379,8 @@ describe("GET /api/listings/[id]/viewer-state", () => {
     expect(data.primaryCta).toBe("CONTACT_HOST");
     expect(data.canContact).toBe(true);
     expect(data.availabilitySource).toBe("LEGACY_BOOKING");
-    expect(data.canBook).toBe(true);
-    expect(data.canHold).toBe(true);
+    expect(data.canBook).toBe(false);
+    expect(data.canHold).toBe(false);
     expect(data.reviewEligibility).toEqual({
       canPublicReview: false,
       hasLegacyAcceptedBooking: false,
@@ -636,5 +659,118 @@ describe("GET /api/listings/[id]/viewer-state", () => {
     expect(response.status).toBe(200);
     expect(data.publicAvailability).toBeNull();
     expect(data.needsMigrationReview).toBe(false);
+  });
+
+  it("freezes booking compatibility fields for legacy-booking listings", async () => {
+    (prisma.booking.findFirst as jest.Mock).mockResolvedValue({
+      id: "booking-1",
+    });
+
+    const response = await GET(createRequest(), routeContext);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.primaryCta).toBe("CONTACT_HOST");
+    expect(data.canContact).toBe(true);
+    expect(data.contactDisabledReason).toBeNull();
+    expect(data.canBook).toBe(false);
+    expect(data.canHold).toBe(false);
+    expect(data.bookingDisabledReason).toBe("CONTACT_ONLY");
+  });
+
+  it("surfaces MIGRATION_REVIEW as the contact-disabled reason", async () => {
+    (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
+      ownerId: "owner-456",
+      status: "ACTIVE",
+      availabilitySource: "HOST_MANAGED",
+      availableSlots: 2,
+      totalSlots: 3,
+      openSlots: 2,
+      moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+      availableUntil: new Date("2026-12-01T00:00:00.000Z"),
+      minStayMonths: 1,
+      lastConfirmedAt: new Date("2026-04-10T12:00:00.000Z"),
+      statusReason: "MIGRATION_REVIEW",
+      needsMigrationReview: true,
+    });
+
+    const response = await GET(createRequest(), routeContext);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.canContact).toBe(false);
+    expect(data.contactDisabledReason).toBe("MIGRATION_REVIEW");
+    expect(data.canBook).toBe(false);
+    expect(data.canHold).toBe(false);
+    expect(data.bookingDisabledReason).toBe("LISTING_UNAVAILABLE");
+  });
+
+  it("includes paywallSummary without blocking contact while enforcement is off", async () => {
+    mockedFeatures.contactPaywall = true;
+    mockedFeatures.contactPaywallEnforcement = false;
+    mockEvaluateMessageStartPaywall.mockResolvedValue({
+      summary: {
+        enabled: true,
+        mode: "PAYWALL_REQUIRED",
+        freeContactsRemaining: 0,
+        packContactsRemaining: 0,
+        activePassExpiresAt: null,
+        requiresPurchase: true,
+        offers: [
+          {
+            productCode: "CONTACT_PACK_3",
+            label: "3 contacts",
+            priceDisplay: "$4.99",
+            description: "Unlock 3 additional message starts.",
+          },
+        ],
+      },
+    });
+
+    const response = await GET(createRequest(), routeContext);
+    const data = await response.json();
+
+    expect(data.paywallSummary).toMatchObject({
+      enabled: true,
+      mode: "PAYWALL_REQUIRED",
+      requiresPurchase: true,
+    });
+    expect(data.canContact).toBe(true);
+    expect(data.contactDisabledReason).toBeNull();
+  });
+
+  it("surfaces PAYWALL_REQUIRED when enforcement is on", async () => {
+    mockedFeatures.contactPaywall = true;
+    mockedFeatures.contactPaywallEnforcement = true;
+    mockEvaluateMessageStartPaywall.mockResolvedValue({
+      summary: {
+        enabled: true,
+        mode: "PAYWALL_REQUIRED",
+        freeContactsRemaining: 0,
+        packContactsRemaining: 0,
+        activePassExpiresAt: null,
+        requiresPurchase: true,
+        offers: [
+          {
+            productCode: "CONTACT_PACK_3",
+            label: "3 contacts",
+            priceDisplay: "$4.99",
+            description: "Unlock 3 additional message starts.",
+          },
+        ],
+      },
+    });
+
+    const response = await GET(createRequest(), routeContext);
+    const data = await response.json();
+
+    expect(data.paywallSummary).toMatchObject({
+      enabled: true,
+      mode: "PAYWALL_REQUIRED",
+      requiresPurchase: true,
+    });
+    expect(data.canContact).toBe(false);
+    expect(data.contactDisabledReason).toBe("PAYWALL_REQUIRED");
+    expect(data.primaryCta).toBe("CONTACT_HOST");
   });
 });

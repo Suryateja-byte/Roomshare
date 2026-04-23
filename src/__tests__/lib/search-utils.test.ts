@@ -22,7 +22,7 @@ describe("buildSearchUrl", () => {
       lng: -122.4194,
     };
     const url = buildSearchUrl(filters);
-    expect(url).toContain("where=San+Francisco");
+    expect(url).toContain("locationLabel=San+Francisco");
     expect(url).toContain("what=quiet+roommates");
   });
 

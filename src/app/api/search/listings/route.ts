@@ -39,6 +39,7 @@ import {
   createSearchResponseMeta,
   getSearchQueryHash,
   type SearchListState,
+  SEARCH_RESPONSE_VERSION,
 } from "@/lib/search/search-response";
 import { normalizeSearchQuery } from "@/lib/search/search-query";
 import {
@@ -190,6 +191,40 @@ export async function GET(request: NextRequest) {
         );
       }
 
+      if (v2Result?.admissionError) {
+        return NextResponse.json(
+          {
+            error: "admission_rejected",
+            admissionError: v2Result.admissionError,
+            meta: createSearchResponseMeta(normalizedQuery, "v2"),
+          },
+          {
+            status: v2Result.admissionError.status,
+            headers: {
+              "x-request-id": requestId,
+              "Cache-Control": "no-store",
+            },
+          }
+        );
+      }
+
+      if (v2Result?.snapshotExpired) {
+        return NextResponse.json(
+          {
+            error: "snapshot_expired",
+            snapshotExpired: v2Result.snapshotExpired,
+            meta: createSearchResponseMeta(normalizedQuery, "v2"),
+          },
+          {
+            status: 409,
+            headers: {
+              "x-request-id": requestId,
+              "Cache-Control": "no-store",
+            },
+          }
+        );
+      }
+
       // V2 success path
       if (v2Result?.response && v2Result.paginatedResult) {
         const { items: listings, total: rawTotal } = v2Result.paginatedResult;
@@ -205,7 +240,26 @@ export async function GET(request: NextRequest) {
         )
           ? "Showing best matches for your vibe in this area"
           : undefined;
-        const meta = createSearchResponseMeta(normalizedQuery, "v2");
+        const meta = {
+          queryHash: v2Result.response.meta.queryHash,
+          backendSource: "v2" as const,
+          responseVersion: SEARCH_RESPONSE_VERSION,
+          ...(v2Result.response.meta.querySnapshotId
+            ? { querySnapshotId: v2Result.response.meta.querySnapshotId }
+            : {}),
+          ...(v2Result.response.meta.projectionVersion !== undefined
+            ? { projectionVersion: v2Result.response.meta.projectionVersion }
+            : {}),
+          ...(v2Result.response.meta.embeddingVersion
+            ? { embeddingVersion: v2Result.response.meta.embeddingVersion }
+            : {}),
+          ...(v2Result.response.meta.rankerProfileVersion
+            ? {
+                rankerProfileVersion:
+                  v2Result.response.meta.rankerProfileVersion,
+              }
+            : {}),
+        };
         const state =
           total === 0
             ? ({ kind: "zero-results", meta } satisfies SearchListState)

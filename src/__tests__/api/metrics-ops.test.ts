@@ -13,6 +13,28 @@ jest.mock("@/lib/env", () => ({
   getServerEnv: () => process.env,
 }));
 
+jest.mock("@/lib/freshness/ops-metrics", () => ({
+  getFreshnessOpsMetricsSnapshot: jest.fn(async () => ({
+    freshnessBucketCounts: {
+      normal: 0,
+      reminder: 0,
+      warning: 0,
+      auto_paused: 0,
+    },
+    staleInSearchCount: 0,
+    staleStillActiveCount: 0,
+    legacyEligibleCount: 0,
+  })),
+}));
+
+jest.mock("@/lib/metrics/cfm-ops-telemetry", () => ({
+  getCfmOpsTelemetrySnapshot: jest.fn(() => ({
+    unauthorizedCreateCount: 0,
+    contactOnlyAttemptCount: 0,
+    freshnessRecoveredCount: 0,
+  })),
+}));
+
 import { GET } from "@/app/api/metrics/ops/route";
 import {
   recordAutoPauseCronRun,
@@ -27,8 +49,12 @@ import {
 import {
   recordSearchClientAbort,
   recordSearchRequestLatency,
+  recordSearchSnapshotExpired,
+  recordSearchSnapshotHoleRatio,
   resetSearchTelemetryForTests,
 } from "@/lib/search/search-telemetry";
+import { getFreshnessOpsMetricsSnapshot } from "@/lib/freshness/ops-metrics";
+import { getCfmOpsTelemetrySnapshot } from "@/lib/metrics/cfm-ops-telemetry";
 
 describe("GET /api/metrics/ops", () => {
   const originalEnv = process.env;
@@ -73,6 +99,22 @@ describe("GET /api/metrics/ops", () => {
   });
 
   it("returns 200 with Prometheus metrics when token matches", async () => {
+    (getFreshnessOpsMetricsSnapshot as jest.Mock).mockResolvedValue({
+      freshnessBucketCounts: {
+        normal: 7,
+        reminder: 2,
+        warning: 1,
+        auto_paused: 3,
+      },
+      staleInSearchCount: 0,
+      staleStillActiveCount: 2,
+      legacyEligibleCount: 5,
+    });
+    (getCfmOpsTelemetrySnapshot as jest.Mock).mockReturnValue({
+      unauthorizedCreateCount: 4,
+      contactOnlyAttemptCount: 2,
+      freshnessRecoveredCount: 3,
+    });
     recordSearchRequestLatency({
       route: "search-page-ssr",
       durationMs: 42,
@@ -85,6 +127,18 @@ describe("GET /api/metrics/ops", () => {
       route: "search-client",
       queryHash: "hash-1",
       reason: "superseded",
+    });
+    recordSearchSnapshotExpired({
+      route: "search-client",
+      queryHash: "hash-2",
+      reason: "snapshot_expired",
+    });
+    recordSearchSnapshotHoleRatio({
+      route: "search-page-ssr",
+      queryHash: "hash-3",
+      querySnapshotId: "snapshot-1",
+      holeCount: 1,
+      consideredCount: 4,
     });
     recordSearchDocCronRun({
       divergenceCounts: {
@@ -152,6 +206,16 @@ describe("GET /api/metrics/ops", () => {
     expect(text).toContain("search_request_latency_ms_count 1");
     expect(text).toContain('search_backend_source{backend_source="v2"} 1');
     expect(text).toContain("search_client_abort_total 1");
+    expect(text).toContain("search_snapshot_expired_total 1");
+    expect(text).toContain("search_snapshot_hole_ratio_average 0.25");
+    expect(text).toContain("search_snapshot_hole_responses_total 1");
+    expect(text).toContain('cfm_listing_freshness_bucket_count{bucket="normal"} 7');
+    expect(text).toContain("cfm_listing_stale_in_search_count 0");
+    expect(text).toContain("cfm_listing_stale_still_active_count 2");
+    expect(text).toContain("cfm_review_legacy_eligible_count 5");
+    expect(text).toContain("cfm_review_unauthorized_create_count 4");
+    expect(text).toContain("cfm_review_contact_only_attempt_count 2");
+    expect(text).toContain("cfm_listing_freshness_recovered_count 3");
     expect(text).toContain(
       'cfm_cron_freshness_reminder_eligible_count{kind="reminder"} 2'
     );

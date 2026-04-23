@@ -224,6 +224,8 @@ export class CreateListingPage {
    */
   async mockImageUpload() {
     let uploadCount = 0;
+    const supabaseBaseUrl =
+      process.env.NEXT_PUBLIC_SUPABASE_URL || "https://fake.supabase.co";
     await this.page.route("**/api/upload", async (route) => {
       uploadCount++;
       const id = `mock-${Date.now()}-${uploadCount}`;
@@ -231,7 +233,7 @@ export class CreateListingPage {
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          url: `https://fake.supabase.co/storage/v1/object/public/images/listings/${id}.jpg`,
+          url: `${supabaseBaseUrl}/storage/v1/object/public/images/listings/${id}.jpg`,
         }),
       });
     });

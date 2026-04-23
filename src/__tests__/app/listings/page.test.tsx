@@ -5,6 +5,13 @@ import { prisma } from "@/lib/prisma";
 import { getReviews } from "@/lib/data";
 import { getAvailability } from "@/lib/availability";
 import { auth } from "@/auth";
+import { features } from "@/lib/env";
+
+const mockedFeatures = features as {
+  semanticSearch: boolean;
+  softHoldsEnabled: boolean;
+  contactFirstListings: boolean;
+};
 
 const mockListingPageClient = jest.fn(
   (props: Record<string, unknown>) => (
@@ -226,5 +233,49 @@ describe("ListingPage SSR availability bootstrap", () => {
         initialEndDate: undefined,
       })
     );
+  });
+
+  it("keeps guest detail on the sanitized path and skips exact coordinates", async () => {
+    (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
+      ...listing,
+      location: { city: "San Francisco", state: "CA" },
+    });
+    (prisma.$queryRaw as jest.Mock).mockResolvedValue([
+      { lat: 37.77, lng: -122.41 },
+    ]);
+
+    render(
+      await ListingPage({
+        params: Promise.resolve({ id: "listing-123" }),
+        searchParams: Promise.resolve({}),
+      })
+    );
+
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    expect(mockListingPageClient).toHaveBeenCalledWith(
+      expect.objectContaining({
+        coordinates: null,
+        canViewExactLocation: false,
+      })
+    );
+  });
+
+  it("returns notFound for guest access to migration-review listings", async () => {
+    (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
+      ...listing,
+      availabilitySource: "HOST_MANAGED",
+      statusReason: "MIGRATION_REVIEW",
+      needsMigrationReview: true,
+      openSlots: 1,
+      availableUntil: new Date("2026-12-01T00:00:00.000Z"),
+      lastConfirmedAt: new Date("2026-04-10T12:00:00.000Z"),
+    });
+
+    await expect(
+      ListingPage({
+        params: Promise.resolve({ id: "listing-123" }),
+        searchParams: Promise.resolve({}),
+      })
+    ).rejects.toThrow("NEXT_NOT_FOUND");
   });
 });

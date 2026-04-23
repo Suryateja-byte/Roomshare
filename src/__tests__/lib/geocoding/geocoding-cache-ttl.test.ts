@@ -123,4 +123,27 @@ describe("geocoding cache TTL", () => {
     const cached = await getCachedResults("san francisco");
     expect(cached).toEqual(results);
   });
+
+  it("keys cached results by cache version", async () => {
+    const results = [
+      {
+        id: "1",
+        place_name: "Austin, TX",
+        center: [-97.74, 30.27] as [number, number],
+        place_type: ["place"],
+      },
+    ];
+
+    await setCachedResults("Austin", results, {
+      cacheVersion: "public:v1:token-a",
+      ttlSeconds: 60,
+    });
+
+    expect(
+      await getCachedResults("Austin", { cacheVersion: "public:v1:token-a" })
+    ).toEqual(results);
+    expect(
+      await getCachedResults("Austin", { cacheVersion: "public:v1:token-b" })
+    ).toBeNull();
+  });
 });

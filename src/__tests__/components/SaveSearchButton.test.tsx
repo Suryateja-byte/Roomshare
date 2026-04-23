@@ -20,6 +20,7 @@ jest.mock("@/app/actions/saved-search", () => ({
 describe("SaveSearchButton", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    global.fetch = jest.fn();
   });
 
   it("renders save search button", () => {
@@ -165,5 +166,28 @@ describe("SaveSearchButton", () => {
     await waitFor(() => {
       expect(screen.queryByText("Save This Search")).not.toBeInTheDocument();
     });
+  });
+
+  it("shows unlock alerts affordance when alerts are saved but locked", async () => {
+    mockSaveSearch.mockResolvedValue({
+      success: true,
+      searchId: "search-123",
+      effectiveAlertState: "LOCKED",
+    });
+
+    render(<SaveSearchButton />);
+
+    await userEvent.click(screen.getByRole("button"));
+    const saveButtons = screen.getAllByText("Save Search");
+    await userEvent.click(saveButtons[saveButtons.length - 1]);
+
+    expect(
+      await screen.findByText(
+        "Search saved. Alerts are locked until you unlock Mover's Pass."
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Unlock Alerts" })
+    ).toBeInTheDocument();
   });
 });

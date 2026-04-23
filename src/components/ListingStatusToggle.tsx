@@ -8,11 +8,17 @@ import {
   updateListingStatus,
   ListingStatus,
 } from "@/app/actions/listing-status";
+import {
+  getModerationWriteLockReason,
+  LISTING_LOCKED_ERROR_MESSAGE,
+} from "@/lib/listings/moderation-write-lock";
 
 interface ListingStatusToggleProps {
   listingId: string;
   currentStatus: ListingStatus;
   currentVersion: number;
+  currentStatusReason?: string | null;
+  moderationWriteLocksEnabled?: boolean;
 }
 
 const statusConfig = {
@@ -43,6 +49,8 @@ export default function ListingStatusToggle({
   listingId,
   currentStatus,
   currentVersion,
+  currentStatusReason = null,
+  moderationWriteLocksEnabled = false,
 }: ListingStatusToggleProps) {
   const router = useRouter();
   const [status, setStatus] = useState<ListingStatus>(currentStatus);
@@ -51,6 +59,9 @@ export default function ListingStatusToggle({
   const [isUpdating, setIsUpdating] = useState(false);
   const [awaitingRefresh, setAwaitingRefresh] = useState(false);
   const awaitingRefreshRef = useRef(false);
+  const isLockedFromProps =
+    moderationWriteLocksEnabled &&
+    getModerationWriteLockReason(currentStatusReason) !== null;
 
   useEffect(() => {
     setStatus(currentStatus);
@@ -59,10 +70,11 @@ export default function ListingStatusToggle({
       awaitingRefreshRef.current = false;
       setAwaitingRefresh(false);
     }
-  }, [currentStatus, currentVersion]);
+  }, [currentStatus, currentVersion, currentStatusReason]);
 
   const config = statusConfig[status];
-  const isInteractionDisabled = isUpdating || awaitingRefresh;
+  const isInteractionDisabled =
+    isUpdating || awaitingRefresh || isLockedFromProps;
 
   const handleStatusChange = async (newStatus: ListingStatus) => {
     if (newStatus === status || isInteractionDisabled) {
@@ -78,6 +90,11 @@ export default function ListingStatusToggle({
         awaitingRefreshRef.current = true;
         setAwaitingRefresh(true);
         toast.error("Listing changed elsewhere. Refreshing the latest version...");
+        router.refresh();
+      } else if (result.code === "LISTING_LOCKED") {
+        awaitingRefreshRef.current = true;
+        setAwaitingRefresh(true);
+        toast.error(LISTING_LOCKED_ERROR_MESSAGE);
         router.refresh();
       } else {
         toast.error(result.error);

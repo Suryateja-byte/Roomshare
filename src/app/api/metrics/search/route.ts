@@ -15,6 +15,7 @@ import {
   recordSearchDedupMemberClick,
   recordSearchDedupOpenPanelClick,
   recordSearchMapListMismatch,
+  recordSearchSnapshotExpired,
 } from "@/lib/search/search-telemetry";
 
 export const runtime = "nodejs";
@@ -23,6 +24,7 @@ const MAX_BODY_SIZE = 2_000;
 const ALLOWED_METRICS = new Set([
   "search_client_abort_total",
   "search_map_list_mismatch_total",
+  "search_snapshot_expired_total",
   "cfm.search.legacy_url_count",
   "search_dedup_open_panel_click",
   "search_dedup_member_click",
@@ -38,6 +40,11 @@ const ALLOWED_REASONS = new Set([
   "retry",
   "stale-query-hash",
   "stale-request-key",
+]);
+const ALLOWED_SNAPSHOT_EXPIRED_REASONS = new Set([
+  "search_contract_changed",
+  "snapshot_missing",
+  "snapshot_expired",
 ]);
 const ALLOWED_LEGACY_URL_ALIASES = new Set<string>(LEGACY_URL_ALIASES);
 const ALLOWED_LEGACY_URL_SURFACES = new Set(["spa"]);
@@ -61,6 +68,12 @@ type SearchClientTelemetryPayload =
       queryHash?: string;
       responseQueryHash?: string;
       reason: string;
+    }
+  | {
+      metric: "search_snapshot_expired_total";
+      route: "search-results-client";
+      queryHash?: string;
+      reason: "search_contract_changed" | "snapshot_missing" | "snapshot_expired";
     }
   | {
       metric: "cfm.search.legacy_url_count";
@@ -186,6 +199,30 @@ function validatePayload(
     };
   }
 
+  if (obj.metric === "search_snapshot_expired_total") {
+    if (
+      obj.route !== "search-results-client" ||
+      typeof obj.reason !== "string" ||
+      !ALLOWED_SNAPSHOT_EXPIRED_REASONS.has(obj.reason) ||
+      !isShortOptionalString(obj.queryHash, 128)
+    ) {
+      return { valid: false };
+    }
+
+    return {
+      valid: true,
+      payload: {
+        metric: "search_snapshot_expired_total",
+        route: "search-results-client",
+        queryHash: obj.queryHash as string | undefined,
+        reason: obj.reason as
+          | "search_contract_changed"
+          | "snapshot_missing"
+          | "snapshot_expired",
+      },
+    };
+  }
+
   if (
     typeof obj.route !== "string" ||
     !ALLOWED_ROUTES.has(obj.route) ||
@@ -293,6 +330,12 @@ export async function POST(request: Request) {
             : "search-map-client",
         queryHash: validation.payload.queryHash,
         responseQueryHash: validation.payload.responseQueryHash,
+        reason: validation.payload.reason,
+      });
+    } else if (validation.payload.metric === "search_snapshot_expired_total") {
+      recordSearchSnapshotExpired({
+        route: "search-client",
+        queryHash: validation.payload.queryHash,
         reason: validation.payload.reason,
       });
     } else if (validation.payload.metric === "search_dedup_open_panel_click") {

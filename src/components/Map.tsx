@@ -4154,7 +4154,11 @@ export default function MapComponent({
       >
         {/* Boundary polygon for named search areas */}
         <BoundaryLayer
-          query={searchParams.get("where") || searchParams.get("q")}
+          query={
+            searchParams.get("locationLabel") ||
+            searchParams.get("where") ||
+            searchParams.get("q")
+          }
           isDarkMode={isDarkMode}
         />
 

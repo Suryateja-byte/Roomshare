@@ -46,11 +46,23 @@ jest.mock("next/cache", () => ({
   revalidatePath: jest.fn(),
 }));
 
+jest.mock("@/lib/env", () => ({
+  features: {
+    get moderationWriteLocks() {
+      return process.env.FEATURE_MODERATION_WRITE_LOCKS === "true";
+    },
+  },
+}));
+
 jest.mock("@/lib/search/search-doc-dirty", () => ({
   markListingDirty: jest.fn().mockResolvedValue(undefined),
   markListingsDirty: jest.fn().mockResolvedValue(undefined),
   markListingDirtyInTx: jest.fn().mockResolvedValue(undefined),
   markListingsDirtyInTx: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock("@/lib/metrics/cfm-ops-telemetry", () => ({
+  recordFreshnessRecovered: jest.fn(),
 }));
 
 import {
@@ -65,8 +77,11 @@ import {
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
+import { recordFreshnessRecovered } from "@/lib/metrics/cfm-ops-telemetry";
 
 describe("listing-status actions", () => {
+  const originalModerationWriteLocks =
+    process.env.FEATURE_MODERATION_WRITE_LOCKS;
   const mockSession = {
     user: {
       id: "user-123",
@@ -138,12 +153,21 @@ describe("listing-status actions", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    delete process.env.FEATURE_MODERATION_WRITE_LOCKS;
     (auth as jest.Mock).mockResolvedValue(mockSession);
     // Mock user.findUnique for suspension check
     (prisma.user.findUnique as jest.Mock).mockResolvedValue({
       id: "user-123",
       isSuspended: false,
     });
+  });
+
+  afterAll(() => {
+    if (originalModerationWriteLocks === undefined) {
+      delete process.env.FEATURE_MODERATION_WRITE_LOCKS;
+    } else {
+      process.env.FEATURE_MODERATION_WRITE_LOCKS = originalModerationWriteLocks;
+    }
   });
 
   describe("updateListingStatus", () => {
@@ -318,6 +342,47 @@ describe("listing-status actions", () => {
           error:
             "This listing must finish migration review before it can be made active.",
           code: "HOST_MANAGED_MIGRATION_REVIEW_REQUIRED",
+        });
+        expect(mockTx.listing.update).not.toHaveBeenCalled();
+      });
+
+      it("returns LISTING_LOCKED for host updates on admin-paused rows", async () => {
+        process.env.FEATURE_MODERATION_WRITE_LOCKS = "true";
+        (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
+          makeLockedListingRow({
+            availabilitySource: "HOST_MANAGED",
+            status: "PAUSED",
+            statusReason: "ADMIN_PAUSED",
+          }),
+        ]);
+
+        const result = await updateListingStatus("listing-123", "ACTIVE", 3);
+
+        expect(result).toEqual({
+          error: "This listing is locked while under review.",
+          code: "LISTING_LOCKED",
+          lockReason: "ADMIN_PAUSED",
+        });
+        expect(mockTx.listing.update).not.toHaveBeenCalled();
+      });
+
+      it("returns LISTING_LOCKED for suppressed legacy rows before version checks", async () => {
+        process.env.FEATURE_MODERATION_WRITE_LOCKS = "true";
+        (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
+          makeLockedListingRow({
+            availabilitySource: "LEGACY_BOOKING",
+            status: "PAUSED",
+            statusReason: "SUPPRESSED",
+            version: 9,
+          }),
+        ]);
+
+        const result = await updateListingStatus("listing-123", "ACTIVE", 3);
+
+        expect(result).toEqual({
+          error: "This listing is locked while under review.",
+          code: "LISTING_LOCKED",
+          lockReason: "SUPPRESSED",
         });
         expect(mockTx.listing.update).not.toHaveBeenCalled();
       });
@@ -520,8 +585,8 @@ describe("listing-status actions", () => {
       });
     });
 
-    describe("recoverHostManagedListing", () => {
-      it("reconfirms HOST_MANAGED listings through the shared helper path", async () => {
+  describe("recoverHostManagedListing", () => {
+    it("reconfirms HOST_MANAGED listings through the shared helper path", async () => {
         (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
           makeLockedListingRow({
             availabilitySource: "HOST_MANAGED",
@@ -562,6 +627,11 @@ describe("listing-status actions", () => {
             freshnessWarningSentAt: null,
             autoPausedAt: null,
           }),
+        });
+        expect(recordFreshnessRecovered).toHaveBeenCalledWith({
+          listingId: "listing-123",
+          ownerId: "user-123",
+          mode: "RECONFIRM",
         });
       });
 
@@ -611,6 +681,11 @@ describe("listing-status actions", () => {
             autoPausedAt: null,
           }),
         });
+        expect(recordFreshnessRecovered).toHaveBeenCalledWith({
+          listingId: "listing-123",
+          ownerId: "user-123",
+          mode: "REOPEN",
+        });
       });
 
       it("rejects reopen when host-managed invariants fail", async () => {
@@ -641,6 +716,7 @@ describe("listing-status actions", () => {
           code: "HOST_MANAGED_ACTIVE_REQUIRES_OPEN_SLOTS",
         });
         expect(mockTx.listing.update).not.toHaveBeenCalled();
+        expect(recordFreshnessRecovered).not.toHaveBeenCalled();
       });
 
       it("returns version conflict when recovery is stale", async () => {
@@ -665,6 +741,54 @@ describe("listing-status actions", () => {
           code: "VERSION_CONFLICT",
         });
       });
+    });
+
+    it("blocks recover when a host-managed listing is admin-paused", async () => {
+      process.env.FEATURE_MODERATION_WRITE_LOCKS = "true";
+      (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
+        makeLockedListingRow({
+          availabilitySource: "HOST_MANAGED",
+          status: "PAUSED",
+          statusReason: "ADMIN_PAUSED",
+        }),
+      ]);
+
+      const result = await recoverHostManagedListing(
+        "listing-123",
+        3,
+        "REOPEN"
+      );
+
+      expect(result).toEqual({
+        error: "This listing is locked while under review.",
+        code: "LISTING_LOCKED",
+        lockReason: "ADMIN_PAUSED",
+      });
+      expect(mockTx.listing.update).not.toHaveBeenCalled();
+    });
+
+    it("blocks recover when a host-managed listing is suppressed", async () => {
+      process.env.FEATURE_MODERATION_WRITE_LOCKS = "true";
+      (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
+        makeLockedListingRow({
+          availabilitySource: "HOST_MANAGED",
+          status: "PAUSED",
+          statusReason: "SUPPRESSED",
+        }),
+      ]);
+
+      const result = await recoverHostManagedListing(
+        "listing-123",
+        3,
+        "RECONFIRM"
+      );
+
+      expect(result).toEqual({
+        error: "This listing is locked while under review.",
+        code: "LISTING_LOCKED",
+        lockReason: "SUPPRESSED",
+      });
+      expect(mockTx.listing.update).not.toHaveBeenCalled();
     });
 
     it("keeps autoPausedAt untouched when updateListingStatus reactivates an auto-paused listing", async () => {

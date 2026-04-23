@@ -1,9 +1,14 @@
 /**
- * Tests for GET /api/listings/[id]/status route
+ * Tests for GET /api/listings/[id]/status route.
  *
- * This is a public endpoint that returns listing status without auth.
- * Used by ListingFreshnessCheck to verify listing availability.
+ * This route stays public, but under the privacy-first status contract it
+ * becomes auth-aware and returns a public-safe snapshot for guests while
+ * preserving recovery diagnostics for owners/admins.
  */
+
+jest.mock("@/auth", () => ({
+  auth: jest.fn(),
+}));
 
 jest.mock("@/lib/prisma", () => ({
   prisma: {
@@ -19,17 +24,40 @@ jest.mock("@/lib/with-rate-limit", () => ({
 
 jest.mock("next/server", () => ({
   NextResponse: {
-    json: (data: unknown, init?: { status?: number }) => ({
-      status: init?.status || 200,
+    json: (data: unknown, init?: { status?: number; headers?: HeadersInit }) => ({
+      status: init?.status ?? 200,
       json: async () => data,
-      headers: new Map(),
+      headers: new Headers(init?.headers),
     }),
   },
 }));
 
+import { auth } from "@/auth";
 import { GET } from "@/app/api/listings/[id]/status/route";
 import { prisma } from "@/lib/prisma";
 import { withRateLimit } from "@/lib/with-rate-limit";
+
+const mockedAuth = auth as jest.Mock;
+
+function buildPrivacyFirstListing(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "listing-123",
+    ownerId: "owner-123",
+    version: 7,
+    availabilitySource: "HOST_MANAGED",
+    status: "ACTIVE",
+    statusReason: null,
+    availableSlots: 1,
+    totalSlots: 1,
+    openSlots: 1,
+    moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+    availableUntil: null,
+    minStayMonths: 1,
+    lastConfirmedAt: new Date("2026-04-01T12:00:00.000Z"),
+    needsMigrationReview: false,
+    ...overrides,
+  };
+}
 
 describe("GET /api/listings/[id]/status", () => {
   const mockParams = Promise.resolve({ id: "listing-123" });
@@ -39,6 +67,7 @@ describe("GET /api/listings/[id]/status", () => {
     jest.useFakeTimers().setSystemTime(now);
     jest.clearAllMocks();
     (withRateLimit as jest.Mock).mockResolvedValue(null);
+    mockedAuth.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -47,14 +76,12 @@ describe("GET /api/listings/[id]/status", () => {
 
   describe("rate limiting", () => {
     it("applies rate limiting to prevent polling abuse", async () => {
-      (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
-        id: "listing-123",
-        availabilitySource: "LEGACY_BOOKING",
-        status: "ACTIVE",
-        statusReason: null,
-        lastConfirmedAt: null,
-        updatedAt: new Date("2026-01-15T00:00:00Z"),
-      });
+      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(
+        buildPrivacyFirstListing({
+          availabilitySource: "LEGACY_BOOKING",
+          lastConfirmedAt: null,
+        })
+      );
 
       const request = new Request(
         "http://localhost/api/listings/listing-123/status"
@@ -70,7 +97,7 @@ describe("GET /api/listings/[id]/status", () => {
       const rateLimitResponse = {
         status: 429,
         json: async () => ({ error: "Too many requests" }),
-        headers: new Map(),
+        headers: new Headers(),
       };
       (withRateLimit as jest.Mock).mockResolvedValue(rateLimitResponse);
 
@@ -83,132 +110,216 @@ describe("GET /api/listings/[id]/status", () => {
     });
   });
 
-  describe("successful status retrieval", () => {
-    it("returns listing status for ACTIVE listing", async () => {
-      const updatedAt = new Date("2026-01-15T12:00:00Z");
-      (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
+  describe("canonical privacy-first status contract", () => {
+    it("returns only the public-safe snapshot fields for guests", async () => {
+      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(
+        buildPrivacyFirstListing()
+      );
+
+      const response = await GET(
+        new Request("http://localhost/api/listings/listing-123/status"),
+        { params: mockParams }
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("Cache-Control")).toBe("no-store");
+
+      const data = await response.json();
+      expect(data).toEqual({
         id: "listing-123",
+        canManage: false,
+        availabilitySource: "HOST_MANAGED",
+        publicStatus: "AVAILABLE",
+        searchEligible: true,
+        contactDisabledReason: null,
+      });
+      expect(Object.keys(data)).toEqual([
+        "id",
+        "canManage",
+        "availabilitySource",
+        "publicStatus",
+        "searchEligible",
+        "contactDisabledReason",
+      ]);
+    });
+
+    it("returns the diagnostic snapshot for the owner", async () => {
+      mockedAuth.mockResolvedValue({
+        user: {
+          id: "owner-123",
+          isAdmin: false,
+        },
+      });
+      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(
+        buildPrivacyFirstListing()
+      );
+
+      const response = await GET(
+        new Request("http://localhost/api/listings/listing-123/status"),
+        { params: mockParams }
+      );
+
+      expect(response.status).toBe(200);
+      const data = await response.json();
+      expect(data).toEqual({
+        id: "listing-123",
+        canManage: true,
         version: 7,
         availabilitySource: "HOST_MANAGED",
         status: "ACTIVE",
         statusReason: null,
-        lastConfirmedAt: new Date("2026-04-01T12:00:00.000Z"),
-        updatedAt,
+        publicStatus: "AVAILABLE",
+        searchEligible: true,
+        freshnessBucket: "REMINDER",
+        lastConfirmedAt: "2026-04-01T12:00:00.000Z",
+        staleAt: "2026-04-22T12:00:00.000Z",
+        autoPauseAt: "2026-05-01T12:00:00.000Z",
+        contactDisabledReason: null,
       });
-
-      const request = new Request(
-        "http://localhost/api/listings/listing-123/status"
-      );
-      const response = await GET(request, { params: mockParams });
-
-      expect(response.status).toBe(200);
-      const data = await response.json();
-      expect(data.id).toBe("listing-123");
-      expect(data.version).toBe(7);
-      expect(data.availabilitySource).toBe("HOST_MANAGED");
-      expect(data.status).toBe("ACTIVE");
-      expect(data.updatedAt).toBe(updatedAt);
-      expect(data.publicStatus).toBe("AVAILABLE");
-      expect(data.statusReason).toBeNull();
-      expect(data.searchEligible).toBe(true);
-      expect(data.freshnessBucket).toBe("REMINDER");
-      expect(data.lastConfirmedAt).toBe("2026-04-01T12:00:00.000Z");
-      expect(data.staleAt).toBe("2026-04-22T12:00:00.000Z");
-      expect(data.autoPauseAt).toBe("2026-05-01T12:00:00.000Z");
     });
 
-    it("returns NEEDS_RECONFIRMATION for stale auto-paused listings", async () => {
-      (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
-        id: "listing-123",
-        version: 3,
-        status: "PAUSED",
-        availabilitySource: "HOST_MANAGED",
-        statusReason: "STALE_AUTO_PAUSE",
-        lastConfirmedAt: new Date("2026-03-10T12:00:00.000Z"),
-        updatedAt: new Date(),
+    it("returns the diagnostic snapshot for admins", async () => {
+      mockedAuth.mockResolvedValue({
+        user: {
+          id: "someone-else",
+          isAdmin: true,
+        },
       });
-
-      const request = new Request(
-        "http://localhost/api/listings/listing-123/status"
+      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(
+        buildPrivacyFirstListing({
+          status: "PAUSED",
+          statusReason: "STALE_AUTO_PAUSE",
+          lastConfirmedAt: new Date("2026-03-10T12:00:00.000Z"),
+        })
       );
-      const response = await GET(request, { params: mockParams });
+
+      const response = await GET(
+        new Request("http://localhost/api/listings/listing-123/status"),
+        { params: mockParams }
+      );
 
       expect(response.status).toBe(200);
       const data = await response.json();
-      expect(data.status).toBe("PAUSED");
+      expect(data.canManage).toBe(true);
+      expect(data.statusReason).toBe("STALE_AUTO_PAUSE");
       expect(data.publicStatus).toBe("NEEDS_RECONFIRMATION");
       expect(data.searchEligible).toBe(false);
       expect(data.freshnessBucket).toBe("AUTO_PAUSE_DUE");
     });
 
-    it("returns stale host-managed listings as not search eligible", async () => {
-      (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
-        id: "listing-123",
-        version: 4,
-        status: "ACTIVE",
-        availabilitySource: "HOST_MANAGED",
-        statusReason: null,
-        lastConfirmedAt: new Date("2026-03-20T12:00:00.000Z"),
-        updatedAt: new Date(),
-      });
-
-      const request = new Request(
-        "http://localhost/api/listings/listing-123/status"
+    it("maps migration review to a public-safe reason", async () => {
+      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(
+        buildPrivacyFirstListing({
+          needsMigrationReview: true,
+          statusReason: "MIGRATION_REVIEW",
+        })
       );
-      const response = await GET(request, { params: mockParams });
 
-      expect(response.status).toBe(200);
-      const data = await response.json();
-      expect(data.status).toBe("ACTIVE");
-      expect(data.searchEligible).toBe(false);
-      expect(data.freshnessBucket).toBe("STALE");
+      const response = await GET(
+        new Request("http://localhost/api/listings/listing-123/status"),
+        { params: mockParams }
+      );
+
+      expect(await response.json()).toEqual({
+        id: "listing-123",
+        canManage: false,
+        availabilitySource: "HOST_MANAGED",
+        publicStatus: "AVAILABLE",
+        searchEligible: false,
+        contactDisabledReason: "MIGRATION_REVIEW",
+      });
     });
 
-    it("queries only the necessary fields for the additive snapshot", async () => {
-      (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
-        id: "listing-123",
-        version: 2,
-        status: "ACTIVE",
-        availabilitySource: "LEGACY_BOOKING",
-        statusReason: null,
-        lastConfirmedAt: null,
-        updatedAt: new Date(),
-      });
-
-      const request = new Request(
-        "http://localhost/api/listings/listing-123/status"
+    it("maps moderation locks to a public-safe reason", async () => {
+      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(
+        buildPrivacyFirstListing({
+          status: "PAUSED",
+          statusReason: "ADMIN_PAUSED",
+        })
       );
-      await GET(request, { params: mockParams });
+
+      const response = await GET(
+        new Request("http://localhost/api/listings/listing-123/status"),
+        { params: mockParams }
+      );
+
+      expect(await response.json()).toEqual({
+        id: "listing-123",
+        canManage: false,
+        availabilitySource: "HOST_MANAGED",
+        publicStatus: "PAUSED",
+        searchEligible: false,
+        contactDisabledReason: "MODERATION_LOCKED",
+      });
+    });
+
+    it("maps generic public unavailability to LISTING_UNAVAILABLE", async () => {
+      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(
+        buildPrivacyFirstListing({
+          status: "PAUSED",
+          statusReason: "HOST_PAUSED",
+          openSlots: 0,
+          availableSlots: 0,
+        })
+      );
+
+      const response = await GET(
+        new Request("http://localhost/api/listings/listing-123/status"),
+        { params: mockParams }
+      );
+
+      expect(await response.json()).toEqual({
+        id: "listing-123",
+        canManage: false,
+        availabilitySource: "HOST_MANAGED",
+        publicStatus: "PAUSED",
+        searchEligible: false,
+        contactDisabledReason: "LISTING_UNAVAILABLE",
+      });
+    });
+
+    it("queries the additional fields needed by the shared evaluator", async () => {
+      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(
+        buildPrivacyFirstListing()
+      );
+
+      await GET(
+        new Request("http://localhost/api/listings/listing-123/status"),
+        { params: mockParams }
+      );
 
       expect(prisma.listing.findUnique).toHaveBeenCalledWith({
         where: { id: "listing-123" },
         select: {
           id: true,
+          ownerId: true,
           version: true,
           availabilitySource: true,
           status: true,
           statusReason: true,
+          availableSlots: true,
+          totalSlots: true,
+          openSlots: true,
+          moveInDate: true,
+          availableUntil: true,
+          minStayMonths: true,
           lastConfirmedAt: true,
-          updatedAt: true,
+          needsMigrationReview: true,
         },
       });
     });
-  });
 
-  describe("listing not found", () => {
-    it("returns 404 when listing does not exist", async () => {
+    it("returns 404 for missing listings", async () => {
       (prisma.listing.findUnique as jest.Mock).mockResolvedValue(null);
 
-      const request = new Request(
-        "http://localhost/api/listings/nonexistent/status"
+      const response = await GET(
+        new Request("http://localhost/api/listings/nonexistent/status"),
+        { params: Promise.resolve({ id: "nonexistent" }) }
       );
-      const response = await GET(request, {
-        params: Promise.resolve({ id: "nonexistent" }),
-      });
 
       expect(response.status).toBe(404);
-      const data = await response.json();
-      expect(data.error).toBe("Listing not found");
+      expect(response.headers.get("Cache-Control")).toBe("no-store");
+      expect(await response.json()).toEqual({ error: "Listing not found" });
     });
   });
 
@@ -218,36 +329,14 @@ describe("GET /api/listings/[id]/status", () => {
         new Error("DB connection failed")
       );
 
-      const request = new Request(
-        "http://localhost/api/listings/listing-123/status"
+      const response = await GET(
+        new Request("http://localhost/api/listings/listing-123/status"),
+        { params: mockParams }
       );
-      const response = await GET(request, { params: mockParams });
 
       expect(response.status).toBe(500);
       const data = await response.json();
       expect(data.error).toBe("Internal server error");
-    });
-  });
-
-  describe("no auth required (public endpoint)", () => {
-    it("returns status without any authentication", async () => {
-      (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
-        id: "listing-123",
-        version: 1,
-        status: "ACTIVE",
-        availabilitySource: "LEGACY_BOOKING",
-        statusReason: null,
-        lastConfirmedAt: null,
-        updatedAt: new Date(),
-      });
-
-      // No session/auth mocks - this is a public endpoint
-      const request = new Request(
-        "http://localhost/api/listings/listing-123/status"
-      );
-      const response = await GET(request, { params: mockParams });
-
-      expect(response.status).toBe(200);
     });
   });
 });

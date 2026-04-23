@@ -53,6 +53,8 @@ test-output.txt
 # env files
 .env*
 !.env.example
+# .env.test is tracked because it only holds non-secret test infra config (NODE_OPTIONS).
+!.env.test
 
 # vercel
 .vercel
@@ -79,7 +81,15 @@ memory-bank/activeContext.md
 # AI tool configs (not project code)
 .superpowers/
 .agent/
-.agents/
+.agents/*
+!.agents/workflows/
+.agents/workflows/*
+!.agents/workflows/implementation-triad.md
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/implementation-triad/
+.agents/skills/implementation-triad/*
+!.agents/skills/implementation-triad/SKILL.md
 .cline/
 .codex/
 .commandcode/

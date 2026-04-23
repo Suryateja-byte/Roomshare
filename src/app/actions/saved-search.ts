@@ -10,6 +10,10 @@ import {
 import { parseSavedSearchFilters } from "@/lib/search/saved-search-parser";
 import type { Prisma } from "@prisma/client";
 import { logger } from "@/lib/logger";
+import {
+  evaluateSavedSearchAlertPaywall,
+  resolveSavedSearchEffectiveAlertState,
+} from "@/lib/payments/search-alert-paywall";
 import { z } from "zod";
 import { headers } from "next/headers";
 import { checkServerComponentRateLimit } from "@/lib/with-rate-limit";
@@ -116,10 +120,20 @@ export async function saveSearch(input: SaveSearchInput) {
         alertFrequency: input.alertFrequency ?? "DAILY",
       },
     });
+    const paywallSummary = await evaluateSavedSearchAlertPaywall({
+      userId: session.user.id,
+    });
 
     revalidatePath("/saved-searches");
 
-    return { success: true, searchId: savedSearch.id };
+    return {
+      success: true,
+      searchId: savedSearch.id,
+      effectiveAlertState: resolveSavedSearchEffectiveAlertState({
+        alertEnabled: savedSearch.alertEnabled,
+        paywallSummary,
+      }),
+    };
   } catch (error: unknown) {
     logger.sync.error("Failed to save search", {
       action: "saveSearch",
@@ -141,12 +155,19 @@ export async function getMySavedSearches() {
       where: { userId: session.user.id },
       orderBy: { createdAt: "desc" },
     });
+    const paywallSummary = await evaluateSavedSearchAlertPaywall({
+      userId: session.user.id,
+    });
 
     // Validate filters JSON on read to prevent malformed data from reaching the client
     return searches.map((search) => ({
       ...search,
       filters:
         (parseSavedSearchFilters(search.filters) ?? {}) as Prisma.JsonValue,
+      effectiveAlertState: resolveSavedSearchEffectiveAlertState({
+        alertEnabled: search.alertEnabled,
+        paywallSummary,
+      }),
     }));
   } catch (error: unknown) {
     logger.sync.error("Failed to fetch saved searches", {
@@ -201,17 +222,27 @@ export async function toggleSearchAlert(searchId: string, enabled: boolean) {
   if (rateLimited) return rateLimited;
 
   try {
-    await prisma.savedSearch.update({
+    const updated = await prisma.savedSearch.update({
       where: {
         id: searchId,
         userId: session.user.id,
       },
       data: { alertEnabled: enabled },
+      select: { alertEnabled: true },
+    });
+    const paywallSummary = await evaluateSavedSearchAlertPaywall({
+      userId: session.user.id,
     });
 
     revalidatePath("/saved-searches");
 
-    return { success: true };
+    return {
+      success: true,
+      effectiveAlertState: resolveSavedSearchEffectiveAlertState({
+        alertEnabled: updated.alertEnabled,
+        paywallSummary,
+      }),
+    };
   } catch (error: unknown) {
     logger.sync.error("Failed to toggle search alert", {
       action: "toggleSearchAlert",

@@ -35,7 +35,11 @@ export function readSearchIntentState(
   searchParams: URLSearchParams
 ): SearchIntentState {
   const vibeInput = searchParams.get("what") || "";
-  const locationInput = searchParams.get("where") || searchParams.get("q") || "";
+  const locationInput =
+    searchParams.get("locationLabel") ||
+    searchParams.get("where") ||
+    searchParams.get("q") ||
+    "";
   const lat = parseFiniteNumber(searchParams.get("lat"));
   const lng = parseFiniteNumber(searchParams.get("lng"));
   const minLng = parseFiniteNumber(searchParams.get("minLng"));

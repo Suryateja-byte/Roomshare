@@ -141,6 +141,36 @@ describe("GET /api/bookings/[id]/audit", () => {
     expect(data.entries[0].action).toBe("CREATED");
   });
 
+  it("sanitizes actorId and ipAddress out of audit details", async () => {
+    (prisma.booking.findUnique as jest.Mock).mockResolvedValue({
+      id: "booking-1",
+      tenantId: "tenant-1",
+      listing: { ownerId: "host-1" },
+    });
+    (prisma.bookingAuditLog.findMany as jest.Mock).mockResolvedValue([
+      {
+        id: "audit-1",
+        action: "UPDATED",
+        previousStatus: "PENDING",
+        newStatus: "ACCEPTED",
+        actorType: "ADMIN",
+        details: {
+          actorId: "admin-1",
+          ipAddress: "127.0.0.1",
+          listingTitle: "Sunny room",
+        },
+        createdAt: new Date("2026-03-12T00:00:00Z"),
+      },
+    ]);
+
+    const response = await GET(createRequest(), makeParams("booking-1"));
+    const data = await response.json();
+
+    expect(data.entries[0].details).toEqual({
+      listingTitle: "Sunny room",
+    });
+  });
+
   it("returns audit entries for host (listing owner)", async () => {
     (auth as jest.Mock).mockResolvedValue({
       user: { id: "host-1", isAdmin: false },

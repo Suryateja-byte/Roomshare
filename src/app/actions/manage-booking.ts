@@ -21,8 +21,8 @@ import {
   isInvalidStateTransitionError,
   type BookingStatus,
 } from "@/lib/booking-state-machine";
-import { features } from "@/lib/env";
 import { hashIdForLog as hashHmacId } from "@/lib/messaging/cfm-messaging-telemetry";
+import { getLegacyBookingMutationGate } from "@/lib/bookings/retirement-freeze";
 
 export type { BookingStatus } from "@/lib/booking-state-machine";
 
@@ -111,29 +111,23 @@ export async function updateBookingStatus(
     return { success: false, error: "Unauthorized", code: "SESSION_EXPIRED" };
   }
 
-  // CFM-902: block legacy mutations for non-admin callers after drain completes.
   const isAdmin = session.user.isAdmin === true;
-  const legacyBookingMutationsEnabled =
-    features.legacyBookingMutations !== false;
-  if (!legacyBookingMutationsEnabled) {
-    logger.sync.info("cfm.booking.legacy_mutation_blocked_count", {
-      action: legacyMutationActionLabel(status),
-      role: isAdmin ? "admin" : "non_admin",
-      reason: isAdmin ? "admin_bypass" : "flag_off",
-      bookingIdHash: hashHmacId(bookingId),
-      userIdHash: hashHmacId(session.user.id),
-      code: isAdmin
-        ? "CFM_LEGACY_MUTATION_ADMIN_BYPASS"
-        : "CFM_LEGACY_MUTATION_BLOCKED",
-    });
+  const legacyMutationGate = getLegacyBookingMutationGate(isAdmin);
+  logger.sync.info("cfm.booking.legacy_mutation_blocked_count", {
+    action: legacyMutationActionLabel(status),
+    role: isAdmin ? "admin" : "non_admin",
+    reason: legacyMutationGate.reason,
+    bookingIdHash: hashHmacId(bookingId),
+    userIdHash: hashHmacId(session.user.id),
+    code: legacyMutationGate.code,
+  });
 
-    if (!isAdmin) {
-      return {
-        success: false,
-        error: "Booking actions are disabled.",
-        code: "LEGACY_DRAIN_COMPLETE",
-      };
-    }
+  if (legacyMutationGate.blocked) {
+    return {
+      success: false,
+      error: "Booking actions are disabled.",
+      code: "LEGACY_DRAIN_COMPLETE",
+    };
   }
 
   const rl = await checkRateLimit(

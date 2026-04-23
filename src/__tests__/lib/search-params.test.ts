@@ -96,7 +96,7 @@ describe("parseSearchParams - vibe cases", () => {
     expect(result.filterParams.vibeQuery).toBe("quiet roommates");
   });
 
-  it("parses canonical where separately from the hard query", () => {
+  it("parses legacy where separately from the hard query", () => {
     const result = parseSearchParams({
       where: "Irving",
       what: "dark room",
@@ -106,6 +106,23 @@ describe("parseSearchParams - vibe cases", () => {
 
     expect(result.locationLabel).toBe("Irving");
     expect(result.filterParams.locationLabel).toBe("Irving");
+    expect(result.q).toBeUndefined();
+    expect(result.filterParams.query).toBeUndefined();
+    expect(result.filterParams.vibeQuery).toBe("dark room");
+    expect(result.boundsRequired).toBe(false);
+  });
+
+  it("prefers locationLabel over where when both are present", () => {
+    const result = parseSearchParams({
+      locationLabel: "Dallas",
+      where: "Irving",
+      what: "dark room",
+      lat: "32.814",
+      lng: "-96.9489",
+    });
+
+    expect(result.locationLabel).toBe("Dallas");
+    expect(result.filterParams.locationLabel).toBe("Dallas");
     expect(result.q).toBeUndefined();
     expect(result.filterParams.query).toBeUndefined();
     expect(result.filterParams.vibeQuery).toBe("dark room");

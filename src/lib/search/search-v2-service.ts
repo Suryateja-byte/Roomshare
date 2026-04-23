@@ -14,6 +14,7 @@ import { parseSearchParams } from "@/lib/search-params";
 import { features } from "@/lib/env";
 import {
   isSearchDocEnabled,
+  getSearchDocListingsByIds,
   getSearchDocListingsPaginated,
   getSearchDocMapListings,
   getSearchDocListingsWithKeyset,
@@ -25,11 +26,15 @@ import {
 import {
   generateQueryHash,
   encodeCursor,
+  encodeSnapshotCursor,
   decodeCursor,
   decodeCursorAny,
   type KeysetCursor,
+  type SnapshotCursor,
   type SortOption,
 } from "@/lib/search/hash";
+import { SEARCH_DOC_PROJECTION_VERSION } from "@/lib/search/search-doc-sync";
+import { getSearchV2VersionMeta } from "@/lib/search/meta";
 import {
   transformToListItems,
   transformToMapResponse,
@@ -47,6 +52,14 @@ import {
   type RankableListing,
 } from "@/lib/search/ranking";
 import type { SearchV2Response } from "@/lib/search/types";
+import { SEARCH_RESPONSE_VERSION } from "@/lib/search/search-response";
+import {
+  createQuerySnapshot,
+  loadValidQuerySnapshot,
+  QUERY_SNAPSHOT_MAX_LISTING_IDS,
+  toSnapshotResponseMeta,
+  type SnapshotExpiredReason,
+} from "@/lib/search/query-snapshots";
 import type {
   PaginatedResultHybrid,
   ListingData,
@@ -67,8 +80,48 @@ import {
   resolvePublicAvailabilityForListings,
 } from "@/lib/search/public-availability";
 import type { FilterParams } from "@/lib/search-types";
+import { isPhase04ProjectionReadsEnabled } from "@/lib/flags/phase04";
+import { executeProjectionSearchV2 } from "@/lib/search/projection-search";
+import type { SearchAdmissionError } from "@/lib/search/search-spec";
 
 const VIBE_SOFT_FALLBACK_WARNING = "VIBE_SOFT_FALLBACK";
+const SEARCH_PAGINATION_SNAPSHOT_VERSION = `${SEARCH_RESPONSE_VERSION}.searchdoc-keyset`;
+
+function getEmptyMapResponse(): SearchV2Response["map"] {
+  return {
+    geojson: {
+      type: "FeatureCollection",
+      features: [],
+    },
+  };
+}
+
+function getSnapshotMapMode(mapPayload: SearchV2Response["map"]): "geojson" | "pins" {
+  return mapPayload.pins ? "pins" : "geojson";
+}
+
+function buildSnapshotExpired(
+  queryHash: string,
+  reason: SnapshotExpiredReason
+): NonNullable<SearchV2Result["snapshotExpired"]> {
+  return { queryHash, reason };
+}
+
+function createSnapshotPageCursor(input: {
+  snapshotId: string;
+  offset: number;
+  limit: number;
+  queryHash: string;
+}): string {
+  return encodeSnapshotCursor({
+    v: 3,
+    snapshotId: input.snapshotId,
+    offset: input.offset,
+    limit: input.limit,
+    queryHash: input.queryHash,
+    responseVersion: SEARCH_RESPONSE_VERSION,
+  });
+}
 
 function normalizeForVibeMatch(value: string | undefined | null): string {
   return sanitizeSearchQuery(value ?? "").toLowerCase();
@@ -273,7 +326,7 @@ async function getSemanticEligibleListPage(
 ): Promise<PaginatedResultHybrid<ListingData> | null> {
   const pageOffset = (page - 1) * pageSize;
   const requiredEligibleCount = pageOffset + pageSize + 1;
-  const batchSize = pageSize + 1;
+  const rawBatchSize = pageSize + 1;
   const eligibleItems: ListingData[] = [];
   const seenListingIds = new Set<string>();
   let rawOffset = 0;
@@ -285,38 +338,33 @@ async function getSemanticEligibleListPage(
         ...filterParams,
         minAvailableSlots: 0,
       },
-      batchSize,
+      rawBatchSize,
       rawOffset
     );
 
-    if (!semanticRows || semanticRows.length === 0) {
+    if (semanticRows === null) {
       break;
     }
 
     sawSemanticRows = true;
 
-    const batchItems = mapSemanticRowsToListingData(semanticRows).filter(
-      (item) => {
-        if (seenListingIds.has(item.id)) {
-          return false;
-        }
-
-        seenListingIds.add(item.id);
-        return true;
+    const batchItems = mapSemanticRowsToListingData(semanticRows).filter((item) => {
+      if (seenListingIds.has(item.id)) {
+        return false;
       }
-    );
+
+      seenListingIds.add(item.id);
+      return true;
+    });
 
     eligibleItems.push(
       ...(await resolveEligibleSemanticItems(batchItems, filterParams))
     );
 
-    rawOffset += semanticRows.length;
-    if (semanticRows.length < batchSize) {
-      break;
-    }
+    rawOffset += rawBatchSize;
   }
 
-  if (!sawSemanticRows) {
+  if (!sawSemanticRows || eligibleItems.length === 0) {
     return null;
   }
 
@@ -332,6 +380,147 @@ async function getSemanticEligibleListPage(
     totalPages: hasNextPage || total === null ? null : Math.ceil(total / pageSize),
     hasNextPage,
     nextCursor: hasNextPage ? encodeCursor(page + 1) : null,
+  };
+}
+
+async function collectSnapshotListingIds(options: {
+  filterParams: FilterParams;
+  useSearchDoc: boolean;
+  useKeyset: boolean;
+  vibeQuery?: string;
+  shouldUseRecommendedVibeRanking: boolean;
+  keysetSnapshot?: {
+    engine: "searchdoc-keyset";
+    responseVersion: string;
+    projectionVersion: number;
+    embeddingVersion: string | null;
+  };
+}): Promise<string[]> {
+  const snapshotFilterParams = {
+    ...options.filterParams,
+    page: 1,
+    limit: QUERY_SNAPSHOT_MAX_LISTING_IDS,
+  };
+
+  if (
+    features.semanticSearch &&
+    options.vibeQuery &&
+    options.vibeQuery.length >= 3 &&
+    options.shouldUseRecommendedVibeRanking
+  ) {
+    const semanticResult = await getSemanticEligibleListPage(
+      snapshotFilterParams,
+      1,
+      QUERY_SNAPSHOT_MAX_LISTING_IDS
+    );
+    if (semanticResult) {
+      return semanticResult.items.map((item) => item.id);
+    }
+  }
+
+  if (options.useKeyset) {
+    const result = await getSearchDocListingsFirstPage(
+      snapshotFilterParams,
+      options.keysetSnapshot
+    );
+    return result.items.map((item) => item.id);
+  }
+
+  if (options.useSearchDoc) {
+    const result = await getSearchDocListingsPaginated(snapshotFilterParams);
+    return result.items.map((item) => item.id);
+  }
+
+  const result = await getListingsPaginated(snapshotFilterParams);
+  return result.items.map((item) => item.id);
+}
+
+async function hydrateSnapshotPage(options: {
+  cursor: SnapshotCursor;
+  queryHash: string;
+  includeMap: boolean;
+}): Promise<SearchV2Result> {
+  if (options.cursor.v !== 3) {
+    return {
+      response: null,
+      paginatedResult: null,
+      snapshotExpired: buildSnapshotExpired(
+        options.queryHash,
+        "search_contract_changed"
+      ),
+    };
+  }
+
+  if (
+    options.cursor.queryHash !== options.queryHash ||
+    options.cursor.responseVersion !== SEARCH_RESPONSE_VERSION
+  ) {
+    return {
+      response: null,
+      paginatedResult: null,
+      snapshotExpired: buildSnapshotExpired(
+        options.queryHash,
+        "search_contract_changed"
+      ),
+    };
+  }
+
+  const snapshotResult = await loadValidQuerySnapshot(options.cursor.snapshotId);
+  if (!snapshotResult.ok) {
+    return {
+      response: null,
+      paginatedResult: null,
+      snapshotExpired: buildSnapshotExpired(options.queryHash, snapshotResult.reason),
+    };
+  }
+
+  const snapshot = snapshotResult.snapshot;
+  const sliceStart = options.cursor.offset;
+  const sliceEnd = sliceStart + options.cursor.limit;
+  const listingIds = snapshot.orderedListingIds.slice(sliceStart, sliceEnd);
+  const items = await getSearchDocListingsByIds(listingIds);
+  const nextOffset = sliceStart + listingIds.length;
+  const hasNextPage = nextOffset < snapshot.orderedListingIds.length;
+  const nextCursor = hasNextPage
+    ? createSnapshotPageCursor({
+        snapshotId: snapshot.id,
+        offset: nextOffset,
+        limit: options.cursor.limit,
+        queryHash: snapshot.queryHash,
+      })
+    : null;
+  const mapPayload =
+    options.includeMap && snapshot.mapPayload
+      ? (snapshot.mapPayload as unknown as SearchV2Response["map"])
+      : getEmptyMapResponse();
+  const total = snapshot.total ?? null;
+
+  return {
+    response: {
+      meta: {
+        ...toSnapshotResponseMeta(snapshot),
+        generatedAt: new Date().toISOString(),
+        mode: getSnapshotMapMode(mapPayload),
+      },
+      list: {
+        items: transformToListItems(items),
+        fullItems: items,
+        nextCursor,
+        total,
+      },
+      map: mapPayload,
+    },
+    paginatedResult: {
+      items,
+      total,
+      page: null,
+      limit: options.cursor.limit,
+      totalPages:
+        total !== null ? Math.ceil(total / options.cursor.limit) : null,
+      hasNextPage,
+      hasPrevPage: sliceStart > 0,
+      nextCursor,
+    },
   };
 }
 
@@ -354,6 +543,13 @@ export interface SearchV2Result {
   paginatedResult: PaginatedResultHybrid<ListingData> | null;
   /** Error message if failed */
   error?: string;
+  /** Structured admission error for pathological requests. */
+  admissionError?: SearchAdmissionError;
+  /** The cursor's pinned search snapshot no longer matches current server state. */
+  snapshotExpired?: {
+    queryHash: string;
+    reason: SnapshotExpiredReason;
+  };
   /**
    * True when the search was blocked because it had a text query but no
    * geographic bounds. UI should prompt user to select a location.
@@ -389,11 +585,33 @@ export async function executeSearchV2(
       };
     }
 
+    if (isPhase04ProjectionReadsEnabled()) {
+      return executeProjectionSearchV2({ params, parsed });
+    }
+
     // Check if features are enabled
     const useSearchDoc = isSearchDocEnabled(
       getFirstValue(params.rawParams.searchDoc)
     );
     const useKeyset = features.searchKeyset && useSearchDoc;
+    const snapshotContractEnabled = features.searchSnapshotContract;
+    const shouldIncludeMap = params.includeMap !== false;
+
+    const queryHash = generateQueryHash({
+      query: parsed.filterParams.query,
+      vibeQuery: parsed.filterParams.vibeQuery,
+      minPrice: parsed.filterParams.minPrice,
+      maxPrice: parsed.filterParams.maxPrice,
+      amenities: parsed.filterParams.amenities,
+      houseRules: parsed.filterParams.houseRules,
+      languages: parsed.filterParams.languages,
+      roomType: parsed.filterParams.roomType,
+      leaseDuration: parsed.filterParams.leaseDuration,
+      moveInDate: parsed.filterParams.moveInDate,
+      endDate: parsed.filterParams.endDate,
+      bounds: parsed.filterParams.bounds,
+      nearMatches: parsed.filterParams.nearMatches,
+    });
 
     // Get sort option from parsed params (default to recommended)
     const sortOption: SortOption =
@@ -401,28 +619,58 @@ export async function executeSearchV2(
     const vibeQuery = parsed.filterParams.vibeQuery?.trim();
     const shouldUseRecommendedVibeRanking =
       Boolean(vibeQuery) && sortOption === "recommended";
+    const rankerEnabled = isRankingEnabled(
+      getFirstValue(params.rawParams.ranker)
+    );
+    const keysetSnapshot = useKeyset
+      ? {
+          engine: "searchdoc-keyset" as const,
+          responseVersion: SEARCH_PAGINATION_SNAPSHOT_VERSION,
+          projectionVersion: SEARCH_DOC_PROJECTION_VERSION,
+          embeddingVersion: null,
+        }
+      : undefined;
 
     // Handle cursor-based pagination
     const cursorStr = getFirstValue(params.rawParams.cursor);
     let page = parsed.requestedPage;
     let keysetCursor: KeysetCursor | null = null;
+    let snapshotCursor: SnapshotCursor | null = null;
 
-    if (cursorStr && useKeyset) {
-      // Try to decode as keyset or legacy cursor
+    if (cursorStr) {
       const decoded = decodeCursorAny(cursorStr, sortOption);
-      if (decoded?.type === "keyset") {
+      if (decoded?.type === "snapshot") {
+        snapshotCursor = decoded.cursor;
+      } else if (useKeyset && decoded?.type === "keyset") {
+        if (
+          keysetSnapshot &&
+          decoded.cursor.v === 2 &&
+          (decoded.cursor.snapshot.engine !== keysetSnapshot.engine ||
+            decoded.cursor.snapshot.responseVersion !==
+              keysetSnapshot.responseVersion ||
+            decoded.cursor.snapshot.projectionVersion !==
+              keysetSnapshot.projectionVersion ||
+            decoded.cursor.snapshot.embeddingVersion !==
+              keysetSnapshot.embeddingVersion)
+        ) {
+          return {
+            response: null,
+            paginatedResult: null,
+            snapshotExpired: buildSnapshotExpired(
+              queryHash,
+              "search_contract_changed"
+            ),
+          };
+        }
         keysetCursor = decoded.cursor;
       } else if (decoded?.type === "legacy") {
-        // Legacy cursor - use page number, but return keyset cursor going forward
-        // Clamp to prevent unbounded OFFSET from crafted cursors (DoS prevention)
+        // Clamp to prevent unbounded OFFSET from crafted cursors.
         page = Math.min(decoded.page, 100);
-      }
-      // If invalid cursor, start from beginning (page 1, no keyset cursor)
-    } else if (cursorStr) {
-      // Keyset disabled - use legacy cursor decoding
-      const decodedPage = decodeCursor(cursorStr);
-      if (decodedPage !== null) {
-        page = decodedPage;
+      } else if (!useKeyset) {
+        const decodedPage = decodeCursor(cursorStr);
+        if (decodedPage !== null) {
+          page = decodedPage;
+        }
       }
     }
 
@@ -433,16 +681,26 @@ export async function executeSearchV2(
       ...(params.limit && { limit: params.limit }),
     };
 
+    if (snapshotContractEnabled && snapshotCursor) {
+      return hydrateSnapshotPage({
+        cursor: snapshotCursor,
+        queryHash,
+        includeMap: shouldIncludeMap,
+      });
+    }
+
     // TTFB optimization: Execute list and map queries in parallel
     // These are independent database queries that don't depend on each other
     const listPromise = (async (): Promise<{
       listResult: PaginatedResultHybrid<ListingData>;
       nextCursor: string | null;
       usedSoftVibeFallback: boolean;
+      usedSemanticSearch: boolean;
     }> => {
       const finalizeListResult = (
         listResult: PaginatedResultHybrid<ListingData>,
-        nextCursor: string | null
+        nextCursor: string | null,
+        usedSemanticSearch: boolean = false
       ) => {
         const usedSoftVibeFallback =
           Boolean(vibeQuery) &&
@@ -459,6 +717,7 @@ export async function executeSearchV2(
               : listResult,
           nextCursor,
           usedSoftVibeFallback,
+          usedSemanticSearch,
         };
       };
 
@@ -481,6 +740,7 @@ export async function executeSearchV2(
             listResult: semanticResult,
             nextCursor: semanticResult.nextCursor ?? null,
             usedSoftVibeFallback: false,
+            usedSemanticSearch: true,
           };
         }
         // Fall through to bounded structural search if semantic matching is
@@ -493,7 +753,8 @@ export async function executeSearchV2(
           // Use keyset cursor for stable pagination
           const keysetResult = await getSearchDocListingsWithKeyset(
             filterParams,
-            keysetCursor
+            keysetCursor,
+            keysetSnapshot
           );
           return finalizeListResult(keysetResult, keysetResult.nextCursor);
         } else if (page > 1) {
@@ -508,7 +769,10 @@ export async function executeSearchV2(
         } else {
           // First page - get first page with keyset cursor
           const firstPageResult =
-            await getSearchDocListingsFirstPage(filterParams);
+            await getSearchDocListingsFirstPage(
+              filterParams,
+              keysetSnapshot
+            );
           return finalizeListResult(
             firstPageResult,
             firstPageResult.nextCursor
@@ -563,7 +827,6 @@ export async function executeSearchV2(
       ...(isSemanticActive ? { query: undefined } : {}),
     };
 
-    const shouldIncludeMap = params.includeMap !== false;
     const mapPromise: Promise<MapListingsResult | MapListingData[]> | null =
       shouldIncludeMap
         ? useSearchDoc
@@ -590,13 +853,19 @@ export async function executeSearchV2(
     let listResult: PaginatedResultHybrid<ListingData>;
     let nextCursor: string | null;
     let usedSoftVibeFallback = false;
+    let usedSemanticSearch = false;
     let mapListings: MapListingData[];
     let mapTruncated: boolean | undefined;
     let mapTotalCandidates: number | undefined;
     const warnings: string[] = [];
 
     if (listSettled.status === "fulfilled") {
-      ({ listResult, nextCursor, usedSoftVibeFallback } = listSettled.value);
+      ({
+        listResult,
+        nextCursor,
+        usedSoftVibeFallback,
+        usedSemanticSearch,
+      } = listSettled.value);
     } else {
       logger.sync.error("[SearchV2] List query failed", {
         error:
@@ -642,31 +911,15 @@ export async function executeSearchV2(
 
     // Determine mode based on mapListings count (not list total)
     const mode = determineMode(mapListings.length);
-
-    // Generate query hash for caching (excludes pagination)
-    const queryHash = generateQueryHash({
-      query: parsed.filterParams.query,
-      vibeQuery: parsed.filterParams.vibeQuery,
-      minPrice: parsed.filterParams.minPrice,
-      maxPrice: parsed.filterParams.maxPrice,
-      amenities: parsed.filterParams.amenities,
-      houseRules: parsed.filterParams.houseRules,
-      languages: parsed.filterParams.languages,
-      roomType: parsed.filterParams.roomType,
-      leaseDuration: parsed.filterParams.leaseDuration,
-      moveInDate: parsed.filterParams.moveInDate,
-      endDate: parsed.filterParams.endDate,
-      bounds: parsed.filterParams.bounds,
-      nearMatches: parsed.filterParams.nearMatches,
+    const versionMeta = getSearchV2VersionMeta({
+      useSearchDoc,
+      usedSemanticSearch,
+      rankerEnabled,
     });
 
     // Transform list items
     const listItems = transformToListItems(listResult.items);
 
-    // Check if ranking is enabled (URL override or env flag)
-    const rankerEnabled = isRankingEnabled(
-      getFirstValue(params.rawParams.ranker)
-    );
     // Debug output only allowed when searchDebugRanking feature flag is enabled.
     // In production, features.searchDebugRanking is false, so the ?debugRank=1
     // query param is ignored — no ranking signals are exposed to end users.
@@ -745,12 +998,67 @@ export async function executeSearchV2(
       totalCandidates: mapTotalCandidates,
     });
 
+    let responseMetaBase: import("@/lib/search/search-response").SearchResponseMeta = {
+      queryHash,
+      backendSource: "v2",
+      responseVersion: SEARCH_RESPONSE_VERSION,
+      ...versionMeta,
+    };
+    let listNextCursor = nextCursor;
+
+    if (snapshotContractEnabled && !snapshotCursor && !keysetCursor) {
+      const orderedListingIds = await collectSnapshotListingIds({
+        filterParams,
+        useSearchDoc,
+        useKeyset,
+        vibeQuery,
+        shouldUseRecommendedVibeRanking,
+        keysetSnapshot,
+      });
+      const querySnapshot = await createQuerySnapshot({
+        queryHash,
+        backendSource: "v2",
+        responseVersion: SEARCH_RESPONSE_VERSION,
+        projectionVersion: versionMeta.projectionVersion,
+        embeddingVersion: versionMeta.embeddingVersion,
+        rankerProfileVersion: versionMeta.rankerProfileVersion,
+        orderedListingIds,
+        mapPayload: shouldIncludeMap ? mapResponse : null,
+        total: listResult.total,
+      });
+      responseMetaBase = toSnapshotResponseMeta(querySnapshot);
+
+      const pageLimit = filterParams.limit || DEFAULT_PAGE_SIZE;
+      const alreadyConsumed = (page - 1) * pageLimit + listResult.items.length;
+      listNextCursor =
+        alreadyConsumed < orderedListingIds.length
+          ? createSnapshotPageCursor({
+              snapshotId: querySnapshot.id,
+              offset: alreadyConsumed,
+              limit: pageLimit,
+              queryHash,
+            })
+          : null;
+    }
+
     // Build response
     const response: SearchV2Response = {
       meta: {
-        queryHash,
+        queryHash: responseMetaBase.queryHash,
+        ...(responseMetaBase.querySnapshotId
+          ? { querySnapshotId: responseMetaBase.querySnapshotId }
+          : {}),
         generatedAt: new Date().toISOString(),
         mode,
+        ...(responseMetaBase.projectionVersion !== undefined
+          ? { projectionVersion: responseMetaBase.projectionVersion }
+          : {}),
+        ...(responseMetaBase.embeddingVersion
+          ? { embeddingVersion: responseMetaBase.embeddingVersion }
+          : {}),
+        ...(responseMetaBase.rankerProfileVersion
+          ? { rankerProfileVersion: responseMetaBase.rankerProfileVersion }
+          : {}),
         ...(warnings.length > 0 ? { warnings } : {}),
         // Debug fields (only when debugRank=1)
         ...(debugRank && rankerEnabled
@@ -763,7 +1071,8 @@ export async function executeSearchV2(
       },
       list: {
         items: listItems,
-        nextCursor,
+        fullItems: listResult.items,
+        nextCursor: listNextCursor,
         total: listResult.total,
       },
       map: mapResponse,
@@ -778,7 +1087,10 @@ export async function executeSearchV2(
       cached: false,
     });
 
-    return { response, paginatedResult: { ...listResult, nextCursor } };
+    return {
+      response,
+      paginatedResult: { ...listResult, nextCursor: listNextCursor },
+    };
   } catch (error) {
     // Log without PII (no user data, just error context)
     logger.sync.error("SearchV2 service error", {

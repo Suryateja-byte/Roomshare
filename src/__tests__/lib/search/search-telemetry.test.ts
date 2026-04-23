@@ -23,6 +23,8 @@ import {
   recordSearchLoadMoreError,
   recordSearchMapListMismatch,
   recordSearchRequestLatency,
+  recordSearchSnapshotExpired,
+  recordSearchSnapshotHoleRatio,
   recordSearchV2Fallback,
   recordSearchZeroResults,
   resetSearchTelemetryForTests,
@@ -113,6 +115,18 @@ describe("search telemetry", () => {
       queryHash: "hash-6",
       reason: "superseded",
     });
+    recordSearchSnapshotExpired({
+      route: "search-client",
+      queryHash: "hash-7",
+      reason: "snapshot_expired",
+    });
+    recordSearchSnapshotHoleRatio({
+      route: "search-page-ssr",
+      queryHash: "hash-8",
+      querySnapshotId: "snapshot-1",
+      holeCount: 1,
+      consideredCount: 4,
+    });
     recordLegacyUrlUsage({
       alias: "startDate",
       surface: "ssr",
@@ -130,6 +144,9 @@ describe("search telemetry", () => {
     expect(snapshot.loadMoreErrorTotal).toBe(1);
     expect(snapshot.mapListMismatchTotal).toBe(1);
     expect(snapshot.clientAbortTotal).toBe(1);
+    expect(snapshot.snapshotExpiredTotal).toBe(1);
+    expect(snapshot.snapshotHoleResponsesTotal).toBe(1);
+    expect(snapshot.snapshotHoleRatioAverage).toBe(0.25);
     expect(snapshot.legacyUrlCounts.ssr.startDate).toBe(1);
 
     expect(logger.sync.info).toHaveBeenCalledWith(

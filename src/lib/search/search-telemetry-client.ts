@@ -17,6 +17,12 @@ type SearchClientMetric =
       reason: string;
     }
   | {
+      metric: "search_snapshot_expired_total";
+      route: "search-results-client";
+      queryHash?: string;
+      reason: "search_contract_changed" | "snapshot_missing" | "snapshot_expired";
+    }
+  | {
       metric: "cfm.search.legacy_url_count";
       alias: LegacyUrlAlias;
       surface: "spa";

@@ -42,6 +42,7 @@ export interface FilterChipData {
  */
 const PRESERVED_PARAMS = [
   "q",
+  "locationLabel",
   "where",
   "lat",
   "lng",

@@ -565,6 +565,347 @@ model IdempotencyKey {
   @@index([userId, endpoint])
 }
 
+enum ProductCode {
+  CONTACT_PACK_3
+  MOVERS_PASS_30D
+}
+
+enum ContactKind {
+  MESSAGE_START
+  REVEAL_PHONE
+}
+
+enum PaymentStatus {
+  CHECKOUT_CREATED
+  CHECKOUT_COMPLETED
+  SUCCEEDED
+  FAILED
+  CANCELED
+}
+
+enum RefundStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELED
+}
+
+enum EntitlementGrantType {
+  PACK
+  PASS
+}
+
+enum EntitlementGrantStatus {
+  ACTIVE
+  FROZEN
+  REVOKED
+  EXPIRED
+}
+
+enum PaymentDisputeStatus {
+  OPEN
+  WON
+  LOST
+}
+
+enum ContactConsumptionSource {
+  FREE
+  PACK
+  PASS
+}
+
+enum EntitlementFreezeReason {
+  NONE
+  CHARGEBACK_PENDING
+  FRAUD_REVIEW
+  MANUAL
+}
+
+enum ContactRestorationState {
+  NONE
+  RESTORED_HOST_BOUNCE
+  RESTORED_HOST_BAN
+  RESTORED_HOST_MASS_DEACTIVATED
+  RESTORED_HOST_GHOST_SLA
+  RESTORED_SUPPORT
+}
+
+enum ContactRestorationReason {
+  HOST_BOUNCE
+  HOST_BAN
+  HOST_MASS_DEACTIVATED
+  HOST_GHOST_SLA
+  SUPPORT
+}
+
+model StripeEvent {
+  id               String   @id @default(cuid())
+  stripeEventId    String   @unique @map("stripe_event_id")
+  eventType        String   @map("event_type")
+  stripeObjectId   String?  @map("stripe_object_id")
+  payload          Json
+  livemode         Boolean  @default(false)
+  signatureVerified Boolean @default(true) @map("signature_verified")
+  processingStatus String   @default("PENDING") @map("processing_status")
+  attemptCount     Int      @default(0) @map("attempt_count")
+  nextAttemptAt    DateTime @default(now()) @map("next_attempt_at")
+  lastError        String?  @map("last_error")
+  processedBy      String?  @map("processed_by")
+  receivedAt       DateTime @default(now()) @map("received_at")
+  processedAt      DateTime? @map("processed_at")
+
+  @@index([eventType, receivedAt], map: "stripe_events_type_received_at_idx")
+  @@index([processingStatus, nextAttemptAt, receivedAt], map: "stripe_events_processing_idx")
+  @@index([livemode, eventType, receivedAt], map: "stripe_events_livemode_type_idx")
+  @@map("stripe_events")
+}
+
+model Payment {
+  id                     String        @id @default(cuid())
+  userId                 String        @map("user_id")
+  productCode            ProductCode   @map("product_code")
+  status                 PaymentStatus @default(CHECKOUT_CREATED)
+  stripeCheckoutSessionId String?      @unique @map("stripe_checkout_session_id")
+  stripePaymentIntentId  String?       @unique @map("stripe_payment_intent_id")
+  stripeCustomerId       String?       @map("stripe_customer_id")
+  amount                 Decimal       @db.Decimal(10, 2)
+  currency               String        @default("usd")
+  livemode               Boolean       @default(false)
+  fraudFlag              Boolean       @default(false) @map("fraud_flag")
+  autoRefundStatus       String?       @map("auto_refund_status")
+  originStripeEventId    String?       @map("origin_stripe_event_id")
+  metadata               Json?
+  paidAt                 DateTime?     @map("paid_at")
+  createdAt              DateTime      @default(now()) @map("created_at")
+  updatedAt              DateTime      @updatedAt @map("updated_at")
+
+  @@index([userId, status], map: "payments_user_status_idx")
+  @@index([productCode, status], map: "payments_product_status_idx")
+  @@index([livemode, status, createdAt], map: "payments_livemode_status_idx")
+  @@map("payments")
+}
+
+model Refund {
+  id            String       @id @default(cuid())
+  paymentId     String       @map("payment_id")
+  stripeRefundId String      @unique @map("stripe_refund_id")
+  amount        Decimal      @db.Decimal(10, 2)
+  currency      String       @default("usd")
+  status        RefundStatus @default(PENDING)
+  reason        String?
+  originStripeEventId String? @map("origin_stripe_event_id")
+  source        String?
+  manualReviewRequired Boolean @default(false) @map("manual_review_required")
+  metadata      Json?
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  @@index([paymentId], map: "refunds_payment_id_idx")
+  @@map("refunds")
+}
+
+model EntitlementGrant {
+  id          String                 @id @default(cuid())
+  userId      String                 @map("user_id")
+  productCode ProductCode            @map("product_code")
+  contactKind ContactKind            @map("contact_kind")
+  grantType   EntitlementGrantType   @map("grant_type")
+  status      EntitlementGrantStatus @default(ACTIVE)
+  creditCount Int?                   @map("credit_count")
+  originalCreditCount Int?           @map("original_credit_count")
+  paymentId   String?                @unique @map("payment_id")
+  sourceRefundId String?             @map("source_refund_id")
+  idempotencyKey String?             @map("idempotency_key")
+  activeFrom  DateTime               @default(now()) @map("active_from")
+  activeUntil DateTime?              @map("active_until")
+  windowStartDelta DateTime?         @map("window_start_delta")
+  windowEndDelta   DateTime?         @map("window_end_delta")
+  metadata    Json?
+  createdAt   DateTime               @default(now()) @map("created_at")
+  updatedAt   DateTime               @updatedAt @map("updated_at")
+
+  @@index([userId, contactKind, status], map: "entitlement_grants_user_kind_status_idx")
+  @@index([userId, contactKind, status, activeUntil], map: "entitlement_grants_user_kind_window_idx")
+  @@index([sourceRefundId], map: "entitlement_grants_source_refund_idx")
+  @@unique([userId, idempotencyKey], map: "entitlement_grants_user_idempotency_idx")
+  @@map("entitlement_grants")
+}
+
+model PaymentDispute {
+  id              String               @id @default(cuid())
+  paymentId       String               @map("payment_id")
+  stripeDisputeId String               @unique @map("stripe_dispute_id")
+  stripeChargeId  String?              @map("stripe_charge_id")
+  amount          Decimal              @db.Decimal(10, 2)
+  currency        String               @default("usd")
+  status          PaymentDisputeStatus @default(OPEN)
+  reason          String?
+  originStripeEventId String?          @map("origin_stripe_event_id")
+  metadata        Json?
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+
+  @@index([paymentId], map: "payment_disputes_payment_id_idx")
+  @@index([status, updatedAt], map: "payment_disputes_status_updated_at_idx")
+  @@map("payment_disputes")
+}
+
+model ContactConsumption {
+  id                 String                   @id @default(cuid())
+  userId             String                   @map("user_id")
+  listingId          String                   @map("listing_id")
+  unitId             String                   @map("unit_id")
+  unitIdentityEpoch  Int                      @map("unit_identity_epoch")
+  inventoryId        String?                  @map("inventory_id")
+  contactKind        ContactKind              @map("contact_kind")
+  source             ContactConsumptionSource
+  consumedCreditFrom String?                  @map("consumed_credit_from")
+  clientIdempotencyKey String?                @map("client_idempotency_key")
+  restorationState   ContactRestorationState  @default(NONE) @map("restoration_state")
+  restorationEligibleUntil DateTime?          @map("restoration_eligible_until")
+  entitlementGrantId String?                  @map("entitlement_grant_id")
+  conversationId     String?                  @map("conversation_id")
+  metadata           Json?
+  consumedAt         DateTime                 @default(now()) @map("consumed_at")
+  restorations       ContactRestoration[]
+
+  @@unique([userId, unitId, unitIdentityEpoch, contactKind], map: "contact_consumption_user_unit_epoch_kind_idx")
+  @@unique([userId, clientIdempotencyKey], map: "contact_consumption_user_idempotency_idx")
+  @@index([userId, contactKind, consumedAt], map: "contact_consumption_user_kind_consumed_at_idx")
+  @@index([entitlementGrantId], map: "contact_consumption_grant_id_idx")
+  @@index([conversationId], map: "contact_consumption_conversation_id_idx")
+  @@index([inventoryId, contactKind], map: "contact_consumption_inventory_kind_idx")
+  @@map("contact_consumption")
+}
+
+model PaymentAbuseSignal {
+  id         String   @id @default(cuid())
+  userId     String?  @map("user_id")
+  signalKind String   @map("signal_kind")
+  signalHash String   @map("signal_hash")
+  reason     String
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([signalHash, signalKind, createdAt], map: "payment_abuse_signals_hash_kind_idx")
+  @@index([userId, createdAt], map: "payment_abuse_signals_user_created_at_idx")
+  @@map("payment_abuse_signals")
+}
+
+model RefundQueueItem {
+  id             String   @id @default(cuid())
+  paymentId      String?  @map("payment_id")
+  userId         String   @map("user_id")
+  reason         String
+  status         String   @default("PENDING")
+  stripeRefundId String?  @map("stripe_refund_id")
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([status, createdAt], map: "refund_queue_items_status_created_at_idx")
+  @@index([paymentId], map: "refund_queue_items_payment_id_idx")
+  @@map("refund_queue_items")
+}
+
+model FraudAuditJob {
+  id          String    @id @default(cuid())
+  status      String    @default("SCHEDULED")
+  reason      String
+  scheduledAt DateTime  @default(now()) @map("scheduled_at")
+  completedAt DateTime? @map("completed_at")
+  metadata    Json?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([status, scheduledAt], map: "fraud_audit_jobs_status_scheduled_idx")
+  @@map("fraud_audit_jobs")
+}
+
+model EntitlementState {
+  userId                String                  @id @map("user_id")
+  creditsFreeRemaining  Int                     @default(0) @map("credits_free_remaining")
+  creditsPaidRemaining  Int                     @default(0) @map("credits_paid_remaining")
+  activePassWindowStart DateTime?               @map("active_pass_window_start")
+  activePassWindowEnd   DateTime?               @map("active_pass_window_end")
+  freezeReason          EntitlementFreezeReason @default(NONE) @map("freeze_reason")
+  fraudFlag             Boolean                 @default(false) @map("fraud_flag")
+  sourceVersion         BigInt                  @default(1) @map("source_version")
+  lastRecomputedAt      DateTime                @default(now()) @map("last_recomputed_at")
+  updatedAt             DateTime                @updatedAt @map("updated_at")
+
+  @@index([freezeReason, lastRecomputedAt], map: "entitlement_state_freeze_recomputed_idx")
+  @@map("entitlement_state")
+}
+
+model ContactRestoration {
+  id                   String                   @id @default(cuid())
+  contactConsumptionId String                   @map("contact_consumption_id")
+  userId               String                   @map("user_id")
+  reason               ContactRestorationReason
+  details              Json?
+  createdAt            DateTime                 @default(now()) @map("created_at")
+  contactConsumption   ContactConsumption       @relation(fields: [contactConsumptionId], references: [id], onDelete: Cascade)
+
+  @@unique([contactConsumptionId, reason], map: "contact_restorations_consumption_reason_idx")
+  @@index([userId, createdAt], map: "contact_restorations_user_created_at_idx")
+  @@map("contact_restorations")
+}
+
+model ContactAttempt {
+  id                         String   @id @default(cuid())
+  userId                     String   @map("user_id")
+  listingId                  String   @map("listing_id")
+  unitId                     String?  @map("unit_id")
+  unitIdentityEpochObserved  Int?     @map("unit_identity_epoch_observed")
+  unitIdentityEpochResolved  Int?     @map("unit_identity_epoch_resolved")
+  contactKind                String   @map("contact_kind")
+  outcome                    String
+  clientIdempotencyKey       String?  @map("client_idempotency_key")
+  conversationId             String?  @map("conversation_id")
+  reasonCode                 String?  @map("reason_code")
+  metadata                   Json?
+  createdAt                  DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, clientIdempotencyKey, contactKind], map: "contact_attempts_user_idempotency_kind_idx")
+  @@index([listingId, createdAt], map: "contact_attempts_listing_created_at_idx")
+  @@index([userId, contactKind, createdAt], map: "contact_attempts_user_kind_created_at_idx")
+  @@map("contact_attempts")
+}
+
+model HostContactChannel {
+  id                  String    @id @default(cuid())
+  hostUserId          String    @unique(map: "host_contact_channels_host_user_id_key") @map("host_user_id")
+  phoneE164Ciphertext String?   @map("phone_e164_ciphertext")
+  phoneE164Last4      String?   @db.VarChar(4) @map("phone_e164_last4")
+  phoneRevealEnabled  Boolean   @default(false) @map("phone_reveal_enabled")
+  verifiedAt          DateTime? @map("verified_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  @@index([phoneRevealEnabled, verifiedAt], map: "host_contact_channels_reveal_enabled_idx")
+  @@map("host_contact_channels")
+}
+
+model PhoneRevealAudit {
+  id                   String   @id @default(cuid())
+  userId               String   @map("user_id")
+  listingId            String   @map("listing_id")
+  unitId               String?  @map("unit_id")
+  unitIdentityEpoch    Int?     @map("unit_identity_epoch")
+  hostUserId           String?  @map("host_user_id")
+  outcome              String
+  reasonCode           String?  @map("reason_code")
+  clientIdempotencyKey String?  @map("client_idempotency_key")
+  metadata             Json?
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, listingId, clientIdempotencyKey], map: "phone_reveal_audits_user_listing_idempotency_idx")
+  @@index([listingId, createdAt], map: "phone_reveal_audits_listing_created_at_idx")
+  @@index([userId, createdAt], map: "phone_reveal_audits_user_created_at_idx")
+  @@map("phone_reveal_audits")
+}
+
 model PhysicalUnit {
   id                   String   @id @default(cuid())
   unitIdentityEpoch    Int      @default(1) @map("unit_identity_epoch")
@@ -579,6 +920,11 @@ model PhysicalUnit {
   supersededByUnitId   String?  @map("superseded_by_unit_id")
   sourceVersion        BigInt   @default(1) @map("source_version")
   rowVersion           BigInt   @default(1) @map("row_version")
+  // Phase 02: geocode worker output columns (nullable; TEXT in PGlite, GEOGRAPHY in production)
+  exactPoint           String?  @map("exact_point")
+  publicPoint          String?  @map("public_point")
+  publicCellId         String?  @map("public_cell_id")
+  publicAreaName       String?  @map("public_area_name")
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
 
@@ -704,4 +1050,116 @@ model AuditEvent {
   createdAt         DateTime @default(now()) @map("created_at")
 
   @@map("audit_events")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 02: Projection models (dark until Phase 10 — no public read path yet)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model InventorySearchProjection {
+  id                          String   @id
+  inventoryId                 String   @map("inventory_id")
+  unitId                      String   @map("unit_id")
+  unitIdentityEpochWrittenAt  Int      @map("unit_identity_epoch_written_at")
+  roomCategory                String   @map("room_category")
+  capacityGuests              Int?     @map("capacity_guests")
+  totalBeds                   Int?     @map("total_beds")
+  openBeds                    Int?     @map("open_beds")
+  price                       Decimal  @db.Decimal(10, 2)
+  availableFrom               DateTime @db.Date @map("available_from")
+  availableUntil              DateTime? @db.Date @map("available_until")
+  availabilityRange           Unsupported("tstzrange") @map("availability_range")
+  leaseMinMonths              Int?     @map("lease_min_months")
+  leaseMaxMonths              Int?     @map("lease_max_months")
+  leaseNegotiable             Boolean  @default(false) @map("lease_negotiable")
+  genderPreference            String?  @map("gender_preference")
+  householdGender             String?  @map("household_gender")
+  publicPoint                 String?  @map("public_point")
+  publicCellId                String?  @map("public_cell_id")
+  publicAreaName              String?  @map("public_area_name")
+  publishStatus               String   @default("PENDING_PROJECTION") @map("publish_status")
+  sourceVersion               BigInt   @map("source_version")
+  projectionEpoch             BigInt   @map("projection_epoch")
+  createdAt                   DateTime @default(now()) @map("created_at")
+  updatedAt                   DateTime @updatedAt @map("updated_at")
+
+  @@unique([inventoryId], map: "inventory_search_projection_inventory_unique_idx")
+  @@index([unitId, unitIdentityEpochWrittenAt, publishStatus], map: "inventory_search_projection_unit_epoch_status_idx")
+  @@index([publishStatus, sourceVersion], map: "inventory_search_projection_publish_status_source_version_idx")
+  @@map("inventory_search_projection")
+}
+
+model UnitPublicProjection {
+  unitId                  String   @map("unit_id")
+  unitIdentityEpoch       Int      @map("unit_identity_epoch")
+  representativeInventoryId String? @map("representative_inventory_id")
+  fromPrice               Decimal? @db.Decimal(10, 2) @map("from_price")
+  roomCategories          String[] @default([]) @map("room_categories")
+  earliestAvailableFrom   DateTime? @db.Date @map("earliest_available_from")
+  matchingInventoryCount  Int      @default(0) @map("matching_inventory_count")
+  coarseAvailabilityBadges String[] @default([]) @map("coarse_availability_badges")
+  publicPoint             String?  @map("public_point")
+  publicCellId            String?  @map("public_cell_id")
+  publicAreaName          String?  @map("public_area_name")
+  displayTitle            String?  @map("display_title")
+  displaySubtitle         String?  @map("display_subtitle")
+  heroImageUrl            String?  @map("hero_image_url")
+  payloadVersion          String   @default("phase04.v1") @map("payload_version")
+  sourceVersion           BigInt   @map("source_version")
+  projectionEpoch         BigInt   @map("projection_epoch")
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  @@unique([unitId, unitIdentityEpoch], map: "unit_public_projection_unit_epoch_idx")
+  @@map("unit_public_projection")
+}
+
+model SemanticInventoryProjection {
+  id                   String   @id
+  inventoryId          String   @map("inventory_id")
+  unitId               String   @map("unit_id")
+  unitIdentityEpoch    Int      @map("unit_identity_epoch")
+  embeddingVersion     String   @map("embedding_version")
+  sanitizedContentHash String   @map("sanitized_content_hash")
+  embedding            Unsupported("vector(768)")
+  coarseFilterAttrs    Json     @default("{}") @map("coarse_filter_attrs")
+  publishStatus        String   @default("SHADOW") @map("publish_status")
+  sourceVersion        BigInt   @map("source_version")
+  projectionEpoch      BigInt   @map("projection_epoch")
+  lastBuiltAt          DateTime @default(now()) @map("last_built_at")
+  publishedAt          DateTime? @map("published_at")
+  tombstonedAt         DateTime? @map("tombstoned_at")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@unique([inventoryId, embeddingVersion], map: "semantic_inventory_projection_inventory_version_idx")
+  @@index([embeddingVersion, publishStatus], map: "semantic_inventory_projection_version_status_idx")
+  @@index([unitId, embeddingVersion, publishStatus], map: "semantic_inventory_projection_unit_version_status_idx")
+  @@index([sourceVersion], map: "semantic_inventory_projection_source_version_idx")
+  @@map("semantic_inventory_projection")
+}
+
+model QuerySnapshot {
+  id                   String   @id @default(cuid())
+  queryHash            String   @map("query_hash")
+  backendSource        String   @map("backend_source")
+  responseVersion      String   @map("response_version")
+  projectionVersion    Int?     @map("projection_version")
+  projectionEpoch      BigInt?  @map("projection_epoch")
+  embeddingVersion     String?  @map("embedding_version")
+  rankerProfileVersion String?  @map("ranker_profile_version")
+  unitIdentityEpochFloor Int?   @map("unit_identity_epoch_floor")
+  snapshotVersion      String   @default("legacy-listing-v1") @map("snapshot_version")
+  orderedListingIds    String[] @default([]) @map("ordered_listing_ids")
+  orderedUnitKeys      String[] @default([]) @map("ordered_unit_keys")
+  mapPayload           Json?    @map("map_payload")
+  total                Int?
+  expiresAt            DateTime @map("expires_at")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  @@index([expiresAt], map: "query_snapshots_expires_at_idx")
+  @@index([queryHash, createdAt], map: "query_snapshots_query_hash_created_at_idx")
+  @@index([projectionEpoch], map: "query_snapshots_projection_epoch_idx")
+  @@index([snapshotVersion, queryHash, createdAt], map: "query_snapshots_snapshot_version_query_hash_created_at_idx")
+  @@map("query_snapshots")
 }

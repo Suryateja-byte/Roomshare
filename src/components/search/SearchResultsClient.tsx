@@ -8,7 +8,7 @@ import {
   useEffect,
   Fragment,
 } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { safeMark, safeMeasure } from "@/lib/perf";
 import { Search, Loader2 } from "lucide-react";
 import Link from "next/link";
@@ -43,6 +43,9 @@ import {
 import { getScenarioHeaderValue } from "@/lib/search/testing/search-scenarios";
 import { emitSearchClientMetric } from "@/lib/search/search-telemetry-client";
 import { buildListingDetailHref } from "@/lib/search/listing-detail-link";
+import { PUBLIC_CACHE_INVALIDATED_EVENT } from "@/lib/public-cache/client";
+import { useSearchV2Setters, useV2MapDataSetter } from "@/contexts/SearchV2DataContext";
+import type { SearchV2Response } from "@/lib/search/types";
 
 /**
  * Maximum accumulated listings before showing a "continue" link.
@@ -90,6 +93,8 @@ interface SearchResultsClientProps {
   initialStateKind?: SearchListState["kind"];
   /** When true, URL changes trigger client-side fetch instead of SSR */
   clientSideSearchEnabled?: boolean;
+  /** When true, client updates use /api/search/v2 and push map data through context */
+  unifiedV2ClientEnabled?: boolean;
 }
 
 export function SearchResultsClient({
@@ -109,6 +114,7 @@ export function SearchResultsClient({
   initialResponseMeta,
   initialStateKind,
   clientSideSearchEnabled = false,
+  unifiedV2ClientEnabled = false,
 }: SearchResultsClientProps) {
   const resolvedInitialResponseMeta = useMemo(
     () =>
@@ -123,6 +129,9 @@ export function SearchResultsClient({
   );
   const resolvedInitialStateKind =
     initialStateKind ?? (hasConfirmedZeroResults ? "zero-results" : "ok");
+  const router = useRouter();
+  const { setIsV2Enabled, setPendingQueryHash } = useSearchV2Setters();
+  const { setV2MapData, dataVersion } = useV2MapDataSetter();
   const { setSearchResultsLabel } = useMobileSearch();
   const testScenario = useSearchTestScenario();
   const [isHydrated, setIsHydrated] = useState(false);
@@ -135,6 +144,7 @@ export function SearchResultsClient({
   // F2 FIX: Ref for total count avoids allListings in handleLoadMore deps
   const totalCountRef = useRef(initialListings.length);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [refreshNotice, setRefreshNotice] = useState<string | null>(null);
   const [isDegraded, setIsDegraded] = useState(false);
   const [loadMoreAnnouncement, setLoadMoreAnnouncement] = useState("");
   const [showTotalPrice, setShowTotalPrice] = useState(false);
@@ -218,6 +228,53 @@ export function SearchResultsClient({
   }, [currentQueryHash]);
 
   useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const handlePublicCacheInvalidated = () => {
+      if (
+        clientFetchAbortRef.current &&
+        !clientFetchAbortRef.current.signal.aborted
+      ) {
+        clientFetchAbortRef.current.abort();
+      }
+
+      setPendingQueryHash(null);
+      setIsClientFetching(false);
+      setClientFetchedListings(null);
+      setClientFetchedTotal(null);
+      setClientFetchedNearMatch(undefined);
+      setClientFetchedVibeAdvisory(undefined);
+      setIsDegraded(false);
+      setLoadError(null);
+      setExtraListings([]);
+      setNextCursor(null);
+      setRefreshNotice("Results refreshed to keep public availability accurate.");
+      setLoadMoreAnnouncement("Results refreshed.");
+      router.refresh();
+    };
+
+    window.addEventListener(
+      PUBLIC_CACHE_INVALIDATED_EVENT,
+      handlePublicCacheInvalidated
+    );
+
+    return () => {
+      window.removeEventListener(
+        PUBLIC_CACHE_INVALIDATED_EVENT,
+        handlePublicCacheInvalidated
+      );
+    };
+  }, [router, setPendingQueryHash]);
+
+  useEffect(() => {
+    if (!unifiedV2ClientEnabled) {
+      setIsV2Enabled(false);
+    }
+  }, [setIsV2Enabled, unifiedV2ClientEnabled]);
+
+  useEffect(() => {
     if (!clientSideSearchEnabled) return;
 
     // Skip the initial render — SSR data covers the first load
@@ -246,13 +303,21 @@ export function SearchResultsClient({
     const controller = new AbortController();
     clientFetchAbortRef.current = controller;
     const requestQueryHash = currentQueryHash;
+    const requestDataVersion = dataVersion;
+
+    if (unifiedV2ClientEnabled) {
+      setIsV2Enabled(true);
+      setPendingQueryHash(requestQueryHash);
+    }
 
     setIsClientFetching(true);
 
     void (async () => {
       try {
         const response = await fetch(
-          `/api/search/listings?${canonicalSearchParamsString}`,
+          `${
+            unifiedV2ClientEnabled ? "/api/search/v2" : "/api/search/listings"
+          }?${canonicalSearchParamsString}`,
           {
             signal: controller.signal,
             headers: {
@@ -265,6 +330,122 @@ export function SearchResultsClient({
         if (!response.ok) {
           // Non-OK response: silently degrade, SSR data remains visible
           setIsClientFetching(false);
+          return;
+        }
+
+        if (unifiedV2ClientEnabled) {
+          const data = (await response.json()) as
+            | SearchV2Response
+            | {
+                unboundedSearch: true;
+                list: null;
+                map: null;
+                meta: {
+                  mode: "pins";
+                  queryHash: string;
+                  generatedAt: string;
+                };
+              };
+
+          if ("unboundedSearch" in data && data.unboundedSearch) {
+            if (
+              controller.signal.aborted ||
+              data.meta.queryHash !== requestQueryHash ||
+              latestQueryHashRef.current !== requestQueryHash
+            ) {
+              emitSearchClientMetric({
+                metric: "search_map_list_mismatch_total",
+                route: "search-results-client",
+                queryHash: requestQueryHash,
+                responseQueryHash: data.meta.queryHash,
+                reason:
+                  data.meta.queryHash !== requestQueryHash
+                    ? "stale-query-hash"
+                    : "stale-request-key",
+              });
+              return;
+            }
+
+            setSearchStateKind("location-required");
+            setClientFetchedListings([]);
+            setClientFetchedTotal(0);
+            setNextCursor(null);
+            setClientFetchedNearMatch(undefined);
+            setClientFetchedVibeAdvisory(undefined);
+            setIsV2Enabled(false);
+            setPendingQueryHash(null);
+            return;
+          }
+
+          if (
+            controller.signal.aborted ||
+            data.meta.queryHash !== requestQueryHash ||
+            latestQueryHashRef.current !== requestQueryHash
+          ) {
+            emitSearchClientMetric({
+              metric: "search_map_list_mismatch_total",
+              route: "search-results-client",
+              queryHash: requestQueryHash,
+              responseQueryHash: data.meta.queryHash,
+              reason:
+                data.meta.queryHash !== requestQueryHash
+                  ? "stale-query-hash"
+                  : "stale-request-key",
+            });
+            return;
+          }
+
+          const searchResponse = data as SearchV2Response;
+          const fullItems = searchResponse.list.fullItems ?? [];
+          const meta: SearchResponseMeta = {
+            queryHash: searchResponse.meta.queryHash,
+            backendSource: "v2",
+            responseVersion: SEARCH_RESPONSE_VERSION,
+            ...(searchResponse.meta.querySnapshotId
+              ? { querySnapshotId: searchResponse.meta.querySnapshotId }
+              : {}),
+            ...(searchResponse.meta.projectionVersion !== undefined
+              ? { projectionVersion: searchResponse.meta.projectionVersion }
+              : {}),
+            ...(searchResponse.meta.embeddingVersion
+              ? { embeddingVersion: searchResponse.meta.embeddingVersion }
+              : {}),
+            ...(searchResponse.meta.rankerProfileVersion
+              ? {
+                  rankerProfileVersion:
+                    searchResponse.meta.rankerProfileVersion,
+                }
+              : {}),
+          };
+
+          setResponseMeta(meta);
+          setSearchStateKind(
+            searchResponse.list.total === 0 ? "zero-results" : "ok"
+          );
+          setClientFetchedListings(fullItems);
+          setClientFetchedTotal(searchResponse.list.total ?? null);
+          setClientFetchedNearMatch(undefined);
+          setClientFetchedVibeAdvisory(
+            searchResponse.meta.warnings?.includes("VIBE_SOFT_FALLBACK")
+              ? "Showing best matches for your vibe in this area"
+              : undefined
+          );
+          setExtraListings([]);
+          setNextCursor(searchResponse.list.nextCursor);
+          seenIdsRef.current = new Set(fullItems.map((listing) => listing.id));
+          seenGroupKeysRef.current = getSeenGroupKeys(fullItems);
+          fetchedFavIdsRef.current = new Set();
+          totalCountRef.current = fullItems.length;
+          setIsV2Enabled(true);
+          setV2MapData(
+            {
+              ...searchResponse.map,
+              mode: searchResponse.meta.mode,
+              queryHash: searchResponse.meta.queryHash,
+              querySnapshotId: searchResponse.meta.querySnapshotId,
+            },
+            requestDataVersion
+          );
           return;
         }
 
@@ -330,6 +511,12 @@ export function SearchResultsClient({
         if ((err as Error).name === "AbortError") return;
         // Fetch failed: keep old listings visible, no crash
       } finally {
+        if (
+          unifiedV2ClientEnabled &&
+          latestQueryHashRef.current === requestQueryHash
+        ) {
+          setPendingQueryHash(null);
+        }
         if (!controller.signal.aborted) {
           setIsClientFetching(false);
         }
@@ -342,7 +529,12 @@ export function SearchResultsClient({
     clientSideSearchEnabled,
     currentQueryHash,
     currentSearchParamsString,
+    dataVersion,
+    setIsV2Enabled,
+    setPendingQueryHash,
+    setV2MapData,
     testScenario,
+    unifiedV2ClientEnabled,
   ]);
 
   // Use client-fetched data when available, otherwise fall back to SSR props
@@ -367,6 +559,7 @@ export function SearchResultsClient({
       setExtraListings([]);
       setNextCursor(initialNextCursor);
       setLoadMoreAnnouncement("");
+      setRefreshNotice(null);
       seenIdsRef.current = new Set(initialListings.map((l) => l.id));
       seenGroupKeysRef.current = getSeenGroupKeys(initialListings);
       fetchedFavIdsRef.current = new Set(); // Reset favorites tracking on new search
@@ -382,6 +575,10 @@ export function SearchResultsClient({
     () => [...effectiveListings, ...extraListings],
     [effectiveListings, extraListings]
   );
+  const effectiveListingsRef = useRef(effectiveListings);
+  useEffect(() => {
+    effectiveListingsRef.current = effectiveListings;
+  }, [effectiveListings]);
   // F8 FIX: Stable string key for effects that depend on listing IDs, not array reference
   const allListingIdsKey = useMemo(
     () => allListings.map((l) => l.id).join(","),
@@ -476,6 +673,28 @@ export function SearchResultsClient({
         testScenario
       );
 
+      if (result.snapshotExpired) {
+        emitSearchClientMetric({
+          metric: "search_snapshot_expired_total",
+          route: "search-results-client",
+          queryHash: requestQueryHash,
+          reason: result.snapshotExpired.reason,
+        });
+        const currentListings = effectiveListingsRef.current;
+        setLoadError(null);
+        setIsDegraded(false);
+        setExtraListings([]);
+        setNextCursor(null);
+        totalCountRef.current = currentListings.length;
+        seenIdsRef.current = new Set(currentListings.map((listing) => listing.id));
+        seenGroupKeysRef.current = getSeenGroupKeys(currentListings);
+        fetchedFavIdsRef.current = new Set();
+        setRefreshNotice("Results refreshed to keep ordering accurate.");
+        setLoadMoreAnnouncement("Results refreshed. Ordering changed.");
+        router.refresh();
+        return;
+      }
+
       if (
         result.meta?.queryHash &&
         (result.meta.queryHash !== requestQueryHash ||
@@ -512,6 +731,7 @@ export function SearchResultsClient({
       safeMark("load-more-end");
       safeMeasure("load-more", "load-more-start", "load-more-end");
       setIsDegraded(false);
+      setRefreshNotice(null);
 
       // Defensive guard: ensure items is an array (protects against malformed server responses)
       const items = Array.isArray(result.items) ? result.items : [];
@@ -582,7 +802,14 @@ export function SearchResultsClient({
       setIsLoadingMore(false);
     }
     // F2 FIX: Removed allListings dep — count read from totalCountRef instead
-  }, [nextCursor, rawParams, effectiveTotal, effectiveListings.length, testScenario]);
+  }, [
+    nextCursor,
+    rawParams,
+    effectiveTotal,
+    effectiveListings.length,
+    router,
+    testScenario,
+  ]);
 
   const total = effectiveTotal;
   // When client-fetched data is active, derive zero-results from effective total
@@ -942,6 +1169,14 @@ export function SearchResultsClient({
           )}
 
           {/* Load error */}
+          {refreshNotice && !loadError && (
+            <div className="flex justify-center mt-4" role="status">
+              <p className="text-sm text-on-surface-variant">
+                {refreshNotice}
+              </p>
+            </div>
+          )}
+
           {loadError && (
             <div className="flex justify-center mt-4" role="alert">
               <p className="text-sm text-red-600">

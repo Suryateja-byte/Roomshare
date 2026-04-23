@@ -11,6 +11,13 @@ export interface SearchResponseMeta {
   queryHash: string;
   backendSource: SearchBackendSource;
   responseVersion: string;
+  querySnapshotId?: string;
+  projectionVersion?: number;
+  projectionEpoch?: string;
+  embeddingVersion?: string;
+  rankerProfileVersion?: string;
+  unitIdentityEpochFloor?: number;
+  snapshotVersion?: string;
 }
 
 export interface SearchListPayload {
@@ -45,12 +52,14 @@ export type SearchMapState = SearchState<SearchMapPayload>;
 
 export function createSearchResponseMeta(
   query: NormalizedSearchQuery,
-  backendSource: SearchBackendSource
+  backendSource: SearchBackendSource,
+  extras?: Omit<SearchResponseMeta, "queryHash" | "backendSource" | "responseVersion">
 ): SearchResponseMeta {
   return {
     queryHash: getSearchQueryHash(query),
     backendSource,
     responseVersion: SEARCH_RESPONSE_VERSION,
+    ...extras,
   };
 }
 

@@ -46,7 +46,12 @@ import {
 } from "@/lib/constants";
 import { features } from "@/lib/env";
 import { parseLocalDate } from "@/lib/utils";
-import type { KeysetCursor, SortOption, CursorRowData } from "./cursor";
+import type {
+  KeysetCursor,
+  SortOption,
+  CursorRowData,
+  SearchPaginationSnapshot,
+} from "./cursor";
 import { buildCursorFromRow, encodeKeysetCursor } from "./cursor";
 import {
   buildPublicAvailability,
@@ -55,6 +60,7 @@ import {
 } from "./public-availability";
 import pgvector from "pgvector";
 import { getCachedQueryEmbedding } from "@/lib/embeddings/query-cache";
+import { getCurrentEmbeddingVersion } from "@/lib/embeddings/version";
 import { logger } from "@/lib/logger";
 import { joinWhereClauseWithSecurityInvariant } from "@/lib/sql-safety";
 import { buildAvailabilitySqlFragments } from "@/lib/availability";
@@ -69,6 +75,7 @@ import {
 // Statement timeout for search queries (5 seconds)
 const SEARCH_QUERY_TIMEOUT_MS = 5000;
 const SEARCH_DEDUP_LOOK_AHEAD = 16;
+const PUBLISHED_EMBEDDING_STATUSES = ["COMPLETED", "PARTIAL"] as const;
 
 function isPresent<T>(value: T | null | undefined): value is T {
   return value != null;
@@ -1246,6 +1253,62 @@ export function mapRawMapListingsToPublic(
   });
 }
 
+export async function getSearchDocListingsByIds(
+  listingIds: string[]
+): Promise<ListingData[]> {
+  if (listingIds.length === 0) {
+    return [];
+  }
+
+  const sqlQuery = `
+    SELECT
+      d.id,
+      d.title,
+      d.description,
+      d.price,
+      d.images,
+      l."availableSlots" as "availableSlots",
+      l."totalSlots" as "totalSlots",
+      l."availabilitySource" as "availabilitySource",
+      l."openSlots" as "openSlots",
+      l."availableUntil" as "availableUntil",
+      l."minStayMonths" as "minStayMonths",
+      l."lastConfirmedAt" as "lastConfirmedAt",
+      l.status::text as status,
+      l."statusReason" as "statusReason",
+      l."needsMigrationReview" as "needsMigrationReview",
+      l."ownerId" as "ownerId",
+      l."normalizedAddress" as "normalizedAddress",
+      d.amenities,
+      d.house_rules as "houseRules",
+      d.household_languages as "householdLanguages",
+      d.primary_home_language as "primaryHomeLanguage",
+      d.lease_duration as "leaseDuration",
+      d.room_type as "roomType",
+      l."moveInDate" as "moveInDate",
+      d.listing_created_at as "createdAt",
+      d.view_count as "viewCount",
+      d.city,
+      d.state,
+      d.lat,
+      d.lng,
+      d.avg_rating as "avgRating",
+      d.review_count as "reviewCount"
+    FROM listing_search_docs d
+    JOIN "Listing" l ON l.id = d.id
+    WHERE d.id = ANY($1::text[])
+  `;
+
+  const rows = await queryWithTimeout<ListingRaw>(sqlQuery, [listingIds]);
+  const mappedById = new Map(
+    mapRawListingsToPublic(rows).map((item) => [item.id, item])
+  );
+
+  return listingIds
+    .map((listingId) => mappedById.get(listingId))
+    .filter(isPresent);
+}
+
 // ============================================
 // Map Listings Query (SearchDoc)
 // ============================================
@@ -1667,7 +1730,8 @@ export interface KeysetPaginatedResult<T> extends PaginatedResultHybrid<T> {
  */
 export async function getSearchDocListingsWithKeyset(
   params: FilterParams = {},
-  cursor: KeysetCursor | null = null
+  cursor: KeysetCursor | null = null,
+  snapshot?: SearchPaginationSnapshot
 ): Promise<KeysetPaginatedResult<ListingData>> {
   // Defense in depth: block unbounded text searches
   if (params.query && !params.bounds) {
@@ -1813,7 +1877,11 @@ export async function getSearchDocListingsWithKeyset(
         avg_rating: lastRawItem._cursorAvgRating,
         review_count: lastRawItem._cursorReviewCount,
       };
-      const keysetCursor = buildCursorFromRow(cursorRowData, sortOption);
+      const keysetCursor = buildCursorFromRow(
+        cursorRowData,
+        sortOption,
+        snapshot
+      );
       nextCursor = encodeKeysetCursor(keysetCursor);
     }
 
@@ -1875,7 +1943,8 @@ export async function getSearchDocListingsWithKeyset(
  * @returns Paginated results with nextCursor for next page
  */
 export async function getSearchDocListingsFirstPage(
-  params: FilterParams = {}
+  params: FilterParams = {},
+  snapshot?: SearchPaginationSnapshot
 ): Promise<KeysetPaginatedResult<ListingData>> {
   // Defense in depth: block unbounded text searches
   if (params.query && !params.bounds) {
@@ -2033,7 +2102,11 @@ export async function getSearchDocListingsFirstPage(
         avg_rating: lastRawItem._cursorAvgRating,
         review_count: lastRawItem._cursorReviewCount,
       };
-      const keysetCursor = buildCursorFromRow(cursorRowData, sortOption);
+      const keysetCursor = buildCursorFromRow(
+        cursorRowData,
+        sortOption,
+        snapshot
+      );
       nextCursor = encodeKeysetCursor(keysetCursor);
     }
 
@@ -2130,6 +2203,29 @@ interface SemanticSearchRow {
   combined_score: number;
 }
 
+async function filterSemanticRowsToCurrentEmbeddingVersion(
+  rows: SemanticSearchRow[],
+  embeddingVersion: string
+): Promise<SemanticSearchRow[]> {
+  if (rows.length === 0) {
+    return rows;
+  }
+
+  const eligibleRows = await queryWithTimeout<{ id: string }>(
+    `
+      SELECT id
+      FROM listing_search_docs
+      WHERE id = ANY($1::text[])
+        AND embedding_model = $2
+        AND embedding_status = ANY($3::text[])
+    `,
+    [rows.map((row) => row.id), embeddingVersion, [...PUBLISHED_EMBEDDING_STATUSES]]
+  );
+
+  const eligibleIds = new Set(eligibleRows.map((row) => row.id));
+  return rows.filter((row) => eligibleIds.has(row.id));
+}
+
 /**
  * Semantic search — called when user provides a natural language query
  * and ENABLE_SEMANTIC_SEARCH is true.
@@ -2158,6 +2254,7 @@ export async function semanticSearchQuery(
 
   try {
     const embedding = await getCachedQueryEmbedding(cappedQuery);
+    const embeddingVersion = getCurrentEmbeddingVersion();
     const vecSql = pgvector.toSql(embedding);
 
     // Lowercase array filters to match _lower columns
@@ -2171,7 +2268,7 @@ export async function semanticSearchQuery(
       ? filterParams.languages.map((l) => l.toLowerCase())
       : null;
 
-    const results = await queryWithTimeout<SemanticSearchRow>(
+    const rawResults = await queryWithTimeout<SemanticSearchRow>(
       `SELECT * FROM search_listings_semantic(
         $1::text::vector,
         $2,
@@ -2217,7 +2314,14 @@ export async function semanticSearchQuery(
       ]
     );
 
-    return results.length > 0 ? results : null;
+    if (rawResults.length === 0) {
+      return null;
+    }
+
+    return filterSemanticRowsToCurrentEmbeddingVersion(
+      rawResults,
+      embeddingVersion
+    );
   } catch (err) {
     logger.sync.error("[semantic-search] Failed, falling back to FTS:", {
       error: err instanceof Error ? err.message : "Unknown",

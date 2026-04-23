@@ -1,0 +1,2644 @@
+diff --git a/.gitignore b/.gitignore
+index 666a144f..22263aa6 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -53,6 +53,8 @@ test-output.txt
+ # env files
+ .env*
+ !.env.example
++# .env.test is tracked because it only holds non-secret test infra config (NODE_OPTIONS).
++!.env.test
+ 
+ # vercel
+ .vercel
+@@ -79,7 +81,15 @@ memory-bank/activeContext.md
+ # AI tool configs (not project code)
+ .superpowers/
+ .agent/
+-.agents/
++.agents/*
++!.agents/workflows/
++.agents/workflows/*
++!.agents/workflows/implementation-triad.md
++!.agents/skills/
++.agents/skills/*
++!.agents/skills/implementation-triad/
++.agents/skills/implementation-triad/*
++!.agents/skills/implementation-triad/SKILL.md
+ .cline/
+ .codex/
+ .commandcode/
+diff --git a/jest.config.js b/jest.config.js
+index 180bdb38..2cc93f98 100644
+--- a/jest.config.js
++++ b/jest.config.js
+@@ -22,6 +22,10 @@ const customJestConfig = {
+     // Stub server-only — it throws at import time in non-server environments.
+     // All tests that transitively import modules using `import "server-only"` need this.
+     "^server-only$": "<rootDir>/src/__tests__/utils/empty-module.js",
++    // Map @electric-sql/pglite to its explicit CJS build to avoid ESM dynamic-import
++    // errors when Jest runs without --experimental-vm-modules.
++    "^@electric-sql/pglite$":
++      "<rootDir>/node_modules/@electric-sql/pglite/dist/index.cjs",
+   },
+   testPathIgnorePatterns: [
+     "<rootDir>/node_modules/",
+@@ -47,6 +51,38 @@ const customJestConfig = {
+     "!src/app/layout.tsx",
+     "!src/app/global-error.tsx",
+   ],
++  coverageThreshold: {
++    "src/lib/identity/**/*.ts": {
++      statements: 90,
++      functions: 90,
++      lines: 90,
++    },
++    "src/lib/validation/category/**/*.ts": {
++      statements: 90,
++      functions: 90,
++      lines: 90,
++    },
++    "src/lib/db/**/*.ts": {
++      statements: 90,
++      functions: 90,
++      lines: 90,
++    },
++    "src/lib/outbox/**/*.ts": {
++      statements: 90,
++      functions: 90,
++      lines: 90,
++    },
++    "src/lib/audit/**/*.ts": {
++      statements: 90,
++      functions: 90,
++      lines: 90,
++    },
++    "src/lib/flags/**/*.ts": {
++      statements: 90,
++      functions: 90,
++      lines: 90,
++    },
++  },
+   forceExit: process.env.CI === "true",
+   workerIdleMemoryLimit: "512MB",
+   moduleDirectories: ["node_modules", "<rootDir>/"],
+diff --git a/package.json b/package.json
+index 6f6102a5..c0bbb297 100644
+--- a/package.json
++++ b/package.json
+@@ -12,10 +12,10 @@
+     "lint": "eslint src --ext .ts,.tsx --cache --cache-location .next/cache/eslint",
+     "typecheck": "rm -rf .next/dev/types && next typegen && tsc --noEmit",
+     "verify": "node verify.js",
+-    "test": "jest",
+-    "test:watch": "jest --watch",
+-    "test:coverage": "jest --coverage",
+-    "test:ci": "jest --ci --coverage --maxWorkers=2",
++    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
++    "test:watch": "NODE_OPTIONS=--experimental-vm-modules jest --watch",
++    "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage",
++    "test:ci": "NODE_OPTIONS=--experimental-vm-modules jest --ci --coverage --maxWorkers=2",
+     "test:unit": "jest --testPathPatterns=\"src/__tests__/(lib|hooks)/\" --testPathIgnorePatterns=\"filter-regression\"",
+     "test:components": "jest --testPathPatterns=\"src/__tests__/(components|pages)/\"",
+     "test:api": "jest --testPathPatterns=\"src/__tests__/(api|actions)/\"",
+@@ -92,6 +92,7 @@
+   },
+   "devDependencies": {
+     "@axe-core/playwright": "^4.11.1",
++    "@electric-sql/pglite": "^0.4.4",
+     "@lhci/cli": "^0.15.1",
+     "@napi-rs/canvas": "^0.1.97",
+     "@playwright/test": "^1.59.1",
+diff --git a/src/__tests__/db/phase01-moderation-precedence.test.ts b/src/__tests__/db/phase01-moderation-precedence.test.ts
+new file mode 100644
+index 00000000..4e48af40
+--- /dev/null
++++ b/src/__tests__/db/phase01-moderation-precedence.test.ts
+@@ -0,0 +1,282 @@
++/**
++ * @jest-environment node
++ */
++/**
++ * AC#3 — plpgsql trigger enforce_moderation_precedence() fires with real
++ *         ERRCODE='P0001' and HINT='moderation'.
++ *
++ * Tests run against a real PGlite instance so the actual plpgsql function body,
++ * RAISE EXCEPTION ... ERRCODE / HINT, and isModerationLockedError(hint path) are
++ * all exercised end-to-end.
++ */
++
++import { withActor } from "@/lib/db/with-actor";
++import { ModerationLockedError } from "@/lib/identity/errors";
++import {
++  createPGliteFixture,
++  hostActor,
++  moderatorActor,
++  type PGliteFixture,
++} from "@/__tests__/utils/pglite-phase01";
++
++describe("Phase 01 moderation-precedence and append-only triggers (PGlite)", () => {
++  let fixture: PGliteFixture;
++  let physicalUnitId: string;
++  let claimId: string;
++  let inventoryId: string;
++
++  beforeAll(async () => {
++    fixture = await createPGliteFixture();
++    await fixture.insertUser("host-1");
++    await fixture.insertUser("moderator-1");
++  });
++
++  beforeEach(async () => {
++    physicalUnitId = await fixture.insertPhysicalUnit({
++      canonicalAddressHash: `hash-mod-${Date.now()}-${Math.random()}`,
++    });
++    claimId = await fixture.insertHostUnitClaim({
++      unitId: physicalUnitId,
++      hostUserId: "host-1",
++    });
++    inventoryId = await fixture.insertListingInventory({
++      unitId: physicalUnitId,
++      canonicalAddressHash: "hash-mod",
++      roomCategory: "PRIVATE_ROOM",
++      capacityGuests: 1,
++    });
++  });
++
++  afterAll(async () => {
++    await fixture.close();
++  });
++
++  // -------------------------------------------------------------------------
++  // AC#3a — trigger fires; ModerationLockedError is thrown via message path
++  // -------------------------------------------------------------------------
++
++  it.each([
++    ["publish_status", "PUBLISHED"],
++    ["lifecycle_status", "PAUSED"],
++    ["privacy_version", 2],
++  ])(
++    "AC#3: host role cannot update %s on physical_units (ModerationLockedError thrown)",
++    async (column, value) => {
++      await expect(
++        withActor(
++          hostActor(),
++          async (tx) => {
++            await (tx as never as { physicalUnit: { update: (a: unknown) => Promise<void> } }).physicalUnit.update({
++              where: { id: physicalUnitId },
++              data: { [column]: value },
++            });
++          },
++          { client: fixture.client as never }
++        )
++      ).rejects.toBeInstanceOf(ModerationLockedError);
++
++      // Row must be unchanged — trigger rolled back the write.
++      const rows = await fixture.query<{
++        publish_status: string;
++        lifecycle_status: string;
++        privacy_version: number;
++      }>(
++        `SELECT publish_status, lifecycle_status, privacy_version
++         FROM physical_units WHERE id = $1`,
++        [physicalUnitId]
++      );
++      expect(rows[0]).toEqual({
++        publish_status: "DRAFT",
++        lifecycle_status: "ACTIVE",
++        privacy_version: 1,
++      });
++    }
++  );
++
++  // -------------------------------------------------------------------------
++  // AC#3b — HINT='moderation' path in isModerationLockedError is exercised
++  // -------------------------------------------------------------------------
++
++  it("AC#3: trigger error carries HINT=moderation and P0001 error code", async () => {
++    let caughtError: unknown;
++
++    // Reach directly into PGlite to capture the raw error before withActor wraps it.
++    await (fixture.pg as unknown as {
++      transaction: (fn: (tx: {
++        query: (sql: string, params: unknown[]) => Promise<void>;
++      }) => Promise<void>) => Promise<void>;
++    }).transaction(async (tx) => {
++      await tx.query("SELECT set_config($1, $2, true)", ["app.actor_role", "host"]);
++      try {
++        await tx.query(
++          `UPDATE physical_units SET publish_status = 'PUBLISHED' WHERE id = $1`,
++          [physicalUnitId]
++        );
++      } catch (err) {
++        caughtError = err;
++      }
++    }).catch(() => {
++      // transaction rollback is expected — the important thing is caughtError was set
++    });
++
++    expect(caughtError).toBeDefined();
++    const e = caughtError as { code?: string; hint?: string; message?: string };
++    expect(e.code).toBe("P0001");
++    expect(e.hint).toBe("moderation");
++    expect(e.message).toContain("MODERATION_LOCKED");
++  });
++
++  // -------------------------------------------------------------------------
++  // AC#3c — moderator and system roles are allowed
++  // -------------------------------------------------------------------------
++
++  it("AC#3: moderator role can update publish_status on all three canonical tables", async () => {
++    await withActor(
++      moderatorActor(),
++      async (tx) => {
++        const client = tx as never as {
++          physicalUnit: { update: (a: unknown) => Promise<void> };
++          hostUnitClaim: { update: (a: unknown) => Promise<void> };
++          listingInventory: { update: (a: unknown) => Promise<void> };
++        };
++        await client.physicalUnit.update({
++          where: { id: physicalUnitId },
++          data: { publish_status: "PUBLISHED" },
++        });
++        await client.hostUnitClaim.update({
++          where: { id: claimId },
++          data: { publish_status: "PUBLISHED" },
++        });
++        await client.listingInventory.update({
++          where: { id: inventoryId },
++          data: { publish_status: "PUBLISHED" },
++        });
++      },
++      { client: fixture.client as never }
++    );
++
++    const puRows = await fixture.query<{ publish_status: string }>(
++      `SELECT publish_status FROM physical_units WHERE id = $1`,
++      [physicalUnitId]
++    );
++    expect(puRows[0].publish_status).toBe("PUBLISHED");
++
++    const hucRows = await fixture.query<{ publish_status: string }>(
++      `SELECT publish_status FROM host_unit_claims WHERE id = $1`,
++      [claimId]
++    );
++    expect(hucRows[0].publish_status).toBe("PUBLISHED");
++
++    const liRows = await fixture.query<{ publish_status: string }>(
++      `SELECT publish_status FROM listing_inventories WHERE id = $1`,
++      [inventoryId]
++    );
++    expect(liRows[0].publish_status).toBe("PUBLISHED");
++  });
++
++  it("AC#3: missing actor_role defaults to system and passes moderation guard", async () => {
++    // No set_config call — current_setting returns '' which trigger treats as 'system'.
++    await fixture.client.$transaction(async (tx: unknown) => {
++      const client = tx as never as {
++        physicalUnit: { update: (a: unknown) => Promise<void> };
++      };
++      await client.physicalUnit.update({
++        where: { id: physicalUnitId },
++        data: { publish_status: "PUBLISHED" },
++      });
++    });
++
++    const rows = await fixture.query<{ publish_status: string }>(
++      `SELECT publish_status FROM physical_units WHERE id = $1`,
++      [physicalUnitId]
++    );
++    expect(rows[0].publish_status).toBe("PUBLISHED");
++  });
++
++  it("AC#3: trigger applies to host_unit_claims for host-role updates", async () => {
++    await expect(
++      withActor(
++        hostActor(),
++        async (tx) => {
++          const client = tx as never as {
++            hostUnitClaim: { update: (a: unknown) => Promise<void> };
++          };
++          await client.hostUnitClaim.update({
++            where: { id: claimId },
++            data: { publish_status: "PUBLISHED" },
++          });
++        },
++        { client: fixture.client as never }
++      )
++    ).rejects.toBeInstanceOf(ModerationLockedError);
++  });
++
++  it("AC#3: trigger applies to listing_inventories for host-role updates", async () => {
++    await expect(
++      withActor(
++        hostActor(),
++        async (tx) => {
++          const client = tx as never as {
++            listingInventory: { update: (a: unknown) => Promise<void> };
++          };
++          await client.listingInventory.update({
++            where: { id: inventoryId },
++            data: { publish_status: "PUBLISHED" },
++          });
++        },
++        { client: fixture.client as never }
++      )
++    ).rejects.toBeInstanceOf(ModerationLockedError);
++  });
++
++  // -------------------------------------------------------------------------
++  // AC#3d — forbid_update_delete trigger for append-only tables
++  // -------------------------------------------------------------------------
++
++  it("AC#3: identity_mutations rejects UPDATE (forbid_update_delete trigger)", async () => {
++    const mutId = await fixture.insertIdentityMutation({
++      fromUnitIds: [physicalUnitId],
++      toUnitIds: [physicalUnitId],
++    });
++
++    await expect(
++      fixture.pg.query(
++        `UPDATE identity_mutations SET reason_code = 'manual_moderation' WHERE id = $1`,
++        [mutId]
++      )
++    ).rejects.toThrow(/append-only/i);
++  });
++
++  it("AC#3: identity_mutations rejects DELETE (forbid_update_delete trigger)", async () => {
++    const mutId = await fixture.insertIdentityMutation({
++      fromUnitIds: [physicalUnitId],
++      toUnitIds: [physicalUnitId],
++    });
++
++    await expect(
++      fixture.pg.query(
++        `DELETE FROM identity_mutations WHERE id = $1`,
++        [mutId]
++      )
++    ).rejects.toThrow(/append-only/i);
++  });
++
++  it("AC#3: audit_events rejects UPDATE (forbid_update_delete trigger)", async () => {
++    const auditId = await fixture.insertAuditEvent({});
++
++    await expect(
++      fixture.pg.query(
++        `UPDATE audit_events SET kind = 'CANONICAL_UNIT_CREATED' WHERE id = $1`,
++        [auditId]
++      )
++    ).rejects.toThrow(/append-only/i);
++  });
++
++  it("AC#3: audit_events rejects DELETE (forbid_update_delete trigger)", async () => {
++    const auditId = await fixture.insertAuditEvent({});
++
++    await expect(
++      fixture.pg.query(`DELETE FROM audit_events WHERE id = $1`, [auditId])
++    ).rejects.toThrow(/append-only/i);
++  });
++});
+diff --git a/src/__tests__/db/phase01-schema.test.ts b/src/__tests__/db/phase01-schema.test.ts
+new file mode 100644
+index 00000000..648296ea
+--- /dev/null
++++ b/src/__tests__/db/phase01-schema.test.ts
+@@ -0,0 +1,367 @@
++/**
++ * @jest-environment node
++ */
++/**
++ * AC#1 — Seven canonical tables + required indexes exist after applying actual migrations.
++ * AC#2 — Category CHECK constraints reject invalid shapes.
++ * AC#4 — resolveOrCreateUnit collapses address variants; source_version increments on upsert.
++ *
++ * All assertions run against a real PGlite instance with the literal migration SQL applied,
++ * exercising PG-specific types (TSTZRANGE, JSONB, TEXT[], SMALLINT, NUMERIC) and the
++ * NOT VALID + VALIDATE CONSTRAINT two-phase attach pattern.
++ */
++
++import { withActor } from "@/lib/db/with-actor";
++import { resolveOrCreateUnit } from "@/lib/identity/resolve-or-create-unit";
++import { validateInventoryInput } from "@/lib/validation/category";
++import {
++  createPGliteFixture,
++  hostActor,
++  type PGliteFixture,
++} from "@/__tests__/utils/pglite-phase01";
++
++describe("Phase 01 schema and DB contracts (PGlite)", () => {
++  let fixture: PGliteFixture;
++
++  beforeAll(async () => {
++    fixture = await createPGliteFixture();
++  });
++
++  afterAll(async () => {
++    await fixture.close();
++  });
++
++  // -------------------------------------------------------------------------
++  // AC#1 — migration applies cleanly; seven canonical tables + indexes exist
++  // -------------------------------------------------------------------------
++
++  it("AC#1: applies all three migrations and creates the seven canonical tables", async () => {
++    const tables = await fixture.query<{ tablename: string }>(
++      `SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename`
++    );
++    const tableNames = tables.map((r) => r.tablename);
++
++    expect(tableNames).toEqual(
++      expect.arrayContaining([
++        "physical_units",
++        "host_unit_claims",
++        "listing_inventories",
++        "identity_mutations",
++        "outbox_events",
++        "cache_invalidations",
++        "audit_events",
++      ])
++    );
++  });
++
++  it("AC#1: required indexes exist after migration", async () => {
++    const indexes = await fixture.query<{ indexname: string }>(
++      `SELECT indexname FROM pg_indexes WHERE schemaname = 'public' ORDER BY indexname`
++    );
++    const indexNames = indexes.map((r) => r.indexname);
++
++    expect(indexNames).toEqual(
++      expect.arrayContaining([
++        "physical_units_canonical_unique_idx",
++        "outbox_events_pending_idx",
++        "outbox_events_aggregate_idx",
++        "outbox_events_dlq_idx",
++        "cache_invalidations_pending_idx",
++        "cache_invalidations_unit_enqueued_idx",
++        "audit_events_aggregate_idx",
++        "audit_events_kind_idx",
++        "audit_events_actor_idx",
++      ])
++    );
++  });
++
++  it("AC#1: partial indexes carry correct WHERE clauses (pg_indexes)", async () => {
++    const partials = await fixture.query<{
++      indexname: string;
++      indexdef: string;
++    }>(
++      `SELECT indexname, indexdef FROM pg_indexes
++       WHERE schemaname = 'public'
++         AND indexname IN (
++           'outbox_events_pending_idx',
++           'outbox_events_dlq_idx',
++           'cache_invalidations_pending_idx'
++         )
++       ORDER BY indexname`
++    );
++
++    const byName = Object.fromEntries(
++      partials.map((r) => [r.indexname, r.indexdef])
++    );
++
++    expect(byName["outbox_events_pending_idx"]).toMatch(/WHERE.*status.*IN/i);
++    expect(byName["outbox_events_dlq_idx"]).toMatch(/WHERE.*status.*=.*'DLQ'/i);
++    expect(byName["cache_invalidations_pending_idx"]).toMatch(
++      /WHERE.*consumed_at IS NULL/i
++    );
++  });
++
++  it("AC#1: Listing.physical_unit_id column exists (migration 3)", async () => {
++    const cols = await fixture.query<{ column_name: string }>(
++      `SELECT column_name FROM information_schema.columns
++       WHERE table_name = 'Listing' AND column_name = 'physical_unit_id'`
++    );
++    expect(cols).toHaveLength(1);
++  });
++
++  it("AC#1: PG-specific types are present in information_schema (TSTZRANGE, JSONB, TEXT[])", async () => {
++    const rangeCol = await fixture.query<{ data_type: string; udt_name: string }>(
++      `SELECT data_type, udt_name FROM information_schema.columns
++       WHERE table_name = 'listing_inventories' AND column_name = 'availability_range'`
++    );
++    expect(rangeCol[0].udt_name).toBe("tstzrange");
++
++    const jsonbCol = await fixture.query<{ udt_name: string }>(
++      `SELECT udt_name FROM information_schema.columns
++       WHERE table_name = 'outbox_events' AND column_name = 'payload'`
++    );
++    expect(jsonbCol[0].udt_name).toBe("jsonb");
++
++    const arrayCol = await fixture.query<{ data_type: string }>(
++      `SELECT data_type FROM information_schema.columns
++       WHERE table_name = 'physical_units' AND column_name = 'supersedes_unit_ids'`
++    );
++    expect(arrayCol[0].data_type).toBe("ARRAY");
++  });
++
++  // -------------------------------------------------------------------------
++  // AC#2 — category CHECK constraints reject invalid shapes
++  //         (tested against the actual migrated schema, NOT hand-written DDL)
++  // -------------------------------------------------------------------------
++
++  it.each([
++    [
++      "ENTIRE_PLACE rejects non-null total_beds",
++      {
++        roomCategory: "ENTIRE_PLACE",
++        capacityGuests: 3,
++        totalBeds: 2,
++        openBeds: null,
++      },
++    ],
++    [
++      "SHARED_ROOM rejects null open_beds",
++      {
++        roomCategory: "SHARED_ROOM",
++        capacityGuests: null,
++        totalBeds: 2,
++        openBeds: null,
++      },
++    ],
++    [
++      "PRIVATE_ROOM rejects non-null total_beds",
++      {
++        roomCategory: "PRIVATE_ROOM",
++        capacityGuests: 1,
++        totalBeds: 1,
++        openBeds: null,
++      },
++    ],
++    [
++      "SHARED_ROOM rejects open_beds > total_beds",
++      {
++        roomCategory: "SHARED_ROOM",
++        capacityGuests: null,
++        totalBeds: 2,
++        openBeds: 3,
++      },
++    ],
++    [
++      "ENTIRE_PLACE rejects non-null gender_preference",
++      {
++        roomCategory: "ENTIRE_PLACE",
++        capacityGuests: 3,
++        totalBeds: null,
++        openBeds: null,
++        genderPreference: "women",
++      },
++    ],
++  ])("AC#2: %s", async (_label, opts) => {
++    const unitId = await fixture.insertPhysicalUnit({
++      canonicalAddressHash: `hash-check-${randomId()}`,
++    });
++
++    await expect(
++      fixture.insertListingInventory({
++        unitId,
++        canonicalAddressHash: "hash-check",
++        roomCategory: opts.roomCategory ?? "ENTIRE_PLACE",
++        capacityGuests: opts.capacityGuests ?? null,
++        totalBeds: opts.totalBeds ?? null,
++        openBeds: opts.openBeds ?? null,
++        genderPreference:
++          "genderPreference" in opts ? opts.genderPreference : null,
++      })
++    ).rejects.toThrow();
++  });
++
++  it("AC#2: accepts a valid ENTIRE_PLACE row (confirms CHECK is not over-restrictive)", async () => {
++    const unitId = await fixture.insertPhysicalUnit({
++      canonicalAddressHash: `hash-valid-${randomId()}`,
++    });
++
++    await expect(
++      fixture.insertListingInventory({
++        unitId,
++        canonicalAddressHash: "hash-valid",
++        roomCategory: "ENTIRE_PLACE",
++        capacityGuests: 3,
++        totalBeds: null,
++        openBeds: null,
++        genderPreference: null,
++        householdGender: null,
++      })
++    ).resolves.toBeDefined();
++  });
++
++  it("AC#2: CHECK constraint names exist in information_schema (NOT VALID + VALIDATE applied)", async () => {
++    const constraints = await fixture.query<{ constraint_name: string }>(
++      `SELECT constraint_name FROM information_schema.table_constraints
++       WHERE table_name = 'listing_inventories'
++         AND constraint_type = 'CHECK'
++         AND constraint_name LIKE 'inventory_category_%'
++       ORDER BY constraint_name`
++    );
++    const names = constraints.map((r) => r.constraint_name);
++
++    expect(names).toEqual(
++      expect.arrayContaining([
++        "inventory_category_entire_place_shape",
++        "inventory_category_private_room_shape",
++        "inventory_category_shared_room_shape",
++      ])
++    );
++  });
++
++  // -------------------------------------------------------------------------
++  // AC#4 — resolveOrCreateUnit collapses address variants; source_version bumps
++  // -------------------------------------------------------------------------
++
++  it("AC#4: resolveOrCreateUnit collapses five address variants into one row", async () => {
++    await fixture.insertUser("host-ac4");
++    const actor = { role: "host" as const, id: "host-ac4" };
++    const variants = [
++      "123 Main St Apt 4B",
++      "  123  main  st  apt 4B ",
++      "123 MAIN ST APT 4B",
++      "123 Main St. Apt 4B",
++      "123 Main Street Apt 4B",
++    ];
++
++    const results: Array<{
++      created: boolean;
++      unitId: string;
++      canonicalAddressHash: string;
++      unitIdentityEpoch: number;
++    }> = [];
++    for (const address of variants) {
++      results.push(
++        await withActor(
++          actor,
++          async (tx) =>
++            resolveOrCreateUnit(tx as never, {
++              actor,
++              address: {
++                address,
++                city: "San Francisco",
++                state: "ca",
++                zip: "94107-1234",
++              },
++            }),
++          { client: fixture.client as never }
++        )
++      );
++    }
++
++    // All five variants must resolve to the same unit id.
++    const unitIds = new Set(results.map((r) => r.unitId));
++    expect(unitIds.size).toBe(1);
++
++    // Exactly one call was a create; the rest resolved existing.
++    expect(results.filter((r) => r.created)).toHaveLength(1);
++    expect(results.filter((r) => !r.created)).toHaveLength(4);
++
++    // There is exactly one row for this canonical address in the DB.
++    const hash = results[0].canonicalAddressHash;
++    const units = await fixture.query<{ id: string }>(
++      `SELECT id FROM physical_units WHERE canonical_address_hash = $1`,
++      [hash]
++    );
++    expect(units).toHaveLength(1);
++  });
++
++  it("AC#4: source_version and row_version increment on repeated upserts", async () => {
++    await fixture.insertUser("host-versions");
++    const actor = { role: "host" as const, id: "host-versions" };
++    const address = {
++      address: "500 Market Street",
++      city: "San Francisco",
++      state: "CA",
++      zip: "94105",
++    };
++
++    await withActor(actor, (tx) =>
++      resolveOrCreateUnit(tx as never, { actor, address }),
++      { client: fixture.client as never }
++    );
++
++    // Check units inserted so far by this test only (fixture is shared across
++    // tests — filter by canonical hash which is unique per address+city+state+zip).
++    const units1 = await fixture.query<{
++      source_version: number;
++      row_version: number;
++    }>(
++      `SELECT source_version, row_version FROM physical_units
++       WHERE canonical_address_hash = (
++         SELECT canonical_address_hash FROM physical_units
++         ORDER BY created_at DESC LIMIT 1
++       )`
++    );
++    expect(BigInt(units1[0].source_version)).toBe(BigInt(1));
++
++    await withActor(actor, (tx) =>
++      resolveOrCreateUnit(tx as never, { actor, address }),
++      { client: fixture.client as never }
++    );
++
++    const units2 = await fixture.query<{
++      source_version: number;
++      row_version: number;
++    }>(
++      `SELECT source_version, row_version FROM physical_units
++       WHERE canonical_address_hash = (
++         SELECT canonical_address_hash FROM physical_units
++         ORDER BY created_at DESC LIMIT 1
++       )`
++    );
++    expect(BigInt(units2[0].source_version)).toBe(BigInt(2));
++    expect(BigInt(units2[0].row_version)).toBe(BigInt(2));
++  });
++
++  // -------------------------------------------------------------------------
++  // Zod layer (no DB needed)
++  // -------------------------------------------------------------------------
++
++  it("rejects invalid SHARED_ROOM shapes at the zod layer before the DB write", () => {
++    const result = validateInventoryInput({
++      roomCategory: "SHARED_ROOM",
++      inventoryKey: "shared-1",
++      availableFrom: "2026-05-01",
++      availabilityRange: "[2026-05-01T00:00:00Z,2026-06-01T00:00:00Z)",
++      price: 900,
++      totalBeds: 2,
++      openBeds: 3,
++    });
++
++    expect(result.ok).toBe(false);
++  });
++});
++
++function randomId(): string {
++  return Math.random().toString(36).slice(2, 8);
++}
+diff --git a/src/__tests__/lib/db/optimistic-lock.test.ts b/src/__tests__/lib/db/optimistic-lock.test.ts
+new file mode 100644
+index 00000000..c1ba7fa6
+--- /dev/null
++++ b/src/__tests__/lib/db/optimistic-lock.test.ts
+@@ -0,0 +1,28 @@
++import { StaleVersionError } from "@/lib/identity/errors";
++import { requireRowVersion } from "@/lib/db/optimistic-lock";
++
++describe("requireRowVersion", () => {
++  it("is a no-op when the caller has no if-match version", () => {
++    expect(() => requireRowVersion(BigInt(5), null)).not.toThrow();
++  });
++
++  it("is a no-op when the version matches", () => {
++    expect(() => requireRowVersion(BigInt(5), BigInt(5))).not.toThrow();
++  });
++
++  it("throws a StaleVersionError on mismatch", () => {
++    expect(() => requireRowVersion(BigInt(5), BigInt(4))).toThrow(
++      StaleVersionError
++    );
++  });
++
++  it("surfaces the expected 409 metadata on stale versions", () => {
++    try {
++      requireRowVersion(BigInt(5), BigInt(4));
++      throw new Error("expected stale version failure");
++    } catch (error) {
++      expect(error).toBeInstanceOf(StaleVersionError);
++      expect((error as StaleVersionError).httpStatus).toBe(409);
++    }
++  });
++});
+diff --git a/src/__tests__/lib/db/with-actor.test.ts b/src/__tests__/lib/db/with-actor.test.ts
+new file mode 100644
+index 00000000..c0e1801d
+--- /dev/null
++++ b/src/__tests__/lib/db/with-actor.test.ts
+@@ -0,0 +1,187 @@
++/**
++ * @jest-environment node
++ */
++
++import { ModerationLockedError } from "@/lib/identity/errors";
++import { withActor } from "@/lib/db/with-actor";
++import {
++  createPGliteFixture,
++  hostActor,
++  type PGliteFixture,
++} from "@/__tests__/utils/pglite-phase01";
++
++// ---------------------------------------------------------------------------
++// Unit tests — mock $transaction (no PGlite required)
++// ---------------------------------------------------------------------------
++
++/** Build a minimal mock client whose $transaction just calls fn with a stub tx. */
++function makeMockClient(throwInTx?: unknown) {
++  const stubTx = {
++    $executeRaw: jest.fn().mockResolvedValue(0),
++    $executeRawUnsafe: jest.fn().mockResolvedValue(0),
++  };
++
++  return {
++    $transaction: jest.fn(async (fn: (tx: typeof stubTx) => Promise<unknown>) => {
++      if (throwInTx !== undefined) {
++        throw throwInTx;
++      }
++      return fn(stubTx);
++    }),
++  };
++}
++
++describe("withActor — unit (mock client)", () => {
++  it("re-throws non-object errors (e.g. strings) without wrapping", async () => {
++    // Covers isModerationLockedError's early-return false branch (line 27):
++    // `!error || typeof error !== "object"` → return false → error is re-thrown as-is.
++    const client = makeMockClient("plain string error");
++
++    await expect(
++      withActor(hostActor(), async () => "ok", { client: client as never })
++    ).rejects.toBe("plain string error");
++  });
++
++  it("wraps MODERATION_LOCKED:SUPPRESSED errors with reason=SUPPRESSED", async () => {
++    // Covers moderationReasonFromError's SUPPRESSED branch (line 51).
++    const err = Object.assign(new Error("MODERATION_LOCKED:SUPPRESSED"), {
++      hint: "moderation",
++    });
++    const client = makeMockClient(err);
++
++    const caught = await withActor(hostActor(), async () => "ok", {
++      client: client as never,
++    }).catch((e) => e);
++
++    expect(caught).toBeInstanceOf(ModerationLockedError);
++    expect((caught as ModerationLockedError).reason).toBe("SUPPRESSED");
++  });
++
++  it("wraps MODERATION_LOCKED:PAUSED errors with reason=PAUSED", async () => {
++    // Covers moderationReasonFromError's PAUSED branch (line 54).
++    const err = Object.assign(new Error("MODERATION_LOCKED:PAUSED"), {
++      hint: "moderation",
++    });
++    const client = makeMockClient(err);
++
++    const caught = await withActor(hostActor(), async () => "ok", {
++      client: client as never,
++    }).catch((e) => e);
++
++    expect(caught).toBeInstanceOf(ModerationLockedError);
++    expect((caught as ModerationLockedError).reason).toBe("PAUSED");
++  });
++
++  it("wraps MODERATION_LOCKED errors with reason=REVIEW when no specific reason in message", async () => {
++    // Covers the REVIEW fallback in moderationReasonFromError.
++    const err = Object.assign(new Error("MODERATION_LOCKED"), {
++      hint: "moderation",
++    });
++    const client = makeMockClient(err);
++
++    const caught = await withActor(hostActor(), async () => "ok", {
++      client: client as never,
++    }).catch((e) => e);
++
++    expect(caught).toBeInstanceOf(ModerationLockedError);
++    expect((caught as ModerationLockedError).reason).toBe("REVIEW");
++  });
++
++  it("accepts hint via meta.hint (Prisma production path)", async () => {
++    // Covers the hint = candidate.meta?.hint path.
++    const err = { message: "MODERATION_LOCKED:SUPPRESSED", meta: { hint: "moderation" } };
++    const client = makeMockClient(err);
++
++    const caught = await withActor(hostActor(), async () => "ok", {
++      client: client as never,
++    }).catch((e) => e);
++
++    expect(caught).toBeInstanceOf(ModerationLockedError);
++    expect((caught as ModerationLockedError).reason).toBe("SUPPRESSED");
++  });
++});
++
++// ---------------------------------------------------------------------------
++// Integration tests — PGlite (real Postgres semantics)
++// ---------------------------------------------------------------------------
++
++describe("withActor — integration (PGlite)", () => {
++  let fixture: PGliteFixture;
++
++  beforeAll(async () => {
++    fixture = await createPGliteFixture();
++  });
++
++  afterAll(async () => {
++    await fixture.close();
++  });
++
++  it("makes actor_role visible inside the transaction via current_setting", async () => {
++    const result = await withActor(
++      hostActor(),
++      async (tx) => {
++        const rows = await (tx as never as {
++          $queryRaw: (s: TemplateStringsArray) => Promise<Array<{ role: string }>>;
++        }).$queryRaw`SELECT current_setting('app.actor_role', true) as role`;
++        return rows[0].role;
++      },
++      { client: fixture.client as never }
++    );
++
++    expect(result).toBe("host");
++  });
++
++  it("auto-resets actor GUCs outside the transaction", async () => {
++    await withActor(hostActor(), async () => "ok", {
++      client: fixture.client as never,
++    });
++
++    // After transaction completes, set_config with is_local=true means the
++    // GUC reverts. Check it is absent / empty outside the transaction.
++    const rows = await fixture.query<{ role: string }>(
++      `SELECT current_setting('app.actor_role', true) as role`
++    );
++    // Outside any transaction, set_config(..., true) has reverted — value is '' or null.
++    expect(rows[0].role ?? "").toBe("");
++  });
++
++  it("leaves no actor GUC residue after a rolled-back transaction", async () => {
++    await expect(
++      withActor(
++        hostActor(),
++        async () => {
++          throw new Error("rollback me");
++        },
++        { client: fixture.client as never }
++      )
++    ).rejects.toThrow("rollback me");
++
++    const rows = await fixture.query<{ role: string }>(
++      `SELECT current_setting('app.actor_role', true) as role`
++    );
++    expect(rows[0].role ?? "").toBe("");
++  });
++
++  it("translates moderation trigger failures to ModerationLockedError", async () => {
++    const unitId = await fixture.insertPhysicalUnit({
++      canonicalAddressHash: `hash-locked-${Date.now()}`,
++    });
++
++    await expect(
++      withActor(
++        hostActor(),
++        async (tx) => {
++          await (tx as never as {
++            physicalUnit: {
++              update: (a: unknown) => Promise<void>;
++            };
++          }).physicalUnit.update({
++            where: { id: unitId },
++            data: { publish_status: "PUBLISHED" },
++          });
++        },
++        { client: fixture.client as never }
++      )
++    ).rejects.toBeInstanceOf(ModerationLockedError);
++  });
++});
+diff --git a/src/__tests__/lib/validation/category/schema.test.ts b/src/__tests__/lib/validation/category/schema.test.ts
+new file mode 100644
+index 00000000..894109af
+--- /dev/null
++++ b/src/__tests__/lib/validation/category/schema.test.ts
+@@ -0,0 +1,97 @@
++import {
++  InventoryInputSchema,
++  PrivateRoomInputSchema,
++  SharedRoomInputSchema,
++} from "@/lib/validation/category/schema";
++import { validateInventoryInput } from "@/lib/validation/category";
++
++describe("InventoryInputSchema", () => {
++  const base = {
++    inventoryKey: "room-1",
++    availableFrom: "2026-05-01",
++    availabilityRange: "[2026-05-01T00:00:00Z,2026-06-01T00:00:00Z)",
++    price: 1200,
++  };
++
++  it("accepts a valid ENTIRE_PLACE shape and forces null-only fields", () => {
++    const result = validateInventoryInput({
++      ...base,
++      roomCategory: "ENTIRE_PLACE",
++      capacityGuests: 2,
++    });
++
++    expect(result.ok).toBe(true);
++    if (result.ok) {
++      expect(result.value.totalBeds).toBeNull();
++      expect(result.value.openBeds).toBeNull();
++    }
++  });
++
++  it("rejects ENTIRE_PLACE rows with non-null totalBeds", () => {
++    const result = validateInventoryInput({
++      ...base,
++      roomCategory: "ENTIRE_PLACE",
++      capacityGuests: 2,
++      totalBeds: 2,
++    });
++
++    expect(result.ok).toBe(false);
++  });
++
++  it("rejects SHARED_ROOM rows where openBeds exceeds totalBeds", () => {
++    const result = InventoryInputSchema.safeParse({
++      ...base,
++      roomCategory: "SHARED_ROOM",
++      totalBeds: 2,
++      openBeds: 3,
++    });
++
++    expect(result.success).toBe(false);
++  });
++
++  it("requires a valid tstzrange literal", () => {
++    const result = validateInventoryInput({
++      ...base,
++      roomCategory: "PRIVATE_ROOM",
++      capacityGuests: 1,
++      availabilityRange: "not-a-range",
++    });
++
++    expect(result.ok).toBe(false);
++  });
++
++  it("accepts a valid PRIVATE_ROOM shape and normalizes optional strings", () => {
++    const result = PrivateRoomInputSchema.parse({
++      ...base,
++      roomCategory: "PRIVATE_ROOM",
++      capacityGuests: "2",
++      spaceLabel: "  Front room  ",
++      leaseMinMonths: "3",
++      leaseMaxMonths: "6",
++      leaseNegotiable: true,
++    });
++
++    expect(result).toEqual(
++      expect.objectContaining({
++        capacityGuests: 2,
++        spaceLabel: "Front room",
++        leaseMinMonths: 3,
++        leaseMaxMonths: 6,
++        leaseNegotiable: true,
++      })
++    );
++  });
++
++  it("accepts a valid SHARED_ROOM shape and forces capacityGuests to null", () => {
++    const result = SharedRoomInputSchema.parse({
++      ...base,
++      roomCategory: "SHARED_ROOM",
++      totalBeds: 3,
++      openBeds: 1,
++    });
++
++    expect(result.capacityGuests).toBeNull();
++    expect(result.totalBeds).toBe(3);
++    expect(result.openBeds).toBe(1);
++  });
++});
+diff --git a/src/lib/db/with-actor.ts b/src/lib/db/with-actor.ts
+new file mode 100644
+index 00000000..6836f358
+--- /dev/null
++++ b/src/lib/db/with-actor.ts
+@@ -0,0 +1,107 @@
++import "server-only";
++
++import { Prisma } from "@prisma/client";
++import { prisma } from "@/lib/prisma";
++import { ModerationLockedError } from "@/lib/identity/errors";
++
++export type TransactionClient = Parameters<
++  Parameters<typeof prisma.$transaction>[0]
++>[0];
++
++export type ActorRole = "host" | "moderator" | "system";
++
++export interface ActorContext {
++  role: ActorRole;
++  id: string | null;
++}
++
++export interface TransactionHost {
++  $transaction<T>(
++    fn: (tx: TransactionClient) => Promise<T>,
++    options?: Record<string, unknown>
++  ): Promise<T>;
++}
++
++function isModerationLockedError(error: unknown): boolean {
++  if (!error || typeof error !== "object") {
++    return false;
++  }
++
++  const candidate = error as {
++    message?: string;
++    hint?: string; // PGlite surfaces HINT directly on the error object
++    meta?: { message?: string; hint?: string }; // Prisma wraps it under .meta
++  };
++  const message = candidate.message ?? candidate.meta?.message ?? "";
++  // Accept hint from both PGlite (direct property) and Prisma (meta.hint).
++  const hint = candidate.hint ?? candidate.meta?.hint ?? "";
++
++  return message.includes("MODERATION_LOCKED") || hint === "moderation";
++}
++
++function moderationReasonFromError(
++  error: unknown
++): ModerationLockedError["reason"] {
++  if (!error || typeof error !== "object") {
++    return "REVIEW";
++  }
++
++  const message = (error as { message?: string }).message ?? "";
++  if (message.includes("SUPPRESSED")) {
++    return "SUPPRESSED";
++  }
++  if (message.includes("PAUSED")) {
++    return "PAUSED";
++  }
++  return "REVIEW";
++}
++
++export async function setActorContext(
++  tx: TransactionClient,
++  actor: ActorContext
++): Promise<void> {
++  await tx.$executeRaw`
++    SELECT set_config('app.actor_role', ${actor.role}, true)
++  `;
++  await tx.$executeRaw`
++    SELECT set_config('app.actor_id', ${actor.id ?? ""}, true)
++  `;
++}
++
++/**
++ * Run `fn` inside a SERIALIZABLE transaction with request-scoped actor GUCs.
++ */
++export async function withActor<T>(
++  actor: ActorContext,
++  fn: (tx: TransactionClient) => Promise<T>,
++  options?: {
++    isolationLevel?: Prisma.TransactionIsolationLevel;
++    timeoutMs?: number;
++    client?: TransactionHost;
++  }
++): Promise<T> {
++  const client = options?.client ?? prisma;
++  const transaction = client.$transaction as <R>(
++    fn: (tx: TransactionClient) => Promise<R>,
++    options?: Record<string, unknown>
++  ) => Promise<R>;
++
++  try {
++    return await transaction(
++      async (tx: TransactionClient) => {
++        await setActorContext(tx, actor);
++        return fn(tx);
++      },
++      {
++        isolationLevel:
++          options?.isolationLevel ?? Prisma.TransactionIsolationLevel.Serializable,
++        timeout: options?.timeoutMs ?? 30000,
++      }
++    );
++  } catch (error) {
++    if (isModerationLockedError(error)) {
++      throw new ModerationLockedError(moderationReasonFromError(error));
++    }
++    throw error;
++  }
++}
+diff --git a/src/lib/identity/resolve-or-create-unit.ts b/src/lib/identity/resolve-or-create-unit.ts
+new file mode 100644
+index 00000000..2f6d79c0
+--- /dev/null
++++ b/src/lib/identity/resolve-or-create-unit.ts
+@@ -0,0 +1,117 @@
++import type { TransactionClient } from "@/lib/db/with-actor";
++import { setActorContext } from "@/lib/db/with-actor";
++import { appendOutboxEvent } from "@/lib/outbox/append";
++import { recordAuditEvent } from "@/lib/audit/events";
++import {
++  acquireXactLock,
++  canonicalUnitLockKey,
++} from "@/lib/identity/advisory-locks";
++import {
++  canonicalizeAddress,
++  type RawAddressInput,
++} from "@/lib/identity/canonical-address";
++
++export interface ResolveOrCreateUnitInput {
++  address: RawAddressInput;
++  actor: { role: "host" | "moderator" | "system"; id: string | null };
++  requestId?: string;
++}
++
++export interface ResolveOrCreateUnitResult {
++  unitId: string;
++  unitIdentityEpoch: number;
++  created: boolean;
++  canonicalAddressHash: string;
++}
++
++/**
++ * Resolve or create the canonical physical_units row for the given address.
++ *
++ * Caller contract:
++ *   This function MUST be called inside a `withActor()` transaction so that the
++ *   `app.actor_role` and `app.actor_id` GUCs are set before the moderation-precedence
++ *   trigger fires.
++ *
++ * Defensive behavior:
++ *   Even when called directly (not via withActor), the local `setActorContext(tx, …)`
++ *   calls below ensure `app.actor_role` is set for the duration of the transaction.
++ *   `set_config(..., true)` is transaction-scoped and idempotent within a tx, so this
++ *   is safe to do redundantly when withActor has already called it.
++ */
++export async function resolveOrCreateUnit(
++  tx: TransactionClient,
++  input: ResolveOrCreateUnitInput
++): Promise<ResolveOrCreateUnitResult> {
++  // Defensive guard: callers are expected to use withActor(), but keeping the
++  // local set_config calls here preserves the actor context for direct tx users.
++  await setActorContext(tx, input.actor);
++
++  const canonical = canonicalizeAddress(input.address);
++  await acquireXactLock(
++    tx,
++    canonicalUnitLockKey(canonical.canonicalAddressHash)
++  );
++
++  const unit = await tx.physicalUnit.upsert({
++    where: {
++      canonicalAddressHash_canonicalUnit: {
++        canonicalAddressHash: canonical.canonicalAddressHash,
++        canonicalUnit: canonical.canonicalUnit,
++      },
++    },
++    create: {
++      canonicalAddressHash: canonical.canonicalAddressHash,
++      canonicalUnit: canonical.canonicalUnit,
++      canonicalizerVersion: canonical.canonicalizerVersion,
++    },
++    update: {
++      canonicalizerVersion: canonical.canonicalizerVersion,
++      sourceVersion: { increment: BigInt(1) },
++      rowVersion: { increment: BigInt(1) },
++    },
++    select: {
++      id: true,
++      unitIdentityEpoch: true,
++      sourceVersion: true,
++    },
++  });
++
++  // Prisma upsert does not expose Postgres xmax, so the created flag relies on
++  // the invariant that inserts start at sourceVersion=1 and every update path
++  // increments it before returning.
++  const created = unit.sourceVersion === BigInt(1);
++
++  await appendOutboxEvent(tx, {
++    aggregateType: "PHYSICAL_UNIT",
++    aggregateId: unit.id,
++    kind: "UNIT_UPSERTED",
++    payload: {
++      canonicalAddressHash: canonical.canonicalAddressHash,
++      canonicalUnit: canonical.canonicalUnit,
++      created,
++      requestId: input.requestId ?? null,
++    },
++    sourceVersion: unit.sourceVersion,
++    unitIdentityEpoch: unit.unitIdentityEpoch,
++  });
++
++  await recordAuditEvent(tx, {
++    kind: created ? "CANONICAL_UNIT_CREATED" : "CANONICAL_UNIT_RESOLVED",
++    actor: input.actor,
++    aggregateType: "physical_units",
++    aggregateId: unit.id,
++    requestId: input.requestId,
++    unitIdentityEpoch: unit.unitIdentityEpoch,
++    details: {
++      created,
++      canonicalizerVersion: canonical.canonicalizerVersion,
++    },
++  });
++
++  return {
++    unitId: unit.id,
++    unitIdentityEpoch: unit.unitIdentityEpoch,
++    created,
++    canonicalAddressHash: canonical.canonicalAddressHash,
++  };
++}
+# --- NEW FILES (untracked) ---
+
+# NEW: src/__tests__/utils/pglite-phase01.ts
+diff --git a/src/__tests__/utils/pglite-phase01.ts b/src/__tests__/utils/pglite-phase01.ts
+new file mode 100644
+--- /dev/null
++++ b/src/__tests__/utils/pglite-phase01.ts
++/**
++ * PGlite-based test fixture for Phase 01.
++ *
++ * Replaces the SQLite harness with a real Postgres-compatible engine so that:
++ *   - Actual prisma/migrations/2026050*_phase01_*.sql files are applied (proving AC#1).
++ *   - PG-specific types (TSTZRANGE, JSONB, TEXT[], SMALLINT, NUMERIC) and partial
++ *     indexes are exercised by the same parser used in production.
++ *   - plpgsql trigger functions (enforce_moderation_precedence, forbid_update_delete)
++ *     fire with real ERRCODE='P0001' and HINT metadata (proving AC#3).
++ *   - pg_advisory_xact_lock, hashtext, current_setting, SET LOCAL are real PG calls
++ *     (proving AC#5 uniqueness invariant).
++ *
++ * Each test suite calls `createPGliteFixture()` in beforeAll and `fixture.close()`
++ * in afterAll.  Within each test, `fixture.client` is a Prisma-shaped adapter that
++ * can be passed as the `client` option to `withActor()` or `db.client.$transaction()`.
++ *
++ * NOTE: PGlite is single-connection per instance.  pg_advisory_xact_lock therefore
++ * serializes within the engine — 10 Promise.all callers prove the uniqueness invariant
++ * (exactly 1 created row) but cannot model true lock *contention* across concurrent
++ * connections.  This is documented as a known harness limitation.
++ */
++
++import { randomUUID } from "crypto";
++import fs from "fs";
++import path from "path";
++
++import { PGlite } from "@electric-sql/pglite";
++
++import type { ActorContext } from "@/lib/db/with-actor";
++
++// ---------------------------------------------------------------------------
++// Migration paths
++// ---------------------------------------------------------------------------
++
++const MIGRATIONS_DIR = path.resolve(
++  __dirname,
++  "../../../prisma/migrations"
++);
++
++const MIGRATION_SQL_FILES = [
++  path.join(
++    MIGRATIONS_DIR,
++    "20260501000000_phase01_canonical_identity_tables",
++    "migration.sql"
++  ),
++  path.join(
++    MIGRATIONS_DIR,
++    "20260501010000_phase01_moderation_precedence_trigger",
++    "migration.sql"
++  ),
++  path.join(
++    MIGRATIONS_DIR,
++    "20260501020000_phase01_add_listing_physical_unit_id",
++    "migration.sql"
++  ),
++];
++
++// ---------------------------------------------------------------------------
++// Type helpers
++// ---------------------------------------------------------------------------
++
++type PGliteRow = Record<string, unknown>;
++
++/** Convert a JS number/string to bigint — PGlite returns BIGINT as number. */
++function toBigInt(value: unknown): bigint {
++  if (typeof value === "bigint") return value;
++  if (typeof value === "number") return BigInt(value);
++  if (typeof value === "string") return BigInt(value);
++  return BigInt(0);
++}
++
++/** Convert a JS value to a Postgres-compatible parameter. */
++function toParam(value: unknown): unknown {
++  if (typeof value === "bigint") return Number(value);
++  return value;
++}
++
++/** Convert an { increment: bigint } Prisma shorthand to a raw delta value. */
++function resolveIncrement(value: unknown): bigint {
++  if (
++    value !== null &&
++    typeof value === "object" &&
++    "increment" in (value as object)
++  ) {
++    return toBigInt((value as { increment: unknown }).increment);
++  }
++  return BigInt(0);
++}
++
++// ---------------------------------------------------------------------------
++// Tagged-template SQL interpolation
++// ---------------------------------------------------------------------------
++
++/**
++ * Convert a tagged-template call (strings[], ...values) into a parameterised
++ * {text, params} pair suitable for pg.query(text, params).
++ */
++function interpolateTagged(
++  strings: TemplateStringsArray,
++  values: unknown[]
++): { text: string; params: unknown[] } {
++  let text = "";
++  const params: unknown[] = [];
++  for (let i = 0; i < strings.length; i++) {
++    text += strings[i];
++    if (i < values.length) {
++      params.push(toParam(values[i]));
++      text += `$${params.length}`;
++    }
++  }
++  return { text, params };
++}
++
++// ---------------------------------------------------------------------------
++// Prisma-shaped TransactionClient adapter over a PGlite transaction handle
++// ---------------------------------------------------------------------------
++
++type QueryHandle = {
++  query: (text: string, params?: unknown[]) => Promise<{ rows: PGliteRow[] }>;
++};
++
++/**
++ * Build a Prisma-shaped client around a PGlite query handle (either the top-level
++ * `pg` instance or an in-progress `tx` handle from `pg.transaction()`).
++ */
++function buildClient(handle: QueryHandle): PrismaShapedClient {
++  return {
++    $executeRawUnsafe: async (sql: string): Promise<number> => {
++      await handle.query(sql);
++      return 0;
++    },
++
++    $executeRaw: async (
++      strings: TemplateStringsArray,
++      ...values: unknown[]
++    ): Promise<number> => {
++      const { text, params } = interpolateTagged(strings, values);
++      await handle.query(text, params);
++      return 0;
++    },
++
++    $queryRaw: async <T>(
++      strings: TemplateStringsArray,
++      ...values: unknown[]
++    ): Promise<T> => {
++      const { text, params } = interpolateTagged(strings, values);
++      const result = await handle.query(text, params);
++      return result.rows as unknown as T;
++    },
++
++    physicalUnit: {
++      upsert: async (args: {
++        where: {
++          canonicalAddressHash_canonicalUnit: {
++            canonicalAddressHash: string;
++            canonicalUnit: string;
++          };
++        };
++        create: {
++          canonicalAddressHash: string;
++          canonicalUnit: string;
++          canonicalizerVersion: string;
++        };
++        update: {
++          canonicalizerVersion: string;
++          sourceVersion: { increment: bigint };
++          rowVersion: { increment: bigint };
++        };
++        select: {
++          id: boolean;
++          unitIdentityEpoch: boolean;
++          sourceVersion: boolean;
++        };
++      }) => {
++        const id = randomUUID();
++        const { canonicalAddressHash, canonicalUnit } =
++          args.where.canonicalAddressHash_canonicalUnit;
++        const { canonicalizerVersion } = args.create;
++
++        const result = await handle.query(
++          `INSERT INTO physical_units
++             (id, canonical_address_hash, canonical_unit, canonicalizer_version)
++           VALUES ($1, $2, $3, $4)
++           ON CONFLICT (canonical_address_hash, canonical_unit)
++           DO UPDATE SET
++             canonicalizer_version = EXCLUDED.canonicalizer_version,
++             source_version = physical_units.source_version + $5,
++             row_version = physical_units.row_version + $6,
++             updated_at = NOW()
++           RETURNING id, unit_identity_epoch, source_version`,
++          [
++            id,
++            canonicalAddressHash,
++            canonicalUnit,
++            canonicalizerVersion,
++            Number(resolveIncrement(args.update.sourceVersion)),
++            Number(resolveIncrement(args.update.rowVersion)),
++          ]
++        );
++
++        const row = result.rows[0];
++        return {
++          id: String(row.id),
++          unitIdentityEpoch: Number(row.unit_identity_epoch),
++          sourceVersion: toBigInt(row.source_version),
++        };
++      },
++
++      findMany: async (args: {
++        where: { id: { in: string[] } };
++        select: {
++          id: boolean;
++          unitIdentityEpoch: boolean;
++          supersedesUnitIds: boolean;
++        };
++      }) => {
++        const ids = args.where.id.in;
++        if (ids.length === 0) return [];
++
++        const placeholders = ids.map((_, i) => `$${i + 1}`).join(", ");
++        const result = await handle.query(
++          `SELECT id, unit_identity_epoch, supersedes_unit_ids
++           FROM physical_units
++           WHERE id IN (${placeholders})`,
++          ids
++        );
++
++        return result.rows.map((row) => ({
++          id: String(row.id),
++          unitIdentityEpoch: Number(row.unit_identity_epoch),
++          supersedesUnitIds: Array.isArray(row.supersedes_unit_ids)
++            ? (row.supersedes_unit_ids as string[])
++            : [],
++        }));
++      },
++
++      update: async (args: {
++        where: { id: string };
++        data: Record<string, unknown>;
++      }) => {
++        const setClauses: string[] = [];
++        const params: unknown[] = [];
++
++        const colMap: Record<string, string> = {
++          unitIdentityEpoch: "unit_identity_epoch",
++          sourceVersion: "source_version",
++          rowVersion: "row_version",
++          supersededByUnitId: "superseded_by_unit_id",
++          supersedesUnitIds: "supersedes_unit_ids",
++          publishStatus: "publish_status",
++          lifecycleStatus: "lifecycle_status",
++          privacyVersion: "privacy_version",
++        };
++
++        for (const [key, rawValue] of Object.entries(args.data)) {
++          const col = colMap[key] ?? key;
++
++          if (
++            rawValue !== null &&
++            typeof rawValue === "object" &&
++            "increment" in (rawValue as object)
++          ) {
++            const delta = Number(resolveIncrement(rawValue));
++            params.push(delta);
++            setClauses.push(`${col} = ${col} + $${params.length}`);
++          } else {
++            params.push(toParam(rawValue));
++            setClauses.push(`${col} = $${params.length}`);
++          }
++        }
++
++        setClauses.push("updated_at = NOW()");
++        params.push(args.where.id);
++
++        await handle.query(
++          `UPDATE physical_units
++           SET ${setClauses.join(", ")}
++           WHERE id = $${params.length}`,
++          params
++        );
++      },
++    },
++
++    hostUnitClaim: {
++      create: async (args: { data: Record<string, unknown> }) => {
++        const id = String(args.data.id ?? randomUUID());
++        await handle.query(
++          `INSERT INTO host_unit_claims
++             (id, unit_id, host_user_id, unit_identity_epoch_written_at,
++              canonical_address_hash, canonicalizer_version)
++           VALUES ($1, $2, $3, $4, $5, $6)`,
++          [
++            id,
++            args.data.unitId ?? args.data.unit_id,
++            args.data.hostUserId ?? args.data.host_user_id,
++            args.data.unitIdentityEpochWrittenAt ??
++              args.data.unit_identity_epoch_written_at ??
++              1,
++            args.data.canonicalAddressHash ?? args.data.canonical_address_hash ?? "",
++            args.data.canonicalizerVersion ?? args.data.canonicalizer_version ?? "v1",
++          ]
++        );
++        return { id };
++      },
++
++      update: async (args: {
++        where: { id: string };
++        data: Record<string, unknown>;
++      }) => {
++        const setClauses: string[] = [];
++        const params: unknown[] = [];
++
++        const colMap: Record<string, string> = {
++          publishStatus: "publish_status",
++          lifecycleStatus: "lifecycle_status",
++          privacyVersion: "privacy_version",
++        };
++
++        for (const [key, rawValue] of Object.entries(args.data)) {
++          const col = colMap[key] ?? key;
++          params.push(toParam(rawValue));
++          setClauses.push(`${col} = $${params.length}`);
++        }
++
++        setClauses.push("updated_at = NOW()");
++        params.push(args.where.id);
++
++        await handle.query(
++          `UPDATE host_unit_claims
++           SET ${setClauses.join(", ")}
++           WHERE id = $${params.length}`,
++          params
++        );
++      },
++    },
++
++    listingInventory: {
++      create: async (args: { data: Record<string, unknown> }) => {
++        const id = String(args.data.id ?? randomUUID());
++        const data = args.data;
++        await handle.query(
++          `INSERT INTO listing_inventories
++             (id, unit_id, unit_identity_epoch_written_at, inventory_key,
++              room_category, capacity_guests, total_beds, open_beds,
++              available_from, availability_range, price,
++              canonicalizer_version, canonical_address_hash)
++           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
++          [
++            id,
++            data.unitId ?? data.unit_id,
++            data.unitIdentityEpochWrittenAt ?? data.unit_identity_epoch_written_at ?? 1,
++            data.inventoryKey ?? data.inventory_key ?? randomUUID(),
++            data.roomCategory ?? data.room_category ?? "PRIVATE_ROOM",
++            data.capacityGuests ?? data.capacity_guests ?? null,
++            data.totalBeds ?? data.total_beds ?? null,
++            data.openBeds ?? data.open_beds ?? null,
++            data.availableFrom ?? data.available_from ?? "2026-05-01",
++            data.availabilityRange ?? data.availability_range ??
++              "[2026-05-01T00:00:00Z,2026-06-01T00:00:00Z)",
++            data.price ?? 1000,
++            data.canonicalizerVersion ?? data.canonicalizer_version ?? "v1",
++            data.canonicalAddressHash ?? data.canonical_address_hash ?? "",
++          ]
++        );
++        return { id };
++      },
++
++      update: async (args: {
++        where: { id: string };
++        data: Record<string, unknown>;
++      }) => {
++        const setClauses: string[] = [];
++        const params: unknown[] = [];
++
++        const colMap: Record<string, string> = {
++          publishStatus: "publish_status",
++          lifecycleStatus: "lifecycle_status",
++          privacyVersion: "privacy_version",
++        };
++
++        for (const [key, rawValue] of Object.entries(args.data)) {
++          const col = colMap[key] ?? key;
++          params.push(toParam(rawValue));
++          setClauses.push(`${col} = $${params.length}`);
++        }
++
++        setClauses.push("updated_at = NOW()");
++        params.push(args.where.id);
++
++        await handle.query(
++          `UPDATE listing_inventories
++           SET ${setClauses.join(", ")}
++           WHERE id = $${params.length}`,
++          params
++        );
++      },
++    },
++
++    identityMutation: {
++      create: async (args: {
++        data: Record<string, unknown>;
++        select: { id: boolean };
++      }) => {
++        const id = randomUUID();
++        const data = args.data;
++        await handle.query(
++          `INSERT INTO identity_mutations
++             (id, kind, from_unit_ids, to_unit_ids, reason_code,
++              operator_id, resulting_epoch)
++           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
++          [
++            id,
++            data.kind,
++            data.fromUnitIds ?? data.from_unit_ids,
++            data.toUnitIds ?? data.to_unit_ids,
++            data.reasonCode ?? data.reason_code,
++            data.operatorId ?? data.operator_id ?? null,
++            data.resultingEpoch ?? data.resulting_epoch ?? 1,
++          ]
++        );
++        return { id };
++      },
++    },
++
++    outboxEvent: {
++      create: async (args: {
++        data: Record<string, unknown>;
++        select: { id: boolean };
++      }) => {
++        const id = randomUUID();
++        const data = args.data;
++        await handle.query(
++          `INSERT INTO outbox_events
++             (id, aggregate_type, aggregate_id, kind, payload,
++              source_version, unit_identity_epoch, priority)
++           VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8)`,
++          [
++            id,
++            data.aggregateType ?? data.aggregate_type,
++            data.aggregateId ?? data.aggregate_id,
++            data.kind,
++            JSON.stringify(data.payload ?? {}),
++            Number(toParam(data.sourceVersion ?? data.source_version ?? 1)),
++            data.unitIdentityEpoch ?? data.unit_identity_epoch ?? 1,
++            data.priority ?? 100,
++          ]
++        );
++        return { id };
++      },
++    },
++
++    auditEvent: {
++      create: async (args: {
++        data: Record<string, unknown>;
++        select: { id: boolean };
++      }) => {
++        const id = randomUUID();
++        const data = args.data;
++        await handle.query(
++          `INSERT INTO audit_events
++             (id, kind, actor_role, actor_id, aggregate_type,
++              aggregate_id, details, request_id, unit_identity_epoch)
++           VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9)`,
++          [
++            id,
++            data.kind,
++            data.actorRole ?? data.actor_role,
++            data.actorId ?? data.actor_id ?? null,
++            data.aggregateType ?? data.aggregate_type,
++            data.aggregateId ?? data.aggregate_id,
++            JSON.stringify(data.details ?? {}),
++            data.requestId ?? data.request_id ?? null,
++            data.unitIdentityEpoch ?? data.unit_identity_epoch ?? null,
++          ]
++        );
++        return { id };
++      },
++    },
++
++    // Replaced in createPGliteFixture via Object.assign.
++    // This stub satisfies the PrismaShapedClient interface at build time.
++    $transaction: async <T>(
++      _fn: (tx: PrismaShapedClient) => Promise<T>
++    ): Promise<T> => {
++      throw new Error(
++        "buildClient.$transaction is a stub — use the fixture.client.$transaction instead"
++      );
++    },
++  } satisfies PrismaShapedClient;
++}
++
++// ---------------------------------------------------------------------------
++// Public types
++// ---------------------------------------------------------------------------
++
++/**
++ * The Prisma-shaped client exposed by the PGlite fixture.
++ * Mirrors the subset of TransactionClient used by Phase 01 source code.
++ */
++export interface PrismaShapedClient {
++  $executeRawUnsafe: (sql: string) => Promise<number>;
++  $executeRaw: (strings: TemplateStringsArray, ...values: unknown[]) => Promise<number>;
++  $queryRaw: <T>(strings: TemplateStringsArray, ...values: unknown[]) => Promise<T>;
++  $transaction: <T>(
++    fn: (tx: PrismaShapedClient) => Promise<T>,
++    options?: Record<string, unknown>
++  ) => Promise<T>;
++  physicalUnit: {
++    upsert: (args: {
++      where: {
++        canonicalAddressHash_canonicalUnit: {
++          canonicalAddressHash: string;
++          canonicalUnit: string;
++        };
++      };
++      create: {
++        canonicalAddressHash: string;
++        canonicalUnit: string;
++        canonicalizerVersion: string;
++      };
++      update: {
++        canonicalizerVersion: string;
++        sourceVersion: { increment: bigint };
++        rowVersion: { increment: bigint };
++      };
++      select: {
++        id: boolean;
++        unitIdentityEpoch: boolean;
++        sourceVersion: boolean;
++      };
++    }) => Promise<{ id: string; unitIdentityEpoch: number; sourceVersion: bigint }>;
++    findMany: (args: {
++      where: { id: { in: string[] } };
++      select: { id: boolean; unitIdentityEpoch: boolean; supersedesUnitIds: boolean };
++    }) => Promise<Array<{ id: string; unitIdentityEpoch: number; supersedesUnitIds: string[] }>>;
++    update: (args: { where: { id: string }; data: Record<string, unknown> }) => Promise<void>;
++  };
++  hostUnitClaim: {
++    create: (args: { data: Record<string, unknown> }) => Promise<{ id: string }>;
++    update: (args: { where: { id: string }; data: Record<string, unknown> }) => Promise<void>;
++  };
++  listingInventory: {
++    create: (args: { data: Record<string, unknown> }) => Promise<{ id: string }>;
++    update: (args: { where: { id: string }; data: Record<string, unknown> }) => Promise<void>;
++  };
++  identityMutation: {
++    create: (args: {
++      data: Record<string, unknown>;
++      select: { id: boolean };
++    }) => Promise<{ id: string }>;
++  };
++  outboxEvent: {
++    create: (args: {
++      data: Record<string, unknown>;
++      select: { id: boolean };
++    }) => Promise<{ id: string }>;
++  };
++  auditEvent: {
++    create: (args: {
++      data: Record<string, unknown>;
++      select: { id: boolean };
++    }) => Promise<{ id: string }>;
++  };
++}
++
++export interface PGliteFixture {
++  pg: PGlite;
++  /** Prisma-shaped client — pass as `client` option to `withActor()`. */
++  client: PrismaShapedClient;
++  /** Insert a row into the "User" stub table. */
++  insertUser: (id: string) => Promise<void>;
++  /** Insert a row into physical_units and return the id. */
++  insertPhysicalUnit: (opts: {
++    id?: string;
++    canonicalAddressHash: string;
++    canonicalUnit?: string;
++    unitIdentityEpoch?: number;
++    supersedesUnitIds?: string[];
++  }) => Promise<string>;
++  /** Insert a row into host_unit_claims and return the id. */
++  insertHostUnitClaim: (opts: {
++    id?: string;
++    unitId: string;
++    hostUserId: string;
++    canonicalAddressHash?: string;
++  }) => Promise<string>;
++  /** Insert a row into listing_inventories and return the id. */
++  insertListingInventory: (opts: {
++    id?: string;
++    unitId: string;
++    canonicalAddressHash: string;
++    roomCategory?: string;
++    capacityGuests?: number | null;
++    totalBeds?: number | null;
++    openBeds?: number | null;
++    genderPreference?: string | null;
++    householdGender?: string | null;
++    availabilityRange?: string;
++  }) => Promise<string>;
++  /** Insert a row into identity_mutations and return the id. */
++  insertIdentityMutation: (opts: {
++    id?: string;
++    fromUnitIds: string[];
++    toUnitIds: string[];
++    kind?: string;
++    reasonCode?: string;
++    resultingEpoch?: number;
++  }) => Promise<string>;
++  /** Insert a row into audit_events and return the id. */
++  insertAuditEvent: (opts: {
++    id?: string;
++    kind?: string;
++    actorRole?: string;
++    aggregateType?: string;
++    aggregateId?: string;
++  }) => Promise<string>;
++  /** Run a raw SQL query directly on pg (outside a transaction). */
++  query: <T extends PGliteRow = PGliteRow>(
++    text: string,
++    params?: unknown[]
++  ) => Promise<T[]>;
++  /** Return all physical_units rows with camelCase keys. */
++  getPhysicalUnits: () => Promise<
++    Array<{
++      id: string;
++      unitIdentityEpoch: number;
++      canonicalAddressHash: string;
++      canonicalUnit: string;
++      sourceVersion: bigint;
++      rowVersion: bigint;
++      supersedesUnitIds: string[];
++      supersededByUnitId: string | null;
++    }>
++  >;
++  getIdentityMutations: () => Promise<
++    Array<{
++      id: string;
++      kind: string;
++      fromUnitIds: string[];
++      toUnitIds: string[];
++      resultingEpoch: number;
++      operatorId: string | null;
++    }>
++  >;
++  getOutboxEvents: () => Promise<
++    Array<{
++      id: string;
++      aggregateType: string;
++      aggregateId: string;
++      kind: string;
++      payload: Record<string, unknown>;
++      sourceVersion: bigint;
++      unitIdentityEpoch: number;
++      priority: number;
++      status: string;
++    }>
++  >;
++  getAuditEvents: () => Promise<
++    Array<{
++      id: string;
++      kind: string;
++      actorRole: string;
++      actorId: string | null;
++      aggregateType: string;
++      aggregateId: string;
++    }>
++  >;
++  /** Tear down — close the PGlite instance. */
++  close: () => Promise<void>;
++}
++
++// ---------------------------------------------------------------------------
++// Factory
++// ---------------------------------------------------------------------------
++
++/**
++ * Create a fresh PGlite instance, apply all Phase 01 migrations, and return
++ * a PGliteFixture.  Call this in `beforeAll` and call `fixture.close()` in
++ * `afterAll`.
++ */
++export async function createPGliteFixture(): Promise<PGliteFixture> {
++  const pg = new PGlite();
++
++  // Create stub tables needed by FK constraints in the migrations.
++  await pg.query(`CREATE TABLE IF NOT EXISTS "User" (id TEXT PRIMARY KEY, email TEXT)`);
++  await pg.query(`CREATE TABLE IF NOT EXISTS "Listing" (id TEXT PRIMARY KEY, title TEXT)`);
++
++  // Apply each Phase 01 migration in order.
++  for (const filePath of MIGRATION_SQL_FILES) {
++    const sql = fs.readFileSync(filePath, "utf-8");
++    // PGlite's exec() runs multi-statement SQL.
++    await (pg as unknown as { exec: (sql: string) => Promise<void> }).exec(sql);
++  }
++
++  // Build the top-level Prisma-shaped client.
++  const baseClient = buildClient(pg as unknown as QueryHandle);
++
++  // Attach $transaction so withActor() can call client.$transaction(fn, options).
++  const client = Object.assign(baseClient, {
++    $transaction: async <T>(
++      fn: (tx: PrismaShapedClient) => Promise<T>,
++      _options?: Record<string, unknown>
++    ): Promise<T> => {
++      return (
++        pg as unknown as {
++          transaction: (fn: (tx: QueryHandle) => Promise<T>) => Promise<T>;
++        }
++      ).transaction(async (pgTx: QueryHandle) => {
++        const txClient = buildClient(pgTx);
++        return fn(txClient);
++      });
++    },
++  });
++
++  // ---------------------------------------------------------------------------
++  // Helper methods
++  // ---------------------------------------------------------------------------
++
++  const insertUser = async (id: string): Promise<void> => {
++    await pg.query(
++      `INSERT INTO "User" (id, email) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING`,
++      [id, `${id}@test.example`]
++    );
++  };
++
++  const insertPhysicalUnit = async (opts: {
++    id?: string;
++    canonicalAddressHash: string;
++    canonicalUnit?: string;
++    unitIdentityEpoch?: number;
++    supersedesUnitIds?: string[];
++  }): Promise<string> => {
++    const id = opts.id ?? randomUUID();
++    await pg.query(
++      `INSERT INTO physical_units
++         (id, canonical_address_hash, canonical_unit, canonicalizer_version,
++          unit_identity_epoch, supersedes_unit_ids)
++       VALUES ($1,$2,$3,$4,$5,$6)`,
++      [
++        id,
++        opts.canonicalAddressHash,
++        opts.canonicalUnit ?? "_none_",
++        "v1",
++        opts.unitIdentityEpoch ?? 1,
++        opts.supersedesUnitIds ?? [],
++      ]
++    );
++    return id;
++  };
++
++  const insertHostUnitClaim = async (opts: {
++    id?: string;
++    unitId: string;
++    hostUserId: string;
++    canonicalAddressHash?: string;
++  }): Promise<string> => {
++    const id = opts.id ?? randomUUID();
++    await pg.query(
++      `INSERT INTO host_unit_claims
++         (id, unit_id, host_user_id, unit_identity_epoch_written_at,
++          canonical_address_hash, canonicalizer_version)
++       VALUES ($1,$2,$3,$4,$5,$6)`,
++      [
++        id,
++        opts.unitId,
++        opts.hostUserId,
++        1,
++        opts.canonicalAddressHash ?? "hash",
++        "v1",
++      ]
++    );
++    return id;
++  };
++
++  const insertListingInventory = async (opts: {
++    id?: string;
++    unitId: string;
++    canonicalAddressHash: string;
++    roomCategory?: string;
++    capacityGuests?: number | null;
++    totalBeds?: number | null;
++    openBeds?: number | null;
++    genderPreference?: string | null;
++    householdGender?: string | null;
++    availabilityRange?: string;
++  }): Promise<string> => {
++    const id = opts.id ?? randomUUID();
++    await pg.query(
++      `INSERT INTO listing_inventories
++         (id, unit_id, unit_identity_epoch_written_at, inventory_key,
++          room_category, capacity_guests, total_beds, open_beds,
++          gender_preference, household_gender,
++          available_from, availability_range, price,
++          canonicalizer_version, canonical_address_hash)
++       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
++      [
++        id,
++        opts.unitId,
++        1,
++        randomUUID(),
++        opts.roomCategory ?? "PRIVATE_ROOM",
++        opts.capacityGuests ?? null,
++        opts.totalBeds ?? null,
++        opts.openBeds ?? null,
++        opts.genderPreference ?? null,
++        opts.householdGender ?? null,
++        "2026-05-01",
++        opts.availabilityRange ?? "[2026-05-01T00:00:00Z,2026-06-01T00:00:00Z)",
++        1000,
++        "v1",
++        opts.canonicalAddressHash,
++      ]
++    );
++    return id;
++  };
++
++  const insertIdentityMutation = async (opts: {
++    id?: string;
++    fromUnitIds: string[];
++    toUnitIds: string[];
++    kind?: string;
++    reasonCode?: string;
++    resultingEpoch?: number;
++  }): Promise<string> => {
++    const id = opts.id ?? randomUUID();
++    await pg.query(
++      `INSERT INTO identity_mutations
++         (id, kind, from_unit_ids, to_unit_ids, reason_code, resulting_epoch)
++       VALUES ($1,$2,$3,$4,$5,$6)`,
++      [
++        id,
++        opts.kind ?? "MERGE",
++        opts.fromUnitIds,
++        opts.toUnitIds,
++        opts.reasonCode ?? "operator_duplicate",
++        opts.resultingEpoch ?? 1,
++      ]
++    );
++    return id;
++  };
++
++  const insertAuditEvent = async (opts: {
++    id?: string;
++    kind?: string;
++    actorRole?: string;
++    aggregateType?: string;
++    aggregateId?: string;
++  }): Promise<string> => {
++    const id = opts.id ?? randomUUID();
++    await pg.query(
++      `INSERT INTO audit_events
++         (id, kind, actor_role, aggregate_type, aggregate_id)
++       VALUES ($1,$2,$3,$4,$5)`,
++      [
++        id,
++        opts.kind ?? "CANONICAL_UNIT_CREATED",
++        opts.actorRole ?? "host",
++        opts.aggregateType ?? "physical_units",
++        opts.aggregateId ?? randomUUID(),
++      ]
++    );
++    return id;
++  };
++
++  const query = async <T extends PGliteRow = PGliteRow>(
++    text: string,
++    params?: unknown[]
++  ): Promise<T[]> => {
++    const result = await pg.query(text, params);
++    return result.rows as T[];
++  };
++
++  const getPhysicalUnits = async () => {
++    const rows = await query(
++      `SELECT id, unit_identity_epoch, canonical_address_hash, canonical_unit,
++              source_version, row_version, supersedes_unit_ids, superseded_by_unit_id
++       FROM physical_units ORDER BY created_at`
++    );
++    return rows.map((row) => ({
++      id: String(row.id),
++      unitIdentityEpoch: Number(row.unit_identity_epoch),
++      canonicalAddressHash: String(row.canonical_address_hash),
++      canonicalUnit: String(row.canonical_unit),
++      sourceVersion: toBigInt(row.source_version),
++      rowVersion: toBigInt(row.row_version),
++      supersedesUnitIds: Array.isArray(row.supersedes_unit_ids)
++        ? (row.supersedes_unit_ids as string[])
++        : [],
++      supersededByUnitId: row.superseded_by_unit_id
++        ? String(row.superseded_by_unit_id)
++        : null,
++    }));
++  };
++
++  const getIdentityMutations = async () => {
++    const rows = await query(
++      `SELECT id, kind, from_unit_ids, to_unit_ids, resulting_epoch, operator_id
++       FROM identity_mutations ORDER BY created_at`
++    );
++    return rows.map((row) => ({
++      id: String(row.id),
++      kind: String(row.kind),
++      fromUnitIds: Array.isArray(row.from_unit_ids)
++        ? (row.from_unit_ids as string[])
++        : [],
++      toUnitIds: Array.isArray(row.to_unit_ids)
++        ? (row.to_unit_ids as string[])
++        : [],
++      resultingEpoch: Number(row.resulting_epoch),
++      operatorId: row.operator_id ? String(row.operator_id) : null,
++    }));
++  };
++
++  const getOutboxEvents = async () => {
++    const rows = await query(
++      `SELECT id, aggregate_type, aggregate_id, kind, payload,
++              source_version, unit_identity_epoch, priority, status
++       FROM outbox_events ORDER BY created_at`
++    );
++    return rows.map((row) => ({
++      id: String(row.id),
++      aggregateType: String(row.aggregate_type),
++      aggregateId: String(row.aggregate_id),
++      kind: String(row.kind),
++      payload:
++        typeof row.payload === "object" && row.payload !== null
++          ? (row.payload as Record<string, unknown>)
++          : {},
++      sourceVersion: toBigInt(row.source_version),
++      unitIdentityEpoch: Number(row.unit_identity_epoch),
++      priority: Number(row.priority),
++      status: String(row.status),
++    }));
++  };
++
++  const getAuditEvents = async () => {
++    const rows = await query(
++      `SELECT id, kind, actor_role, actor_id, aggregate_type, aggregate_id
++       FROM audit_events ORDER BY created_at`
++    );
++    return rows.map((row) => ({
++      id: String(row.id),
++      kind: String(row.kind),
++      actorRole: String(row.actor_role),
++      actorId: row.actor_id ? String(row.actor_id) : null,
++      aggregateType: String(row.aggregate_type),
++      aggregateId: String(row.aggregate_id),
++    }));
++  };
++
++  const close = async (): Promise<void> => {
++    await pg.close();
++  };
++
++  return {
++    pg,
++    client,
++    insertUser,
++    insertPhysicalUnit,
++    insertHostUnitClaim,
++    insertListingInventory,
++    insertIdentityMutation,
++    insertAuditEvent,
++    query,
++    getPhysicalUnits,
++    getIdentityMutations,
++    getOutboxEvents,
++    getAuditEvents,
++    close,
++  };
++}
++
++// ---------------------------------------------------------------------------
++// Actor helpers
++// ---------------------------------------------------------------------------
++
++export function hostActor(): ActorContext {
++  return { role: "host", id: "host-1" };
++}
++
++export function moderatorActor(): ActorContext {
++  return { role: "moderator", id: "moderator-1" };
++}
++
++export function systemActor(): ActorContext {
++  return { role: "system", id: null };
++}
+
+# NEW: src/__tests__/db/phase01-advisory-lock-contention.test.ts
+diff --git a/src/__tests__/db/phase01-advisory-lock-contention.test.ts b/src/__tests__/db/phase01-advisory-lock-contention.test.ts
+new file mode 100644
+--- /dev/null
++++ b/src/__tests__/db/phase01-advisory-lock-contention.test.ts
++/**
++ * @jest-environment node
++ */
++/**
++ * AC#5 — advisory lock + upsert uniqueness invariant.
++ *
++ * Ten concurrent callers all invoke resolveOrCreateUnit with the same address.
++ * The uniqueness constraint on physical_units(canonical_address_hash, canonical_unit)
++ * plus ON CONFLICT upsert guarantees exactly 1 created row.
++ *
++ * PGlite is single-connection per instance.  pg_advisory_xact_lock therefore
++ * serializes within the engine — this test proves the uniqueness invariant but
++ * cannot model true lock *contention* across concurrent connections.
++ * That limitation is documented; a Postgres testcontainer would be required for
++ * full concurrency fidelity (deferred per v2-review.json §deferred).
++ */
++
++import { withActor } from "@/lib/db/with-actor";
++import { resolveOrCreateUnit } from "@/lib/identity/resolve-or-create-unit";
++import {
++  createPGliteFixture,
++  type PGliteFixture,
++} from "@/__tests__/utils/pglite-phase01";
++
++describe("Phase 01 advisory-lock contention (PGlite)", () => {
++  let fixture: PGliteFixture;
++
++  beforeAll(async () => {
++    fixture = await createPGliteFixture();
++    await fixture.insertUser("host-lock-1");
++  });
++
++  afterAll(async () => {
++    await fixture.close();
++  });
++
++  it("AC#5: 10 parallel callers converge on one physical_units row and 9 resolve existing", async () => {
++    const actor = { role: "host" as const, id: "host-lock-1" };
++    const address = {
++      address: "123 Main St Apt 4B",
++      city: "San Francisco",
++      state: "CA",
++      zip: "94107",
++    };
++
++    const results = await Promise.all(
++      Array.from({ length: 10 }, (_, index) =>
++        withActor(
++          actor,
++          async (tx) =>
++            resolveOrCreateUnit(tx as never, {
++              actor,
++              address,
++              requestId: `req-${index}`,
++            }),
++          { client: fixture.client as never }
++        )
++      )
++    );
++
++    // All 10 calls succeeded.
++    expect(results).toHaveLength(10);
++
++    // Exactly one insertion; nine resolutions.
++    const created = results.filter((r) => r.created);
++    const resolved = results.filter((r) => !r.created);
++    expect(created).toHaveLength(1);
++    expect(resolved).toHaveLength(9);
++
++    // Exactly one physical_units row in the DB.
++    const units = await fixture.getPhysicalUnits();
++    expect(units).toHaveLength(1);
++
++    // All calls reference the same unit id.
++    const unitIds = new Set(results.map((r) => r.unitId));
++    expect(unitIds.size).toBe(1);
++
++    // source_version must equal 10 (1 insert + 9 updates, each incrementing by 1).
++    expect(units[0].sourceVersion).toBe(BigInt(10));
++  });
++
++  it("AC#5: advisory lock SQL reaches pg_advisory_xact_lock(hashtext(key)) without error", async () => {
++    // Directly exercise acquireXactLock to confirm the SQL emitted is accepted by PGlite.
++    await fixture.client.$transaction(async (tx: unknown) => {
++      // acquireXactLock calls tx.$executeRawUnsafe + tx.$executeRaw
++      const { acquireXactLock, canonicalUnitLockKey } = await import(
++        "@/lib/identity/advisory-locks"
++      );
++      await acquireXactLock(
++        tx as never,
++        canonicalUnitLockKey("test-hash-for-lock")
++      );
++    });
++    // If we reach here the lock was acquired without error.
++  });
++});
+
+# NEW: src/__tests__/integration/phase01-identity-mutation.test.ts
+diff --git a/src/__tests__/integration/phase01-identity-mutation.test.ts b/src/__tests__/integration/phase01-identity-mutation.test.ts
+new file mode 100644
+--- /dev/null
++++ b/src/__tests__/integration/phase01-identity-mutation.test.ts
++/**
++ * @jest-environment node
++ */
++/**
++ * AC#6 — recordIdentityMutation writes ledger + outbox + audit in one transaction,
++ *         and real transaction rollback discards all three on failure.
++ */
++
++import { recordIdentityMutation } from "@/lib/identity/mutate-unit";
++import {
++  createPGliteFixture,
++  type PGliteFixture,
++} from "@/__tests__/utils/pglite-phase01";
++
++describe("Phase 01 identity mutation integration (PGlite)", () => {
++  let fixture: PGliteFixture;
++
++  beforeAll(async () => {
++    fixture = await createPGliteFixture();
++    await fixture.insertUser("moderator-1");
++  });
++
++  afterAll(async () => {
++    await fixture.close();
++  });
++
++  it("AC#6: rolls back the ledger row and outbox when a failure happens after the INSERT", async () => {
++    const sourceUnitId = await fixture.insertPhysicalUnit({
++      id: "unit-merge-a",
++      canonicalAddressHash: "hash-merge-a",
++      unitIdentityEpoch: 2,
++    });
++    const targetUnitId = await fixture.insertPhysicalUnit({
++      id: "unit-merge-target",
++      canonicalAddressHash: "hash-merge-target",
++      unitIdentityEpoch: 4,
++    });
++
++    const unitsBefore = await fixture.getPhysicalUnits();
++
++    await expect(
++      fixture.client.$transaction(async (tx: unknown) => {
++        // Patch outboxEvent.create on this tx instance to throw after the
++        // identity_mutations INSERT has already happened.
++        const txObj = tx as Record<string, unknown>;
++        const failingTx = {
++          ...txObj,
++          outboxEvent: {
++            ...(txObj.outboxEvent as Record<string, unknown>),
++            create: jest
++              .fn()
++              .mockRejectedValue(new Error("synthetic outbox failure")),
++          },
++        };
++
++        await recordIdentityMutation(failingTx as never, {
++          kind: "MERGE",
++          fromUnitIds: [sourceUnitId],
++          toUnitIds: [targetUnitId],
++          reasonCode: "operator_duplicate",
++          operatorId: "moderator-1",
++        });
++      })
++    ).rejects.toThrow("synthetic outbox failure");
++
++    // Everything rolled back — ledger, outbox, and audit are all empty.
++    expect(await fixture.getIdentityMutations()).toEqual([]);
++    expect(await fixture.getOutboxEvents()).toEqual([]);
++    expect(await fixture.getAuditEvents()).toEqual([]);
++
++    // Physical units unchanged.
++    const unitsAfter = await fixture.getPhysicalUnits();
++    expect(unitsAfter.map((u) => ({ id: u.id, unitIdentityEpoch: u.unitIdentityEpoch }))).toEqual(
++      unitsBefore.map((u) => ({ id: u.id, unitIdentityEpoch: u.unitIdentityEpoch }))
++    );
++  });
++
++  it("AC#6: supports SPLIT with multiple to_unit_ids and bumps all affected epochs", async () => {
++    const sourceUnitId = await fixture.insertPhysicalUnit({
++      id: "unit-split-source",
++      canonicalAddressHash: "hash-split-source",
++      unitIdentityEpoch: 5,
++    });
++    const targetUnitOneId = await fixture.insertPhysicalUnit({
++      id: "unit-split-target-1",
++      canonicalAddressHash: "hash-split-target-1",
++      unitIdentityEpoch: 1,
++      supersedesUnitIds: ["legacy-parent"],
++    });
++    const targetUnitTwoId = await fixture.insertPhysicalUnit({
++      id: "unit-split-target-2",
++      canonicalAddressHash: "hash-split-target-2",
++      unitIdentityEpoch: 3,
++    });
++
++    const result = await fixture.client.$transaction((tx: unknown) =>
++      recordIdentityMutation(tx as never, {
++        kind: "SPLIT",
++        fromUnitIds: [sourceUnitId],
++        toUnitIds: [targetUnitOneId, targetUnitTwoId],
++        reasonCode: "operator_split",
++        operatorId: "moderator-1",
++      })
++    );
++
++    expect(result.affectedUnitIds).toEqual(
++      expect.arrayContaining([sourceUnitId, targetUnitOneId, targetUnitTwoId])
++    );
++    expect(result.affectedUnitIds).toHaveLength(3);
++
++    // Scope by mutationId to avoid conflicts with other tests sharing the fixture.
++    const mutations = await fixture.query<{
++      id: string;
++      kind: string;
++      from_unit_ids: string[];
++      to_unit_ids: string[];
++      resulting_epoch: number;
++    }>(
++      `SELECT id, kind, from_unit_ids, to_unit_ids, resulting_epoch
++       FROM identity_mutations WHERE id = $1`,
++      [result.mutationId]
++    );
++    expect(mutations).toHaveLength(1);
++    expect(mutations[0]).toMatchObject({
++      kind: "SPLIT",
++      from_unit_ids: [sourceUnitId],
++      to_unit_ids: [targetUnitOneId, targetUnitTwoId],
++      resulting_epoch: 6,
++    });
++
++    const outbox = await fixture.query<{
++      kind: string;
++      priority: number;
++      unit_identity_epoch: number;
++    }>(
++      `SELECT kind, priority, unit_identity_epoch
++       FROM outbox_events WHERE aggregate_id = $1`,
++      [result.mutationId]
++    );
++    expect(outbox).toHaveLength(1);
++    expect(outbox[0]).toMatchObject({
++      kind: "IDENTITY_MUTATION",
++      priority: 0,
++      unit_identity_epoch: 6,
++    });
++
++    const units = await fixture.getPhysicalUnits();
++    const byId = Object.fromEntries(units.map((u) => [u.id, u]));
++
++    expect(byId[sourceUnitId].unitIdentityEpoch).toBe(6);
++    expect(byId[targetUnitOneId].unitIdentityEpoch).toBe(6);
++    expect(byId[targetUnitOneId].supersedesUnitIds).toEqual(
++      expect.arrayContaining(["legacy-parent", sourceUnitId])
++    );
++    expect(byId[targetUnitTwoId].unitIdentityEpoch).toBe(6);
++    expect(byId[targetUnitTwoId].supersedesUnitIds).toEqual(
++      expect.arrayContaining([sourceUnitId])
++    );
++  });
++
++  it("AC#6: supports CANONICALIZER_UPGRADE with null operator_id and writes priority 0", async () => {
++    const unitId = await fixture.insertPhysicalUnit({
++      id: "unit-upgrade",
++      canonicalAddressHash: "hash-upgrade",
++      unitIdentityEpoch: 7,
++    });
++
++    const result = await fixture.client.$transaction((tx: unknown) =>
++      recordIdentityMutation(tx as never, {
++        kind: "CANONICALIZER_UPGRADE",
++        fromUnitIds: [unitId],
++        toUnitIds: [unitId],
++        reasonCode: "canonicalizer_upgrade",
++        operatorId: null,
++      })
++    );
++
++    expect(result.resultingEpoch).toBe(8);
++
++    const mutations = await fixture.getIdentityMutations();
++    const upgrade = mutations.find((m) => m.kind === "CANONICALIZER_UPGRADE");
++    expect(upgrade).toBeDefined();
++    expect(upgrade!.operatorId).toBeNull();
++    expect(upgrade!.resultingEpoch).toBe(8);
++
++    // Scope outbox lookup by the specific mutationId returned.
++    const outbox = await fixture.query<{ priority: number }>(
++      `SELECT priority FROM outbox_events WHERE aggregate_id = $1`,
++      [result.mutationId]
++    );
++    expect(outbox).toHaveLength(1);
++    expect(outbox[0].priority).toBe(0);
++
++    // Scope audit lookup by the specific mutationId returned.
++    const audit = await fixture.query<{ actor_role: string; actor_id: string | null }>(
++      `SELECT actor_role, actor_id FROM audit_events
++       WHERE aggregate_id = $1 AND kind = 'IDENTITY_MUTATION'`,
++      [result.mutationId]
++    );
++    expect(audit).toHaveLength(1);
++    expect(audit[0].actor_role).toBe("system");
++    expect(audit[0].actor_id).toBeNull();
++  });
++});

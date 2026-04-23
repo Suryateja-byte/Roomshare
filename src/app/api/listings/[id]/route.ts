@@ -39,6 +39,7 @@ import {
   requiresDedicatedHostManagedWritePath,
   type HostManagedListingWriteCurrent,
 } from "@/lib/listings/host-managed-write";
+import { getModerationWriteLockResult } from "@/lib/listings/moderation-write-lock";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -547,6 +548,23 @@ export async function PATCH(
             throw new Error("NOT_FOUND");
           }
 
+          const writeLock = features.moderationWriteLocks
+            ? getModerationWriteLockResult({
+                actor: "host",
+                statusReason: lockedListing.statusReason,
+              })
+            : null;
+
+          if (writeLock) {
+            return {
+              ok: false,
+              error: writeLock.error,
+              code: writeLock.code,
+              lockReason: writeLock.lockReason,
+              httpStatus: writeLock.httpStatus,
+            } as const;
+          }
+
           const preparedWrite = prepareHostManagedListingWrite(
             lockedListing,
             hostManagedPatch,
@@ -580,6 +598,9 @@ export async function PATCH(
             {
               error: hostManagedResult.error,
               code: hostManagedResult.code,
+              ...("lockReason" in hostManagedResult
+                ? { lockReason: hostManagedResult.lockReason }
+                : {}),
             },
             { status: hostManagedResult.httpStatus }
           );
@@ -787,7 +808,7 @@ export async function PATCH(
       }
 
       try {
-        result = await prisma.$transaction(async (tx) => {
+        const genericPatchResult = await prisma.$transaction(async (tx) => {
           const [lockedListing] = await tx.$queryRaw<LockedListingRow[]>`
             SELECT
               id,
@@ -815,6 +836,23 @@ export async function PATCH(
 
           if (!lockedListing || lockedListing.ownerId !== userId) {
             throw new Error("NOT_FOUND");
+          }
+
+          const writeLock = features.moderationWriteLocks
+            ? getModerationWriteLockResult({
+                actor: "host",
+                statusReason: lockedListing.statusReason,
+              })
+            : null;
+
+          if (writeLock) {
+            return {
+              ok: false,
+              error: writeLock.error,
+              code: writeLock.code,
+              lockReason: writeLock.lockReason,
+              httpStatus: writeLock.httpStatus,
+            } as const;
           }
 
           const nextMoveInDate = moveInDate ? new Date(moveInDate) : null;
@@ -955,8 +993,23 @@ export async function PATCH(
 
           await markListingDirtyInTx(tx, id, "listing_updated");
 
-          return updatedListing;
+          return { ok: true, updatedListing } as const;
         });
+
+        if (!genericPatchResult.ok) {
+          return NextResponse.json(
+            {
+              error: genericPatchResult.error,
+              code: genericPatchResult.code,
+              ...("lockReason" in genericPatchResult
+                ? { lockReason: genericPatchResult.lockReason }
+                : {}),
+            },
+            { status: genericPatchResult.httpStatus }
+          );
+        }
+
+        result = genericPatchResult.updatedListing;
       } catch (error) {
         if (error instanceof Error) {
           if (error.message === "NOT_FOUND") {
