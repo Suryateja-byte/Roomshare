@@ -52,6 +52,7 @@ import {
   recordSearchV2Fallback,
   recordSearchZeroResults,
 } from "@/lib/search/search-telemetry";
+import { buildPublicCacheHeadersForListings } from "@/lib/public-cache/headers";
 
 export const runtime = "nodejs";
 
@@ -297,6 +298,11 @@ export async function GET(request: NextRequest) {
             headers: {
               "Cache-Control":
                 "public, s-maxage=60, max-age=30, stale-while-revalidate=120",
+              ...buildPublicCacheHeadersForListings({
+                listings,
+                projectionEpoch: v2Result.response.meta.projectionEpoch,
+                embeddingVersion: v2Result.response.meta.embeddingVersion,
+              }),
               "x-request-id": requestId,
               Vary: "Accept-Encoding",
             },
@@ -371,6 +377,14 @@ export async function GET(request: NextRequest) {
           headers: {
             "Cache-Control":
               "public, s-maxage=60, max-age=30, stale-while-revalidate=120",
+            ...buildPublicCacheHeadersForListings({
+              listings:
+                state.kind === "ok" || state.kind === "degraded"
+                  ? state.data.items
+                  : [],
+              projectionEpoch: state.meta.projectionEpoch,
+              embeddingVersion: state.meta.embeddingVersion,
+            }),
             "x-request-id": requestId,
             Vary: "Accept-Encoding",
           },

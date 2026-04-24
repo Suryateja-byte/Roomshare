@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateCronAuth } from "@/lib/cron-auth";
 import { isPhase02ProjectionWritesEnabled, isKillSwitchActive } from "@/lib/flags/phase02";
 import { drainOutboxOnce } from "@/lib/outbox/drain";
+import { drainPublicCacheFanoutOnce } from "@/lib/public-cache/push";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 
 export async function GET(request: NextRequest) {
@@ -35,14 +36,17 @@ export async function GET(request: NextRequest) {
       // If kill switch is active, only drain fast-lane (priority=0) tombstones
       priorityMax: killSwitchActive ? 0 : 100,
     });
+    const publicCacheFanout = await drainPublicCacheFanoutOnce(20);
 
     logger.sync.info("[outbox-drain] Drain tick complete", {
       ...result,
+      publicCacheFanout,
       killSwitchActive,
     });
 
     return NextResponse.json({
       ...result,
+      publicCacheFanout,
       killSwitchActive,
       timestamp: new Date().toISOString(),
     });

@@ -53,6 +53,7 @@ import {
 import type { SearchV2Map } from "@/lib/search/types";
 import { searchV2MapToListings } from "@/lib/search/v2-map-data";
 import { hydratePhase04MapSnapshot } from "@/lib/search/projection-search";
+import { buildPublicCacheHeadersForSearchState } from "@/lib/public-cache/headers";
 
 export const runtime = "nodejs";
 
@@ -356,6 +357,7 @@ export async function GET(request: NextRequest) {
           // max-age: browser cache duration (shorter to allow user refresh)
           "Cache-Control":
             "public, s-maxage=60, max-age=30, stale-while-revalidate=120",
+          ...buildPublicCacheHeadersForSearchState(state),
           "x-request-id": requestId,
           // Vary by Accept-Encoding for proper CDN compression handling
           Vary: "Accept-Encoding",

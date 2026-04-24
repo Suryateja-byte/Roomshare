@@ -20,6 +20,8 @@ describe("GET /api/public-cache/state", () => {
     withRateLimitMock.mockResolvedValue(null);
     getPublicCacheStatePayloadMock.mockResolvedValue({
       cacheFloorToken: "v1:2026-04-22T17:00:00.000Z:abc123",
+      latestCursor: "cursor-1",
+      projectionEpochFloor: "8",
       generatedAt: "2026-04-22T17:00:01.000Z",
     });
   });

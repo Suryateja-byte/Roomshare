@@ -22,6 +22,8 @@ describe("ServiceWorkerRegistration public cache coherence", () => {
   const registerMock = jest.fn();
   const getRegistrationsMock = jest.fn();
   const updateMock = jest.fn();
+  const addServiceWorkerListenerMock = jest.fn();
+  const removeServiceWorkerListenerMock = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -51,6 +53,8 @@ describe("ServiceWorkerRegistration public cache coherence", () => {
       value: {
         controller: { postMessage: postMessageMock },
         register: registerMock,
+        addEventListener: addServiceWorkerListenerMock,
+        removeEventListener: removeServiceWorkerListenerMock,
         getRegistrations: getRegistrationsMock,
         ready: Promise.resolve({
           active: { postMessage: postMessageMock },
@@ -122,7 +126,11 @@ describe("ServiceWorkerRegistration public cache coherence", () => {
       });
     });
 
-    expect(postMessageMock).not.toHaveBeenCalled();
+    expect(postMessageMock).toHaveBeenLastCalledWith({
+      type: "PUBLIC_CACHE_FLOOR",
+      payload: { cacheFloorToken: "token-1" },
+    });
+    postMessageMock.mockClear();
 
     await act(async () => {
       document.dispatchEvent(new Event("visibilitychange"));
@@ -131,7 +139,11 @@ describe("ServiceWorkerRegistration public cache coherence", () => {
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledTimes(2);
     });
-    expect(postMessageMock).not.toHaveBeenCalled();
+    expect(postMessageMock).toHaveBeenLastCalledWith({
+      type: "PUBLIC_CACHE_FLOOR",
+      payload: { cacheFloorToken: "token-1" },
+    });
+    postMessageMock.mockClear();
 
     await act(async () => {
       jest.advanceTimersByTime(60_000);
@@ -139,6 +151,10 @@ describe("ServiceWorkerRegistration public cache coherence", () => {
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledTimes(3);
+      expect(postMessageMock).toHaveBeenCalledWith({
+        type: "PUBLIC_CACHE_FLOOR",
+        payload: { cacheFloorToken: "token-2" },
+      });
       expect(postMessageMock).toHaveBeenCalledWith({
         type: "CLEAR_DYNAMIC_CACHE",
       });

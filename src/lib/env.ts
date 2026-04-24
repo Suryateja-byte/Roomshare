@@ -123,6 +123,16 @@ const serverEnvSchema = z
     ENABLE_CONTACT_FIRST_LISTINGS: z.enum(["true", "false"]).optional(),
     FEATURE_MODERATION_WRITE_LOCKS: z.enum(["true", "false"]).optional(),
     FEATURE_PUBLIC_CACHE_COHERENCE: z.enum(["true", "false"]).optional(),
+    KILL_SWITCH_DISABLE_PUBLIC_CACHE_PUSH: z
+      .enum(["true", "false"])
+      .optional(),
+    PUBLIC_CACHE_CURSOR_SECRET: z.string().optional(),
+    PUBLIC_CACHE_KEY_SECRET: z.string().optional(),
+    PUBLIC_CACHE_PUSH_ENCRYPTION_KEY: z.string().optional(),
+    PUBLIC_CACHE_VAPID_PUBLIC_KEY: z.string().optional(),
+    PUBLIC_CACHE_VAPID_PRIVATE_KEY: z.string().optional(),
+    PUBLIC_CACHE_VAPID_SUBJECT: z.string().optional(),
+    NEXT_PUBLIC_PUBLIC_CACHE_VAPID_KEY: z.string().optional(),
     FEATURE_PUBLIC_AUTOCOMPLETE_CONTRACT: z
       .enum(["true", "false"])
       .optional(),
@@ -650,6 +660,9 @@ export const features = {
   },
   get publicCacheCoherence() {
     return process.env.FEATURE_PUBLIC_CACHE_COHERENCE === "true";
+  },
+  get disablePublicCachePush() {
+    return process.env.KILL_SWITCH_DISABLE_PUBLIC_CACHE_PUSH === "true";
   },
   get publicAutocompleteContract() {
     return process.env.FEATURE_PUBLIC_AUTOCOMPLETE_CONTRACT === "true";

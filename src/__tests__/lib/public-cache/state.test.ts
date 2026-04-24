@@ -6,6 +6,10 @@ jest.mock("@/lib/prisma", () => ({
   },
 }));
 
+jest.mock("@/lib/public-cache/push", () => ({
+  getPublicCacheVapidPublicKey: jest.fn(() => null),
+}));
+
 import { prisma } from "@/lib/prisma";
 import { getPublicCacheStatePayload } from "@/lib/public-cache/state";
 
@@ -22,10 +26,12 @@ describe("getPublicCacheStatePayload", () => {
     const payload = await getPublicCacheStatePayload();
 
     expect(payload.cacheFloorToken).toBe("none");
+    expect(payload.latestCursor).toBeNull();
+    expect(payload.projectionEpochFloor).toBe("1");
     expect(new Date(payload.generatedAt).toISOString()).toBe(payload.generatedAt);
   });
 
-  it("serializes only the coarse cache-floor token and generatedAt", async () => {
+  it("serializes only coarse public cache state and an opaque signed cursor", async () => {
     findFirstMock.mockResolvedValue({
       id: "cache-row-123",
       enqueuedAt: new Date("2026-04-22T16:40:00.000Z"),
@@ -33,10 +39,13 @@ describe("getPublicCacheStatePayload", () => {
 
     const payload = await getPublicCacheStatePayload();
 
-    expect(payload).toEqual({
-      cacheFloorToken: expect.stringContaining("2026-04-22T16:40:00.000Z"),
-      generatedAt: expect.any(String),
-    });
+    expect(payload.cacheFloorToken).toEqual(
+      expect.stringContaining("2026-04-22T16:40:00.000Z")
+    );
+    expect(payload.latestCursor).toEqual(expect.stringMatching(/^v1\./));
+    expect(payload.projectionEpochFloor).toBe("1");
+    expect(payload.generatedAt).toEqual(expect.any(String));
     expect(payload.cacheFloorToken).not.toContain("cache-row-123");
+    expect(payload.latestCursor).not.toContain("cache-row-123");
   });
 });

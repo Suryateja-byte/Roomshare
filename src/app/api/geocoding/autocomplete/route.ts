@@ -12,6 +12,7 @@ import { getCachedResults, setCachedResults } from "@/lib/geocoding-cache";
 import { FetchTimeoutError } from "@/lib/fetch-with-timeout";
 import { searchPhoton } from "@/lib/geocoding/photon";
 import { searchPublicAutocomplete } from "@/lib/geocoding/public-autocomplete";
+import { buildPublicCacheHeaders } from "@/lib/public-cache/headers";
 import { getPublicCacheStatePayload } from "@/lib/public-cache/state";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { features } from "@/lib/env";
@@ -30,6 +31,9 @@ function jsonError(code: LocationAutocompleteErrorCode, status: number) {
 function jsonSuccess(data: LocationAutocompleteSuccessResponse) {
   const response = NextResponse.json<LocationAutocompleteSuccessResponse>(data);
   response.headers.set("Cache-Control", "no-store");
+  for (const [key, value] of Object.entries(buildPublicCacheHeaders())) {
+    response.headers.set(key, value);
+  }
   return response;
 }
 

@@ -34,6 +34,7 @@ import {
 } from "@/lib/constants";
 import { isPhase04ProjectionReadsEnabled } from "@/lib/flags/phase04";
 import { getProjectionSearchCount } from "@/lib/search/projection-search";
+import { buildPublicCacheHeaders } from "@/lib/public-cache/headers";
 
 // Disable static caching - counts must be fresh
 export const dynamic = "force-dynamic";
@@ -116,6 +117,7 @@ export async function GET(request: NextRequest) {
           {
             headers: {
               "Cache-Control": "public, s-maxage=15, stale-while-revalidate=30",
+              ...buildPublicCacheHeaders(),
             },
           }
         );
@@ -150,6 +152,7 @@ export async function GET(request: NextRequest) {
           headers: {
             // Short CDN cache for identical requests; private fallback for auth-dependent counts
             "Cache-Control": "public, s-maxage=15, stale-while-revalidate=30",
+            ...buildPublicCacheHeaders(),
           },
         }
       );

@@ -4,10 +4,13 @@ import { cache } from "react";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { resolvePublicListingVisibilityState } from "@/lib/listings/public-contact-contract";
+import { buildPublicUnitCacheKey } from "@/lib/public-cache/cache-policy";
+import { currentProjectionEpoch } from "@/lib/projections/epoch";
 
 export const publicListingDetailSelect = {
   id: true,
   ownerId: true,
+  physicalUnitId: true,
   title: true,
   description: true,
   price: true,
@@ -65,6 +68,11 @@ export interface PublicListingDetailResult {
   isPubliclyVisible: boolean;
   isOwner: boolean;
   isAdmin: boolean;
+  publicCacheMetadata: {
+    unitCacheKey: string;
+    unitIdentityEpoch: number;
+    projectionEpoch: string;
+  } | null;
 }
 
 const getPublicListingDetailCached = cache(
@@ -89,12 +97,30 @@ const getPublicListingDetailCached = cache(
       return null;
     }
 
+    const unit = listing.physicalUnitId
+      ? await prisma.physicalUnit.findUnique({
+          where: { id: listing.physicalUnitId },
+          select: { unitIdentityEpoch: true },
+        })
+      : null;
+
     return {
       listing,
       publicAvailability: visibility.publicAvailability,
       isPubliclyVisible: visibility.isPubliclyVisible,
       isOwner,
       isAdmin,
+      publicCacheMetadata:
+        listing.physicalUnitId && unit
+          ? {
+              unitCacheKey: buildPublicUnitCacheKey(
+                listing.physicalUnitId,
+                unit.unitIdentityEpoch
+              ),
+              unitIdentityEpoch: unit.unitIdentityEpoch,
+              projectionEpoch: String(currentProjectionEpoch()),
+            }
+          : null,
     };
   }
 );

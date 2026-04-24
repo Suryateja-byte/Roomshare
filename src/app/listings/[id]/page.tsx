@@ -401,6 +401,7 @@ export default async function ListingPage({ params, searchParams }: PageProps) {
         initialAvailability={availability}
         contactFirstEnabled={features.contactFirstListings}
         moderationWriteLocksEnabled={features.moderationWriteLocks}
+        publicCacheMetadata={publicDetail.publicCacheMetadata}
       />
     </>
   );

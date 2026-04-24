@@ -146,6 +146,15 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        source: "/listings/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=30, stale-while-revalidate=120",
+          },
+        ],
+      },
       // Static assets built by Next.js — content-hashed filenames, safe to cache forever
       {
         source: "/_next/static/:path*",

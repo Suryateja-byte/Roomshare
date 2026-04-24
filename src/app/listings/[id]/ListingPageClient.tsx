@@ -137,6 +137,11 @@ interface ListingPageClientProps {
     initialAvailability?: AvailabilitySnapshot | null;
     contactFirstEnabled?: boolean;
     moderationWriteLocksEnabled?: boolean;
+    publicCacheMetadata?: {
+      unitCacheKey: string;
+      unitIdentityEpoch: number;
+      projectionEpoch: string;
+    } | null;
   }
 
 type ReviewEligibilityReason =
@@ -596,6 +601,7 @@ export default function ListingPageClient({
   viewToken,
   initialAvailability,
   moderationWriteLocksEnabled = false,
+  publicCacheMetadata = null,
 }: ListingPageClientProps) {
   const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
@@ -674,6 +680,34 @@ export default function ListingPageClient({
   useEffect(() => {
     setHasHydrated(true);
   }, []);
+
+  useEffect(() => {
+    if (
+      !publicCacheMetadata ||
+      typeof navigator === "undefined" ||
+      !("serviceWorker" in navigator)
+    ) {
+      return;
+    }
+
+    const message = {
+      type: "PUBLIC_CACHE_FLOOR",
+      payload: {
+        unitCacheKey: publicCacheMetadata.unitCacheKey,
+        unitIdentityEpoch: publicCacheMetadata.unitIdentityEpoch,
+        projectionEpochFloor: publicCacheMetadata.projectionEpoch,
+      },
+    };
+
+    if (navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage(message);
+      return;
+    }
+
+    void navigator.serviceWorker.ready.then((registration) => {
+      registration.active?.postMessage(message);
+    });
+  }, [publicCacheMetadata]);
 
   useEffect(() => {
     if (!canRenderGuestControls) {

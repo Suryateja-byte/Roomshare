@@ -1106,8 +1106,33 @@ model CacheInvalidation {
   enqueuedAt        DateTime @default(now()) @map("enqueued_at")
   consumedAt        DateTime? @map("consumed_at")
   consumedBy        String?  @map("consumed_by")
+  fanoutStatus      String   @default("PENDING") @map("fanout_status")
+  fanoutAttemptCount Int     @default(0) @map("fanout_attempt_count")
+  fanoutNextAttemptAt DateTime @default(now()) @map("fanout_next_attempt_at")
+  fanoutLastAttemptAt DateTime? @map("fanout_last_attempt_at")
+  fanoutCompletedAt DateTime? @map("fanout_completed_at")
+  fanoutLastError   String?  @map("fanout_last_error")
 
   @@map("cache_invalidations")
+}
+
+model PublicCachePushSubscription {
+  id                           String    @id @default(cuid())
+  userId                       String?   @map("user_id")
+  endpointHash                 String    @unique @map("endpoint_hash")
+  subscriptionCiphertext       String    @map("subscription_ciphertext") @db.Text
+  subscriptionCiphertextVersion String   @default("v1") @map("subscription_ciphertext_version")
+  active                       Boolean   @default(true)
+  disabledReason               String?   @map("disabled_reason")
+  lastSeenAt                   DateTime  @default(now()) @map("last_seen_at")
+  lastDeliveredAt              DateTime? @map("last_delivered_at")
+  lastFailedAt                 DateTime? @map("last_failed_at")
+  createdAt                    DateTime  @default(now()) @map("created_at")
+  updatedAt                    DateTime  @updatedAt @map("updated_at")
+
+  @@index([active, lastSeenAt], map: "public_cache_push_subscriptions_active_seen_idx")
+  @@index([userId, active], map: "public_cache_push_subscriptions_user_active_idx")
+  @@map("public_cache_push_subscriptions")
 }
 
 model AuditEvent {

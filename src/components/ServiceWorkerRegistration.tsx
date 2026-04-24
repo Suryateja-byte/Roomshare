@@ -12,7 +12,10 @@ interface ServiceWorkerRegistrationProps {
 const UPDATE_POLL_MS = 60 * 60 * 1000;
 const CACHE_FLOOR_POLL_MS = 60 * 1000;
 
-async function postServiceWorkerMessage(message: { type: string }) {
+async function postServiceWorkerMessage(message: {
+  type: string;
+  payload?: Record<string, unknown>;
+}) {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
     return;
   }
@@ -30,19 +33,33 @@ async function postServiceWorkerMessage(message: { type: string }) {
   }
 }
 
+function urlBase64ToArrayBuffer(value: string): ArrayBuffer {
+  const padding = "=".repeat((4 - (value.length % 4)) % 4);
+  const base64 = `${value}${padding}`.replace(/-/g, "+").replace(/_/g, "/");
+  const raw = window.atob(base64);
+  const buffer = new ArrayBuffer(raw.length);
+  const output = new Uint8Array(buffer);
+  for (let i = 0; i < raw.length; i += 1) {
+    output[i] = raw.charCodeAt(i);
+  }
+  return buffer;
+}
+
 export function ServiceWorkerRegistration({
   onUpdate,
   onSuccess,
   publicCacheCoherenceEnabled = false,
 }: ServiceWorkerRegistrationProps) {
   const lastCacheFloorTokenRef = useRef<string | null>(null);
+  const lastCursorRef = useRef<string | null>(null);
+  const pushKeyRegisteredRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
       return;
     }
 
-    // In development, don't register SW — actively clean up stale ones
+    // In development, don't register SW â€” actively clean up stale ones
     // from previous production builds to prevent cache-first serving stale assets
     if (process.env.NODE_ENV !== "production") {
       navigator.serviceWorker.getRegistrations().then((registrations) => {
@@ -64,6 +81,128 @@ export function ServiceWorkerRegistration({
     let updateInterval: ReturnType<typeof setInterval> | null = null;
     let cacheFloorInterval: ReturnType<typeof setInterval> | null = null;
     let removeVisibilityListener: (() => void) | null = null;
+    let eventSource: EventSource | null = null;
+
+    const registerPushSubscription = async (vapidPublicKey?: string) => {
+      if (
+        disposed ||
+        !publicCacheCoherenceEnabled ||
+        !vapidPublicKey ||
+        pushKeyRegisteredRef.current === vapidPublicKey ||
+        !("PushManager" in window) ||
+        !("Notification" in window) ||
+        Notification.permission !== "granted"
+      ) {
+        return;
+      }
+
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        const existing = await registration.pushManager.getSubscription();
+        const subscription =
+          existing ??
+          (await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToArrayBuffer(vapidPublicKey),
+          }));
+
+        const response = await fetch("/api/public-cache/push-subscription", {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ subscription: subscription.toJSON() }),
+        });
+
+        if (response.ok) {
+          pushKeyRegisteredRef.current = vapidPublicKey;
+        }
+      } catch (error) {
+        console.warn("[SW] Public cache push registration failed:", error);
+      }
+    };
+
+    const connectPublicCacheEvents = (cursor: string | null) => {
+      if (
+        disposed ||
+        !publicCacheCoherenceEnabled ||
+        typeof EventSource === "undefined"
+      ) {
+        return;
+      }
+
+      eventSource?.close();
+      const params = new URLSearchParams();
+      if (cursor) {
+        params.set("cursor", cursor);
+      }
+
+      const source = new EventSource(
+        `/api/public-cache/events${params.size ? `?${params.toString()}` : ""}`
+      );
+      eventSource = source;
+
+      source.addEventListener("public-cache.invalidate", (event) => {
+        try {
+          const data = JSON.parse((event as MessageEvent).data) as {
+            cursor?: string;
+            cacheFloorToken?: string;
+            unitCacheKey?: string;
+            projectionEpoch?: string;
+          };
+
+          if (typeof data.cursor === "string") {
+            lastCursorRef.current = data.cursor;
+          }
+          if (typeof data.cacheFloorToken === "string") {
+            lastCacheFloorTokenRef.current = data.cacheFloorToken;
+            emitPublicCacheInvalidated(data.cacheFloorToken);
+          }
+
+          void postServiceWorkerMessage({
+            type: "PUBLIC_CACHE_INVALIDATED",
+            payload: { ...data, broadcast: false },
+          });
+
+          source.close();
+          if (!disposed) {
+            connectPublicCacheEvents(lastCursorRef.current);
+          }
+        } catch (error) {
+          console.warn("[SW] Public cache event parse failed:", error);
+        }
+      });
+
+      source.addEventListener("public-cache.state", (event) => {
+        try {
+          const data = JSON.parse((event as MessageEvent).data) as {
+            cacheFloorToken?: string;
+            latestCursor?: string | null;
+            projectionEpochFloor?: string;
+          };
+          if (typeof data.latestCursor === "string") {
+            lastCursorRef.current = data.latestCursor;
+          }
+          void postServiceWorkerMessage({
+            type: "PUBLIC_CACHE_FLOOR",
+            payload: data as Record<string, unknown>,
+          });
+        } catch {
+          // State events are advisory; polling remains the fallback.
+        }
+      });
+    };
+
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      const data = event.data as
+        | { type?: string; payload?: { cacheFloorToken?: string } }
+        | undefined;
+      if (
+        data?.type === "PUBLIC_CACHE_INVALIDATED" &&
+        typeof data.payload?.cacheFloorToken === "string"
+      ) {
+        emitPublicCacheInvalidated(data.payload.cacheFloorToken);
+      }
+    };
 
     const pollPublicCacheState = async () => {
       if (disposed || !publicCacheCoherenceEnabled) {
@@ -81,16 +220,31 @@ export function ServiceWorkerRegistration({
 
         const data = (await response.json()) as {
           cacheFloorToken?: string;
+          latestCursor?: string | null;
+          projectionEpochFloor?: string;
+          vapidPublicKey?: string;
         };
 
         if (disposed || typeof data.cacheFloorToken !== "string") {
           return;
         }
 
+        void postServiceWorkerMessage({
+          type: "PUBLIC_CACHE_FLOOR",
+          payload: data as Record<string, unknown>,
+        });
+        void registerPushSubscription(data.vapidPublicKey);
+
         const previousToken = lastCacheFloorTokenRef.current;
         lastCacheFloorTokenRef.current = data.cacheFloorToken;
+        if (typeof data.latestCursor === "string") {
+          lastCursorRef.current = data.latestCursor;
+        }
 
         if (previousToken === null || previousToken === data.cacheFloorToken) {
+          if (previousToken === null) {
+            connectPublicCacheEvents(lastCursorRef.current);
+          }
           return;
         }
 
@@ -129,6 +283,10 @@ export function ServiceWorkerRegistration({
         }, UPDATE_POLL_MS);
 
         if (publicCacheCoherenceEnabled) {
+          navigator.serviceWorker.addEventListener(
+            "message",
+            handleServiceWorkerMessage
+          );
           void pollPublicCacheState();
           cacheFloorInterval = setInterval(() => {
             void pollPublicCacheState();
@@ -175,6 +333,11 @@ export function ServiceWorkerRegistration({
         clearInterval(updateInterval);
       }
       removeVisibilityListener?.();
+      eventSource?.close();
+      navigator.serviceWorker?.removeEventListener?.(
+        "message",
+        handleServiceWorkerMessage
+      );
     };
   }, [onUpdate, onSuccess, publicCacheCoherenceEnabled]);
 

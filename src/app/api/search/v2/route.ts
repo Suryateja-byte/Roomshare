@@ -33,6 +33,7 @@ import * as Sentry from "@sentry/nextjs";
 import { getSearchRateLimitIdentifier } from "@/lib/search-rate-limit-identifier";
 import { normalizeSearchQuery } from "@/lib/search/search-query";
 import { createSearchResponseMeta } from "@/lib/search/search-response";
+import { buildPublicCacheHeadersForListings } from "@/lib/public-cache/headers";
 
 /**
  * Check if v2 is enabled via feature flag or URL param.
@@ -169,6 +170,11 @@ export async function GET(request: NextRequest) {
           // CDN caching for search results
           "Cache-Control":
             "public, s-maxage=60, max-age=30, stale-while-revalidate=120",
+          ...buildPublicCacheHeadersForListings({
+            listings: result.paginatedResult?.items ?? [],
+            projectionEpoch: result.response.meta.projectionEpoch,
+            embeddingVersion: result.response.meta.embeddingVersion,
+          }),
           "x-request-id": requestId,
           Vary: "Accept-Encoding",
         },
