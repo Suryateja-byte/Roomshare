@@ -426,16 +426,16 @@ function setupDefaultMocks({
       const ids = args?.where?.id?.in ?? [];
       return ids.map((id) => ({
         id,
-        availabilitySource: "LEGACY_BOOKING" as const,
         status: "ACTIVE",
         statusReason: null,
+        needsMigrationReview: false,
         totalSlots: 2,
         availableSlots: 1,
-        openSlots: null,
-        moveInDate: null,
+        openSlots: 1,
+        moveInDate: new Date("2026-05-01T00:00:00.000Z"),
         availableUntil: null,
         minStayMonths: 1,
-        lastConfirmedAt: null,
+        lastConfirmedAt: new Date("2026-04-20T00:00:00.000Z"),
       }));
     }
   );
@@ -855,7 +855,9 @@ describe("search-v2-service", () => {
       expect(mockPrismaListingFindMany).toHaveBeenCalledWith(
         expect.objectContaining({
           select: expect.objectContaining({
-            needsMigrationReview: true,
+            statusReason: true,
+            totalSlots: true,
+            availableSlots: true,
           }),
         })
       );

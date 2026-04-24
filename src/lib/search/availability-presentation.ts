@@ -48,11 +48,7 @@ function normalizeSlotCounts(
   totalSlots: number | null | undefined
 ): { openSlots: number; totalSlots: number } {
   const safeOpenSlots = toSafeCount(availableSlots, 0);
-  const safeTotalSlots = Math.max(
-    toSafeCount(totalSlots, safeOpenSlots || 1),
-    safeOpenSlots || 1,
-    1
-  );
+  const safeTotalSlots = Math.max(toSafeCount(totalSlots, safeOpenSlots || 1), 1);
 
   return {
     openSlots: Math.min(safeOpenSlots, safeTotalSlots),

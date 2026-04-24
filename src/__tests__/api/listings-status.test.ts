@@ -294,7 +294,6 @@ describe("GET /api/listings/[id]/status", () => {
           id: true,
           ownerId: true,
           version: true,
-          availabilitySource: true,
           status: true,
           statusReason: true,
           availableSlots: true,
@@ -304,7 +303,6 @@ describe("GET /api/listings/[id]/status", () => {
           availableUntil: true,
           minStayMonths: true,
           lastConfirmedAt: true,
-          needsMigrationReview: true,
         },
       });
     });

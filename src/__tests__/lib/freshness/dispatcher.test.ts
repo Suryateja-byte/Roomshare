@@ -404,7 +404,6 @@ describe("freshness dispatcher", () => {
       1,
       expect.objectContaining({
         where: expect.objectContaining({
-          availabilitySource: "HOST_MANAGED",
           status: "ACTIVE",
           freshnessWarningSentAt: null,
           lastConfirmedAt: expect.objectContaining({

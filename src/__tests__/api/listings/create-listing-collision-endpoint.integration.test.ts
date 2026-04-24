@@ -331,7 +331,7 @@ describe("POST /api/listings collision flow", () => {
     });
   });
 
-  it("marks the new row for moderation on the fourth acked collision in 24 hours", async () => {
+  it("records moderation-gated telemetry on the fourth acked collision in 24 hours", async () => {
     process.env.FEATURE_LISTING_CREATE_COLLISION_WARN = "true";
     const { tx, getCreatePayload } = createTx();
     (prisma.$transaction as jest.Mock).mockImplementation(async (callback) =>
@@ -349,11 +349,7 @@ describe("POST /api/listings collision flow", () => {
     );
 
     expect(response.status).toBe(201);
-    expect(getCreatePayload()).toEqual(
-      expect.objectContaining({
-        needsMigrationReview: true,
-      })
-    );
+    expect(getCreatePayload()).not.toHaveProperty("needsMigrationReview");
     expect(recordListingCreateCollisionModerationGated).toHaveBeenCalledWith({
       ownerHashPrefix8: "deadbeef",
       windowCount24h: 3,

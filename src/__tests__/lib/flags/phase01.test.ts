@@ -1,5 +1,8 @@
 describe("phase01 flags", () => {
   const originalEnv = process.env;
+  const setNodeEnv = (value: NodeJS.ProcessEnv["NODE_ENV"]) => {
+    process.env = { ...process.env, NODE_ENV: value };
+  };
 
   beforeEach(() => {
     jest.resetModules();
@@ -11,7 +14,14 @@ describe("phase01 flags", () => {
     process.env = originalEnv;
   });
 
-  it("defaults canonical writes to false", async () => {
+  it("defaults canonical writes to true in non-production", async () => {
+    setNodeEnv("test");
+    const { isPhase01CanonicalWritesEnabled } = await import("@/lib/flags/phase01");
+    expect(isPhase01CanonicalWritesEnabled()).toBe(true);
+  });
+
+  it("defaults canonical writes to false in production", async () => {
+    setNodeEnv("production");
     const { isPhase01CanonicalWritesEnabled } = await import("@/lib/flags/phase01");
     expect(isPhase01CanonicalWritesEnabled()).toBe(false);
   });

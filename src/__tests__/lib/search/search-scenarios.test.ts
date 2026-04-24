@@ -79,7 +79,7 @@ describe("search-scenarios", () => {
     if (state.kind === "degraded") {
       expect(state.data.items.length).toBeGreaterThan(0);
       expect(state.data.items[0]?.publicAvailability).toMatchObject({
-        availabilitySource: "LEGACY_BOOKING",
+        availabilitySource: "HOST_MANAGED",
       });
     }
   });
@@ -117,7 +117,7 @@ describe("search-scenarios", () => {
     expect(listState.kind).toBe("ok");
     if (listState.kind === "ok") {
       expect(listState.data.items[0]?.publicAvailability).toMatchObject({
-        availabilitySource: "LEGACY_BOOKING",
+        availabilitySource: "HOST_MANAGED",
         openSlots: listState.data.items[0]?.availableSlots,
         totalSlots: listState.data.items[0]?.totalSlots,
       });
@@ -126,7 +126,7 @@ describe("search-scenarios", () => {
     expect(mapState.kind).toBe("ok");
     if (mapState.kind === "ok") {
       expect(mapState.data.listings[0]?.publicAvailability).toMatchObject({
-        availabilitySource: "LEGACY_BOOKING",
+        availabilitySource: "HOST_MANAGED",
         openSlots: mapState.data.listings[0]?.availableSlots,
       });
     }

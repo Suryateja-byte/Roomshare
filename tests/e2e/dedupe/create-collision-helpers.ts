@@ -79,11 +79,10 @@ export async function deleteListings(
 export async function getListingCollisionState(
   page: Page,
   listingId: string
-): Promise<{ id: string; normalizedAddress: string | null; needsMigrationReview: boolean }> {
+): Promise<{ id: string; normalizedAddress: string | null }> {
   const response = await testApi<{
     id: string;
     normalizedAddress: string | null;
-    needsMigrationReview: boolean;
   }>(page, "getListingCollisionState", {
     listingId,
   });

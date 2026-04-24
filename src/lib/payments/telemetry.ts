@@ -5,6 +5,11 @@ import type { ContactConsumptionSource, ProductCode } from "@prisma/client";
 
 type PurchaseContext = "CONTACT_HOST" | "PHONE_REVEAL" | "SEARCH_ALERTS";
 
+export const PAYWALL_MISSING_PHYSICAL_UNIT_ID_REASON =
+  "missing_physical_unit_id";
+export const PAYWALL_MISSING_PHYSICAL_UNIT_ROW_REASON =
+  "missing_physical_unit_row";
+
 export function recordCheckoutSessionCreated(input: {
   userId: string;
   purchaseContext: PurchaseContext;
@@ -73,7 +78,9 @@ export function recordStartConversationBlockedPaywall(input: {
 export function recordPaywallBypassMissingUnitId(input: {
   userId: string;
   listingId: string;
-  reason: "missing_physical_unit_id" | "missing_physical_unit_row";
+  reason:
+    | typeof PAYWALL_MISSING_PHYSICAL_UNIT_ID_REASON
+    | typeof PAYWALL_MISSING_PHYSICAL_UNIT_ROW_REASON;
 }) {
   logger.sync.info("cfm.paywall.bypass_missing_unit_id_count", {
     metric: "paywall_bypass_missing_unit_id",

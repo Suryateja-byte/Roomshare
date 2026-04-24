@@ -86,7 +86,7 @@ jobs:
     name: Unit Tests
     runs-on: ubuntu-latest
     env:
-      NODE_OPTIONS: '--max-old-space-size=4096'
+      NODE_OPTIONS: '--experimental-vm-modules --max-old-space-size=8192'
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v5
@@ -97,7 +97,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm jest --ci --coverage --testPathPatterns="src/__tests__/lib/" --testPathPatterns="src/__tests__/hooks/" --testPathIgnorePatterns="filter-regression"
+      - run: pnpm jest --ci --maxWorkers=2 --coverage --testPathPatterns="src/__tests__/lib/" --testPathPatterns="src/__tests__/hooks/" --testPathIgnorePatterns="filter-regression|test-utils"
       - uses: codecov/codecov-action@v6
         if: always()
         with:
@@ -110,7 +110,7 @@ jobs:
     name: Component Tests
     runs-on: ubuntu-latest
     env:
-      NODE_OPTIONS: '--max-old-space-size=4096'
+      NODE_OPTIONS: '--experimental-vm-modules --max-old-space-size=4096'
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v5
@@ -128,7 +128,7 @@ jobs:
     name: API & Action Tests
     runs-on: ubuntu-latest
     env:
-      NODE_OPTIONS: '--max-old-space-size=8192'
+      NODE_OPTIONS: '--experimental-vm-modules --max-old-space-size=8192'
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v5
@@ -151,7 +151,7 @@ jobs:
     name: Filter System Tests
     runs-on: ubuntu-latest
     env:
-      NODE_OPTIONS: '--max-old-space-size=4096'
+      NODE_OPTIONS: '--experimental-vm-modules --max-old-space-size=4096'
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v5
@@ -176,7 +176,7 @@ jobs:
     name: Filter Regression Validation
     runs-on: ubuntu-latest
     env:
-      NODE_OPTIONS: '--max-old-space-size=4096'
+      NODE_OPTIONS: '--experimental-vm-modules --max-old-space-size=4096'
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v5
@@ -197,7 +197,7 @@ jobs:
     name: Performance & Safety Tests
     runs-on: ubuntu-latest
     env:
-      NODE_OPTIONS: '--max-old-space-size=4096'
+      NODE_OPTIONS: '--experimental-vm-modules --max-old-space-size=4096'
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v5

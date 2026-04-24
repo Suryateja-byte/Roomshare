@@ -49,6 +49,14 @@ jest.mock("@/lib/data", () => ({
   getLimitedCount: jest.fn(),
 }));
 
+jest.mock("@/lib/flags/phase04", () => ({
+  isPhase04ProjectionReadsEnabled: jest.fn().mockReturnValue(false),
+}));
+
+jest.mock("@/lib/public-cache/headers", () => ({
+  buildPublicCacheHeaders: jest.fn().mockReturnValue({}),
+}));
+
 jest.mock("@sentry/nextjs", () => ({
   captureException: jest.fn(),
 }));

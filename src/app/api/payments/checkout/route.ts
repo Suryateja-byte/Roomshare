@@ -21,6 +21,8 @@ import {
 import { evaluateSavedSearchAlertPaywall } from "@/lib/payments/search-alert-paywall";
 import { getStripeClient, getStripePriceId } from "@/lib/payments/stripe";
 import {
+  PAYWALL_MISSING_PHYSICAL_UNIT_ID_REASON,
+  PAYWALL_MISSING_PHYSICAL_UNIT_ROW_REASON,
   recordCheckoutSessionCreated,
   recordPaywallBypassMissingUnitId,
 } from "@/lib/payments/telemetry";
@@ -272,8 +274,8 @@ export async function POST(request: Request) {
           userId: session.user.id,
           listingId: listingId!,
           reason: contactable.listing.physicalUnitId
-            ? "missing_physical_unit_row"
-            : "missing_physical_unit_id",
+            ? PAYWALL_MISSING_PHYSICAL_UNIT_ROW_REASON
+            : PAYWALL_MISSING_PHYSICAL_UNIT_ID_REASON,
         });
 
         return NextResponse.json(

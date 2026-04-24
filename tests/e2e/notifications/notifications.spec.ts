@@ -5,9 +5,7 @@
  * mark-as-read, delete, navigation, empty state.
  *
  * Seed data (for testUser e2e-test@roomshare.dev):
- *   BOOKING_ACCEPTED "Booking Confirmed" (unread, link: /bookings)
  *   NEW_MESSAGE      "New Message"       (unread, link: /messages)
- *   BOOKING_CANCELLED "Booking Cancelled" (read, no link)
  *   NEW_REVIEW        "New Review"        (read, link: /listings/[id])
  *
  * Test ordering: read-only tests first (NF-01..NF-06, NF-10),
@@ -236,17 +234,17 @@ test.describe("Notifications", () => {
         .catch(() => false);
       test.skip(!hasItems, "Notification items not available");
 
-      // "Booking Confirmed" has link to /bookings
-      const bookingNotification = page
+      // Prefer the contact-first message notification when seeded.
+      const messageNotification = page
         .getByTestId("notification-item")
-        .filter({ hasText: "Booking Confirmed" });
+        .filter({ hasText: "New Message" });
 
-      const linkElement = bookingNotification.locator("a").first();
+      const linkElement = messageNotification.locator("a").first();
       const isLinkVisible = await linkElement.isVisible().catch(() => false);
 
       if (isLinkVisible) {
         await linkElement.click();
-        await expect(page).toHaveURL(/\/bookings/, {
+        await expect(page).toHaveURL(/\/messages/, {
           timeout: timeouts.navigation,
         });
       } else {

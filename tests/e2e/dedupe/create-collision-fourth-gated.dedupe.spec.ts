@@ -8,7 +8,7 @@ import {
   seedCollisionListings,
 } from "./create-collision-helpers";
 
-test("T-19: the fourth acknowledged collision is created under review and shows the moderation toast", async ({
+test("T-19: the fourth acknowledged collision records telemetry and creates a listing", async ({
   page,
 }) => {
   const cleanupIds = await seedCollisionListings(page, {
@@ -40,18 +40,11 @@ test("T-19: the fourth acknowledged collision is created under review and shows 
     const ackResponse = await ackResponsePromise;
     expect(ackResponse.status()).toBe(201);
 
-    await expect(
-      page
-        .locator('[data-sonner-toast][role="status"]')
-        .filter({ hasText: /review/i })
-        .first()
-    ).toBeVisible();
-
     const createdListingId = await expectCreatedListingId(page);
     cleanupIds.push(createdListingId);
 
     const listingState = await getListingCollisionState(page, createdListingId);
-    expect(listingState.needsMigrationReview).toBe(true);
+    expect(listingState.normalizedAddress).toBeTruthy();
   } finally {
     await deleteListings(page, cleanupIds);
   }

@@ -6,14 +6,28 @@ import {
   LISTING_NOT_FOUND_MESSAGE,
 } from "@/lib/messaging/listing-contactable";
 
+const contactableListing = {
+  status: "ACTIVE" as const,
+  availabilitySource: "HOST_MANAGED" as const,
+  availableSlots: 1,
+  totalSlots: 1,
+  openSlots: 1,
+  moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+  availableUntil: null,
+  minStayMonths: 1,
+  lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
+  statusReason: null,
+  needsMigrationReview: false,
+};
+
 describe("evaluateListingContactable", () => {
   it("returns ok for an ACTIVE listing", () => {
-    const result = evaluateListingContactable({ status: "ACTIVE" });
-    expect(result).toEqual({ ok: true, listing: { status: "ACTIVE" } });
+    const result = evaluateListingContactable(contactableListing);
+    expect(result).toEqual({ ok: true, listing: contactableListing });
   });
 
   it("preserves extra fields on an ACTIVE listing", () => {
-    const listing = { status: "ACTIVE" as const, ownerId: "owner-1", id: "l-1" };
+    const listing = { ...contactableListing, ownerId: "owner-1", id: "l-1" };
     const result = evaluateListingContactable(listing);
     expect(result.ok).toBe(true);
     if (result.ok) {

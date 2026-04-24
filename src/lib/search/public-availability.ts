@@ -420,6 +420,7 @@ export function isListingEligibleForPublicSearch(
 ): boolean {
   return (
     input.resolvedAvailability.searchEligible &&
+    input.needsMigrationReview !== true &&
     input.statusReason !== "MIGRATION_REVIEW"
   );
 }

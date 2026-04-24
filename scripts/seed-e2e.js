@@ -7,6 +7,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 
@@ -18,6 +19,31 @@ const DEFAULT_IMAGES = [
   'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=600',
   'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=600',
 ];
+const DEFAULT_PROFILE_IMAGE =
+  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200';
+const DEFAULT_PROFILE_BIO =
+  'E2E verified Roomshare test profile with enough detail for create flows.';
+const SF_PRIMARY_USER_LISTING_COUNT = 5;
+
+function slugifyFixtureId(value) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 48);
+}
+
+function buildSfListingSeed(data, index) {
+  const moveInDate = new Date(Date.UTC(2026, 4, 1 + index, 12, 0, 0));
+  const createdAt = new Date(Date.UTC(2026, 3, 1, 12, index, 0));
+
+  return {
+    ...data,
+    id: `e2e-sf-${index + 1}-${slugifyFixtureId(data.title)}`,
+    moveInDate: moveInDate.toISOString(),
+    createdAt: createdAt.toISOString(),
+  };
+}
 
 // SF locations within the bounds used by E2E tests
 const SF_LISTINGS = [
@@ -354,14 +380,15 @@ async function upsertListingWithLocation(ownerId, seed) {
       description: seed.description,
       price: seed.price,
       roomType: seed.roomType,
-      amenities: ['Wifi', 'Furnished', 'Kitchen'],
-      houseRules: ['No Smoking', 'Quiet Hours 10pm-8am'],
+      amenities: seed.amenities || ['Wifi', 'Furnished', 'Kitchen'],
+      houseRules: seed.houseRules || ['No Smoking', 'Quiet Hours 10pm-8am'],
       householdLanguages: ['en'],
-      leaseDuration: '6 months',
-      totalSlots: 2,
-      availableSlots: 1,
+      leaseDuration: seed.leaseDuration || '6 months',
+      totalSlots: seed.totalSlots || 2,
+      availableSlots: seed.availableSlots || 1,
+      openSlots: seed.openSlots ?? seed.availableSlots ?? 1,
       moveInDate: new Date(seed.moveInDate),
-      images: DEFAULT_IMAGES,
+      images: seed.images || DEFAULT_IMAGES,
       createdAt: new Date(seed.createdAt),
       location: {
         upsert: {
@@ -387,14 +414,15 @@ async function upsertListingWithLocation(ownerId, seed) {
       description: seed.description,
       price: seed.price,
       roomType: seed.roomType,
-      amenities: ['Wifi', 'Furnished', 'Kitchen'],
-      houseRules: ['No Smoking', 'Quiet Hours 10pm-8am'],
+      amenities: seed.amenities || ['Wifi', 'Furnished', 'Kitchen'],
+      houseRules: seed.houseRules || ['No Smoking', 'Quiet Hours 10pm-8am'],
       householdLanguages: ['en'],
-      leaseDuration: '6 months',
-      totalSlots: 2,
-      availableSlots: 1,
+      leaseDuration: seed.leaseDuration || '6 months',
+      totalSlots: seed.totalSlots || 2,
+      availableSlots: seed.availableSlots || 1,
+      openSlots: seed.openSlots ?? seed.availableSlots ?? 1,
       moveInDate: new Date(seed.moveInDate),
-      images: DEFAULT_IMAGES,
+      images: seed.images || DEFAULT_IMAGES,
       createdAt: new Date(seed.createdAt),
       location: {
         create: {
@@ -417,6 +445,342 @@ async function upsertListingWithLocation(ownerId, seed) {
   return listing;
 }
 
+const ROOM_CATEGORY_BY_ROOM_TYPE = {
+  'Private Room': 'PRIVATE_ROOM',
+  'Shared Room': 'SHARED_ROOM',
+  'Entire Place': 'ENTIRE_PLACE',
+};
+
+function toRoomCategory(roomType) {
+  return ROOM_CATEGORY_BY_ROOM_TYPE[roomType] || 'PRIVATE_ROOM';
+}
+
+function toDateOnly(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+  }
+  return date.toISOString().slice(0, 10);
+}
+
+function deriveUnitIdentity(ownerId, seed) {
+  const canonicalMaterial = [
+    ownerId,
+    seed.address,
+    seed.city,
+    seed.state,
+    seed.zip,
+  ]
+    .join('|')
+    .toLowerCase();
+  const hash = crypto
+    .createHash('sha256')
+    .update(canonicalMaterial)
+    .digest('hex');
+
+  return {
+    unitId: `e2e-unit-${hash.slice(0, 24)}`,
+    canonicalAddressHash: hash,
+    canonicalUnit: `owner:${ownerId}`,
+  };
+}
+
+function buildProjectionInput(listing, seed, ownerId) {
+  return {
+    listing,
+    seed,
+    ownerId,
+    unit: deriveUnitIdentity(ownerId, seed),
+    roomCategory: toRoomCategory(seed.roomType),
+    availableFrom: toDateOnly(listing.moveInDate || seed.moveInDate),
+    availableUntil: listing.availableUntil
+      ? toDateOnly(listing.availableUntil)
+      : null,
+    totalSlots: Number(listing.totalSlots || 1),
+    openSlots: Math.max(
+      1,
+      Number(listing.openSlots ?? listing.availableSlots ?? 1)
+    ),
+    price: Number(listing.price ?? seed.price ?? 1000),
+  };
+}
+
+async function tableExists(tableName) {
+  const result = await prisma.$queryRaw`
+    SELECT EXISTS (
+      SELECT FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = ${tableName}
+    ) AS "exists"
+  `;
+  return result[0]?.exists === true;
+}
+
+async function upsertProjectionFixtureRows(inputs) {
+  if (inputs.length === 0) return;
+
+  const hasProjectionTables =
+    (await tableExists('physical_units')) &&
+    (await tableExists('listing_inventories')) &&
+    (await tableExists('inventory_search_projection')) &&
+    (await tableExists('unit_public_projection'));
+
+  if (!hasProjectionTables) {
+    console.log('  ⚠ projection tables do not exist — skipping projection fixture backfill');
+    return;
+  }
+
+  const groups = new Map();
+
+  for (const input of inputs) {
+    const { listing, seed, unit, roomCategory } = input;
+    const point = `POINT(${seed.lng} ${seed.lat})`;
+    const cell = `${Number(seed.lat).toFixed(4)},${Number(seed.lng).toFixed(4)}`;
+    const areaName = seed.city || 'San Francisco';
+    const capacityGuests = roomCategory === 'SHARED_ROOM' ? null : input.totalSlots;
+    const totalBeds = roomCategory === 'SHARED_ROOM' ? input.totalSlots : null;
+    const openBeds = roomCategory === 'SHARED_ROOM' ? input.openSlots : null;
+    const sourceVersion = 1;
+    const projectionEpoch = 1;
+
+    await prisma.$executeRawUnsafe(
+      `
+        INSERT INTO "physical_units" (
+          id, unit_identity_epoch, canonical_address_hash, canonical_unit,
+          canonicalizer_version, privacy_version, geocode_status,
+          lifecycle_status, publish_status, supersedes_unit_ids,
+          superseded_by_unit_id, source_version, row_version,
+          exact_point, public_point, public_cell_id, public_area_name,
+          created_at, updated_at
+        )
+        VALUES (
+          $1, 1, $2, $3, 'e2e.v1', 1, 'COMPLETE',
+          'ACTIVE', 'PUBLISHED', ARRAY[]::TEXT[],
+          NULL, $4::BIGINT, $4::BIGINT,
+          $5::geography, $5::geography, $6, $7,
+          NOW(), NOW()
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          unit_identity_epoch = EXCLUDED.unit_identity_epoch,
+          canonical_address_hash = EXCLUDED.canonical_address_hash,
+          canonical_unit = EXCLUDED.canonical_unit,
+          canonicalizer_version = EXCLUDED.canonicalizer_version,
+          privacy_version = EXCLUDED.privacy_version,
+          geocode_status = EXCLUDED.geocode_status,
+          lifecycle_status = EXCLUDED.lifecycle_status,
+          publish_status = EXCLUDED.publish_status,
+          source_version = EXCLUDED.source_version,
+          row_version = EXCLUDED.row_version,
+          exact_point = EXCLUDED.exact_point,
+          public_point = EXCLUDED.public_point,
+          public_cell_id = EXCLUDED.public_cell_id,
+          public_area_name = EXCLUDED.public_area_name,
+          updated_at = NOW()
+      `,
+      unit.unitId,
+      unit.canonicalAddressHash,
+      unit.canonicalUnit,
+      sourceVersion,
+      point,
+      cell,
+      areaName
+    );
+
+    await prisma.$executeRawUnsafe(
+      `
+        INSERT INTO "listing_inventories" (
+          id, unit_id, unit_identity_epoch_written_at, inventory_key,
+          room_category, space_label, capacity_guests, total_beds, open_beds,
+          available_from, available_until, availability_range, price,
+          lease_min_months, lease_max_months, lease_negotiable,
+          gender_preference, household_gender, lifecycle_status, publish_status,
+          source_version, row_version, last_published_version, last_embedded_version,
+          canonicalizer_version, canonical_address_hash, privacy_version,
+          created_at, updated_at
+        )
+        VALUES (
+          $1, $2, 1, $3, $4, NULL, $5::INTEGER, $6::INTEGER, $7::INTEGER,
+          $8::DATE, $9::DATE,
+          tstzrange($8::timestamptz, COALESCE($9::timestamptz, 'infinity'::timestamptz), '[)'),
+          $10::NUMERIC, 1, NULL, FALSE, NULL, NULL, 'ACTIVE', 'PUBLISHED',
+          $11::BIGINT, $11::BIGINT, $11::BIGINT, NULL, 'e2e.v1', $12, 1,
+          NOW(), NOW()
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          unit_id = EXCLUDED.unit_id,
+          unit_identity_epoch_written_at = EXCLUDED.unit_identity_epoch_written_at,
+          inventory_key = EXCLUDED.inventory_key,
+          room_category = EXCLUDED.room_category,
+          capacity_guests = EXCLUDED.capacity_guests,
+          total_beds = EXCLUDED.total_beds,
+          open_beds = EXCLUDED.open_beds,
+          available_from = EXCLUDED.available_from,
+          available_until = EXCLUDED.available_until,
+          availability_range = EXCLUDED.availability_range,
+          price = EXCLUDED.price,
+          lifecycle_status = EXCLUDED.lifecycle_status,
+          publish_status = EXCLUDED.publish_status,
+          source_version = EXCLUDED.source_version,
+          row_version = EXCLUDED.row_version,
+          last_published_version = EXCLUDED.last_published_version,
+          canonical_address_hash = EXCLUDED.canonical_address_hash,
+          updated_at = NOW()
+      `,
+      listing.id,
+      unit.unitId,
+      `listing:${listing.id}`,
+      roomCategory,
+      capacityGuests,
+      totalBeds,
+      openBeds,
+      input.availableFrom,
+      input.availableUntil,
+      input.price,
+      sourceVersion,
+      unit.canonicalAddressHash
+    );
+
+    await prisma.listing.update({
+      where: { id: listing.id },
+      data: { physicalUnitId: unit.unitId },
+    });
+
+    await prisma.$executeRawUnsafe(
+      `
+        INSERT INTO "inventory_search_projection" (
+          id, inventory_id, unit_id, unit_identity_epoch_written_at,
+          room_category, capacity_guests, total_beds, open_beds, price,
+          available_from, available_until, availability_range,
+          lease_min_months, lease_max_months, lease_negotiable,
+          gender_preference, household_gender, public_point, public_cell_id,
+          public_area_name, publish_status, source_version, projection_epoch,
+          created_at, updated_at
+        )
+        VALUES (
+          $1, $2, $3, 1, $4, $5::INTEGER, $6::INTEGER, $7::INTEGER,
+          $8::NUMERIC, $9::DATE, $10::DATE,
+          tstzrange($9::timestamptz, COALESCE($10::timestamptz, 'infinity'::timestamptz), '[)'),
+          1, NULL, FALSE, NULL, NULL, $11, $12, $13, 'PUBLISHED',
+          $14::BIGINT, $15::BIGINT, NOW(), NOW()
+        )
+        ON CONFLICT (inventory_id) DO UPDATE SET
+          unit_id = EXCLUDED.unit_id,
+          unit_identity_epoch_written_at = EXCLUDED.unit_identity_epoch_written_at,
+          room_category = EXCLUDED.room_category,
+          capacity_guests = EXCLUDED.capacity_guests,
+          total_beds = EXCLUDED.total_beds,
+          open_beds = EXCLUDED.open_beds,
+          price = EXCLUDED.price,
+          available_from = EXCLUDED.available_from,
+          available_until = EXCLUDED.available_until,
+          availability_range = EXCLUDED.availability_range,
+          public_point = EXCLUDED.public_point,
+          public_cell_id = EXCLUDED.public_cell_id,
+          public_area_name = EXCLUDED.public_area_name,
+          publish_status = EXCLUDED.publish_status,
+          source_version = EXCLUDED.source_version,
+          projection_epoch = EXCLUDED.projection_epoch,
+          updated_at = NOW()
+      `,
+      `e2e-projection-${listing.id}`,
+      listing.id,
+      unit.unitId,
+      roomCategory,
+      capacityGuests,
+      totalBeds,
+      openBeds,
+      input.price,
+      input.availableFrom,
+      input.availableUntil,
+      point,
+      cell,
+      areaName,
+      sourceVersion,
+      projectionEpoch
+    );
+
+    const groupKey = unit.unitId;
+    const group = groups.get(groupKey) || {
+      unit,
+      point,
+      cell,
+      areaName,
+      inputs: [],
+    };
+    group.inputs.push(input);
+    groups.set(groupKey, group);
+  }
+
+  for (const group of groups.values()) {
+    const sorted = [...group.inputs].sort((a, b) => {
+      if (a.price !== b.price) return a.price - b.price;
+      return a.availableFrom.localeCompare(b.availableFrom);
+    });
+    const representative = sorted[0];
+    const fromPrice = Math.min(...sorted.map((input) => input.price));
+    const roomCategories = Array.from(
+      new Set(sorted.map((input) => input.roomCategory))
+    );
+    const earliestAvailableFrom = sorted
+      .map((input) => input.availableFrom)
+      .sort()[0];
+    const heroImage = representative.listing.images?.[0] || null;
+
+    await prisma.$executeRawUnsafe(
+      `
+        INSERT INTO "unit_public_projection" (
+          unit_id, unit_identity_epoch, representative_inventory_id,
+          from_price, room_categories, earliest_available_from,
+          matching_inventory_count, coarse_availability_badges,
+          public_point, public_cell_id, public_area_name,
+          display_title, display_subtitle, hero_image_url, payload_version,
+          source_version, projection_epoch, created_at, updated_at
+        )
+        VALUES (
+          $1, 1, $2, $3::NUMERIC, $4::TEXT[], $5::DATE, $6::INTEGER,
+          $7::TEXT[], $8, $9, $10, $11, $12, $13, 'phase04.v1',
+          1::BIGINT, 1::BIGINT, NOW(), NOW()
+        )
+        ON CONFLICT (unit_id, unit_identity_epoch) DO UPDATE SET
+          representative_inventory_id = EXCLUDED.representative_inventory_id,
+          from_price = EXCLUDED.from_price,
+          room_categories = EXCLUDED.room_categories,
+          earliest_available_from = EXCLUDED.earliest_available_from,
+          matching_inventory_count = EXCLUDED.matching_inventory_count,
+          coarse_availability_badges = EXCLUDED.coarse_availability_badges,
+          public_point = EXCLUDED.public_point,
+          public_cell_id = EXCLUDED.public_cell_id,
+          public_area_name = EXCLUDED.public_area_name,
+          display_title = EXCLUDED.display_title,
+          display_subtitle = EXCLUDED.display_subtitle,
+          hero_image_url = EXCLUDED.hero_image_url,
+          payload_version = EXCLUDED.payload_version,
+          source_version = EXCLUDED.source_version,
+          projection_epoch = EXCLUDED.projection_epoch,
+          updated_at = NOW()
+      `,
+      group.unit.unitId,
+      representative.listing.id,
+      fromPrice,
+      roomCategories,
+      earliestAvailableFrom,
+      sorted.length,
+      [`${sorted.length} open`],
+      group.point,
+      group.cell,
+      group.areaName,
+      representative.seed.title,
+      `${sorted.length} available ${sorted.length === 1 ? 'space' : 'spaces'}`,
+      heroImage
+    );
+  }
+
+  console.log(
+    `  ✓ contact-first projections backfilled: ${inputs.length} inventories, ${groups.size} units`
+  );
+}
+
 async function main() {
   console.log('🌱 Seeding E2E test data...');
 
@@ -424,13 +788,25 @@ async function main() {
   const hashedPassword = await bcrypt.hash(E2E_USER_PASSWORD, 10);
   const user = await prisma.user.upsert({
     where: { email: E2E_USER_EMAIL },
-    update: { password: hashedPassword, emailVerified: new Date(), isVerified: true },
+    update: {
+      password: hashedPassword,
+      emailVerified: new Date(),
+      isVerified: true,
+      bio: DEFAULT_PROFILE_BIO,
+      image: DEFAULT_PROFILE_IMAGE,
+      countryOfOrigin: 'United States',
+      languages: ['en'],
+    },
     create: {
       email: E2E_USER_EMAIL,
       name: 'E2E Test User',
       password: hashedPassword,
       emailVerified: new Date(),
       isVerified: true,
+      bio: DEFAULT_PROFILE_BIO,
+      image: DEFAULT_PROFILE_IMAGE,
+      countryOfOrigin: 'United States',
+      languages: ['en'],
     },
   });
   console.log(`  ✓ User: ${user.email} (${user.id})`);
@@ -438,69 +814,55 @@ async function main() {
   // 2. Create a second user for reviews
   const reviewer = await prisma.user.upsert({
     where: { email: 'e2e-reviewer@roomshare.dev' },
-    update: {},
+    update: {
+      bio: DEFAULT_PROFILE_BIO,
+      image: DEFAULT_PROFILE_IMAGE,
+      countryOfOrigin: 'United States',
+      languages: ['en'],
+      isVerified: true,
+    },
     create: {
       email: 'e2e-reviewer@roomshare.dev',
       name: 'E2E Reviewer',
       password: hashedPassword,
       emailVerified: new Date(),
       isVerified: true,
+      bio: DEFAULT_PROFILE_BIO,
+      image: DEFAULT_PROFILE_IMAGE,
+      countryOfOrigin: 'United States',
+      languages: ['en'],
     },
   });
   console.log(`  ✓ Reviewer: ${reviewer.email} (${reviewer.id})`);
 
-  // 3. Create listings with locations
+  // 3. Create listings with locations. Keep the primary test user below the
+  // create-listing cap so real create flows can exercise their intended paths.
   const createdListings = [];
-  for (const data of SF_LISTINGS) {
-    const existing = await prisma.listing.findFirst({
-      where: { title: data.title, ownerId: user.id },
-    });
+  const sfListingOwnerIds = [];
+  const sfListingIds = [];
+  for (const [index, data] of SF_LISTINGS.entries()) {
+    const ownerId =
+      index < SF_PRIMARY_USER_LISTING_COUNT ? user.id : reviewer.id;
+    const seed = buildSfListingSeed(data, index);
+    const listing = await upsertListingWithLocation(ownerId, seed);
 
-    if (existing) {
-      createdListings.push(existing);
-      console.log(`  ⏭ Listing exists: ${data.title}`);
-      continue;
-    }
-
-    const listing = await prisma.listing.create({
-      data: {
-        ownerId: user.id,
-        title: data.title,
-        description: data.description,
-        price: data.price,
-        roomType: data.roomType,
-        amenities: data.amenities || ['Wifi', 'Furnished', 'Kitchen'],
-        houseRules: data.houseRules || ['No Smoking', 'Quiet Hours 10pm-8am'],
-        householdLanguages: ['en'],
-        leaseDuration: data.leaseDuration || null,
-        totalSlots: 2,
-        availableSlots: 1,
-        moveInDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        images: [
-          'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=600',
-          'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=600',
-        ],
-        location: {
-          create: {
-            address: data.address,
-            city: data.city,
-            state: data.state,
-            zip: data.zip,
-          },
-        },
-      },
-    });
-
-    // Set PostGIS coords
-    const point = `POINT(${data.lng} ${data.lat})`;
-    await prisma.$executeRaw`
-      UPDATE "Location"
-      SET coords = ST_SetSRID(ST_GeomFromText(${point}), 4326)
-      WHERE "listingId" = ${listing.id}
-    `;
-
+    sfListingOwnerIds.push(ownerId);
+    sfListingIds.push(listing.id);
     createdListings.push(listing);
     console.log(`  ✓ Listing: ${data.title} (${listing.id})`);
+  }
+
+  const retiredSfDuplicates = await prisma.listing.updateMany({
+    where: {
+      id: { notIn: sfListingIds },
+      ownerId: { in: [user.id, reviewer.id] },
+      title: { in: SF_LISTINGS.map((listing) => listing.title) },
+      status: { in: ['ACTIVE', 'PAUSED'] },
+    },
+    data: { status: 'RENTED' },
+  });
+  if (retiredSfDuplicates.count > 0) {
+    console.log(`  ✓ Retired stale SF listing duplicates: ${retiredSfDuplicates.count}`);
   }
 
   // 3b. Create a listing owned by REVIEWER (so test user sees booking form, not owner view)
@@ -562,7 +924,14 @@ async function main() {
   // 4. Create admin user
   const admin = await prisma.user.upsert({
     where: { email: 'e2e-admin@roomshare.dev' },
-    update: { isAdmin: true },
+    update: {
+      isAdmin: true,
+      bio: DEFAULT_PROFILE_BIO,
+      image: DEFAULT_PROFILE_IMAGE,
+      countryOfOrigin: 'United States',
+      languages: ['en'],
+      isVerified: true,
+    },
     create: {
       email: 'e2e-admin@roomshare.dev',
       name: 'E2E Admin',
@@ -570,6 +939,10 @@ async function main() {
       emailVerified: new Date(),
       isVerified: true,
       isAdmin: true,
+      bio: DEFAULT_PROFILE_BIO,
+      image: DEFAULT_PROFILE_IMAGE,
+      countryOfOrigin: 'United States',
+      languages: ['en'],
     },
   });
   console.log(`  ✓ Admin: ${admin.email} (${admin.id})`);
@@ -577,7 +950,13 @@ async function main() {
   // 5. Create third user (for blocking/messaging tests)
   const thirdUser = await prisma.user.upsert({
     where: { email: 'e2e-other@roomshare.dev' },
-    update: {},
+    update: {
+      bio: 'Another verified E2E user for messaging and safety tests.',
+      image: DEFAULT_PROFILE_IMAGE,
+      countryOfOrigin: 'United States',
+      languages: ['en'],
+      isVerified: true,
+    },
     create: {
       email: 'e2e-other@roomshare.dev',
       name: 'E2E Other User',
@@ -585,6 +964,9 @@ async function main() {
       emailVerified: new Date(),
       isVerified: true,
       bio: 'Another test user for E2E tests.',
+      image: DEFAULT_PROFILE_IMAGE,
+      countryOfOrigin: 'United States',
+      languages: ['en'],
     },
   });
   console.log(`  ✓ Third user: ${thirdUser.email} (${thirdUser.id})`);
@@ -898,6 +1280,35 @@ async function main() {
   } catch (err) {
     console.error('  ⚠ listing_search_docs backfill failed:', err.message);
     // Non-fatal: tests may still partially work without it
+  }
+
+  // 12b. Backfill contact-first projection tables for Phase 04 reads.
+  try {
+    const projectionInputs = [
+      ...createdListings.map((listing, index) =>
+        buildProjectionInput(
+          listing,
+          SF_LISTINGS[index],
+          sfListingOwnerIds[index] || user.id
+        )
+      ),
+      buildProjectionInput(reviewerListing, REVIEWER_LISTING, reviewer.id),
+      buildProjectionInput(dedupeSingleton, DEDUPE_SINGLETON_SEED, reviewer.id),
+      ...dedupeGroupListings.map((listing, index) =>
+        buildProjectionInput(listing, DEDUPE_GROUP_SEEDS[index], reviewer.id)
+      ),
+      ...crossOwnerListings.map((listing, index) =>
+        buildProjectionInput(
+          listing,
+          CROSS_OWNER_SEEDS[index],
+          index === 0 ? reviewer.id : thirdUser.id
+        )
+      ),
+    ];
+
+    await upsertProjectionFixtureRows(projectionInputs);
+  } catch (err) {
+    console.error('  ⚠ contact-first projection backfill failed:', err.message);
   }
 
   // 13. Create notification records for E2E tests

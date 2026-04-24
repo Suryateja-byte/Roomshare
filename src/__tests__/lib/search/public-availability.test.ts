@@ -6,7 +6,7 @@ import {
 } from "@/lib/search/public-availability";
 
 describe("search/public-availability", () => {
-  it("builds the legacy-default availability block from current listing fields", () => {
+  it("builds the host-managed default availability block from current listing fields", () => {
     expect(
       buildPublicAvailability({
         availableSlots: 2,
@@ -14,7 +14,7 @@ describe("search/public-availability", () => {
         moveInDate: new Date("2026-06-01T00:00:00.000Z"),
       })
     ).toEqual({
-      availabilitySource: "LEGACY_BOOKING",
+      availabilitySource: "HOST_MANAGED",
       openSlots: 2,
       totalSlots: 4,
       availableFrom: "2026-06-01",
@@ -46,7 +46,7 @@ describe("search/public-availability", () => {
     });
   });
 
-  it("resolves LEGACY_BOOKING listings with booking-derived compatibility slots", () => {
+  it("ignores retired booking snapshots and resolves legacy rows through host-managed rules", () => {
     expect(
       resolvePublicAvailability(
         {
@@ -65,18 +65,18 @@ describe("search/public-availability", () => {
         }
       )
     ).toEqual({
-      availabilitySource: "LEGACY_BOOKING",
-      openSlots: 3,
+      availabilitySource: "HOST_MANAGED",
+      openSlots: 2,
       totalSlots: 4,
       availableFrom: "2026-06-01",
       availableUntil: null,
       minStayMonths: 1,
       lastConfirmedAt: null,
-      effectiveAvailableSlots: 3,
-      isValid: true,
-      isPubliclyAvailable: true,
-      freshnessBucket: "NOT_APPLICABLE",
-      searchEligible: true,
+      effectiveAvailableSlots: 0,
+      isValid: false,
+      isPubliclyAvailable: false,
+      freshnessBucket: "UNCONFIRMED",
+      searchEligible: false,
       staleAt: null,
       autoPauseAt: null,
       publicStatus: "AVAILABLE",
@@ -430,9 +430,8 @@ describe("search/public-availability", () => {
       }
     );
 
-    expect(resolved.get("legacy-1")?.availabilitySource).toBe(
-      "LEGACY_BOOKING"
-    );
+    expect(resolved.get("legacy-1")?.availabilitySource).toBe("HOST_MANAGED");
+    expect(resolved.get("legacy-1")?.searchEligible).toBe(false);
     expect(resolved.get("host-1")?.availabilitySource).toBe("HOST_MANAGED");
     expect(resolved.get("host-1")?.effectiveAvailableSlots).toBe(2);
   });

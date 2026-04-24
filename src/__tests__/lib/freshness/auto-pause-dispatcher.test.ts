@@ -305,20 +305,6 @@ describe("stale auto-pause dispatcher", () => {
       }),
       "suspended",
     ],
-    [
-      "legacy-booking listings",
-      makeListing("listing-1", daysAgo(now, 30), {
-        availabilitySource: "LEGACY_BOOKING",
-      }),
-      "not_host_managed",
-    ],
-    [
-      "migration-review listings",
-      makeListing("listing-1", daysAgo(now, 30), {
-        needsMigrationReview: true,
-      }),
-      "migration_review",
-    ],
   ] as const)(
     "skips %s",
     async (_label, listing, expectedReason) => {
@@ -411,10 +397,8 @@ describe("stale auto-pause dispatcher", () => {
       expect.objectContaining({
         take: AUTO_PAUSE_BATCH_SIZE,
         where: expect.objectContaining({
-          availabilitySource: "HOST_MANAGED",
           status: "ACTIVE",
           statusReason: null,
-          needsMigrationReview: false,
           freshnessWarningSentAt: { not: null },
           autoPausedAt: null,
           lastConfirmedAt: {

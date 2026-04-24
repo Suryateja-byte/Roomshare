@@ -1436,13 +1436,12 @@ describe("slotThreshold parameterization", () => {
       const params = mockQueryWithTimeout.mock.calls[0][1] as unknown[];
 
       // The slot threshold condition must use a $N placeholder, not a literal number.
-      // Current availability SQL uses the effective availability subquery directly in
-      // the WHERE clause, so assert the placeholder contract instead of a specific alias.
-      expect(sql).toContain(">= $1");
-      expect(sql).not.toContain(">= 1");
+      // Other public eligibility predicates may still use literal constants such as
+      // totalSlots >= 1, so scope this assertion to the openSlots threshold.
+      expect(sql).toMatch(/l\."openSlots"\s+>=\s+\$\d+/);
+      expect(sql).not.toMatch(/l\."openSlots"\s+>=\s+1\b/);
 
-      // slotThreshold (default 1) must be the first query param
-      expect(params[0]).toBe(1);
+      expect(params).toContain(1);
     });
 
     it("passes custom minAvailableSlots as parameterized value", async () => {
@@ -1454,7 +1453,7 @@ describe("slotThreshold parameterization", () => {
       });
 
       const params = mockQueryWithTimeout.mock.calls[0][1] as unknown[];
-      expect(params[0]).toBe(3);
+      expect(params).toContain(3);
     });
   });
 
@@ -1472,10 +1471,10 @@ describe("slotThreshold parameterization", () => {
         const sql = call[0] as string;
         const params = call[1] as unknown[];
 
-        if (sql.includes(">= $1")) {
-          expect(sql).toContain(">= $1");
-          expect(sql).not.toContain(">= 1");
-          expect(params[0]).toBe(1);
+        if (sql.includes('l."openSlots"')) {
+          expect(sql).toMatch(/l\."openSlots"\s+>=\s+\$\d+/);
+          expect(sql).not.toMatch(/l\."openSlots"\s+>=\s+1\b/);
+          expect(params).toContain(1);
         }
       }
     });
@@ -1491,8 +1490,9 @@ describe("slotThreshold parameterization", () => {
       for (const call of mockQueryWithTimeout.mock.calls) {
         const sql = call[0] as string;
         const params = call[1] as unknown[];
-        if (sql.includes('"availableSlots"')) {
-          expect(params[0]).toBe(5);
+        if (sql.includes('l."openSlots"')) {
+          expect(sql).toMatch(/l\."openSlots"\s+>=\s+\$\d+/);
+          expect(params).toContain(5);
         }
       }
     });
@@ -1507,7 +1507,7 @@ describe("slotThreshold parameterization", () => {
 
       for (const call of mockQueryWithTimeout.mock.calls) {
         const sql = call[0] as string;
-        expect(sql).toContain(`l."moveInDate"::date <= $4::date`);
+        expect(sql).toMatch(/l\."moveInDate"::date <= \$\d+::date/);
       }
     });
   });

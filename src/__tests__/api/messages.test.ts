@@ -313,15 +313,13 @@ describe("Messages API", () => {
         listing: {
           status: "ACTIVE",
           statusReason: null,
-          needsMigrationReview: false,
-          availabilitySource: "LEGACY_BOOKING",
           availableSlots: 1,
           totalSlots: 1,
-          openSlots: null,
+          openSlots: 1,
           moveInDate: new Date("2026-05-01T00:00:00.000Z"),
           availableUntil: null,
           minStayMonths: 1,
-          lastConfirmedAt: null,
+          lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
         },
       });
       (checkBlockBeforeAction as jest.Mock).mockResolvedValueOnce({
@@ -347,15 +345,13 @@ describe("Messages API", () => {
         listing: {
           status: "ACTIVE",
           statusReason: null,
-          needsMigrationReview: false,
-          availabilitySource: "LEGACY_BOOKING",
           availableSlots: 1,
           totalSlots: 1,
-          openSlots: null,
+          openSlots: 1,
           moveInDate: new Date("2026-05-01T00:00:00.000Z"),
           availableUntil: null,
           minStayMonths: 1,
-          lastConfirmedAt: null,
+          lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
         },
       });
       (checkBlockBeforeAction as jest.Mock).mockResolvedValueOnce({
@@ -383,15 +379,13 @@ describe("Messages API", () => {
         listing: {
           status: "ACTIVE",
           statusReason: null,
-          needsMigrationReview: false,
-          availabilitySource: "LEGACY_BOOKING",
           availableSlots: 1,
           totalSlots: 1,
-          openSlots: null,
+          openSlots: 1,
           moveInDate: new Date("2026-05-01T00:00:00.000Z"),
           availableUntil: null,
           minStayMonths: 1,
-          lastConfirmedAt: null,
+          lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
         },
       };
       const mockMessage = {
@@ -476,8 +470,7 @@ describe("Messages API", () => {
       expect(response.status).toBe(403);
       const data = await response.json();
       expect(data).toEqual({
-        error:
-          "This listing is temporarily unavailable while it completes migration review.",
+        error: "This listing is temporarily unavailable.",
         code: "MIGRATION_REVIEW",
       });
       expect(prisma.message.create).not.toHaveBeenCalled();

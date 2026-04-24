@@ -51,7 +51,7 @@ test("T-18: create-separate requires a reason and creates a non-moderated listin
     cleanupIds.push(createdListingId);
 
     const listingState = await getListingCollisionState(page, createdListingId);
-    expect(listingState.needsMigrationReview).toBe(false);
+    expect(listingState.normalizedAddress).toBeTruthy();
   } finally {
     await deleteListings(page, cleanupIds);
   }

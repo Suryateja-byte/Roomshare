@@ -34,6 +34,7 @@ const customJestConfig = {
     "<rootDir>/.claude/worktrees/",
     "<rootDir>/src/__tests__/utils/",
     "<rootDir>/src/__tests__/fixtures/",
+    "<rootDir>/src/__tests__/lib/listings/collision-detector-test-utils.ts",
     "<rootDir>/tests/e2e/",
   ],
   modulePathIgnorePatterns: [

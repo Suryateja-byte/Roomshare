@@ -340,7 +340,7 @@ describe("Listings API IDOR Protection", () => {
       expect(response.status).toBe(409);
       await expect(response.json()).resolves.toEqual({
         error:
-          "This listing now uses host-managed availability. Reload and use the new availability editor.",
+          "Availability is managed by the contact-first inventory editor. Reload and use the availability editor.",
         code: "HOST_MANAGED_WRITE_PATH_REQUIRED",
       });
       expect(updateMock).not.toHaveBeenCalled();
@@ -385,7 +385,7 @@ describe("Listings API IDOR Protection", () => {
       expect(response.status).toBe(409);
       await expect(response.json()).resolves.toEqual({
         error:
-          "This listing now uses host-managed availability. Reload and use the new availability editor.",
+          "Availability is managed by the contact-first inventory editor. Reload and use the availability editor.",
         code: "HOST_MANAGED_WRITE_PATH_REQUIRED",
       });
       expect(updateMock).not.toHaveBeenCalled();
@@ -430,13 +430,13 @@ describe("Listings API IDOR Protection", () => {
       expect(response.status).toBe(409);
       await expect(response.json()).resolves.toEqual({
         error:
-          "This listing now uses host-managed availability. Reload and use the new availability editor.",
+          "Availability is managed by the contact-first inventory editor. Reload and use the availability editor.",
         code: "HOST_MANAGED_WRITE_PATH_REQUIRED",
       });
       expect(updateMock).not.toHaveBeenCalled();
     });
 
-    it("allows generic PATCH of availableUntil on LEGACY_BOOKING listings", async () => {
+    it("blocks generic PATCH of availability-window fields after booking retirement", async () => {
       (auth as jest.Mock).mockResolvedValue(ownerSession);
       (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
       const queryRawMock = jest.fn().mockResolvedValue([
@@ -475,11 +475,16 @@ describe("Listings API IDOR Protection", () => {
         params: Promise.resolve({ id: "listing-abc" }),
       });
 
-      expect(response.status).toBe(200);
-      expect(updateMock).toHaveBeenCalled();
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toEqual({
+        error:
+          "Availability is managed by the contact-first inventory editor. Reload and use the availability editor.",
+        code: "HOST_MANAGED_WRITE_PATH_REQUIRED",
+      });
+      expect(updateMock).not.toHaveBeenCalled();
     });
 
-    it("recomputes availableSlots from live availability when cached value is stale high", async () => {
+    it("blocks generic PATCH of totalSlots instead of recalculating retired booking availability", async () => {
       (auth as jest.Mock).mockResolvedValue(ownerSession);
       (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
         ...mockListing,
@@ -521,26 +526,12 @@ describe("Listings API IDOR Protection", () => {
         params: Promise.resolve({ id: "listing-abc" }),
       });
 
-      expect(response.status).toBe(200);
-      expect(updateMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: "listing-abc" },
-          data: expect.objectContaining({
-            totalSlots: 7,
-            availableSlots: 6,
-          }),
-        })
-      );
-      expect(syncFutureInventoryTotalSlots).toHaveBeenCalledTimes(1);
-      expect((syncFutureInventoryTotalSlots as jest.Mock).mock.calls[0][1]).toBe(
-        "listing-abc"
-      );
-      expect((syncFutureInventoryTotalSlots as jest.Mock).mock.calls[0][2]).toBe(
-        7
-      );
+      expect(response.status).toBe(409);
+      expect(updateMock).not.toHaveBeenCalled();
+      expect(syncFutureInventoryTotalSlots).not.toHaveBeenCalled();
     });
 
-    it("recomputes availableSlots from live availability when cached value is stale low", async () => {
+    it("does not revive stale low booking availability math after booking retirement", async () => {
       (auth as jest.Mock).mockResolvedValue(ownerSession);
       (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
         ...mockListing,
@@ -582,18 +573,11 @@ describe("Listings API IDOR Protection", () => {
         params: Promise.resolve({ id: "listing-abc" }),
       });
 
-      expect(response.status).toBe(200);
-      expect(updateMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            totalSlots: 7,
-            availableSlots: 6,
-          }),
-        })
-      );
+      expect(response.status).toBe(409);
+      expect(updateMock).not.toHaveBeenCalled();
     });
 
-    it("uses live reserved slots when reducing totalSlots and still syncs future inventory", async () => {
+    it("blocks totalSlots reductions before retired inventory sync can run", async () => {
       (auth as jest.Mock).mockResolvedValue(ownerSession);
       (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
         ...mockListing,
@@ -636,26 +620,13 @@ describe("Listings API IDOR Protection", () => {
         params: Promise.resolve({ id: "listing-abc" }),
       });
 
-      expect(response.status).toBe(200);
-      expect(getFuturePeakReservedLoad).toHaveBeenCalledTimes(1);
-      expect(updateMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            totalSlots: 4,
-            availableSlots: 1,
-          }),
-        })
-      );
-      expect(syncFutureInventoryTotalSlots).toHaveBeenCalledTimes(1);
-      expect((syncFutureInventoryTotalSlots as jest.Mock).mock.calls[0][1]).toBe(
-        "listing-abc"
-      );
-      expect((syncFutureInventoryTotalSlots as jest.Mock).mock.calls[0][2]).toBe(
-        4
-      );
+      expect(response.status).toBe(409);
+      expect(getFuturePeakReservedLoad).not.toHaveBeenCalled();
+      expect(updateMock).not.toHaveBeenCalled();
+      expect(syncFutureInventoryTotalSlots).not.toHaveBeenCalled();
     });
 
-    it("keeps the existing reduction block and does not fall back to stale math", async () => {
+    it("keeps totalSlots changes on the contact-first inventory editor path", async () => {
       (auth as jest.Mock).mockResolvedValue(ownerSession);
       (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
         ...mockListing,
@@ -688,15 +659,19 @@ describe("Listings API IDOR Protection", () => {
         params: Promise.resolve({ id: "listing-abc" }),
       });
 
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(409);
       const body = await response.json();
-      expect(body.error).toContain("Cannot reduce total slots");
+      expect(body).toEqual({
+        error:
+          "Availability is managed by the contact-first inventory editor. Reload and use the availability editor.",
+        code: "HOST_MANAGED_WRITE_PATH_REQUIRED",
+      });
       expect(getAvailability).not.toHaveBeenCalled();
       expect(updateMock).not.toHaveBeenCalled();
       expect(syncFutureInventoryTotalSlots).not.toHaveBeenCalled();
     });
 
-    it("returns 500 when live availability is unexpectedly missing for a locked listing", async () => {
+    it("does not call retired live availability checks for generic totalSlots edits", async () => {
       (auth as jest.Mock).mockResolvedValue(ownerSession);
       (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
       (getAvailability as jest.Mock).mockResolvedValue(null);
@@ -725,9 +700,8 @@ describe("Listings API IDOR Protection", () => {
         params: Promise.resolve({ id: "listing-abc" }),
       });
 
-      expect(response.status).toBe(500);
-      const body = await response.json();
-      expect(body.error).toBe("Internal server error");
+      expect(response.status).toBe(409);
+      expect(getAvailability).not.toHaveBeenCalled();
       expect(updateMock).not.toHaveBeenCalled();
       expect(syncFutureInventoryTotalSlots).not.toHaveBeenCalled();
     });
@@ -967,7 +941,7 @@ describe("Listings API IDOR Protection", () => {
       expect(body.error).toBe("Unauthorized");
     });
 
-    it("prevents deletion when active bookings exist", async () => {
+    it("allows deletion without checking retired booking rows", async () => {
       (auth as jest.Mock).mockResolvedValue(ownerSession);
       // Transaction callback: listing found and owned, but has active bookings
       (prisma.$transaction as jest.Mock).mockImplementation(
@@ -997,9 +971,9 @@ describe("Listings API IDOR Protection", () => {
         params: Promise.resolve({ id: "listing-abc" }),
       });
 
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(200);
       const body = await response.json();
-      expect(body.error).toBe("Cannot delete listing with active bookings");
+      expect(body.success).toBe(true);
     });
   });
 

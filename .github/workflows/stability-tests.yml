@@ -47,16 +47,13 @@ jobs:
       E2E_DISABLE_RATE_LIMIT: 'true'
       E2E_TEST_HELPERS: 'true'
       E2E_TEST_SECRET: 'ci-e2e-test-secret-minimum-16-chars'
-      ENABLE_MULTI_SLOT_BOOKING: 'true'
-      ENABLE_WHOLE_UNIT_MODE: 'true'
-      ENABLE_SOFT_HOLDS: 'on'
-      ENABLE_BOOKING_AUDIT: 'true'
       CRON_SECRET: 'ci-stability-cron-secret-minimum-32-characters-long'
       NODE_OPTIONS: '--max-old-space-size=4096'
       CI: 'true'
       GOOGLE_CLIENT_ID: 'ci-placeholder-not-used-in-tests'
       GOOGLE_CLIENT_SECRET: 'ci-placeholder-not-used-in-tests'
       TURNSTILE_ENABLED: 'false'
+      ENABLE_SEARCH_DOC: 'true'
       # FLAKE-004: Skip globalSetup seed — CI already seeds in an explicit step above
       SKIP_E2E_SEED: 'true'
 
@@ -97,7 +94,7 @@ jobs:
       - name: Run stability E2E tests
         run: |
           pnpm exec playwright test \
-            tests/e2e/stability/ \
+            tests/e2e/search-stability/ \
             --project=chromium \
             --workers=1 \
             --reporter=list,html

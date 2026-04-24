@@ -44,20 +44,28 @@ describe("v2MapDataToListings", () => {
       mode: "pins",
     } as any);
 
-    expect(listings).toEqual([
-      {
-        id: "valid-listing",
-        title: "Valid listing",
-        price: 0,
-        availableSlots: 0,
-        images: ["cover.jpg"],
-        location: { lat: 30.2672, lng: -97.7431 },
-        tier: "primary",
-        avgRating: 0,
-        reviewCount: 0,
-        recommendedScore: null,
-        createdAt: null,
+    expect(listings).toHaveLength(1);
+    expect(listings[0]).toMatchObject({
+      id: "valid-listing",
+      title: "Valid listing",
+      price: 0,
+      availableSlots: 0,
+      totalSlots: 0,
+      images: ["cover.jpg"],
+      location: { lat: 30.2672, lng: -97.7431 },
+      tier: "primary",
+      avgRating: 0,
+      reviewCount: 0,
+      recommendedScore: null,
+      createdAt: null,
+      publicAvailability: {
+        availabilitySource: "HOST_MANAGED",
+        openSlots: 0,
+        totalSlots: 0,
       },
-    ]);
+    });
+    expect(listings[0]).not.toHaveProperty("ownerId");
+    expect(listings[0].location).not.toHaveProperty("address");
+    expect(listings[0].location).not.toHaveProperty("zip");
   });
 });

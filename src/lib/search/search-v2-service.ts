@@ -324,6 +324,10 @@ async function getSemanticEligibleListPage(
 
     sawSemanticRows = true;
 
+    if (semanticRows.length === 0) {
+      break;
+    }
+
     const batchItems = mapSemanticRowsToListingData(semanticRows).filter((item) => {
       if (seenListingIds.has(item.id)) {
         return false;
@@ -332,6 +336,10 @@ async function getSemanticEligibleListPage(
       seenListingIds.add(item.id);
       return true;
     });
+
+    if (batchItems.length === 0) {
+      break;
+    }
 
     eligibleItems.push(
       ...(await resolveEligibleSemanticItems(batchItems, filterParams))

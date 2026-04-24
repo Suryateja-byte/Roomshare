@@ -342,7 +342,7 @@ function addParam(params: SqlValue[], value: SqlValue): string {
 
 function normalizeRoomCategory(roomType: string | undefined): string | null {
   if (!roomType || roomType === "any") return null;
-  return roomType.trim().replace(/-/g, "_").toUpperCase();
+  return roomType.trim().replace(/[\s-]+/g, "_").toUpperCase();
 }
 
 async function queryProjectionUnitRows(spec: SearchSpec): Promise<ProjectionUnitRow[]> {

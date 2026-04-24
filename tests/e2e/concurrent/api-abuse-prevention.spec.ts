@@ -73,35 +73,18 @@ test.describe("API Abuse Prevention", () => {
     }
   });
 
-  test("rate limiting blocks excessive booking requests", async ({ page }) => {
-    test.skip(
-      process.env.E2E_DISABLE_RATE_LIMIT === "true",
-      "Rate limiting bypassed in E2E — covered by unit tests"
-    );
-    const listing = await testApi<{ id: string }>(
-      page,
-      "findTestListing",
-      {}
-    );
-    test.skip(!listing.ok, "Test API not available or no suitable listing");
+  test("retired booking status endpoint remains unavailable", async ({
+    page,
+  }) => {
+    const response = await page.request.post("/api/bookings/status", {
+      data: {
+        bookingId: "nonexistent-id",
+        status: "ACCEPTED",
+      },
+      failOnStatusCode: false,
+    });
 
-    // Fire 25 rapid booking status requests (limit is typically 10-20/min)
-    const results = await Promise.all(
-      Array.from({ length: 25 }, () =>
-        page.request
-          .post("/api/bookings/status", {
-            data: {
-              bookingId: "nonexistent-id",
-              status: "ACCEPTED",
-            },
-          })
-          .then((r) => r.status())
-      )
-    );
-
-    // At least some should be rate-limited (429)
-    const rateLimited = results.filter((s) => s === 429);
-    expect(rateLimited.length).toBeGreaterThan(0);
+    expect([404, 405, 410]).toContain(response.status());
   });
 
   test("listing status endpoint is rate limited", async ({ page }) => {

@@ -18,6 +18,36 @@ jest.mock("@/lib/logger", () => ({
   },
 }));
 
+jest.mock("@/lib/projections/geocode-worker", () => ({
+  handleGeocodeNeeded: jest.fn(),
+}));
+
+jest.mock("@/lib/projections/semantic", () => ({
+  ...jest.requireActual("@/lib/projections/semantic"),
+  rebuildSemanticInventoryProjection: jest.fn(),
+}));
+
+jest.mock("@/lib/payments/webhook-worker", () => {
+  class PaymentWebhookRetryableError extends Error {
+    retryAfterMs: number;
+
+    constructor(message = "Payment webhook retryable", retryAfterMs = 45_000) {
+      super(message);
+      this.retryAfterMs = retryAfterMs;
+    }
+  }
+
+  return {
+    PaymentWebhookRetryableError,
+    processCapturedStripeEvent: jest.fn(),
+  };
+});
+
+jest.mock("@/lib/search-alerts", () => ({
+  deliverQueuedSearchAlert: jest.fn(),
+  processSearchAlerts: jest.fn(),
+}));
+
 import {
   createPGlitePhase02Fixture,
   type Phase02Fixture,
@@ -25,6 +55,19 @@ import {
 import { HANDLERS, type OutboxRow } from "@/lib/outbox/handlers";
 import { __setProjectionEpochForTesting } from "@/lib/projections/epoch";
 import type { TransactionClient } from "@/lib/db/with-actor";
+import { handleGeocodeNeeded } from "@/lib/projections/geocode-worker";
+import {
+  EmbeddingBudgetExceededError,
+  rebuildSemanticInventoryProjection,
+} from "@/lib/projections/semantic";
+import {
+  PaymentWebhookRetryableError,
+  processCapturedStripeEvent,
+} from "@/lib/payments/webhook-worker";
+import {
+  deliverQueuedSearchAlert,
+  processSearchAlerts,
+} from "@/lib/search-alerts";
 
 let fixture: Phase02Fixture;
 
@@ -41,6 +84,7 @@ afterAll(async () => {
 afterEach(() => {
   jest.clearAllMocks();
   __setProjectionEpochForTesting(BigInt(1));
+  delete process.env.KILL_SWITCH_PAUSE_EMBED_PUBLISH;
 });
 
 async function withTx<T>(fn: (tx: TransactionClient) => Promise<T>): Promise<T> {
@@ -438,5 +482,252 @@ describe("HANDLERS.TOMBSTONE / SUPPRESSION / PAUSE", () => {
 
     const result = await withTx((tx) => HANDLERS.PAUSE(tx, event));
     expect(result.outcome).toBe("completed");
+  });
+});
+
+describe("HANDLERS Phase 03+ async integrations", () => {
+  const tx = {} as TransactionClient;
+  const mockHandleGeocodeNeeded = handleGeocodeNeeded as jest.MockedFunction<
+    typeof handleGeocodeNeeded
+  >;
+  const mockRebuildSemanticInventoryProjection =
+    rebuildSemanticInventoryProjection as jest.MockedFunction<
+      typeof rebuildSemanticInventoryProjection
+    >;
+  const mockProcessCapturedStripeEvent =
+    processCapturedStripeEvent as jest.MockedFunction<
+      typeof processCapturedStripeEvent
+    >;
+  const mockProcessSearchAlerts = processSearchAlerts as jest.MockedFunction<
+    typeof processSearchAlerts
+  >;
+  const mockDeliverQueuedSearchAlert =
+    deliverQueuedSearchAlert as jest.MockedFunction<typeof deliverQueuedSearchAlert>;
+
+  it.each([
+    ["success", { status: "success" }, "completed"],
+    ["not_found", { status: "not_found" }, "completed"],
+    [
+      "transient_error",
+      { status: "transient_error", retryAfterMs: 12_345 },
+      "transient_error",
+    ],
+    ["exhausted", { status: "exhausted", dlqReason: "NO_GEOCODE" }, "fatal_error"],
+  ] as const)(
+    "maps GEOCODE_NEEDED %s outcome",
+    async (_status, geocodeOutcome, expectedOutcome) => {
+      mockHandleGeocodeNeeded.mockResolvedValueOnce(geocodeOutcome as never);
+
+      const result = await HANDLERS.GEOCODE_NEEDED(
+        tx,
+        makeEvent({
+          kind: "GEOCODE_NEEDED",
+          aggregateType: "PHYSICAL_UNIT",
+          aggregateId: "unit-geocode",
+          payload: { address: "Austin, TX", requestId: "request-1" },
+          attemptCount: 2,
+        })
+      );
+
+      expect(result.outcome).toBe(expectedOutcome);
+      expect(mockHandleGeocodeNeeded).toHaveBeenCalledWith(
+        tx,
+        expect.objectContaining({
+          aggregateType: "PHYSICAL_UNIT",
+          aggregateId: "unit-geocode",
+          payload: { address: "Austin, TX", requestId: "request-1" },
+          attemptCount: 2,
+        })
+      );
+      if (result.outcome === "transient_error") {
+        expect(result.retryAfterMs).toBe(12_345);
+      }
+      if (result.outcome === "fatal_error") {
+        expect(result.dlqReason).toBe("NO_GEOCODE");
+      }
+    }
+  );
+
+  it("completes EMBED_NEEDED when semantic projection rebuild succeeds", async () => {
+    mockRebuildSemanticInventoryProjection.mockResolvedValueOnce({
+      skippedStale: false,
+    } as never);
+
+    const result = await HANDLERS.EMBED_NEEDED(
+      tx,
+      makeEvent({
+        kind: "EMBED_NEEDED",
+        aggregateId: "inventory-embed",
+        payload: { unitId: "unit-embed" },
+      })
+    );
+
+    expect(result).toEqual({ outcome: "completed" });
+    expect(mockRebuildSemanticInventoryProjection).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        inventoryId: "inventory-embed",
+        unitId: "unit-embed",
+      })
+    );
+  });
+
+  it("returns stale_skipped for stale EMBED_NEEDED rebuilds", async () => {
+    mockRebuildSemanticInventoryProjection.mockResolvedValueOnce({
+      skippedStale: true,
+    } as never);
+
+    const result = await HANDLERS.EMBED_NEEDED(
+      tx,
+      makeEvent({
+        kind: "EMBED_NEEDED",
+        aggregateId: "inventory-stale",
+        payload: { unitId: "unit-stale" },
+      })
+    );
+
+    expect(result).toEqual({ outcome: "stale_skipped" });
+  });
+
+  it("requeues EMBED_NEEDED while embed publishing is paused", async () => {
+    process.env.KILL_SWITCH_PAUSE_EMBED_PUBLISH = "true";
+
+    const result = await HANDLERS.EMBED_NEEDED(
+      tx,
+      makeEvent({
+        kind: "EMBED_NEEDED",
+        aggregateId: "inventory-paused",
+        payload: { unitId: "unit-paused" },
+      })
+    );
+
+    expect(result).toEqual({
+      outcome: "transient_error",
+      retryAfterMs: 60_000,
+      lastError: "Embedding publication paused",
+    });
+    expect(mockRebuildSemanticInventoryProjection).not.toHaveBeenCalled();
+  });
+
+  it("uses provider retry timing when EMBED_NEEDED exhausts the embedding budget", async () => {
+    mockRebuildSemanticInventoryProjection.mockRejectedValueOnce(
+      new EmbeddingBudgetExceededError(98_765)
+    );
+
+    const result = await HANDLERS.EMBED_NEEDED(
+      tx,
+      makeEvent({
+        kind: "EMBED_NEEDED",
+        aggregateId: "inventory-budget",
+        payload: { unitId: "unit-budget" },
+      })
+    );
+
+    expect(result).toEqual({
+      outcome: "transient_error",
+      retryAfterMs: 98_765,
+      lastError: "EMBEDDING_TOKEN_BUDGET_EXCEEDED",
+    });
+  });
+
+  it("maps PAYMENT_WEBHOOK success and retryable failure", async () => {
+    mockProcessCapturedStripeEvent.mockResolvedValueOnce(undefined);
+    await expect(
+      HANDLERS.PAYMENT_WEBHOOK(
+        tx,
+        makeEvent({ kind: "PAYMENT_WEBHOOK", aggregateId: "evt_1" })
+      )
+    ).resolves.toEqual({ outcome: "completed" });
+
+    mockProcessCapturedStripeEvent.mockRejectedValueOnce(
+      new PaymentWebhookRetryableError("stripe not ready", 22_000)
+    );
+    await expect(
+      HANDLERS.PAYMENT_WEBHOOK(
+        tx,
+        makeEvent({ kind: "PAYMENT_WEBHOOK", aggregateId: "evt_2" })
+      )
+    ).resolves.toEqual({
+      outcome: "transient_error",
+      retryAfterMs: 22_000,
+      lastError: "stripe not ready",
+    });
+  });
+
+  it("maps ALERT_MATCH success and transient failure", async () => {
+    mockProcessSearchAlerts.mockResolvedValueOnce({
+      processed: 1,
+      alertsSent: 0,
+      errors: 0,
+      details: [],
+    });
+    await expect(
+      HANDLERS.ALERT_MATCH(tx, makeEvent({ kind: "ALERT_MATCH" }))
+    ).resolves.toEqual({ outcome: "completed" });
+
+    mockProcessSearchAlerts.mockRejectedValueOnce(new Error("alerts offline"));
+    await expect(
+      HANDLERS.ALERT_MATCH(tx, makeEvent({ kind: "ALERT_MATCH" }))
+    ).resolves.toEqual({
+      outcome: "transient_error",
+      retryAfterMs: 30_000,
+      lastError: "alerts offline",
+    });
+  });
+
+  it("maps ALERT_DELIVER retry and completed statuses", async () => {
+    mockDeliverQueuedSearchAlert.mockResolvedValueOnce({
+      status: "retry",
+      error: "mail throttled",
+    } as never);
+
+    await expect(
+      HANDLERS.ALERT_DELIVER(
+        tx,
+        makeEvent({
+          kind: "ALERT_DELIVER",
+          aggregateId: "delivery-fallback",
+          payload: {},
+        })
+      )
+    ).resolves.toEqual({
+      outcome: "transient_error",
+      retryAfterMs: 30_000,
+      lastError: "mail throttled",
+    });
+    expect(mockDeliverQueuedSearchAlert).toHaveBeenLastCalledWith(
+      tx,
+      "delivery-fallback"
+    );
+
+    mockDeliverQueuedSearchAlert.mockResolvedValueOnce({
+      status: "delivered",
+    } as never);
+    await expect(
+      HANDLERS.ALERT_DELIVER(
+        tx,
+        makeEvent({
+          kind: "ALERT_DELIVER",
+          aggregateId: "delivery-fallback",
+          payload: { deliveryId: "delivery-explicit" },
+        })
+      )
+    ).resolves.toEqual({ outcome: "completed" });
+    expect(mockDeliverQueuedSearchAlert).toHaveBeenLastCalledWith(
+      tx,
+      "delivery-explicit"
+    );
+  });
+
+  it("returns transient_error when ALERT_DELIVER throws", async () => {
+    mockDeliverQueuedSearchAlert.mockRejectedValueOnce(new Error("delivery db down"));
+
+    await expect(
+      HANDLERS.ALERT_DELIVER(tx, makeEvent({ kind: "ALERT_DELIVER" }))
+    ).resolves.toEqual({
+      outcome: "transient_error",
+      retryAfterMs: 30_000,
+      lastError: "delivery db down",
+    });
   });
 });

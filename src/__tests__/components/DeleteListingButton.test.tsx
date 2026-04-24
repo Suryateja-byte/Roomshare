@@ -74,9 +74,6 @@ describe("DeleteListingButton", () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({
-        canDelete: true,
-        activeBookings: 0,
-        pendingBookings: 0,
         activeConversations: 0,
       }),
     });
@@ -97,9 +94,6 @@ describe("DeleteListingButton", () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({
-        canDelete: true,
-        activeBookings: 0,
-        pendingBookings: 0,
         activeConversations: 0,
       }),
     });
@@ -124,9 +118,6 @@ describe("DeleteListingButton", () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        canDelete: true,
-        activeBookings: 0,
-        pendingBookings: 0,
         activeConversations: 0,
       }),
     });
@@ -159,9 +150,6 @@ describe("DeleteListingButton", () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        canDelete: true,
-        activeBookings: 0,
-        pendingBookings: 0,
         activeConversations: 0,
       }),
     });
@@ -169,7 +157,7 @@ describe("DeleteListingButton", () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
       json: async () => ({
-        error: "Cannot delete listing with active bookings",
+        error: "Cannot delete listing with active conversations",
       }),
     });
 
@@ -185,18 +173,15 @@ describe("DeleteListingButton", () => {
 
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith(
-        "Cannot delete listing with active bookings"
+        "Cannot delete listing with active conversations"
       );
     });
   });
 
-  it("shows blocking message when canDelete is false due to active bookings", async () => {
+  it("does not block deletion when there are no active conversations", async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({
-        canDelete: false,
-        activeBookings: 2,
-        pendingBookings: 0,
         activeConversations: 0,
       }),
     });
@@ -205,9 +190,30 @@ describe("DeleteListingButton", () => {
     await userEvent.click(screen.getByText("Delete Listing"));
 
     await waitFor(() => {
-      expect(screen.getByText("Cannot delete listing")).toBeInTheDocument();
+      expect(screen.getByText("Delete Anyway")).toBeInTheDocument();
       expect(
-        screen.getByText(/You have 2 active bookings/)
+        screen.queryByText("This will affect active users")
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it("warns when active conversations will be removed", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        activeConversations: 2,
+      }),
+    });
+
+    render(<DeleteListingButton listingId="listing-123" />);
+    await userEvent.click(screen.getByText("Delete Listing"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("This will affect active users")
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/conversations will be deleted/)
       ).toBeInTheDocument();
     });
   });
@@ -217,9 +223,6 @@ describe("DeleteListingButton", () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        canDelete: true,
-        activeBookings: 0,
-        pendingBookings: 0,
         activeConversations: 0,
       }),
     });

@@ -127,17 +127,13 @@ export async function withIdempotency<T>(
   }
 ): Promise<IdempotencyResult<T>> {
   const requestHash = computeRequestHash(requestBody);
-  const client = options?.client ?? prisma;
-  const transaction = client.$transaction as <R>(
-    fn: (tx: TransactionClient) => Promise<R>,
-    options?: Record<string, unknown>
-  ) => Promise<R>;
+  const client = (options?.client ?? prisma) as TransactionHost;
 
   // Retry loop for SERIALIZABLE serialization conflicts
   for (let attempt = 1; attempt <= MAX_SERIALIZATION_RETRIES; attempt++) {
     try {
       // ENTIRE flow runs in ONE transaction - lock held until commit
-      return await transaction(
+      return await client.$transaction(
         async (tx: TransactionClient) => {
           // ─────────────────────────────────────────────────────────────
           // Step 1: Atomic claim via INSERT ON CONFLICT DO NOTHING

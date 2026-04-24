@@ -5,6 +5,9 @@
 export {}; // Make this a module to avoid block-scoped variable conflicts
 
 const originalEnv = { ...process.env };
+const setNodeEnv = (value: NodeJS.ProcessEnv["NODE_ENV"]) => {
+  process.env = { ...process.env, NODE_ENV: value };
+};
 
 afterEach(() => {
   // Restore env after each test
@@ -18,8 +21,17 @@ afterEach(() => {
 });
 
 describe("isPhase02ProjectionWritesEnabled()", () => {
-  it("returns false when FEATURE_PHASE02_PROJECTION_WRITES is unset", async () => {
+  it("returns true in non-production when FEATURE_PHASE02_PROJECTION_WRITES is unset", async () => {
     delete process.env.FEATURE_PHASE02_PROJECTION_WRITES;
+    setNodeEnv("test");
+    jest.resetModules();
+    const { isPhase02ProjectionWritesEnabled } = await import("@/lib/flags/phase02");
+    expect(isPhase02ProjectionWritesEnabled()).toBe(true);
+  });
+
+  it("returns false in production when FEATURE_PHASE02_PROJECTION_WRITES is unset", async () => {
+    delete process.env.FEATURE_PHASE02_PROJECTION_WRITES;
+    setNodeEnv("production");
     jest.resetModules();
     const { isPhase02ProjectionWritesEnabled } = await import("@/lib/flags/phase02");
     expect(isPhase02ProjectionWritesEnabled()).toBe(false);

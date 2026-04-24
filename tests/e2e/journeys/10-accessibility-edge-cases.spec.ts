@@ -272,7 +272,10 @@ test.describe("Edge Case Journeys", () => {
       ).toBeAttached({ timeout: 30000 });
     });
 
-    test(`${tags.auth} - Empty bookings list`, async ({ page, nav }) => {
+    test(`${tags.auth} - Retired bookings bookmark redirects accessibly`, async ({
+      page,
+      nav,
+    }) => {
       await nav.goToBookings();
 
       // Check we weren't redirected to login
@@ -281,17 +284,9 @@ test.describe("Edge Case Journeys", () => {
       if (!isAuthenticated) return;
 
       await page.waitForLoadState("domcontentloaded");
+      await expect(page).toHaveURL(/\/messages/, { timeout: 30_000 });
 
-      const hasBookings =
-        (await page.locator('[data-testid="booking-item"]').count()) > 0;
-      const hasEmptyState = await page
-        .locator(selectors.emptyState)
-        .first()
-        .isVisible()
-        .catch(() => false);
-
-      // One should be true
-      expect(hasBookings || hasEmptyState).toBeTruthy();
+      await expect(page.locator("#main-content, main").first()).toBeVisible();
     });
   });
 

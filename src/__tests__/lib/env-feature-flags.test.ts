@@ -97,7 +97,7 @@ describe("Multi-slot booking feature flag cross-validation", () => {
     consoleSpy.mockRestore();
   });
 
-  it("feature getters do not throw on unrelated invalid production secrets", async () => {
+  it("retired booking feature getters do not throw on unrelated invalid production secrets", async () => {
     process.env.CRON_SECRET = "change-in-production-aaaa-bbbb-cccc-dddd-eeee";
     process.env.ENABLE_MULTI_SLOT_BOOKING = "true";
     process.env.ENABLE_SOFT_HOLDS = "on";
@@ -105,8 +105,8 @@ describe("Multi-slot booking feature flag cross-validation", () => {
     const { features } = await import("@/lib/env");
 
     expect(() => features.softHoldsEnabled).not.toThrow();
-    expect(features.softHoldsEnabled).toBe(true);
-    expect(features.multiSlotBooking).toBe(true);
+    expect(features.softHoldsEnabled).toBe(false);
+    expect(features.multiSlotBooking).toBe(false);
   });
 
   it("exposes contact-first listing flag when enabled", async () => {

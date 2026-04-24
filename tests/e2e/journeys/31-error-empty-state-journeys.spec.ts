@@ -3,7 +3,7 @@
  *
  * Gap coverage identified by journey audit:
  * - J31: 404 page renders proper UI (not just "has text")
- * - J32: Empty bookings page for user with no bookings
+ * - J32: Retired bookings bookmark redirects to messages
  * - J33: Empty saved listings page
  * - J34: Empty messages page
  * - J35: Signup form missing fields validation
@@ -96,82 +96,19 @@ test.describe("Error & Empty State Journeys", () => {
   });
 
   // ──────────────────────────────────────────────
-  // J32: Empty Bookings Page
+  // J32: Retired Bookings Bookmark
   // ──────────────────────────────────────────────
-  test.describe("J32: Empty Bookings State", () => {
-    // Use authenticated state — the default test user may or may not have bookings,
-    // so we verify the page loads properly and shows EITHER bookings OR empty state
-    test(`${tags.auth} - bookings page shows content or empty state with CTA`, async ({
+  test.describe("J32: Retired Bookings Route", () => {
+    test(`${tags.auth} - bookings bookmark redirects to messages`, async ({
       page,
     }) => {
-      // Wait for API response to verify we're testing real data
-      const responsePromise = page.waitForResponse(
-        (resp) =>
-          resp.url().includes("/api/") &&
-          (resp.url().includes("booking") || resp.url().includes("bookings")),
-        { timeout: 30000 }
-      ).catch(() => null);
-
       await page.goto("/bookings");
       await page.waitForLoadState("domcontentloaded");
+      await expect(page).toHaveURL(/\/messages/, { timeout: 30_000 });
 
-      // Wait for the page content to settle
       await expect(page.locator("#main-content, main").first()).toBeVisible({
         timeout: 30000,
       });
-
-      // Check: does the page show bookings or an empty state?
-      const emptyState = page.locator('[data-testid="empty-state"]');
-      const bookingCards = page.locator(
-        '[data-testid*="booking"], [class*="booking"]'
-      );
-      const hasEmptyState = await emptyState
-        .isVisible({ timeout: 5000 })
-        .catch(() => false);
-      const hasBookings =
-        (await bookingCards.count().catch(() => 0)) > 0;
-
-      if (hasEmptyState) {
-        // Verify empty state has descriptive text
-        await expect(
-          page
-            .getByText(/no booking|no .* yet/i)
-            .first()
-        ).toBeVisible();
-
-        // Verify there's a CTA to browse/search listings
-        const ctaLink = page
-          .getByRole("link", { name: /browse|search|explore/i })
-          .first();
-        const ctaVisible = await ctaLink
-          .isVisible({ timeout: 3000 })
-          .catch(() => false);
-        // CTA may be a link or button — either is acceptable
-        if (!ctaVisible) {
-          // At minimum, the empty state text itself provides guidance
-          expect(hasEmptyState).toBeTruthy();
-        }
-      } else if (hasBookings) {
-        // Bookings exist — page is rendering real data, which is valid
-        expect(hasBookings).toBeTruthy();
-      } else {
-        // Page loaded but shows neither bookings nor a labeled empty state.
-        // This is still valid if the page has meaningful text content.
-        // Wait for content to populate (React hydration may not be complete).
-        const mainEl = page.locator("#main-content, main").first();
-        await expect
-          .poll(
-            async () => ((await mainEl.textContent()) ?? "").trim().length,
-            { timeout: 15_000, message: "main content to have text" }
-          )
-          .toBeGreaterThan(0);
-      }
-
-      // Verify API was called (not just a static page)
-      const apiResponse = await responsePromise;
-      if (apiResponse) {
-        expect(apiResponse.status()).toBeLessThan(500);
-      }
     });
   });
 
