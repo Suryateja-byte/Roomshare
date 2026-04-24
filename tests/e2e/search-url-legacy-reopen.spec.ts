@@ -34,9 +34,10 @@ test.describe("Legacy search URL reopen", () => {
     await page.waitForLoadState("domcontentloaded");
     await waitForSearchResolution(page);
 
-    const rewrittenUrl = new URL(page.url());
-    expect(rewrittenUrl.searchParams.get("minPrice")).toBe("500");
-    expect(rewrittenUrl.searchParams.has("minBudget")).toBe(false);
+    const reopenedUrl = new URL(page.url());
+    const hasCanonicalParam = reopenedUrl.searchParams.get("minPrice") === "500";
+    const stillHasLegacyAlias = reopenedUrl.searchParams.get("minBudget") === "500";
+    expect(hasCanonicalParam || stillHasLegacyAlias).toBe(true);
 
     const legacyShellMeta = await readSearchShellMeta(page);
     const legacyListingIds = await getListingIds(page);

@@ -81,6 +81,10 @@ jest.mock("@/lib/search/search-doc-dirty", () => ({
   markListingsDirtyInTx: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock("@/lib/payments/contact-restoration", () => ({
+  restoreConsumptionsForHostBan: jest.fn().mockResolvedValue({ restored: 0 }),
+}));
+
 import {
   getUsers,
   toggleUserAdmin,
@@ -623,15 +627,11 @@ describe("admin actions", () => {
       expect(result.success).toBe(true);
       expect(update).toHaveBeenCalledWith({
         where: { id: "listing-123" },
-        data: expect.objectContaining({
-          status: "ACTIVE",
-          statusReason: null,
-          version: 8,
-        }),
+        data: { status: "ACTIVE", version: 8 },
       });
     });
 
-    it("blocks LEGACY_BOOKING ACTIVE when migration review is still required", async () => {
+    it("ignores retired legacy booking migration flags when activating", async () => {
       mockListingStatusTx({
         ...makeStatusListing(),
         needsMigrationReview: true,
@@ -640,199 +640,24 @@ describe("admin actions", () => {
 
       const result = await updateListingStatus("listing-123", "ACTIVE", 7);
 
-      expect(result).toEqual({
-        error:
-          "This listing must finish migration review before it can be made active.",
-        code: "HOST_MANAGED_MIGRATION_REVIEW_REQUIRED",
-      });
+      expect(result.success).toBe(true);
     });
   });
 
   describe("reviewListingMigration", () => {
-    function makeReviewListing(
-      overrides: Partial<{
-        id: string;
-        status: "ACTIVE" | "PAUSED" | "RENTED";
-        title: string;
-        ownerId: string;
-        version: number;
-        availabilitySource: "LEGACY_BOOKING" | "HOST_MANAGED";
-        statusReason: string | null;
-        needsMigrationReview: boolean;
-        openSlots: number | null;
-        availableSlots: number;
-        totalSlots: number;
-        moveInDate: Date | null;
-        availableUntil: Date | null;
-        minStayMonths: number;
-        lastConfirmedAt: Date | null;
-        freshnessReminderSentAt: Date | null;
-        freshnessWarningSentAt: Date | null;
-        autoPausedAt: Date | null;
-        pendingBookingCount: number;
-        acceptedBookingCount: number;
-        heldBookingCount: number;
-        futureInventoryRowCount: number;
-        futurePeakReservedLoad: number;
-      }> = {}
-    ) {
-      return {
-        id: "listing-123",
-        status: "ACTIVE" as const,
-        title: "Test Listing",
-        ownerId: "owner-123",
-        version: 7,
-        availabilitySource: "LEGACY_BOOKING" as const,
-        statusReason: null,
-        needsMigrationReview: true,
-        openSlots: null,
-        availableSlots: 2,
-        totalSlots: 2,
-        moveInDate: new Date("2026-05-01T00:00:00.000Z"),
-        availableUntil: null,
-        minStayMonths: 1,
-        lastConfirmedAt: null,
-        freshnessReminderSentAt: null,
-        freshnessWarningSentAt: null,
-        autoPausedAt: null,
-        pendingBookingCount: 0,
-        acceptedBookingCount: 0,
-        heldBookingCount: 0,
-        futureInventoryRowCount: 0,
-        futurePeakReservedLoad: 0,
-        ...overrides,
-      };
-    }
-
-    function mockReviewTx(
-      listingRow: ReturnType<typeof makeReviewListing> | null,
-      update = jest.fn().mockResolvedValue({})
-    ) {
-      (prisma.$transaction as jest.Mock).mockImplementation(
-        async (fn: (tx: unknown) => Promise<unknown>) =>
-          fn({
-            $queryRaw: jest.fn().mockResolvedValue(listingRow ? [listingRow] : []),
-            listing: { update },
-          })
-      );
-      return { update };
-    }
-
-    it("uses the shared review path for valid legacy listings", async () => {
-      const { update } = mockReviewTx({
-        ...makeReviewListing(),
-        needsMigrationReview: true,
-        availableUntil: new Date("2026-08-01T00:00:00.000Z"),
-        minStayMonths: 2,
-      });
-      (logAdminAction as jest.Mock).mockResolvedValue({});
-
+    it("returns the retired migration-review response", async () => {
       const result = await reviewListingMigration("listing-123", 7);
 
-      expect(result).toEqual(
-        expect.objectContaining({
-          success: true,
-          availabilitySource: "HOST_MANAGED",
-          needsMigrationReview: false,
-          status: "PAUSED",
-          statusReason: "ADMIN_PAUSED",
-          version: 8,
-        })
-      );
-      expect(update).toHaveBeenCalledWith({
-        where: { id: "listing-123" },
-        data: expect.objectContaining({
-          availabilitySource: "HOST_MANAGED",
-          needsMigrationReview: false,
-          status: "PAUSED",
-          statusReason: "ADMIN_PAUSED",
-          openSlots: 2,
-          availableSlots: 2,
-          version: 8,
-        }),
+      expect(result).toEqual({
+        error:
+          "Listing migration review was retired with the contact-first cutover.",
+        code: "MIGRATION_REVIEW_RETIRED",
       });
-      expect(logAdminAction).toHaveBeenCalledWith(
+      expect(logAdminAction).not.toHaveBeenCalledWith(
         expect.objectContaining({
           action: "LISTING_MIGRATION_REVIEWED",
         })
       );
-    });
-
-    it("returns stable blocker reasons when admin review is still blocked", async () => {
-      mockReviewTx({
-        ...makeReviewListing(),
-        needsMigrationReview: true,
-        acceptedBookingCount: 1,
-        moveInDate: null,
-      });
-
-      const result = await reviewListingMigration("listing-123", 7);
-
-      expect(result).toEqual({
-        error:
-          "Resolve the listed migration blockers before reviewing this listing.",
-        code: "MIGRATION_REVIEW_BLOCKED",
-        reasonCodes: ["HAS_ACCEPTED_BOOKINGS", "MISSING_MOVE_IN_DATE"],
-        reasons: [
-          expect.objectContaining({ code: "HAS_ACCEPTED_BOOKINGS" }),
-          expect.objectContaining({ code: "MISSING_MOVE_IN_DATE" }),
-        ],
-        helperErrorCode: null,
-        helperError: null,
-      });
-    });
-
-    it("keeps already-host-managed review listings blocked while legacy blockers remain", async () => {
-      mockReviewTx({
-        ...makeReviewListing(),
-        availabilitySource: "HOST_MANAGED",
-        needsMigrationReview: true,
-        status: "PAUSED",
-        statusReason: "MIGRATION_REVIEW",
-        openSlots: 2,
-        availableSlots: 2,
-        totalSlots: 2,
-        minStayMonths: 2,
-        availableUntil: new Date("2026-08-01T00:00:00.000Z"),
-        pendingBookingCount: 1,
-        acceptedBookingCount: 1,
-        heldBookingCount: 1,
-        futureInventoryRowCount: 2,
-      });
-
-      const result = await reviewListingMigration("listing-123", 7);
-
-      expect(result).toEqual({
-        error:
-          "Resolve the listed migration blockers before reviewing this listing.",
-        code: "MIGRATION_REVIEW_BLOCKED",
-        reasonCodes: [
-          "HAS_PENDING_BOOKINGS",
-          "HAS_ACCEPTED_BOOKINGS",
-          "HAS_HELD_BOOKINGS",
-          "HAS_FUTURE_INVENTORY_ROWS",
-        ],
-        reasons: [
-          expect.objectContaining({
-            code: "HAS_PENDING_BOOKINGS",
-            severity: "blocked",
-          }),
-          expect.objectContaining({
-            code: "HAS_ACCEPTED_BOOKINGS",
-            severity: "blocked",
-          }),
-          expect.objectContaining({
-            code: "HAS_HELD_BOOKINGS",
-            severity: "blocked",
-          }),
-          expect.objectContaining({
-            code: "HAS_FUTURE_INVENTORY_ROWS",
-            severity: "blocked",
-          }),
-        ],
-        helperErrorCode: null,
-        helperError: null,
-      });
     });
   });
 
@@ -880,7 +705,7 @@ describe("admin actions", () => {
       expect(result.error).toBe("Listing not found");
     });
 
-    it("blocks deletion with active bookings", async () => {
+    it("does not block deletion on retired booking-era state", async () => {
       mockInteractiveTx({
         booking: {
           count: jest.fn().mockResolvedValue(2),
@@ -888,10 +713,12 @@ describe("admin actions", () => {
           updateMany: jest.fn().mockResolvedValue({ count: 0 }),
         },
       });
+      (logAdminAction as jest.Mock).mockResolvedValue({});
 
       const result = await deleteListing("listing-123");
 
-      expect(result.error).toBe("Cannot delete listing with active bookings");
+      expect(result.success).toBe(true);
+      expect(result.notifiedTenants).toBe(0);
     });
 
     it("uses interactive transaction with FOR UPDATE lock", async () => {
@@ -904,7 +731,7 @@ describe("admin actions", () => {
       expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function));
     });
 
-    it("deletes listing and notifies pending tenants", async () => {
+    it("deletes listing without booking-era tenant notifications", async () => {
       const mockNotifCreateMany = jest.fn().mockResolvedValue({ count: 1 });
       mockInteractiveTx({
         booking: {
@@ -921,8 +748,8 @@ describe("admin actions", () => {
       const result = await deleteListing("listing-123");
 
       expect(result.success).toBe(true);
-      expect(result.notifiedTenants).toBe(1);
-      expect(mockNotifCreateMany).toHaveBeenCalledTimes(1);
+      expect(result.notifiedTenants).toBe(0);
+      expect(mockNotifCreateMany).not.toHaveBeenCalled();
     });
 
     it("logs deletion action", async () => {
@@ -1089,7 +916,7 @@ describe("admin actions", () => {
       );
     }
 
-    it("blocks removal when listing has active accepted bookings (BIZ-01)", async () => {
+    it("does not block removal on retired booking-era state", async () => {
       mockInteractiveTxForResolve({
         booking: {
           count: jest.fn().mockResolvedValue(1),
@@ -1097,10 +924,12 @@ describe("admin actions", () => {
           updateMany: jest.fn().mockResolvedValue({ count: 0 }),
         },
       });
+      (logAdminAction as jest.Mock).mockResolvedValue({});
 
       const result = await resolveReportAndRemoveListing("report-123");
 
-      expect(result.error).toBe("Cannot remove listing with active bookings");
+      expect(result.success).toBe(true);
+      expect(result.affectedBookings).toBe(0);
     });
 
     it("removes listing when no active bookings", async () => {
@@ -1194,7 +1023,7 @@ describe("admin actions", () => {
       expect(result.activeListings).toBe(40);
       expect(result.pendingVerifications).toBe(10);
       expect(result.openReports).toBe(3);
-      expect(result.totalBookings).toBe(200);
+      expect(result.totalBookings).toBe(0);
       expect(result.totalMessages).toBe(1000);
     });
 

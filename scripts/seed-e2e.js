@@ -271,7 +271,7 @@ const DEDUPE_SINGLETON_SEED = {
   city: 'San Francisco',
   state: 'CA',
   zip: '94109',
-  moveInDate: '2026-02-10T00:00:00.000Z',
+  moveInDate: '2026-05-10T00:00:00.000Z',
   createdAt: '2026-01-10T12:00:00.000Z',
 };
 
@@ -288,7 +288,7 @@ const DEDUPE_GROUP_SEEDS = [
     city: 'San Francisco',
     state: 'CA',
     zip: '94103',
-    moveInDate: '2026-03-20T00:00:00.000Z',
+    moveInDate: '2026-05-20T00:00:00.000Z',
     createdAt: '2026-01-04T12:00:00.000Z',
   },
   {
@@ -303,7 +303,7 @@ const DEDUPE_GROUP_SEEDS = [
     city: 'San Francisco',
     state: 'CA',
     zip: '94103',
-    moveInDate: '2026-04-18T00:00:00.000Z',
+    moveInDate: '2026-06-18T00:00:00.000Z',
     createdAt: '2026-01-03T12:00:00.000Z',
   },
   {
@@ -318,7 +318,7 @@ const DEDUPE_GROUP_SEEDS = [
     city: 'San Francisco',
     state: 'CA',
     zip: '94103',
-    moveInDate: '2026-05-15T00:00:00.000Z',
+    moveInDate: '2026-07-15T00:00:00.000Z',
     createdAt: '2026-01-02T12:00:00.000Z',
   },
   {
@@ -333,7 +333,7 @@ const DEDUPE_GROUP_SEEDS = [
     city: 'San Francisco',
     state: 'CA',
     zip: '94103',
-    moveInDate: '2026-06-01T00:00:00.000Z',
+    moveInDate: '2026-08-01T00:00:00.000Z',
     createdAt: '2026-01-01T12:00:00.000Z',
   },
 ];
@@ -351,7 +351,7 @@ const CROSS_OWNER_SEEDS = [
     city: 'San Francisco',
     state: 'CA',
     zip: '94103',
-    moveInDate: '2026-04-01T00:00:00.000Z',
+    moveInDate: '2026-05-01T00:00:00.000Z',
     createdAt: '2026-01-08T12:00:00.000Z',
   },
   {
@@ -366,7 +366,7 @@ const CROSS_OWNER_SEEDS = [
     city: 'San Francisco',
     state: 'CA',
     zip: '94103',
-    moveInDate: '2026-04-15T00:00:00.000Z',
+    moveInDate: '2026-05-15T00:00:00.000Z',
     createdAt: '2026-01-07T12:00:00.000Z',
   },
 ];

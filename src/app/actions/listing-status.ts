@@ -298,6 +298,13 @@ export async function recoverHostManagedListing(
             : currentListing.statusReason;
         const nextVersion = currentListing.version + 1;
 
+        if (nextStatus === "ACTIVE" && (currentListing.openSlots ?? 0) <= 0) {
+          return {
+            error: "Active host-managed listings require at least one open slot.",
+            code: "HOST_MANAGED_ACTIVE_REQUIRES_OPEN_SLOTS",
+          } as const;
+        }
+
         await tx.listing.update({
           where: { id: listingId },
           data: {

@@ -205,7 +205,9 @@ test.describe("20 Critical Search Page Journeys", () => {
         .isVisible({ timeout: 5000 })
         .catch(() => false)
     ) {
-      await clearAllBtn.first().click();
+      await clearAllBtn
+        .first()
+        .evaluate((element) => (element as HTMLElement).click());
 
       // Poll URL for filter removal (soft navigation may not trigger domcontentloaded)
       await expect

@@ -80,8 +80,13 @@ test.describe("Filter + Pagination Interactions", () => {
     await waitForSearchReady(page);
 
     // Get initial card count
+    await expect
+      .poll(() => scopedCards(page).count(), {
+        timeout: 30_000,
+        message: "Expected initial cards before sort pagination test",
+      })
+      .toBeGreaterThan(0);
     const initialCardCount = await scopedCards(page).count();
-    expect(initialCardCount).toBeGreaterThan(0);
 
     // Click "Show more places" once to load more items
     const loadMoreButton = page.getByRole("button", {

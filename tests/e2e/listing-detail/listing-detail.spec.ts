@@ -405,12 +405,12 @@ test.describe("LD: Owner View", () => {
     test.skip(!found, "Listing not found");
 
     // Management card visible
-    await expect(page.getByText("Manage Listing")).toBeVisible();
-    await expect(page.getByText("Edit Listing")).toBeVisible();
+    await expect(page.getByText("Manage Listing").first()).toBeVisible();
+    await expect(page.getByText("Edit Listing").first()).toBeVisible();
     // Delete button
     await expect(page.getByRole("button", { name: /Delete/i })).toBeVisible();
     // "View listing as guest" link
-    await expect(page.getByText("View listing as guest")).toBeVisible();
+    await expect(page.getByText("View listing as guest").first()).toBeVisible();
 
     // Public booking CTA must NOT be visible
     await expect(
@@ -457,7 +457,7 @@ test.describe("LD: Owner View", () => {
     const found = await goToListing(page, nav, "Sunny Mission Room");
     test.skip(!found, "Listing not found");
 
-    await expect(page.getByText("Boost Visibility")).toBeVisible();
+    await expect(page.getByText("Boost Visibility").first()).toBeVisible();
     // "Promote now" was replaced with a disabled "Coming Q3 2026" button
     await expect(page.getByText("Coming Q3 2026")).toBeVisible();
   });

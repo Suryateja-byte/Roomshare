@@ -30,6 +30,8 @@ if (runningDedupeSuite) {
   webServerEnv.FEATURE_SEARCH_LISTING_DEDUP = "true";
   webServerEnv.FEATURE_LISTING_CREATE_COLLISION_WARN = "true";
 }
+webServerEnv.NEXT_PUBLIC_SUPABASE_URL =
+  webServerEnv.NEXT_PUBLIC_SUPABASE_URL || "https://fake.supabase.co";
 
 /**
  * Playwright configuration for RoomShare E2E tests

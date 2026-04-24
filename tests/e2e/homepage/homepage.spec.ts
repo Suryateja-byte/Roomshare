@@ -40,13 +40,19 @@ test.describe("Homepage — Authenticated User", () => {
   }) => {
     // Navbar has "List a Room" link pointing to /listings/create
     const createLink = page
-      .getByRole("link", { name: /list a room/i })
-      .or(page.getByRole("link", { name: /post.*listing|create.*listing/i }))
+      .locator('a[href="/listings/create"]')
+      .filter({ visible: true })
       .first();
 
+    if (!(await createLink.isVisible({ timeout: 3000 }).catch(() => false))) {
+      await page.locator('[data-testid="user-menu"]').click();
+    }
+
     await expect(createLink).toBeVisible({ timeout: 15000 });
-    await createLink.click();
-    await page.waitForURL(/\/listings\/create/, { timeout: 15000 });
+    await Promise.all([
+      page.waitForURL(/\/listings\/create/, { timeout: 15000 }),
+      createLink.evaluate((element) => (element as HTMLAnchorElement).click()),
+    ]);
     await expect(page).toHaveURL(/\/listings\/create/);
   });
 

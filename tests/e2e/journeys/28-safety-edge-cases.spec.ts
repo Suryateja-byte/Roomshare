@@ -254,8 +254,18 @@ test.describe("J48: Protected Route Redirects", () => {
 
     for (const route of protectedRoutes) {
       // Use a fresh context approach: just verify the page loads or redirects
-      await page.goto(route);
-      await page.waitForLoadState("domcontentloaded");
+      await page
+        .goto(route, { waitUntil: "domcontentloaded" })
+        .catch((error: unknown) => {
+          if (
+            error instanceof Error &&
+            error.message.includes("net::ERR_ABORTED")
+          ) {
+            return null;
+          }
+          throw error;
+        });
+      await page.waitForLoadState("domcontentloaded").catch(() => {});
 
       const currentUrl = page.url();
 

@@ -9,6 +9,12 @@ import {
 test("T-03: expanding the grouped dates panel shows all dates and routes to the selected sibling", async ({
   page,
 }) => {
+  const viewport = page.viewportSize();
+  test.skip(
+    !!viewport && viewport.width < 768,
+    "Desktop-only grouped-date panel contract; mobile uses the modal contract"
+  );
+
   await page.goto(searchUrls.cloneGroup, { waitUntil: "domcontentloaded" });
   await waitForVisibleCards(page);
 
@@ -20,7 +26,7 @@ test("T-03: expanding the grouped dates panel shows all dates and routes to the 
   await expect(panel).toBeVisible();
   await expect(panel.locator('[data-testid="group-dates-chip"]')).toHaveCount(4);
 
-  const apr18Chip = panel.getByRole("button", { name: /available april 18, 2026/i });
+  const apr18Chip = panel.getByRole("button", { name: /available june 18, 2026/i });
   await apr18Chip.click();
 
   await page.waitForURL(`**/listings/${DEDUPE_IDS.apr18}`);

@@ -266,7 +266,7 @@ test.describe("Mobile Bottom Sheet - Drag Handle (7.2)", () => {
       timeout: 30_000,
     });
 
-    const handle = page.locator(selectors.bottomSheetHandle);
+    const handle = page.locator(selectors.bottomSheetHandle).first();
     await expect(handle).toBeVisible({ timeout: 5000 });
 
     // Verify ARIA slider attributes (3-snap model)

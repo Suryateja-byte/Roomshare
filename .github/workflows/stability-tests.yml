@@ -54,6 +54,7 @@ jobs:
       GOOGLE_CLIENT_SECRET: 'ci-placeholder-not-used-in-tests'
       TURNSTILE_ENABLED: 'false'
       ENABLE_SEARCH_DOC: 'true'
+      NEXT_PUBLIC_SUPABASE_URL: 'https://fake.supabase.co'
       # FLAKE-004: Skip globalSetup seed — CI already seeds in an explicit step above
       SKIP_E2E_SEED: 'true'
 
@@ -95,7 +96,7 @@ jobs:
         run: |
           pnpm exec playwright test \
             tests/e2e/search-stability/ \
-            --project=chromium \
+            --project=chromium-anon \
             --workers=1 \
             --reporter=list,html
 

@@ -294,7 +294,8 @@ describe("listing-status actions", () => {
         const result = await updateListingStatus("listing-123", "PAUSED", 2);
 
         expect(result).toEqual({
-          error: "This listing was updated elsewhere. Reload and try again.",
+          error:
+            "This listing changed while you were editing it. Refresh and try again.",
           code: "VERSION_CONFLICT",
         });
         expect(mockTx.listing.update).not.toHaveBeenCalled();
@@ -317,15 +318,11 @@ describe("listing-status actions", () => {
         expect(mockTx.booking.count).not.toHaveBeenCalled();
         expect(mockTx.listing.update).toHaveBeenCalledWith({
           where: { id: "listing-123" },
-          data: expect.objectContaining({
-            status: "ACTIVE",
-            statusReason: null,
-            version: 4,
-          }),
+          data: { status: "ACTIVE", version: 4 },
         });
       });
 
-      it("blocks HOST_MANAGED ACTIVE when migration review is still required", async () => {
+      it("does not apply retired migration-review blockers to contact-first rows", async () => {
         (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
           makeLockedListingRow({
             availabilitySource: "HOST_MANAGED",
@@ -338,12 +335,11 @@ describe("listing-status actions", () => {
 
         const result = await updateListingStatus("listing-123", "ACTIVE", 3);
 
-        expect(result).toEqual({
-          error:
-            "This listing must finish migration review before it can be made active.",
-          code: "HOST_MANAGED_MIGRATION_REVIEW_REQUIRED",
+        expect(result.success).toBe(true);
+        expect(mockTx.listing.update).toHaveBeenCalledWith({
+          where: { id: "listing-123" },
+          data: { status: "ACTIVE", version: 4 },
         });
-        expect(mockTx.listing.update).not.toHaveBeenCalled();
       });
 
       it("returns LISTING_LOCKED for host updates on admin-paused rows", async () => {
@@ -387,7 +383,7 @@ describe("listing-status actions", () => {
         expect(mockTx.listing.update).not.toHaveBeenCalled();
       });
 
-      it("blocks LEGACY_BOOKING ACTIVE when migration review is still required", async () => {
+      it("ignores retired legacy booking migration flags when activating", async () => {
         (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
           makeLockedListingRow({
             needsMigrationReview: true,
@@ -397,12 +393,11 @@ describe("listing-status actions", () => {
 
         const result = await updateListingStatus("listing-123", "ACTIVE", 3);
 
-        expect(result).toEqual({
-          error:
-            "This listing must finish migration review before it can be made active.",
-          code: "HOST_MANAGED_MIGRATION_REVIEW_REQUIRED",
+        expect(result.success).toBe(true);
+        expect(mockTx.listing.update).toHaveBeenCalledWith({
+          where: { id: "listing-123" },
+          data: { status: "ACTIVE", version: 4 },
         });
-        expect(mockTx.listing.update).not.toHaveBeenCalled();
       });
     });
 
@@ -423,7 +418,7 @@ describe("listing-status actions", () => {
     });
 
     describe("reviewListingMigration", () => {
-      it("converts valid legacy listings into paused host-managed rows", async () => {
+      it("returns the retired migration-review response without mutating", async () => {
         (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
           makeLockedListingRow({
             needsMigrationReview: true,
@@ -432,156 +427,15 @@ describe("listing-status actions", () => {
             minStayMonths: 2,
           }),
         ]);
-        (mockTx.listing.update as jest.Mock).mockResolvedValue({
-          id: "listing-123",
-        });
-
-        const result = await reviewListingMigration("listing-123", 3);
-
-        expect(result).toEqual({
-          success: true,
-          listingId: "listing-123",
-          availabilitySource: "HOST_MANAGED",
-          needsMigrationReview: false,
-          status: "PAUSED",
-          statusReason: "HOST_PAUSED",
-          version: 4,
-        });
-        expect(mockTx.listing.update).toHaveBeenCalledWith({
-          where: { id: "listing-123" },
-          data: expect.objectContaining({
-            availabilitySource: "HOST_MANAGED",
-            needsMigrationReview: false,
-            status: "PAUSED",
-            statusReason: "HOST_PAUSED",
-            openSlots: 2,
-            availableSlots: 2,
-            totalSlots: 2,
-            minStayMonths: 2,
-            version: 4,
-          }),
-        });
-      });
-
-      it("returns stable blocker reasons when review cannot proceed", async () => {
-        (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
-          makeLockedListingRow({
-            needsMigrationReview: true,
-            pendingBookingCount: 1,
-            moveInDate: null,
-          }),
-        ]);
 
         const result = await reviewListingMigration("listing-123", 3);
 
         expect(result).toEqual({
           error:
-            "Resolve the listed migration blockers before reviewing this listing.",
-          code: "MIGRATION_REVIEW_BLOCKED",
-          reasonCodes: ["HAS_PENDING_BOOKINGS", "MISSING_MOVE_IN_DATE"],
-          reasons: [
-            expect.objectContaining({ code: "HAS_PENDING_BOOKINGS" }),
-            expect.objectContaining({ code: "MISSING_MOVE_IN_DATE" }),
-          ],
-          helperErrorCode: null,
-          helperError: null,
+            "Listing migration review was retired with the contact-first cutover.",
+          code: "MIGRATION_REVIEW_RETIRED",
         });
         expect(mockTx.listing.update).not.toHaveBeenCalled();
-      });
-
-      it("keeps already-host-managed review listings blocked while legacy blockers remain", async () => {
-        (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
-          makeLockedListingRow({
-            availabilitySource: "HOST_MANAGED",
-            needsMigrationReview: true,
-            status: "PAUSED",
-            statusReason: "MIGRATION_REVIEW",
-            openSlots: 2,
-            availableSlots: 2,
-            totalSlots: 2,
-            minStayMonths: 2,
-            availableUntil: new Date("2026-08-01T00:00:00.000Z"),
-            pendingBookingCount: 1,
-            acceptedBookingCount: 1,
-            heldBookingCount: 1,
-            futureInventoryRowCount: 2,
-          }),
-        ]);
-
-        const result = await reviewListingMigration("listing-123", 3);
-
-        expect(result).toEqual({
-          error:
-            "Resolve the listed migration blockers before reviewing this listing.",
-          code: "MIGRATION_REVIEW_BLOCKED",
-          reasonCodes: [
-            "HAS_PENDING_BOOKINGS",
-            "HAS_ACCEPTED_BOOKINGS",
-            "HAS_HELD_BOOKINGS",
-            "HAS_FUTURE_INVENTORY_ROWS",
-          ],
-          reasons: [
-            expect.objectContaining({
-              code: "HAS_PENDING_BOOKINGS",
-              severity: "blocked",
-            }),
-            expect.objectContaining({
-              code: "HAS_ACCEPTED_BOOKINGS",
-              severity: "blocked",
-            }),
-            expect.objectContaining({
-              code: "HAS_HELD_BOOKINGS",
-              severity: "blocked",
-            }),
-            expect.objectContaining({
-              code: "HAS_FUTURE_INVENTORY_ROWS",
-              severity: "blocked",
-            }),
-          ],
-          helperErrorCode: null,
-          helperError: null,
-        });
-        expect(mockTx.listing.update).not.toHaveBeenCalled();
-      });
-
-      it("marks already-host-managed review listings as reviewed without reopening", async () => {
-        (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
-          makeLockedListingRow({
-            availabilitySource: "HOST_MANAGED",
-            needsMigrationReview: true,
-            status: "ACTIVE",
-            statusReason: "MIGRATION_REVIEW",
-            openSlots: 2,
-            availableSlots: 2,
-            totalSlots: 3,
-            minStayMonths: 2,
-            availableUntil: new Date("2026-08-01T00:00:00.000Z"),
-          }),
-        ]);
-
-        const result = await reviewListingMigration("listing-123", 3);
-
-        expect(result).toEqual({
-          success: true,
-          listingId: "listing-123",
-          availabilitySource: "HOST_MANAGED",
-          needsMigrationReview: false,
-          status: "PAUSED",
-          statusReason: "HOST_PAUSED",
-          version: 4,
-        });
-        expect(mockTx.listing.update).toHaveBeenCalledWith({
-          where: { id: "listing-123" },
-          data: expect.objectContaining({
-            availabilitySource: "HOST_MANAGED",
-            needsMigrationReview: false,
-            status: "PAUSED",
-            statusReason: "HOST_PAUSED",
-            openSlots: 2,
-            availableSlots: 2,
-            totalSlots: 3,
-          }),
-        });
       });
     });
 
@@ -619,9 +473,6 @@ describe("listing-status actions", () => {
             version: 4,
             status: "ACTIVE",
             statusReason: null,
-            openSlots: 2,
-            availableSlots: 2,
-            totalSlots: 2,
             lastConfirmedAt: expect.any(Date),
             freshnessReminderSentAt: null,
             freshnessWarningSentAt: null,
@@ -737,7 +588,8 @@ describe("listing-status actions", () => {
         );
 
         expect(result).toEqual({
-          error: "This listing was updated elsewhere. Reload and try again.",
+          error:
+            "This listing changed while you were editing it. Refresh and try again.",
           code: "VERSION_CONFLICT",
         });
       });
@@ -815,16 +667,12 @@ describe("listing-status actions", () => {
       expect(result).toEqual({
         success: true,
         status: "ACTIVE",
-        statusReason: null,
+        statusReason: "STALE_AUTO_PAUSE",
         version: 4,
       });
       expect(mockTx.listing.update).toHaveBeenCalledWith({
         where: { id: "listing-123" },
-        data: expect.objectContaining({
-          version: 4,
-          status: "ACTIVE",
-          statusReason: null,
-        }),
+        data: { status: "ACTIVE", version: 4 },
       });
       const updateData = (mockTx.listing.update as jest.Mock).mock.calls[0][0]
         .data;
@@ -858,8 +706,9 @@ describe("listing-status actions", () => {
         ).mock.calls[0][0].join("");
         expect(sqlStrings).toContain("FOR UPDATE");
 
-        // Booking count and listing update happen inside the transaction (via tx)
-        expect(mockTx.booking.count).toHaveBeenCalled();
+        // Booking checks were retired in Phase 09; only the listing update
+        // happens inside this transaction.
+        expect(mockTx.booking.count).not.toHaveBeenCalled();
         expect(mockTx.listing.update).toHaveBeenCalledWith({
           where: { id: "listing-123" },
           data: { status: "PAUSED", version: 4 },

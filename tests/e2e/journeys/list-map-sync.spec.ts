@@ -253,8 +253,11 @@ test.describe("List <-> Map Sync", () => {
 
     // May not have a marker visible if map is not showing this area
     // or if clustering is hiding the marker. This is an optional assertion.
-    const markerCount = await anyHighlightedMarker.count();
-    if (markerCount > 0) {
+    const markerVisible = await anyHighlightedMarker
+      .first()
+      .isVisible()
+      .catch(() => false);
+    if (markerVisible) {
       await expect(anyHighlightedMarker.first()).toBeVisible();
     }
 

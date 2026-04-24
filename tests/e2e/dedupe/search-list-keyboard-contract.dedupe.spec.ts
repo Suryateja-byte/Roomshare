@@ -9,6 +9,12 @@ import {
 test("T-04: the grouped-date trigger and panel honor the keyboard contract", async ({
   page,
 }) => {
+  const viewport = page.viewportSize();
+  test.skip(
+    !!viewport && viewport.width < 768,
+    "Desktop-only grouped-date panel contract; mobile uses the modal contract"
+  );
+
   await page.goto(searchUrls.cloneGroup, { waitUntil: "domcontentloaded" });
   await waitForVisibleCards(page);
 

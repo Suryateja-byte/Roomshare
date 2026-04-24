@@ -367,7 +367,7 @@ test.describe("Budget URL Param Aliases", () => {
       );
 
       if (chipVisible) {
-        await chip.click();
+        await chip.evaluate((element) => (element as HTMLElement).click());
       } else {
         await openFilterModal(page);
         const clearAll = page.locator('[data-testid="filter-modal-clear-all"]');

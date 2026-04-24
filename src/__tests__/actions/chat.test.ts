@@ -134,7 +134,7 @@ describe("Chat Actions", () => {
       availabilitySource: "LEGACY_BOOKING" as const,
       availableSlots: 1,
       totalSlots: 1,
-      openSlots: null,
+      openSlots: 1,
       moveInDate: new Date("2026-05-01T00:00:00.000Z"),
       availableUntil: null,
       minStayMonths: 1,
@@ -229,8 +229,7 @@ describe("Chat Actions", () => {
       const result = await startConversation("listing-123");
 
       expect(result).toEqual({
-        error:
-          "This listing is temporarily unavailable while it completes migration review.",
+        error: "This listing is temporarily unavailable.",
         code: "MIGRATION_REVIEW",
       });
       expect(prisma.conversation.create).not.toHaveBeenCalled();
@@ -420,7 +419,7 @@ describe("Chat Actions", () => {
         availabilitySource: "LEGACY_BOOKING" as const,
         availableSlots: 1,
         totalSlots: 1,
-        openSlots: null,
+        openSlots: 1,
         moveInDate: new Date("2026-05-01T00:00:00.000Z"),
         availableUntil: null,
         minStayMonths: 1,

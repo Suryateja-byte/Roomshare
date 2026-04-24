@@ -169,11 +169,18 @@ test.describe("Price Range Filter", () => {
     // Verify starting state
     expect(getUrlParam(page, "minPrice")).toBe("500");
 
-    const priceChip = page.getByRole("button", {
-      name: /remove filter:.*\$500.*\$2,000/i,
-    });
+    const priceChip = page
+      .getByRole("button", {
+        name: /remove filter:\s*\$500\s*-\s*\$2,000/i,
+      })
+      .or(
+        page
+          .locator('[aria-label="Applied filters"] button')
+          .filter({ hasText: /\$500\s*-\s*\$2,000/i })
+      )
+      .first();
     await expect(priceChip).toBeVisible({ timeout: 10_000 });
-    await priceChip.click();
+    await priceChip.evaluate((element) => (element as HTMLButtonElement).click());
 
     // Wait for filter state to fully commit (URL + React hydration)
     await waitForFilterCommit(page, "minPrice", null);

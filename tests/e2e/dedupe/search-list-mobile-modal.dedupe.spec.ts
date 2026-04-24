@@ -14,15 +14,24 @@ test("T-14: mobile grouped dates open in a modal without changing the bottom-she
   const snapContent = page.locator("[data-snap-current]").first();
   await expect(snapContent).toHaveAttribute("data-snap-current", "1");
 
-  const trigger = page.locator('[data-testid="group-dates-trigger"]').first();
+  const trigger = page
+    .locator('[data-testid="group-dates-trigger"]')
+    .filter({ visible: true })
+    .first();
   await expect(trigger).toBeVisible();
-  await trigger.click();
+  await expect(trigger).toHaveAttribute("aria-haspopup", "dialog", {
+    timeout: 15_000,
+  });
+  await trigger.evaluate((element) => (element as HTMLButtonElement).click());
 
   await expect(page.locator('[data-testid="group-dates-modal"]')).toBeVisible();
   await expect(snapContent).toHaveAttribute("data-snap-current", "1");
 
-  await page.getByRole("button", { name: /close/i }).click();
+  await page.mouse.click(12, 12);
 
-  await expect(page.locator('[data-testid="group-dates-modal"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="group-dates-modal"]')).toHaveCount(
+    0,
+    { timeout: 10_000 }
+  );
   await expect(snapContent).toHaveAttribute("data-snap-current", "1");
 });

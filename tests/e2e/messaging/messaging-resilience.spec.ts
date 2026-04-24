@@ -19,6 +19,7 @@ import {
   openConversation,
   sendMessage,
 } from "./messaging-helpers";
+import type { Page } from "@playwright/test";
 
 test.describe("Messaging: Resilience", { tag: [tags.auth] }, () => {
   test.use({ storageState: "playwright/.auth/user.json" });
@@ -39,6 +40,22 @@ test.describe("Messaging: Resilience", { tag: [tags.auth] }, () => {
     await network.goOnline();
     await network.clearRoutes();
   });
+
+  async function stableMessageCount(page: Page) {
+    const messages = page.locator(MSG_SELECTORS.messageBubble);
+    let previous = await messages.count();
+
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      await page.waitForTimeout(500);
+      const current = await messages.count();
+      if (current === previous) {
+        return current;
+      }
+      previous = current;
+    }
+
+    return previous;
+  }
 
   // ────────────────────────────────────────────────
   // RT-R01: Offline send fails gracefully
@@ -413,9 +430,7 @@ test.describe("Messaging: Resilience", { tag: [tags.auth] }, () => {
     await openConversation(page);
 
     // Note the initial message count
-    const initialCount = await page
-      .locator(MSG_SELECTORS.messageBubble)
-      .count();
+    const initialCount = await stableMessageCount(page);
 
     // Fill input with only whitespace
     const input = page.locator(MSG_SELECTORS.messageInput);
@@ -432,7 +447,7 @@ test.describe("Messaging: Resilience", { tag: [tags.auth] }, () => {
     }
 
     // Verify no new message bubble was added
-    const afterCount = await page.locator(MSG_SELECTORS.messageBubble).count();
+    const afterCount = await stableMessageCount(page);
     expect(afterCount).toBe(initialCount);
 
     // Also verify with completely empty input
@@ -446,7 +461,7 @@ test.describe("Messaging: Resilience", { tag: [tags.auth] }, () => {
       await page.waitForLoadState("domcontentloaded").catch(() => {});
     }
 
-    const finalCount = await page.locator(MSG_SELECTORS.messageBubble).count();
+    const finalCount = await stableMessageCount(page);
     expect(finalCount).toBe(initialCount);
   });
 

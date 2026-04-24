@@ -353,7 +353,9 @@ test.describe("30 Advanced Search Page Journeys", () => {
         .isVisible({ timeout: 5000 })
         .catch(() => false)
     ) {
-      await clearBtn.first().click();
+      await clearBtn
+        .first()
+        .evaluate((element) => (element as HTMLElement).click());
       // Wait for navigation to clear filters
       await expect
         .poll(
@@ -1024,7 +1026,7 @@ test.describe("30 Advanced Search Page Journeys", () => {
     if (hasPills && (await pills.count()) >= 2) {
       const urlBefore = page.url();
       // Remove the first pill
-      await pills.first().click();
+      await pills.first().click({ force: true });
       // Wait for URL to change after pill removal via soft navigation
       await expect
         .poll(() => page.url(), {

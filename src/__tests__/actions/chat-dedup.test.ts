@@ -21,11 +21,27 @@ jest.mock("next/cache", () => ({
   unstable_cache: jest.fn((fn) => fn),
 }));
 
-type ListingMock = { id: string; ownerId: string };
+type ListingMock = {
+  id: string;
+  ownerId: string;
+  physicalUnitId: string;
+  status: "ACTIVE" | "PAUSED" | "RENTED";
+  statusReason: string | null;
+  needsMigrationReview: boolean;
+  availableSlots: number;
+  totalSlots: number;
+  openSlots: number;
+  moveInDate: Date | null;
+  availableUntil: Date | null;
+  minStayMonths: number;
+  lastConfirmedAt: Date | null;
+};
 type ConversationRow = { id: string; listingId: string; participantIds: string[] };
 
 type PrismaMock = {
   listing: { findUnique: jest.Mock };
+  user: { findUnique: jest.Mock };
+  physicalUnit: { findUnique: jest.Mock };
   conversation: {
     findFirst: jest.Mock;
     create: jest.Mock;
@@ -40,7 +56,26 @@ type PrismaMock = {
 const conversationStore: ConversationRow[] = [];
 const perUserDeletions: Array<{ conversationId: string; userId: string }> = [];
 
-let listingRow: ListingMock = { id: "listing-1", ownerId: "host-1" };
+let listingRow: ListingMock = makeListingRow();
+
+function makeListingRow(overrides: Partial<ListingMock> = {}): ListingMock {
+  return {
+    id: "listing-1",
+    ownerId: "host-1",
+    physicalUnitId: "unit-1",
+    status: "ACTIVE",
+    statusReason: null,
+    needsMigrationReview: false,
+    availableSlots: 1,
+    totalSlots: 1,
+    openSlots: 1,
+    moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+    availableUntil: null,
+    minStayMonths: 1,
+    lastConfirmedAt: null,
+    ...overrides,
+  };
+}
 
 jest.mock("@/lib/prisma", () => {
   const findFirstMock = jest.fn(
@@ -99,6 +134,19 @@ jest.mock("@/lib/prisma", () => {
     listing: {
       findUnique: jest.fn(async () => listingRow),
     },
+    user: {
+      findUnique: jest.fn().mockResolvedValue({
+        id: "user-1",
+        emailVerified: new Date("2026-04-01T00:00:00.000Z"),
+        isSuspended: false,
+      }),
+    },
+    physicalUnit: {
+      findUnique: jest.fn().mockResolvedValue({
+        unitIdentityEpoch: 1,
+        supersededByUnitId: null,
+      }),
+    },
     conversation: {
       findFirst: findFirstMock,
       create: createMock,
@@ -149,6 +197,15 @@ jest.mock("@/lib/rate-limit", () => ({
   },
 }));
 
+const mockConsumeMessageStartEntitlement = jest.fn();
+const mockAttachConsumptionToConversation = jest.fn();
+jest.mock("@/lib/payments/contact-paywall", () => ({
+  consumeMessageStartEntitlement: (...args: unknown[]) =>
+    mockConsumeMessageStartEntitlement(...args),
+  attachConsumptionToConversation: (...args: unknown[]) =>
+    mockAttachConsumptionToConversation(...args),
+}));
+
 jest.mock("@/app/actions/suspension", () => ({
   checkSuspension: jest.fn().mockResolvedValue({ suspended: false }),
   checkEmailVerified: jest.fn().mockResolvedValue({ verified: true }),
@@ -189,7 +246,7 @@ const mockedPrisma = prisma as unknown as PrismaMock;
 const mockedCheckRateLimit = checkRateLimit as unknown as jest.Mock;
 
 function seedListing(overrides: Partial<ListingMock> = {}): void {
-  listingRow = { id: "listing-1", ownerId: "host-1", ...overrides };
+  listingRow = makeListingRow(overrides);
 }
 
 function installSerializedTransaction(): void {
@@ -211,6 +268,23 @@ function resetState(): void {
   _resetCfmMessagingTelemetryForTests();
   mockedAuth.mockResolvedValue({ user: { id: "user-1" } });
   mockedCheckRateLimit.mockResolvedValue({ success: true });
+  mockConsumeMessageStartEntitlement.mockResolvedValue({
+    ok: true,
+    summary: {
+      enabled: false,
+      mode: "OPEN",
+      freeContactsRemaining: 2,
+      packContactsRemaining: 0,
+      activePassExpiresAt: null,
+      requiresPurchase: false,
+      offers: [],
+    },
+    unitId: "unit-1",
+    unitIdentityEpoch: 1,
+    source: "ENFORCEMENT_DISABLED",
+    consumptionId: null,
+  });
+  mockAttachConsumptionToConversation.mockResolvedValue(undefined);
   installSerializedTransaction();
   (mockedPrisma.$executeRaw as jest.Mock).mockResolvedValue(undefined);
 }
@@ -235,8 +309,12 @@ describe("CFM-003 — startConversation dedup & race safety", () => {
       expect(uniqueIds.size).toBe(1);
       expect(uniqueIds.has("conv-1")).toBe(true);
 
-      // Advisory lock MUST be acquired on every attempt.
-      expect(mockedPrisma.$executeRaw).toHaveBeenCalledTimes(10);
+      // Advisory lock MUST be acquired on every attempt. Other contact-first
+      // audit writes also use $executeRaw, so filter for the lock statement.
+      const advisoryLockCalls = mockedPrisma.$executeRaw.mock.calls.filter(
+        (call) => String(call[0]).includes("pg_advisory_xact_lock")
+      );
+      expect(advisoryLockCalls).toHaveLength(10);
     });
 
     it("20 consecutive runs of the concurrent scenario all yield exactly one row", async () => {

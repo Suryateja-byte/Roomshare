@@ -270,7 +270,7 @@ test.describe("5. Cursor Reset on Filter/Sort Change", () => {
 
     // Verify URL has new bounds, no cursor
     const url = new URL(page.url());
-    expect(url.searchParams.get("minLat")).toBe("37.72");
+    expect(Number(url.searchParams.get("minLat"))).toBeCloseTo(37.72, 3);
     expect(url.searchParams.has("cursor")).toBe(false);
   });
 
