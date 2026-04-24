@@ -1,6 +1,6 @@
 {
   "current_phase": 10,
-  "status": "phase_10_pending",
+  "status": "launch_ready",
   "phase_count": 10,
   "phases": [
     { "id": "01", "slug": "foundations-identity-lifecycle", "status": "APPROVED", "approved_attempt": "v3", "generator": "Claude Sonnet 4.6 (v3); Codex CLI (v1, v2)", "reviewer": "Claude Opus" },
@@ -12,7 +12,7 @@
     { "id": "07", "slug": "saved-searches-alerts-revalidation", "status": "APPROVED", "approved_attempt": "v1", "generator": "Codex GPT-5 in-thread Generating agent", "reviewer": "Codex GPT-5 in-thread Critic" },
     { "id": "08", "slug": "client-cache-coherence", "status": "APPROVED", "approved_attempt": "v1", "generator": "Codex GPT-5 in-thread Generating agent", "reviewer": "Codex GPT-5 in-thread Critic" },
     { "id": "09", "slug": "cutover-retire-booking", "status": "APPROVED", "approved_attempt": "v1", "generator": "Codex GPT-5 in-thread Generating agent", "reviewer": "Codex GPT-5 in-thread Critic" },
-    { "id": "10", "slug": "launch-hardening-drills", "status": "pending" }
+    { "id": "10", "slug": "launch-hardening-drills", "status": "APPROVED", "approved_attempt": "v1", "generator": "Codex GPT-5 in-thread Generating agent", "reviewer": "Codex GPT-5 in-thread Critic" }
   ],
   "notes": [
     "Master plan: .orchestrator/master-plan.md (v10.0).",
@@ -27,6 +27,7 @@
     "Phase 06 approved 2026-04-23: Codex in-thread implementation-triad completed additive monetization hardening, Stripe webhook capture and async entitlement worker, checkout abuse controls, MESSAGE_START/REVEAL_PHONE paywall enforcement, refund/dispute/restoration handling, saved-alert delivery revalidation, runbooks, and focused regression coverage; state advanced to Phase 07 pending.",
     "Phase 07 approved 2026-04-23: Codex in-thread implementation-triad completed saved-search canonical metadata, EMAIL alert subscriptions, durable alert delivery records, ALERT_MATCH/ALERT_DELIVER outbox support, delivery-time preference/paywall/visibility revalidation, disable_alerts pause behavior, runbook coverage, and focused/regression validation; state advanced to Phase 08 pending.",
     "Phase 08 approved 2026-04-24: Codex in-thread implementation-triad completed flagged public cache coherence with signed invalidation cursors, SSE events, encrypted Web Push subscriptions and fanout metadata, public cache headers, service-worker floor/unit eviction, listing detail metadata handoff, autocomplete cache-floor versioning, runbook coverage, and focused/regression validation; state advanced to Phase 09 pending.",
-    "Phase 09 approved 2026-04-24: Codex in-thread implementation-triad completed the destructive cutover retiring booking-era schema/runtime/tests/tooling, preserving legacy redirects without Booking reads, making contact-first/projection behavior default outside production, refitting focused seed/test surfaces, and passing targeted/focused regression validation. `pnpm run seed:e2e` was blocked by no local Postgres at localhost:5433 and Docker unavailable in WSL; `node --check scripts/seed-e2e.js` passed. State advanced to Phase 10 pending."
+    "Phase 09 approved 2026-04-24: Codex in-thread implementation-triad completed the destructive cutover retiring booking-era schema/runtime/tests/tooling, preserving legacy redirects without Booking reads, making contact-first/projection behavior default outside production, refitting focused seed/test surfaces, and passing targeted/focused regression validation. `pnpm run seed:e2e` was blocked by no local Postgres at localhost:5433 and Docker unavailable in WSL; `node --check scripts/seed-e2e.js` passed. State advanced to Phase 10 pending.",
+    "Phase 10 approved 2026-04-24: Codex in-thread implementation-triad added launch-hardening spec/artifacts, runbooks, kill-switch catalog, Definition-of-Done/preflight docs, Vercel/Sentry SLO stubs, deterministic drill helpers/tests, public-payload PII scanner, and CI scanner gate. Phase 10 targeted checks, focused Phase 02/04/06/07/08/09 regressions, prisma validate/typecheck/lint, local Docker Postgres migrations, and `pnpm run seed:e2e` passed. State set to launch_ready."
   ]
 }

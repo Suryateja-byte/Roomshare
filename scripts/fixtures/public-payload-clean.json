@@ -1,0 +1,17 @@
+{
+  "querySnapshotId": "qs_phase10_clean",
+  "projectionEpoch": 12,
+  "embeddingVersion": "text-embedding-004",
+  "results": [
+    {
+      "unitKey": "unit_public_1@12",
+      "displayTitle": "Private room near transit",
+      "displaySubtitle": "North Loop area",
+      "publicAreaName": "North Loop",
+      "publicCellId": "cell_9q8yyz",
+      "price": 1250,
+      "availableFrom": "2026-05-01",
+      "roomCategory": "PRIVATE_ROOM"
+    }
+  ]
+}

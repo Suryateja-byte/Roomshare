@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "owner": "launch-oncall",
+  "alertBackend": "vercel-sentry-stubs",
+  "rules": [
+    {
+      "id": "search_availability",
+      "sourceMetric": "search.request.success_rate",
+      "threshold": "99.5% over 5m",
+      "severity": "page",
+      "sentryProject": "roomshare-web",
+      "vercelSignal": "api_search_5xx_rate"
+    },
+    {
+      "id": "write_success",
+      "sourceMetric": "write.request.success_rate",
+      "threshold": "99.0% over 5m",
+      "severity": "page",
+      "sentryProject": "roomshare-web",
+      "vercelSignal": "server_action_error_rate"
+    },
+    {
+      "id": "projection_lag",
+      "sourceMetric": "projection.lag.seconds",
+      "threshold": "p95 <= 60s over 5m",
+      "severity": "page",
+      "sentryProject": "roomshare-workers",
+      "vercelSignal": "outbox_projection_lag"
+    },
+    {
+      "id": "embedding_lag",
+      "sourceMetric": "embedding.lag.seconds",
+      "threshold": "p95 <= 300s over 10m",
+      "severity": "ticket",
+      "sentryProject": "roomshare-workers",
+      "vercelSignal": "embedding_queue_lag"
+    },
+    {
+      "id": "identity_lag",
+      "sourceMetric": "identity.mutation.lag.seconds",
+      "threshold": "p95 <= 60s over 5m",
+      "severity": "page",
+      "sentryProject": "roomshare-workers",
+      "vercelSignal": "identity_mutation_lag"
+    },
+    {
+      "id": "snapshot_hole_ratio",
+      "sourceMetric": "search.snapshot.hole_ratio",
+      "threshold": "p95 <= 0.05 over 10m",
+      "severity": "ticket",
+      "sentryProject": "roomshare-web",
+      "vercelSignal": "snapshot_hole_ratio"
+    },
+    {
+      "id": "alert_delivery_safety",
+      "sourceMetric": "alerts.delivered_to_tombstoned_target.count",
+      "threshold": "= 0 over 5m",
+      "severity": "page",
+      "sentryProject": "roomshare-workers",
+      "vercelSignal": "alert_delivery_safety"
+    },
+    {
+      "id": "webhook_processing",
+      "sourceMetric": "stripe.webhook.processing_lag.seconds",
+      "threshold": "p95 <= 120s over 5m",
+      "severity": "page",
+      "sentryProject": "roomshare-workers",
+      "vercelSignal": "stripe_webhook_lag"
+    },
+    {
+      "id": "paywall_latency",
+      "sourceMetric": "paywall.evaluate.duration_ms",
+      "threshold": "p95 <= 500ms over 5m",
+      "severity": "ticket",
+      "sentryProject": "roomshare-web",
+      "vercelSignal": "paywall_latency"
+    },
+    {
+      "id": "ledger_consistency",
+      "sourceMetric": "entitlement.ledger.inconsistency.count",
+      "threshold": "= 0 over 5m",
+      "severity": "page",
+      "sentryProject": "roomshare-workers",
+      "vercelSignal": "ledger_consistency"
+    }
+  ]
+}
