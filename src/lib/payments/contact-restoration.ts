@@ -29,8 +29,6 @@ type ListingSnapshot = Pick<
   | "ownerId"
   | "status"
   | "statusReason"
-  | "needsMigrationReview"
-  | "availabilitySource"
   | "availableSlots"
   | "totalSlots"
   | "openSlots"
@@ -122,8 +120,6 @@ async function loadListings(listingIds: string[]) {
       ownerId: true,
       status: true,
       statusReason: true,
-      needsMigrationReview: true,
-      availabilitySource: true,
       availableSlots: true,
       totalSlots: true,
       openSlots: true,
@@ -460,8 +456,6 @@ export async function runMassDeactivationRestoration() {
           ownerId: true,
           status: true,
           statusReason: true,
-          needsMigrationReview: true,
-          availabilitySource: true,
           availableSlots: true,
           totalSlots: true,
           openSlots: true,

@@ -33,7 +33,7 @@ describe("buildSearchDocWhereConditions", () => {
     // PAUSED, DRAFT, ARCHIVED, etc. listings must never appear in search
     expect(conditions).toContain(`l.status = 'ACTIVE'`);
     expect(conditions).toContain(
-      `COALESCE(l."needsMigrationReview", FALSE) = FALSE`
+      `COALESCE(FALSE, FALSE) = FALSE`
     );
     expect(conditions).toContain(`l."statusReason" IS DISTINCT FROM 'MIGRATION_REVIEW'`);
     // Verify no other status values are included
@@ -46,8 +46,9 @@ describe("buildSearchDocWhereConditions", () => {
   it("requires range-aware availability >= $1 in base conditions", () => {
     const { conditions } = buildSearchDocWhereConditions({});
 
-    expect(conditions[0]).toContain(`l."availabilitySource" = 'HOST_MANAGED'`);
-    expect(conditions[0]).toContain("generate_series");
+    expect(conditions[0]).toContain(`'HOST_MANAGED' = 'HOST_MANAGED'`);
+    expect(conditions[0]).toContain(`l."openSlots" >= $2`);
+    expect(conditions[0]).toContain(`l."availableUntil"`);
   });
 
   it("defaults to >= 1 when minAvailableSlots is undefined", () => {
@@ -280,9 +281,9 @@ describe("buildSearchDocListWhereConditions", () => {
   it("adds migration-review and host-managed freshness guards to list search", () => {
     const result = buildSearchDocListWhereConditions({});
 
-    expect(result.conditions).toContain(`COALESCE(l."needsMigrationReview", FALSE) = FALSE`);
+    expect(result.conditions).toContain(`COALESCE(FALSE, FALSE) = FALSE`);
     expect(result.conditions).toContain(`l."statusReason" IS DISTINCT FROM 'MIGRATION_REVIEW'`);
-    expect(result.conditions[0]).toContain(`l."availabilitySource" = 'HOST_MANAGED'`);
+    expect(result.conditions[0]).toContain(`'HOST_MANAGED' = 'HOST_MANAGED'`);
     expect(result.conditions[0]).toContain(`NOW() - INTERVAL '21 days'`);
     expect(result.params).toEqual([1, 1]);
   });
@@ -292,9 +293,9 @@ describe("buildSearchDocListWhereConditions", () => {
       moveInDate: "2026-05-01",
     });
 
-    expect(result.conditions[0]).toContain(`l."moveInDate"::date <= $4::date`);
+    expect(result.conditions[0]).toContain(`l."moveInDate"::date <= $3::date`);
     expect(result.conditions[0]).toContain(
-      `l."availableUntil"::date >= $4::date`
+      `l."availableUntil"::date >= $3::date`
     );
   });
 

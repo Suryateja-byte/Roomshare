@@ -117,8 +117,6 @@ const ALERT_LISTING_SELECT = {
   physicalUnitId: true,
   status: true,
   statusReason: true,
-  needsMigrationReview: true,
-  availabilitySource: true,
   availableSlots: true,
   totalSlots: true,
   openSlots: true,
@@ -458,9 +456,12 @@ export async function deliverQueuedSearchAlert(
 
   const emailResult = await sendNotificationEmail("searchAlert", user.email, {
     userName: user.name || "User",
-    searchQuery: delivery.savedSearch.name,
-    newListingsCount,
-    searchId: delivery.savedSearch.id,
+    searchName: delivery.savedSearch.name,
+    listingTitle:
+      newListingsCount === 1
+        ? "a matching listing"
+        : `${newListingsCount} matching listings`,
+    listingId: delivery.targetListingId ?? delivery.savedSearch.id,
   });
 
   if (!emailResult.success) {

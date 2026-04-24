@@ -432,10 +432,8 @@ describe("stale auto-pause dispatcher", () => {
     expect(
       classifyAutoPauseCandidate(
         {
-          availabilitySource: "HOST_MANAGED",
           status: "ACTIVE",
           statusReason: null,
-          needsMigrationReview: false,
           lastConfirmedAt: daysAgo(now, 30),
           freshnessWarningSentAt: null,
           autoPausedAt: null,

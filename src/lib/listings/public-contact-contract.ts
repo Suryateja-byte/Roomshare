@@ -72,7 +72,7 @@ const MODERATION_LOCKED_STATUS_REASONS = new Set(["ADMIN_PAUSED", "SUPPRESSED"])
 export const LISTING_UNAVAILABLE_MESSAGE =
   "This listing is not available for new messages right now.";
 export const MIGRATION_REVIEW_MESSAGE =
-  "This listing is temporarily unavailable while it completes migration review.";
+  "This listing is temporarily unavailable.";
 export const MODERATION_LOCKED_MESSAGE =
   "This listing is temporarily unavailable while it is under review.";
 
@@ -93,10 +93,7 @@ export function resolveListingAvailabilityGateReason(
   >,
   isSearchEligible: boolean
 ): ListingAvailabilityGateReason | null {
-  if (
-    listing.needsMigrationReview === true ||
-    listing.statusReason === "MIGRATION_REVIEW"
-  ) {
+  if (listing.statusReason === "MIGRATION_REVIEW") {
     return "MIGRATION_REVIEW";
   }
 
@@ -122,7 +119,7 @@ export function resolvePublicListingVisibilityState<
 ): PublicListingVisibilityState {
   if (!listing) {
     return {
-      availabilitySource: "LEGACY_BOOKING",
+      availabilitySource: "HOST_MANAGED",
       publicAvailability: null,
       isSearchEligible: false,
       isPubliclyVisible: false,

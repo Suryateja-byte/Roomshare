@@ -5,11 +5,10 @@
  * to fit within Vercel Hobby plan's 2-cron limit. Each task runs independently
  * with its own try/catch, so one failure does not block others.
  *
- * Schedule: 2,17,32,47 * * * * (every 15 minutes, offset from the hold sweeper)
+ * Schedule: 2,17,32,47 * * * * (every 15 minutes)
  *
  * Every invocation:
- * 1. Reconcile listing slot counts (safety net)
- * 2. Refresh dirty search documents
+ * 1. Refresh dirty search documents
  *
  * Daily window only (09:02-09:04 UTC):
  * 3. Cleanup expired rate limit entries
@@ -95,11 +94,8 @@ async function runDelegatedTask(
 
   try {
     const { ok, data } = await callInternalCron(path, cronSecret);
-    // CFM-904-F2: Promote detail.skipped === true to the top-level `skipped`
-    // field so summary counters correctly tag flag-gated early-returns (e.g.
-    // reconcile-slots when ENABLE_LEGACY_CRONS=off) as skipped rather than
-    // succeeded. The authoritative signal remains the cron's own
-    // cfm.cron.legacy_*_skipped_count log line.
+    // Promote detail.skipped === true to the top-level `skipped` field so
+    // summary counters correctly tag flag-gated early-returns as skipped.
     const skipped = data?.skipped === true;
     results.push({
       task,
@@ -168,13 +164,6 @@ export async function GET(request: NextRequest) {
   const results: TaskResult[] = [];
 
   // --- Fast cadence tasks ---
-  await runDelegatedTask(
-    results,
-    "reconcile-slots",
-    "/api/cron/reconcile-slots",
-    cronSecret
-  );
-
   await runDelegatedTask(
     results,
     "refresh-search-docs",

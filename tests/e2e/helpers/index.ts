@@ -104,9 +104,6 @@ export * from "./filter-helpers";
 // Map tile mocking for CI stability (auto-applied via test fixture)
 export { mockMapTileRequests } from "./map-mock-helpers";
 
-// Booking helpers for race condition and booking tests
-export { selectBookingDates, createBookingAsUser } from "./booking-helpers";
-
 // Mobile auth helpers for mobile authenticated tests
 export {
   setupMobileAuthViewport,
@@ -141,7 +138,6 @@ export {
   createExpiredHold,
   cleanupTestBookings,
   getSlotInfoViaApi,
-  invokeSweeper,
   getGroundTruthSlots,
   updateListingPrice,
   createPendingBooking,

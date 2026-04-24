@@ -60,6 +60,12 @@ jest.mock("@/lib/search/search-telemetry", () => ({
   recordLegacyUrlUsage: jest.fn(),
 }));
 
+const mockGetUsersWithUnlockedSearchAlerts = jest.fn();
+jest.mock("@/lib/payments/search-alert-paywall", () => ({
+  getUsersWithUnlockedSearchAlerts: (...args: unknown[]) =>
+    mockGetUsersWithUnlockedSearchAlerts(...args),
+}));
+
 import { sendNotificationEmail } from "@/lib/email";
 import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
@@ -116,11 +122,11 @@ describe("search-alerts telemetry routing", () => {
         status: "ACTIVE",
         statusReason: null,
         needsMigrationReview: false,
-        availabilitySource: "LEGACY_BOOKING",
+        availabilitySource: "HOST_MANAGED",
         availableSlots: 1,
         totalSlots: 1,
         openSlots: 1,
-        moveInDate: null,
+        moveInDate: new Date("2026-05-01T00:00:00.000Z"),
         availableUntil: null,
         minStayMonths: 1,
         lastConfirmedAt: new Date("2026-04-20T00:00:00.000Z"),
@@ -133,11 +139,11 @@ describe("search-alerts telemetry routing", () => {
       status: "ACTIVE",
       statusReason: null,
       needsMigrationReview: false,
-      availabilitySource: "LEGACY_BOOKING",
+      availabilitySource: "HOST_MANAGED",
       availableSlots: 1,
       totalSlots: 1,
       openSlots: 1,
-      moveInDate: null,
+      moveInDate: new Date("2026-05-01T00:00:00.000Z"),
       availableUntil: null,
       minStayMonths: 1,
       lastConfirmedAt: new Date("2026-04-20T00:00:00.000Z"),
@@ -157,6 +163,9 @@ describe("search-alerts telemetry routing", () => {
     (prisma.outboxEvent.create as jest.Mock).mockResolvedValue({
       id: "outbox-123",
     });
+    mockGetUsersWithUnlockedSearchAlerts.mockImplementation(
+      async (userIds: string[]) => new Set(userIds)
+    );
   });
 
   it("emits legacy saved-search telemetry and matches canonical filters in processSearchAlerts", async () => {

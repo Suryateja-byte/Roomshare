@@ -43,32 +43,27 @@ export async function getFreshnessOpsMetricsSnapshot(): Promise<FreshnessOpsMetr
   const bucketRows = await prisma.$queryRaw<BucketMetricsRow[]>`
     SELECT
       COUNT(*) FILTER (
-        WHERE l."availabilitySource" = 'HOST_MANAGED'
-          AND l."lastConfirmedAt" IS NOT NULL
+        WHERE l."lastConfirmedAt" IS NOT NULL
           AND NOT (l.status = 'PAUSED' AND l."statusReason" = 'STALE_AUTO_PAUSE')
           AND l."lastConfirmedAt" > NOW() - make_interval(days => ${REMINDER_THRESHOLD_DAYS})
       ) AS "normalCount",
       COUNT(*) FILTER (
-        WHERE l."availabilitySource" = 'HOST_MANAGED'
-          AND l."lastConfirmedAt" IS NOT NULL
+        WHERE l."lastConfirmedAt" IS NOT NULL
           AND NOT (l.status = 'PAUSED' AND l."statusReason" = 'STALE_AUTO_PAUSE')
           AND l."lastConfirmedAt" <= NOW() - make_interval(days => ${REMINDER_THRESHOLD_DAYS})
           AND l."lastConfirmedAt" > NOW() - make_interval(days => ${STALE_THRESHOLD_DAYS})
       ) AS "reminderCount",
       COUNT(*) FILTER (
-        WHERE l."availabilitySource" = 'HOST_MANAGED'
-          AND l."lastConfirmedAt" IS NOT NULL
+        WHERE l."lastConfirmedAt" IS NOT NULL
           AND NOT (l.status = 'PAUSED' AND l."statusReason" = 'STALE_AUTO_PAUSE')
           AND l."lastConfirmedAt" <= NOW() - make_interval(days => ${STALE_THRESHOLD_DAYS})
       ) AS "warningCount",
       COUNT(*) FILTER (
-        WHERE l."availabilitySource" = 'HOST_MANAGED'
-          AND l.status = 'PAUSED'
+        WHERE l.status = 'PAUSED'
           AND l."statusReason" = 'STALE_AUTO_PAUSE'
       ) AS "autoPausedCount",
       COUNT(*) FILTER (
-        WHERE l."availabilitySource" = 'HOST_MANAGED'
-          AND l.status = 'ACTIVE'
+        WHERE l.status = 'ACTIVE'
           AND l."lastConfirmedAt" IS NOT NULL
           AND l."lastConfirmedAt" <= NOW() - make_interval(days => ${AUTO_PAUSE_THRESHOLD_DAYS})
       ) AS "staleStillActiveCount"
@@ -101,7 +96,6 @@ async function getStaleInSearchCount(): Promise<number> {
   const staleDaysParamIndex = whereBuilder.paramIndex;
   const conditions = [
     ...whereBuilder.conditions,
-    `l."availabilitySource" = 'HOST_MANAGED'`,
     `l."lastConfirmedAt" IS NOT NULL`,
     `l."lastConfirmedAt" <= NOW() - make_interval(days => $${staleDaysParamIndex})`,
   ];
@@ -124,21 +118,5 @@ async function getStaleInSearchCount(): Promise<number> {
 }
 
 async function getLegacyEligibleCount(): Promise<number> {
-  const rows = await prisma.$queryRaw<CountRow[]>`
-    SELECT COUNT(*) AS count
-    FROM (
-      SELECT DISTINCT b."tenantId", b."listingId"
-      FROM "Booking" b
-      WHERE b.status = 'ACCEPTED'
-        AND b."tenantId" IS NOT NULL
-        AND NOT EXISTS (
-          SELECT 1
-          FROM "Review" r
-          WHERE r."authorId" = b."tenantId"
-            AND r."listingId" = b."listingId"
-        )
-    ) AS eligible_pairs
-  `;
-
-  return normalizeCount(Array.isArray(rows) ? rows[0]?.count : 0);
+  return 0;
 }

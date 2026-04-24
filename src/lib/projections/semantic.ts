@@ -363,6 +363,18 @@ export async function tombstoneSemanticProjectionRows(
   tx: TransactionClient,
   input: { unitId: string; inventoryId: string | null }
 ): Promise<number> {
+  const semanticTable = await tx.$queryRaw<{ exists: boolean }[]>`
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+        AND table_name = 'semantic_inventory_projection'
+    ) AS "exists"
+  `;
+  if (!semanticTable[0]?.exists) {
+    return 0;
+  }
+
   if (input.inventoryId) {
     return tx.$executeRaw`
       DELETE FROM semantic_inventory_projection

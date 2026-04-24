@@ -122,14 +122,14 @@ describe("POST /api/payments/checkout", () => {
       status: "ACTIVE",
       statusReason: null,
       needsMigrationReview: false,
-      availabilitySource: "LEGACY_BOOKING",
+      availabilitySource: "HOST_MANAGED",
       availableSlots: 1,
       totalSlots: 1,
-      openSlots: null,
+      openSlots: 1,
       moveInDate: new Date("2026-05-01T00:00:00.000Z"),
       availableUntil: null,
       minStayMonths: 1,
-      lastConfirmedAt: null,
+      lastConfirmedAt: new Date("2026-04-20T00:00:00.000Z"),
     });
     mockEvaluateMessageStartPaywall.mockResolvedValue({
       summary: {

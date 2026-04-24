@@ -541,6 +541,12 @@ function hasStrongSecret(value: string | undefined): boolean {
   );
 }
 
+function phaseCutoverDefault(value: string | undefined): boolean {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return process.env.NODE_ENV !== "production";
+}
+
 // Helper to check if a feature is available
 // Uses direct env reads so unrelated secret validation cannot break public page renders.
 export const features = {
@@ -638,52 +644,54 @@ export const features = {
   },
   // Multi-slot booking feature flags
   get multiSlotBooking() {
-    return process.env.ENABLE_MULTI_SLOT_BOOKING === "true";
+    return false;
   },
   get wholeUnitMode() {
-    return process.env.ENABLE_WHOLE_UNIT_MODE === "true";
+    return false;
   },
   get softHoldsEnabled() {
-    return process.env.ENABLE_SOFT_HOLDS === "on";
+    return false;
   },
   get softHoldsDraining() {
-    return process.env.ENABLE_SOFT_HOLDS === "drain";
+    return false;
   },
   get bookingAudit() {
-    return process.env.ENABLE_BOOKING_AUDIT === "true";
+    return false;
   },
   get contactFirstListings() {
-    return process.env.ENABLE_CONTACT_FIRST_LISTINGS === "true";
+    return phaseCutoverDefault(process.env.ENABLE_CONTACT_FIRST_LISTINGS);
   },
   get moderationWriteLocks() {
-    return process.env.FEATURE_MODERATION_WRITE_LOCKS === "true";
+    return phaseCutoverDefault(process.env.FEATURE_MODERATION_WRITE_LOCKS);
   },
   get publicCacheCoherence() {
-    return process.env.FEATURE_PUBLIC_CACHE_COHERENCE === "true";
+    return phaseCutoverDefault(process.env.FEATURE_PUBLIC_CACHE_COHERENCE);
   },
   get disablePublicCachePush() {
     return process.env.KILL_SWITCH_DISABLE_PUBLIC_CACHE_PUSH === "true";
   },
   get publicAutocompleteContract() {
-    return process.env.FEATURE_PUBLIC_AUTOCOMPLETE_CONTRACT === "true";
+    return phaseCutoverDefault(process.env.FEATURE_PUBLIC_AUTOCOMPLETE_CONTRACT);
   },
   get bookingRetirementFreeze() {
-    return process.env.ENABLE_BOOKING_RETIREMENT_FREEZE === "true";
+    return false;
   },
   get contactPaywall() {
-    return process.env.ENABLE_CONTACT_PAYWALL === "true";
+    return phaseCutoverDefault(process.env.ENABLE_CONTACT_PAYWALL);
   },
   get contactPaywallEnforcement() {
-    return process.env.ENABLE_CONTACT_PAYWALL_ENFORCEMENT === "true";
+    return phaseCutoverDefault(process.env.ENABLE_CONTACT_PAYWALL_ENFORCEMENT);
   },
   get searchAlertPaywall() {
-    return process.env.ENABLE_SEARCH_ALERT_PAYWALL === "true";
+    return phaseCutoverDefault(process.env.ENABLE_SEARCH_ALERT_PAYWALL);
   },
   get entitlementState() {
-    return process.env.ENABLE_ENTITLEMENT_STATE === "true";
+    return phaseCutoverDefault(process.env.ENABLE_ENTITLEMENT_STATE);
   },
   get contactRestorationAutomation() {
-    return process.env.ENABLE_CONTACT_RESTORATION_AUTOMATION === "true";
+    return phaseCutoverDefault(
+      process.env.ENABLE_CONTACT_RESTORATION_AUTOMATION
+    );
   },
   get disablePhoneReveal() {
     return process.env.KILL_SWITCH_DISABLE_PHONE_REVEAL === "true";
@@ -701,13 +709,13 @@ export const features = {
     return process.env.KILL_SWITCH_DISABLE_ALERTS === "true";
   },
   get bookingNotifications() {
-    return process.env.ENABLE_BOOKING_NOTIFICATIONS !== "off";
+    return false;
   },
   get legacyCrons() {
-    return process.env.ENABLE_LEGACY_CRONS !== "off";
+    return false;
   },
   get privateFeedback() {
-    return process.env.ENABLE_PRIVATE_FEEDBACK === "true";
+    return phaseCutoverDefault(process.env.ENABLE_PRIVATE_FEEDBACK);
   },
   get freshnessNotifications() {
     return process.env.ENABLE_FRESHNESS_NOTIFICATIONS === "on";
@@ -716,23 +724,25 @@ export const features = {
     return process.env.ENABLE_STALE_AUTO_PAUSE === "on";
   },
   get searchListingDedup() {
-    return process.env.FEATURE_SEARCH_LISTING_DEDUP === "true";
+    return phaseCutoverDefault(process.env.FEATURE_SEARCH_LISTING_DEDUP);
   },
   get listingCreateCollisionWarn() {
-    return process.env.FEATURE_LISTING_CREATE_COLLISION_WARN === "true";
+    return phaseCutoverDefault(process.env.FEATURE_LISTING_CREATE_COLLISION_WARN);
   },
   get phase01CanonicalWrites() {
-    return process.env.FEATURE_PHASE01_CANONICAL_WRITES === "true";
+    return phaseCutoverDefault(process.env.FEATURE_PHASE01_CANONICAL_WRITES);
   },
   // Phase 02: projection writes master gate
   get phase02ProjectionWrites() {
-    return process.env.FEATURE_PHASE02_PROJECTION_WRITES === "true";
+    return phaseCutoverDefault(process.env.FEATURE_PHASE02_PROJECTION_WRITES);
   },
   get phase03SemanticProjectionWrites() {
-    return process.env.FEATURE_PHASE03_SEMANTIC_PROJECTION_WRITES === "true";
+    return phaseCutoverDefault(
+      process.env.FEATURE_PHASE03_SEMANTIC_PROJECTION_WRITES
+    );
   },
   get phase04ProjectionReads() {
-    return process.env.FEATURE_PHASE04_PROJECTION_READS === "true";
+    return phaseCutoverDefault(process.env.FEATURE_PHASE04_PROJECTION_READS);
   },
   // Phase 02: kill switch — disable new publication (all projection writes pause)
   get disableNewPublication() {

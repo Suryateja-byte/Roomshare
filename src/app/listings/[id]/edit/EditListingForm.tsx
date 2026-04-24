@@ -49,9 +49,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import ImageUploader from "@/components/listings/ImageUploader";
 import ListingFreshnessCheck from "@/components/ListingFreshnessCheck";
-import ListingMigrationReviewPanel from "@/components/ListingMigrationReviewPanel";
 import { ImageIcon } from "lucide-react";
-import type { ListingMigrationReviewState } from "@/lib/migration/review";
 import {
   getModerationWriteLockReason,
   LISTING_LOCKED_ERROR_MESSAGE,
@@ -83,9 +81,7 @@ interface Listing {
   householdGender: string | null;
   leaseDuration: string | null;
   roomType: string | null;
-  bookingMode: string;
-  availabilitySource?: "LEGACY_BOOKING" | "HOST_MANAGED";
-  needsMigrationReview?: boolean;
+  bookingMode?: string;
   version?: number;
   status?: "ACTIVE" | "PAUSED" | "RENTED";
   statusReason?: string | null;
@@ -107,7 +103,7 @@ interface Listing {
 
 interface EditListingFormProps {
   listing: Listing;
-  migrationReview?: ListingMigrationReviewState | null;
+  migrationReview?: { isReviewRequired: boolean } | null;
   enableWholeUnitMode?: boolean;
   moderationWriteLocksEnabled?: boolean;
 }
@@ -163,7 +159,7 @@ function resolveInitialWriteLock(options: {
 
 function HostManagedEditListingForm({
   listing,
-  migrationReview = null,
+  migrationReview: _migrationReview = null,
   moderationWriteLocksEnabled = false,
 }: EditListingFormProps) {
   const router = useRouter();
@@ -401,22 +397,6 @@ function HostManagedEditListingForm({
         <ArrowLeft className="w-4 h-4 mr-1" />
         Back to listing
       </Link>
-
-      <div className="mb-8">
-        <ListingMigrationReviewPanel
-          actor="host"
-          listingId={listing.id}
-          expectedVersion={version}
-          reviewState={migrationReview}
-          onReviewed={(result) => {
-            setVersion(result.version);
-            setStatus(result.status);
-            setError("");
-            setFieldErrors({});
-            setFormModified(false);
-          }}
-        />
-      </div>
 
       <div className="mb-8">
         <ListingFreshnessCheck listingId={listing.id} canManage={true} />
@@ -693,6 +673,7 @@ function HostManagedEditListingForm({
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function LegacyEditListingForm({
   listing,
   migrationReview = null,
@@ -1152,15 +1133,6 @@ function LegacyEditListingForm({
         <ArrowLeft className="w-4 h-4 mr-1" />
         Back to listing
       </Link>
-
-      <div className="mb-8">
-        <ListingMigrationReviewPanel
-          actor="host"
-          listingId={listing.id}
-          expectedVersion={listing.version ?? 0}
-          reviewState={migrationReview}
-        />
-      </div>
 
       {isWriteLocked && (
         <div className="bg-amber-50 border border-amber-100 px-4 py-4 rounded-xl mb-8">
@@ -1820,9 +1792,5 @@ function LegacyEditListingForm({
 }
 
 export default function EditListingForm(props: EditListingFormProps) {
-  if (props.listing.availabilitySource === "HOST_MANAGED") {
-    return <HostManagedEditListingForm {...props} />;
-  }
-
-  return <LegacyEditListingForm {...props} />;
+  return <HostManagedEditListingForm {...props} />;
 }

@@ -223,8 +223,6 @@ export async function POST(request: Request) {
           title: true,
           status: true,
           statusReason: true,
-          needsMigrationReview: true,
-          availabilitySource: true,
           availableSlots: true,
           totalSlots: true,
           openSlots: true,

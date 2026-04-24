@@ -229,16 +229,6 @@ export function buildFreshnessReadModel(
 ): FreshnessReadModel {
   const publicStatus = resolvePublicStatus(listing.status, listing.statusReason);
 
-  if (listing.availabilitySource !== "HOST_MANAGED") {
-    return {
-      freshnessBucket: "NOT_APPLICABLE",
-      searchEligible: listing.status === "ACTIVE",
-      staleAt: null,
-      autoPauseAt: null,
-      publicStatus,
-    };
-  }
-
   const freshness = resolveHostManagedFreshness(
     listing.lastConfirmedAt,
     options.now ?? new Date()
@@ -268,7 +258,7 @@ export function buildPublicAvailability(
   );
 
   return {
-    availabilitySource: input.availabilitySource ?? "LEGACY_BOOKING",
+    availabilitySource: input.availabilitySource ?? "HOST_MANAGED",
     openSlots,
     totalSlots,
     availableFrom: toDateOnlyString(input.availableFrom ?? input.moveInDate),
@@ -294,10 +284,6 @@ export function isHostManagedAvailabilityValid(
   listing: PublicAvailabilityListingInput,
   now: Date = new Date()
 ): boolean {
-  if (listing.availabilitySource !== "HOST_MANAGED") {
-    return false;
-  }
-
   const availability = buildPublicAvailability(listing);
   const openSlots = listing.openSlots;
 
@@ -408,11 +394,8 @@ export function resolvePublicAvailability(
   listing: PublicAvailabilityListingInput,
   options: ResolvePublicAvailabilityOptions = {}
 ): ResolvedPublicAvailability {
-  if (listing.availabilitySource === "HOST_MANAGED") {
-    return buildHostManagedPublicAvailability(listing, options.now);
-  }
-
-  return buildLegacyPublicAvailability(listing, options.legacySnapshot);
+  void options.legacySnapshot;
+  return buildHostManagedPublicAvailability(listing, options.now);
 }
 
 export function resolvePublicAvailabilityForListings<
@@ -437,7 +420,6 @@ export function isListingEligibleForPublicSearch(
 ): boolean {
   return (
     input.resolvedAvailability.searchEligible &&
-    input.needsMigrationReview !== true &&
     input.statusReason !== "MIGRATION_REVIEW"
   );
 }

@@ -1,0 +1,64 @@
+{
+  "phase": "09",
+  "slug": "cutover-retire-booking",
+  "attempt": "v1",
+  "verdict": "approved",
+  "reviewer": "Codex GPT-5 in-thread Critic",
+  "generator": "Codex GPT-5 in-thread Generating agent",
+  "findings": [],
+  "rationale": "Phase 09 is approved. The implementation removes booking-era schema/runtime surfaces, preserves legacy bookmark redirects without Booking reads, keeps contact-first and projection-read behavior canonical in non-production, and passes the focused regression sets for Phase 09 plus the affected Phase 08, 07, 06, 04, and 02 layers.",
+  "checks": [
+    {
+      "command": "pnpm test -- --runTestsByPath <Phase 09 targeted set> --runInBand",
+      "status": "passed",
+      "result": "4 suites, 15 tests"
+    },
+    {
+      "command": "pnpm test -- --runTestsByPath <Phase 08 public-cache focused set> --runInBand",
+      "status": "passed",
+      "result": "10 suites, 28 tests"
+    },
+    {
+      "command": "pnpm test -- --runTestsByPath <Phase 07 saved-search/alerts focused set> --runInBand",
+      "status": "passed",
+      "result": "7 suites, 95 tests"
+    },
+    {
+      "command": "pnpm test -- --runTestsByPath <Phase 06 payments focused set> --runInBand",
+      "status": "passed",
+      "result": "10 suites, 60 tests"
+    },
+    {
+      "command": "pnpm test -- --runTestsByPath <Phase 04 search focused set> --runInBand",
+      "status": "passed",
+      "result": "7 suites, 76 tests"
+    },
+    {
+      "command": "pnpm test -- --runTestsByPath <Phase 02 outbox/projection focused set> --runInBand",
+      "status": "passed",
+      "result": "14 suites, 99 tests"
+    },
+    {
+      "command": "pnpm exec prisma validate",
+      "status": "passed"
+    },
+    {
+      "command": "pnpm typecheck",
+      "status": "passed"
+    },
+    {
+      "command": "pnpm lint",
+      "status": "passed",
+      "result": "0 errors; existing warnings"
+    },
+    {
+      "command": "pnpm run seed:e2e",
+      "status": "blocked",
+      "result": "Postgres unreachable at localhost:5433; Docker unavailable in WSL. node --check scripts/seed-e2e.js passed."
+    }
+  ],
+  "approval": {
+    "status": "APPROVED",
+    "next_phase": "phase_10_pending"
+  }
+}

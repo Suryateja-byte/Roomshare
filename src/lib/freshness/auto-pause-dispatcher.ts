@@ -29,10 +29,8 @@ type AutoPauseListingSnapshot = {
   id: string;
   title: string;
   version: number;
-  availabilitySource: "LEGACY_BOOKING" | "HOST_MANAGED";
   status: "ACTIVE" | "PAUSED" | "RENTED";
   statusReason: string | null;
-  needsMigrationReview: boolean;
   lastConfirmedAt: Date | null;
   freshnessWarningSentAt: Date | null;
   autoPausedAt: Date | null;
@@ -48,10 +46,8 @@ type LockedListingRow = {
   id: string;
   title: string;
   version: number;
-  availabilitySource: "LEGACY_BOOKING" | "HOST_MANAGED";
   status: "ACTIVE" | "PAUSED" | "RENTED";
   statusReason: string | null;
-  needsMigrationReview: boolean;
   lastConfirmedAt: Date | null;
   freshnessWarningSentAt: Date | null;
   autoPausedAt: Date | null;
@@ -125,10 +121,8 @@ const listingSelection = {
   id: true,
   title: true,
   version: true,
-  availabilitySource: true,
   status: true,
   statusReason: true,
-  needsMigrationReview: true,
   lastConfirmedAt: true,
   freshnessWarningSentAt: true,
   autoPausedAt: true,
@@ -206,13 +200,12 @@ function compareCandidates(left: QueryCandidate, right: QueryCandidate): number 
 function buildListingLogMeta(
   listing: Pick<
     AutoPauseListingSnapshot,
-    "id" | "availabilitySource" | "status" | "statusReason"
+    "id" | "status" | "statusReason"
   >
 ): Record<string, unknown> {
   return {
     event: "cfm.cron.stale_auto_pause",
     listingIdHash: hashIdForLog(listing.id),
-    availabilitySource: listing.availabilitySource,
     listingStatus: listing.status,
     statusReason: listing.statusReason,
   };
@@ -257,10 +250,8 @@ async function fetchDueCandidates(now: Date): Promise<QueryCandidate[]> {
   const autoPauseAtOrBefore = subtractDays(now, AUTO_PAUSE_THRESHOLD_DAYS);
   const rows = await prisma.listing.findMany({
     where: {
-      availabilitySource: "HOST_MANAGED",
       status: "ACTIVE",
       statusReason: null,
-      needsMigrationReview: false,
       lastConfirmedAt: {
         lte: autoPauseAtOrBefore,
       },
@@ -312,10 +303,8 @@ async function fetchLatestListings(
 
 export function classifyAutoPauseCandidate(
   listing: {
-    availabilitySource: "LEGACY_BOOKING" | "HOST_MANAGED" | null | undefined;
     status: string | null | undefined;
     statusReason: string | null | undefined;
-    needsMigrationReview?: boolean | null | undefined;
     lastConfirmedAt: Date | string | null | undefined;
     freshnessWarningSentAt?: Date | null | undefined;
     autoPausedAt?: Date | null | undefined;
@@ -323,14 +312,6 @@ export function classifyAutoPauseCandidate(
   },
   now: Date = new Date()
 ): AutoPauseDispatchDecision {
-  if (listing.availabilitySource !== "HOST_MANAGED") {
-    return { action: "skip", reason: "not_host_managed" };
-  }
-
-  if (listing.needsMigrationReview) {
-    return { action: "skip", reason: "migration_review" };
-  }
-
   if (listing.ownerIsSuspended) {
     return { action: "skip", reason: "suspended" };
   }
@@ -359,10 +340,8 @@ function toLockedSnapshot(row: LockedListingRow): AutoPauseListingSnapshot {
     id: row.id,
     title: row.title,
     version: row.version,
-    availabilitySource: row.availabilitySource,
     status: row.status,
     statusReason: row.statusReason,
-    needsMigrationReview: row.needsMigrationReview,
     lastConfirmedAt: row.lastConfirmedAt,
     freshnessWarningSentAt: row.freshnessWarningSentAt,
     autoPausedAt: row.autoPausedAt,
@@ -386,10 +365,8 @@ async function pauseListingInTransaction(
           l.id,
           l.title,
           l.version,
-          l."availabilitySource",
           l.status,
           l."statusReason",
-          l."needsMigrationReview",
           l."lastConfirmedAt",
           l."freshnessWarningSentAt",
           l."autoPausedAt",
@@ -430,10 +407,8 @@ async function pauseListingInTransaction(
         where: {
           id: lockedListing.id,
           version: lockedListing.version,
-          availabilitySource: "HOST_MANAGED",
           status: "ACTIVE",
           statusReason: null,
-          needsMigrationReview: false,
           freshnessWarningSentAt: {
             not: null,
           },

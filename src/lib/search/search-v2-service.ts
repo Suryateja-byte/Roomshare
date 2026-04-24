@@ -73,7 +73,6 @@ import {
 } from "@/lib/constants";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
-import { getAvailabilityForListings } from "@/lib/availability";
 import { prisma } from "@/lib/prisma";
 import {
   isListingEligibleForPublicSearch,
@@ -209,17 +208,10 @@ function getFirstValue(
   return value;
 }
 
-function parseDateParam(value?: string): Date | undefined {
-  if (!value) return undefined;
-  return new Date(`${value}T00:00:00.000Z`);
-}
-
 interface SemanticListingAvailabilityRow {
   id: string;
-  availabilitySource: "LEGACY_BOOKING" | "HOST_MANAGED" | null;
   status: string | null;
   statusReason: string | null;
-  needsMigrationReview: boolean | null;
   totalSlots: number | null;
   availableSlots: number | null;
   openSlots: number | null;
@@ -241,10 +233,8 @@ async function resolveEligibleSemanticItems(
     where: { id: { in: items.map((item) => item.id) } },
     select: {
       id: true,
-      availabilitySource: true,
       status: true,
       statusReason: true,
-      needsMigrationReview: true,
       totalSlots: true,
       availableSlots: true,
       openSlots: true,
@@ -257,24 +247,11 @@ async function resolveEligibleSemanticItems(
   const listingRowsById = new Map<string, SemanticListingAvailabilityRow>(
     listingRows.map((listing) => [listing.id, listing])
   );
-  const legacyIds = listingRows
-    .filter((listing) => listing.availabilitySource === "LEGACY_BOOKING")
-    .map((listing) => listing.id);
-  const availabilityByListing =
-    legacyIds.length > 0
-      ? await getAvailabilityForListings(legacyIds, {
-          startDate: parseDateParam(filterParams.moveInDate),
-          endDate: parseDateParam(filterParams.endDate),
-        })
-      : new Map();
   const resolvedAvailabilityByListing = resolvePublicAvailabilityForListings(
     items.map((item) => ({
       ...item,
       ...(listingRowsById.get(item.id) ?? {}),
-    })),
-    {
-      legacyAvailabilityByListing: availabilityByListing,
-    }
+    }))
   );
   const requiredSlots = Math.max(filterParams.minAvailableSlots ?? 1, 1);
 
@@ -310,7 +287,6 @@ async function resolveEligibleSemanticItems(
         listingRow &&
           resolvedAvailability &&
           isListingEligibleForPublicSearch({
-            needsMigrationReview: listingRow?.needsMigrationReview,
             statusReason: listingRow?.statusReason,
             resolvedAvailability,
           }) &&

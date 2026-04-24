@@ -114,8 +114,6 @@ export async function startConversation(
         ownerId: true,
         status: true,
         statusReason: true,
-        needsMigrationReview: true,
-        availabilitySource: true,
         availableSlots: true,
         totalSlots: true,
         openSlots: true,
@@ -403,8 +401,6 @@ export async function sendMessage(conversationId: string, content: string) {
           select: {
             status: true,
             statusReason: true,
-            needsMigrationReview: true,
-            availabilitySource: true,
             availableSlots: true,
             totalSlots: true,
             openSlots: true,

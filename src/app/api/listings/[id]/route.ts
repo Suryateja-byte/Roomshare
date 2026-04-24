@@ -13,7 +13,6 @@ import {
   listingRoomTypeSchema,
   listingGenderPreferenceSchema,
   listingHouseholdGenderSchema,
-  listingBookingModeSchema,
 } from "@/lib/schemas";
 import { VALID_AMENITIES, VALID_HOUSE_RULES } from "@/lib/filter-schema";
 import { checkListingLanguageCompliance } from "@/lib/listing-language-guard";
@@ -29,16 +28,6 @@ import { normalizeStringList } from "@/lib/utils";
 import { z } from "zod";
 import { features } from "@/lib/env";
 import { syncListingEmbedding } from "@/lib/embeddings/sync";
-import {
-  getAvailability,
-  getFuturePeakReservedLoad,
-  syncFutureInventoryTotalSlots,
-} from "@/lib/availability";
-import {
-  prepareHostManagedListingWrite,
-  requiresDedicatedHostManagedWritePath,
-  type HostManagedListingWriteCurrent,
-} from "@/lib/listings/host-managed-write";
 import { getModerationWriteLockResult } from "@/lib/listings/moderation-write-lock";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -140,75 +129,25 @@ const updateListingSchema = z.object({
     .nullable()
     .optional(),
   images: z.array(supabaseImageUrlSchema).max(10).optional(),
-  bookingMode: listingBookingModeSchema,
 });
 
-const listingStatusSchema = z.enum(["ACTIVE", "PAUSED", "RENTED"]);
-const nonEmptyNumberishSchema = z
-  .union([z.number(), z.string().trim().min(1)])
-  .pipe(z.coerce.number());
-const integerLikeSchema = nonEmptyNumberishSchema.pipe(z.number().int());
-const nonNegativeIntegerLikeSchema = nonEmptyNumberishSchema.pipe(
-  z.number().int().min(0)
-);
-const optionalHostManagedDateSchema = z
-  .union([
-    z
-      .string()
-      .trim()
-      .min(1)
-      .refine((value) => !Number.isNaN(Date.parse(value)), {
-        message: "Invalid date format",
-      })
-      .transform((value) => new Date(value)),
-    z.null(),
-  ])
-  .optional();
-
-const hostManagedPatchSchema = z
-  .object({
-    expectedVersion: nonNegativeIntegerLikeSchema,
-    openSlots: z.union([integerLikeSchema, z.null()]).optional(),
-    totalSlots: integerLikeSchema.optional(),
-    moveInDate: optionalHostManagedDateSchema,
-    availableUntil: optionalHostManagedDateSchema,
-    minStayMonths: integerLikeSchema.optional(),
-    status: listingStatusSchema.optional(),
-  })
-  .strict();
-
-type LockedListingRow = HostManagedListingWriteCurrent & {
+type LockedListingRow = {
+  id: string;
   ownerId: string;
-  bookingMode: string;
+  version: number;
+  status: string;
+  statusReason: string | null;
+  openSlots: number | null;
+  availableSlots: number;
+  totalSlots: number;
+  moveInDate: Date | null;
+  availableUntil: Date | null;
+  minStayMonths: number;
+  lastConfirmedAt: Date | null;
+  freshnessReminderSentAt: Date | null;
+  freshnessWarningSentAt: Date | null;
+  autoPausedAt: Date | null;
 };
-
-const HOST_MANAGED_PATCH_KEYS = new Set([
-  "expectedVersion",
-  "openSlots",
-  "totalSlots",
-  "moveInDate",
-  "availableUntil",
-  "minStayMonths",
-  "status",
-]);
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function isPureHostManagedPatchPayload(
-  value: unknown
-): value is Record<string, unknown> {
-  if (!isRecord(value)) {
-    return false;
-  }
-
-  const keys = Object.keys(value);
-  return (
-    keys.includes("expectedVersion") &&
-    keys.every((key) => HOST_MANAGED_PATCH_KEYS.has(key))
-  );
-}
 
 export async function DELETE(
   request: Request,
@@ -242,7 +181,6 @@ export async function DELETE(
     // to prevent TOCTOU race between check and delete
     let _listingTitle: string | null = null;
     let listingImages: string[] = [];
-    let pendingBookings: { id: string; tenantId: string | null }[] = [];
 
     try {
       await prisma.$transaction(async (tx) => {
@@ -262,100 +200,7 @@ export async function DELETE(
         _listingTitle = listing.title;
         listingImages = listing.images || [];
 
-        // Check for active ACCEPTED bookings - block deletion if any exist
-        const activeAcceptedBookings = await tx.booking.count({
-          where: {
-            listingId: id,
-            status: "ACCEPTED",
-            endDate: { gte: new Date() },
-          },
-        });
-
-        if (activeAcceptedBookings > 0) {
-          throw new Error("ACTIVE_BOOKINGS");
-        }
-
-        // Get all PENDING bookings to notify tenants before deletion
-        pendingBookings = await tx.booking.findMany({
-          where: {
-            listingId: id,
-            status: "PENDING",
-          },
-          select: {
-            id: true,
-            tenantId: true,
-          },
-        });
-
-        // Batch-create notifications for tenants with pending bookings
-        if (pendingBookings.length > 0) {
-          const pendingBookingNotifications = pendingBookings
-            .filter((booking) => booking.tenantId != null)
-            .map((booking) => ({
-              userId: booking.tenantId!,
-              type: "BOOKING_CANCELLED" as const,
-              title: "Booking Request Cancelled",
-              message: `Your pending booking request for "${listing.title}" has been cancelled because the host removed the listing.`,
-              link: "/bookings",
-            }));
-
-          if (pendingBookingNotifications.length > 0) {
-            if (!features.bookingNotifications) {
-              logger.sync.info(
-                "cfm.notifications.booking_emission_blocked_count",
-                {
-                  type: "BOOKING_CANCELLED",
-                  kind: "inapp",
-                  source: "batch",
-                }
-              );
-            } else {
-              await tx.notification.createMany({
-                data: pendingBookingNotifications,
-              });
-            }
-          }
-        }
-
-        // Phase 4: Notify tenants with active HELD bookings
-        const heldBookings = await tx.booking.findMany({
-          where: {
-            listingId: id,
-            status: "HELD",
-            heldUntil: { gte: new Date() },
-          },
-          select: { id: true, tenantId: true },
-        });
-        if (heldBookings.length > 0) {
-          const heldBookingNotifications = heldBookings
-            .filter((booking) => booking.tenantId != null)
-            .map((booking) => ({
-              userId: booking.tenantId!,
-              type: "BOOKING_HOLD_EXPIRED" as const,
-              title: "Hold Cancelled",
-              message: `Your hold on "${listing.title}" has been cancelled because the host removed the listing.`,
-              link: "/bookings",
-            }));
-
-          if (heldBookingNotifications.length > 0) {
-            if (!features.bookingNotifications) {
-              logger.sync.info(
-                "cfm.notifications.booking_emission_blocked_count",
-                {
-                  type: "BOOKING_HOLD_EXPIRED",
-                  kind: "inapp",
-                  source: "batch",
-                }
-              );
-            } else {
-              await tx.notification.createMany({
-                data: heldBookingNotifications,
-              });
-            }
-          }
-        }
-
-        // Delete listing — Location and bookings cascade-deleted automatically
+        // Delete listing; contact-first tables are independent projections/ledgers.
         await tx.listing.delete({ where: { id } });
       });
     } catch (error) {
@@ -364,16 +209,6 @@ export async function DELETE(
           return NextResponse.json(
             { error: "Listing not found" },
             { status: 404 }
-          );
-        }
-        if (error.message === "ACTIVE_BOOKINGS") {
-          return NextResponse.json(
-            {
-              error: "Cannot delete listing with active bookings",
-              message:
-                "You have active bookings for this listing. Please cancel them before deleting.",
-            },
-            { status: 400 }
           );
         }
       }
@@ -410,7 +245,7 @@ export async function DELETE(
     return NextResponse.json(
       {
         success: true,
-        notifiedTenants: pendingBookings.length,
+        notifiedTenants: 0,
       },
       { status: 200 }
     );
@@ -497,126 +332,10 @@ export async function PATCH(
       return NextResponse.json({ error: "Listing not found" }, { status: 404 });
     }
 
-    const useDedicatedHostManagedPatch =
-      listing.availabilitySource === "HOST_MANAGED" &&
-      isPureHostManagedPatchPayload(rawBody);
-
     let result;
     let removedImageUrls: string[] = [];
 
-    if (useDedicatedHostManagedPatch) {
-      const parsedHostManagedPatch = hostManagedPatchSchema.safeParse(rawBody);
-      if (!parsedHostManagedPatch.success) {
-        return NextResponse.json(
-          {
-            error: "Validation failed",
-            fields: parsedHostManagedPatch.error.flatten().fieldErrors,
-          },
-          { status: 400 }
-        );
-      }
-      const hostManagedPatch = parsedHostManagedPatch.data;
-
-      try {
-        const hostManagedResult = await prisma.$transaction(async (tx) => {
-          const [lockedListing] = await tx.$queryRaw<LockedListingRow[]>`
-            SELECT
-              id,
-              "ownerId",
-              version,
-              "availabilitySource",
-              status,
-              "statusReason",
-              "needsMigrationReview",
-              "openSlots",
-              "availableSlots",
-              "totalSlots",
-              "moveInDate",
-              "availableUntil",
-              "minStayMonths",
-              "lastConfirmedAt",
-              "freshnessReminderSentAt",
-              "freshnessWarningSentAt",
-              "autoPausedAt",
-              "booking_mode" as "bookingMode"
-            FROM "Listing"
-            WHERE "id" = ${id}
-            FOR UPDATE
-          `;
-
-          if (!lockedListing || lockedListing.ownerId !== userId) {
-            throw new Error("NOT_FOUND");
-          }
-
-          const writeLock = features.moderationWriteLocks
-            ? getModerationWriteLockResult({
-                actor: "host",
-                statusReason: lockedListing.statusReason,
-              })
-            : null;
-
-          if (writeLock) {
-            return {
-              ok: false,
-              error: writeLock.error,
-              code: writeLock.code,
-              lockReason: writeLock.lockReason,
-              httpStatus: writeLock.httpStatus,
-            } as const;
-          }
-
-          const preparedWrite = prepareHostManagedListingWrite(
-            lockedListing,
-            hostManagedPatch,
-            {
-              actor: "host",
-              now: new Date(),
-            }
-          );
-
-          if (!preparedWrite.ok) {
-            return {
-              ok: false,
-              error: preparedWrite.error,
-              code: preparedWrite.code,
-              httpStatus: preparedWrite.httpStatus,
-            } as const;
-          }
-
-          const updatedListing = await tx.listing.update({
-            where: { id },
-            data: preparedWrite.data,
-          });
-
-          await markListingDirtyInTx(tx, id, "listing_updated");
-
-          return { ok: true, updatedListing } as const;
-        });
-
-        if (!hostManagedResult.ok) {
-          return NextResponse.json(
-            {
-              error: hostManagedResult.error,
-              code: hostManagedResult.code,
-              ...("lockReason" in hostManagedResult
-                ? { lockReason: hostManagedResult.lockReason }
-                : {}),
-            },
-            { status: hostManagedResult.httpStatus }
-          );
-        }
-
-        result = hostManagedResult.updatedListing;
-      } catch (error) {
-        if (error instanceof Error && error.message === "NOT_FOUND") {
-          return NextResponse.json(
-            { error: "Listing not found" },
-            { status: 404 }
-          );
-        }
-        throw error;
-      }
-    } else {
+    {
       const parsed = updateListingSchema.safeParse(rawBody);
       if (!parsed.success) {
         return NextResponse.json(
@@ -649,7 +368,6 @@ export async function PATCH(
         householdGender,
         primaryHomeLanguage,
         images,
-        bookingMode,
       } = parsed.data;
 
       if (householdLanguages && householdLanguages.length > 0) {
@@ -791,16 +509,6 @@ export async function PATCH(
         );
       }
 
-      if (bookingMode === "WHOLE_UNIT") {
-        const { features } = await import("@/lib/env");
-        if (!features.wholeUnitMode) {
-          return NextResponse.json(
-            { error: "Whole-unit booking mode is not currently available." },
-            { status: 400 }
-          );
-        }
-      }
-
       if (Array.isArray(images) && Array.isArray(listing.images)) {
         const oldSet = new Set(listing.images);
         const newSet = new Set(images);
@@ -814,10 +522,8 @@ export async function PATCH(
               id,
               "ownerId",
               version,
-              "availabilitySource",
               status,
               "statusReason",
-              "needsMigrationReview",
               "openSlots",
               "availableSlots",
               "totalSlots",
@@ -827,8 +533,7 @@ export async function PATCH(
               "lastConfirmedAt",
               "freshnessReminderSentAt",
               "freshnessWarningSentAt",
-              "autoPausedAt",
-              "booking_mode" as "bookingMode"
+              "autoPausedAt"
             FROM "Listing"
             WHERE "id" = ${id}
             FOR UPDATE
@@ -865,11 +570,6 @@ export async function PATCH(
           const moveInDateChanged =
             (lockedListing.moveInDate?.toISOString().slice(0, 10) ?? null) !==
             (nextMoveInDate?.toISOString().slice(0, 10) ?? null);
-          const bookingModeChanged =
-            bookingMode !== undefined &&
-            bookingMode !== null &&
-            bookingMode !== lockedListing.bookingMode;
-          const totalSlotsChanged = totalSlots !== lockedListing.totalSlots;
           const availableUntilChanged =
             availableUntil !== undefined &&
             (lockedListing.availableUntil?.toISOString().slice(0, 10) ?? null) !==
@@ -877,59 +577,15 @@ export async function PATCH(
           const minStayMonthsChanged =
             minStayMonths !== undefined &&
             minStayMonths !== lockedListing.minStayMonths;
-          const hostManagedInventoryMutation =
-            requiresDedicatedHostManagedWritePath({
-              availabilitySource: lockedListing.availabilitySource,
-              moveInDateChanged,
-              bookingModeChanged,
-              totalSlotsChanged,
-              availableUntilChanged,
-              minStayMonthsChanged,
-            });
 
-          if (hostManagedInventoryMutation) {
+          if (
+            moveInDateChanged ||
+            totalSlots !== lockedListing.totalSlots ||
+            availableUntilChanged ||
+            minStayMonthsChanged
+          ) {
             throw new Error("HOST_MANAGED_WRITE_PATH_REQUIRED");
           }
-
-          if (bookingModeChanged) {
-            const futureAccepted = await tx.booking.count({
-              where: {
-                listingId: id,
-                status: "ACCEPTED",
-                endDate: { gte: new Date() },
-              },
-            });
-            if (futureAccepted > 0) {
-              throw new Error("BOOKING_MODE_CONFLICT");
-            }
-          }
-
-          if (
-            lockedListing.availabilitySource === "LEGACY_BOOKING" &&
-            totalSlots !== undefined &&
-            totalSlots !== null &&
-            totalSlots < lockedListing.totalSlots
-          ) {
-            const peakReservedLoad = await getFuturePeakReservedLoad(tx, id);
-            if (totalSlots < peakReservedLoad) {
-              throw new Error("SLOTS_REDUCTION_BLOCKED");
-            }
-          }
-
-          const currentAvailability =
-            lockedListing.availabilitySource === "LEGACY_BOOKING"
-              ? await getAvailability(id, { tx })
-              : null;
-          if (
-            lockedListing.availabilitySource === "LEGACY_BOOKING" &&
-            !currentAvailability
-          ) {
-            throw new Error("LISTING_AVAILABILITY_NOT_FOUND");
-          }
-
-          const reservedSlotsToday = currentAvailability
-            ? currentAvailability.acceptedSlots + currentAvailability.heldSlots
-            : 0;
 
           const updatedListing = await tx.listing.update({
             where: { id },
@@ -952,26 +608,13 @@ export async function PATCH(
               leaseDuration: leaseDuration || null,
               roomType: roomType || null,
               totalSlots,
-              ...(lockedListing.availabilitySource === "LEGACY_BOOKING" && {
-                availableSlots: Math.max(0, totalSlots - reservedSlotsToday),
-              }),
+              availableSlots: totalSlots,
               moveInDate: nextMoveInDate,
               availableUntil: nextAvailableUntil,
               ...(minStayMonths !== undefined && { minStayMonths }),
               ...(Array.isArray(images) && { images }),
-              ...(bookingMode !== undefined &&
-                bookingMode !== null && { bookingMode }),
             },
           });
-
-          if (
-            lockedListing.availabilitySource === "LEGACY_BOOKING" &&
-            totalSlots !== undefined &&
-            totalSlots !== null &&
-            totalSlots !== lockedListing.totalSlots
-          ) {
-            await syncFutureInventoryTotalSlots(tx, id, totalSlots);
-          }
 
           if (addressChanged && listing.location && coords) {
             await tx.location.update({
@@ -1018,29 +661,11 @@ export async function PATCH(
               { status: 404 }
             );
           }
-          if (error.message === "BOOKING_MODE_CONFLICT") {
-            return NextResponse.json(
-              {
-                error:
-                  "Cannot change booking mode while active bookings exist. Cancel conflicting bookings first.",
-              },
-              { status: 400 }
-            );
-          }
-          if (error.message === "SLOTS_REDUCTION_BLOCKED") {
-            return NextResponse.json(
-              {
-                error:
-                  "Cannot reduce total slots below the number committed by accepted bookings and active holds.",
-              },
-              { status: 400 }
-            );
-          }
           if (error.message === "HOST_MANAGED_WRITE_PATH_REQUIRED") {
             return NextResponse.json(
               {
                 error:
-                  "This listing now uses host-managed availability. Reload and use the new availability editor.",
+                  "Availability is managed by the contact-first inventory editor. Reload and use the availability editor.",
                 code: "HOST_MANAGED_WRITE_PATH_REQUIRED",
               },
               { status: 409 }

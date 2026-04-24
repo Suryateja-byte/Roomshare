@@ -125,30 +125,6 @@ export async function getSlotInfoViaApi(
   return res.data;
 }
 
-/**
- * Invoke the sweep-expired-holds cron endpoint.
- */
-export async function invokeSweeper(page: Page): Promise<{
-  success: boolean;
-  expired: number;
-  skipped: boolean;
-  reason?: string;
-}> {
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret)
-    throw new Error("CRON_SECRET env var required for sweeper invocation");
-  const response = await page.request.get("/api/cron/sweep-expired-holds", {
-    headers: { Authorization: `Bearer ${cronSecret}` },
-    timeout: 30_000,
-  });
-  return (await response.json()) as {
-    success: boolean;
-    expired: number;
-    skipped: boolean;
-    reason?: string;
-  };
-}
-
 // ─── Phase 2 API Helpers ────────────────────────────────────────
 
 export async function getGroundTruthSlots(

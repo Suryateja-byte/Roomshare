@@ -102,11 +102,11 @@ describe("search-alerts", () => {
       status: "ACTIVE",
       statusReason: null,
       needsMigrationReview: false,
-      availabilitySource: "LEGACY_BOOKING",
+      availabilitySource: "HOST_MANAGED",
       availableSlots: 1,
       totalSlots: 1,
       openSlots: 1,
-      moveInDate: null,
+      moveInDate: new Date("2026-05-01T00:00:00.000Z"),
       availableUntil: null,
       minStayMonths: 1,
       lastConfirmedAt: new Date("2026-04-20T00:00:00.000Z"),
@@ -520,8 +520,9 @@ describe("search-alerts", () => {
         "searchAlert",
         mockUser.email,
         expect.objectContaining({
-          searchQuery: "NYC Rooms",
-          newListingsCount: 1,
+          searchName: "NYC Rooms",
+          listingTitle: "a matching listing",
+          listingId: "listing-123",
         })
       );
       expect(prisma.notification.create).toHaveBeenCalledWith({

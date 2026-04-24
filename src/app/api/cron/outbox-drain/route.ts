@@ -3,7 +3,7 @@
  *
  * Internal endpoint invoked by:
  *   - daily-maintenance (every 15 min) for all priority lanes
- *   - sweep-expired-holds (every 5 min) for priority=0 lane only (tombstone fast-lane)
+ *   - direct operator/test invocation for priority=0 tombstone fast-lane drains
  *
  * NOT registered as a dedicated Vercel cron (would exceed Hobby plan 2-cron limit).
  * See spec §(A) for the fan-out rationale.

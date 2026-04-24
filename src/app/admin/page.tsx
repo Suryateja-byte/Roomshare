@@ -8,11 +8,9 @@ import {
   Home,
   FileCheck,
   Flag,
-  Calendar,
   MessageSquare,
   TrendingUp,
   Shield,
-  ScrollText,
 } from "lucide-react";
 
 export const metadata: Metadata = {
@@ -28,7 +26,6 @@ async function getAdminStats() {
     activeListingsCount,
     pendingVerifications,
     pendingReports,
-    bookingsCount,
     messagesCount,
     verifiedUsersCount,
   ] = await Promise.all([
@@ -37,7 +34,6 @@ async function getAdminStats() {
     prisma.listing.count({ where: { status: "ACTIVE" } }),
     prisma.verificationRequest.count({ where: { status: "PENDING" } }),
     prisma.report.count(),
-    prisma.booking.count(),
     prisma.message.count(),
     prisma.user.count({ where: { isVerified: true } }),
   ]);
@@ -48,7 +44,6 @@ async function getAdminStats() {
     activeListingsCount,
     pendingVerifications,
     pendingReports,
-    bookingsCount,
     messagesCount,
     verifiedUsersCount,
   };
@@ -113,12 +108,6 @@ export default async function AdminDashboard() {
       alert: stats.pendingReports > 0,
     },
     {
-      label: "Total Bookings",
-      value: stats.bookingsCount,
-      icon: Calendar,
-      color: "bg-primary",
-    },
-    {
       label: "Messages Sent",
       value: stats.messagesCount,
       icon: MessageSquare,
@@ -135,7 +124,6 @@ export default async function AdminDashboard() {
     },
     { label: "User Management", href: "/admin/users", icon: Users },
     { label: "Listing Moderation", href: "/admin/listings", icon: Home },
-    { label: "Bookings", href: "/admin/bookings", icon: ScrollText },
     {
       label: "Reports",
       href: "/admin/reports",

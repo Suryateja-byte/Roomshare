@@ -369,8 +369,6 @@ export async function POST(request: Request) {
           select: {
             status: true,
             statusReason: true,
-            needsMigrationReview: true,
-            availabilitySource: true,
             availableSlots: true,
             totalSlots: true,
             openSlots: true,

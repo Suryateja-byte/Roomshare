@@ -557,27 +557,7 @@ async function main() {
     console.log(`  ✓ Reviewer listing: ${REVIEWER_LISTING.title} (${reviewerListing.id})`);
   }
 
-  // 3c. Create a COMPLETED booking for test user on reviewer's listing (enables review writing)
-  const existingCompletedBooking = await prisma.booking.findFirst({
-    where: { tenantId: user.id, listingId: reviewerListing.id },
-  });
-  if (!existingCompletedBooking) {
-    const pastStart = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-    const pastEnd = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    await prisma.booking.create({
-      data: {
-        listingId: reviewerListing.id,
-        tenantId: user.id,
-        startDate: pastStart,
-        endDate: pastEnd,
-        totalPrice: REVIEWER_LISTING.price * 2,
-        status: 'ACCEPTED',
-      },
-    });
-    console.log(`  ✓ COMPLETED booking for test user on reviewer's listing`);
-  } else {
-    console.log(`  ⏭ Completed booking exists`);
-  }
+  console.log('  ✓ Review fixture uses contact-first private feedback; bookings retired');
 
   // 4. Create admin user
   const admin = await prisma.user.upsert({
@@ -658,56 +638,8 @@ async function main() {
     }
   }
 
-  // 7. Create bookings (PENDING and ACCEPTED) on a listing NOT owned by auth user
-  // Use thirdUser's perspective: they book a listing owned by E2E test user
-  if (createdListings.length >= 2) {
-    const bookingListing = createdListings[1]; // SOMA Shared
-    const startDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-    const endDate = new Date(Date.now() + 120 * 24 * 60 * 60 * 1000);
-
-    // PENDING booking from reviewer
-    const existingPending = await prisma.booking.findFirst({
-      where: { tenantId: reviewer.id, listingId: bookingListing.id, status: 'PENDING' },
-    });
-    if (!existingPending) {
-      await prisma.booking.create({
-        data: {
-          listingId: bookingListing.id,
-          tenantId: reviewer.id,
-          startDate,
-          endDate,
-          totalPrice: bookingListing.price * 3,
-          status: 'PENDING',
-        },
-      });
-      console.log(`  ✓ PENDING booking on: ${bookingListing.title}`);
-    } else {
-      console.log(`  ⏭ PENDING booking exists`);
-    }
-
-    // ACCEPTED booking from thirdUser on a different listing
-    const acceptedListing = createdListings[2]; // Cozy Sunset Studio
-    const startDate2 = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
-    const endDate2 = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
-    const existingAccepted = await prisma.booking.findFirst({
-      where: { tenantId: thirdUser.id, listingId: acceptedListing.id, status: 'ACCEPTED' },
-    });
-    if (!existingAccepted) {
-      await prisma.booking.create({
-        data: {
-          listingId: acceptedListing.id,
-          tenantId: thirdUser.id,
-          startDate: startDate2,
-          endDate: endDate2,
-          totalPrice: acceptedListing.price * 3,
-          status: 'ACCEPTED',
-        },
-      });
-      console.log(`  ✓ ACCEPTED booking on: ${acceptedListing.title}`);
-    } else {
-      console.log(`  ⏭ ACCEPTED booking exists`);
-    }
-  }
+  // 7. Booking-era fixtures are intentionally omitted after Phase 09.
+  console.log('  ✓ Booking fixtures omitted; contact-first flow is canonical');
 
   // 8. Create conversation with messages between user and reviewer
   if (createdListings.length > 0) {
@@ -970,19 +902,11 @@ async function main() {
 
   // 13. Create notification records for E2E tests
   const existingNotification = await prisma.notification.findFirst({
-    where: { userId: user.id, type: 'BOOKING_ACCEPTED' },
+    where: { userId: user.id, type: 'NEW_MESSAGE' },
   });
   if (!existingNotification) {
     await prisma.notification.createMany({
       data: [
-        {
-          userId: user.id,
-          type: 'BOOKING_ACCEPTED',
-          title: 'Booking Confirmed',
-          message: 'Your booking request for Spacious SOMA Shared has been accepted!',
-          link: '/bookings',
-          read: false,
-        },
         {
           userId: user.id,
           type: 'NEW_MESSAGE',
@@ -993,27 +917,11 @@ async function main() {
         },
         {
           userId: user.id,
-          type: 'BOOKING_CANCELLED',
-          title: 'Booking Cancelled',
-          message: 'A booking for Hayes Valley Private Suite was cancelled.',
-          link: null,
-          read: true,
-        },
-        {
-          userId: user.id,
           type: 'NEW_REVIEW',
           title: 'New Review',
           message: 'Someone left a review on your listing Sunny Mission Room.',
           link: `/listings/${createdListings[0]?.id || 'unknown'}`,
           read: true,
-        },
-        {
-          userId: reviewer.id,
-          type: 'BOOKING_REQUEST',
-          title: 'New Booking Request',
-          message: 'You have a new booking request for Reviewer Nob Hill Apartment.',
-          link: '/bookings',
-          read: false,
         },
       ],
     });

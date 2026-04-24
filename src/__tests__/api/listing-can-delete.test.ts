@@ -15,7 +15,6 @@ jest.mock("next/server", () => ({
 jest.mock("@/lib/prisma", () => ({
   prisma: {
     listing: { findUnique: jest.fn() },
-    booking: { count: jest.fn() },
     conversation: { count: jest.fn() },
   },
 }));
@@ -60,7 +59,6 @@ describe("GET /api/listings/[id]/can-delete", () => {
     (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
       ownerId: "user-123",
     });
-    (prisma.booking.count as jest.Mock).mockResolvedValue(0);
     (prisma.conversation.count as jest.Mock).mockResolvedValue(0);
   });
 
@@ -96,9 +94,7 @@ describe("GET /api/listings/[id]/can-delete", () => {
     expect(data.error).toBe("Listing not found");
   });
 
-  it("returns canDelete: true when no active bookings", async () => {
-    (prisma.booking.count as jest.Mock).mockResolvedValue(0);
-
+  it("returns canDelete: true without reading bookings", async () => {
     const response = await GET(createRequest(), routeContext);
     const data = await response.json();
 
@@ -107,30 +103,14 @@ describe("GET /api/listings/[id]/can-delete", () => {
     expect(data.activeBookings).toBe(0);
   });
 
-  it("returns canDelete: false when active bookings exist", async () => {
-    (prisma.booking.count as jest.Mock)
-      .mockResolvedValueOnce(2) // active ACCEPTED bookings
-      .mockResolvedValueOnce(0); // pending bookings
-
-    const response = await GET(createRequest(), routeContext);
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.canDelete).toBe(false);
-    expect(data.activeBookings).toBe(2);
-  });
-
-  it("returns pending booking and conversation counts", async () => {
-    (prisma.booking.count as jest.Mock)
-      .mockResolvedValueOnce(0) // active ACCEPTED bookings
-      .mockResolvedValueOnce(3); // pending bookings
+  it("returns compatibility booking zeros and conversation counts", async () => {
     (prisma.conversation.count as jest.Mock).mockResolvedValue(5);
 
     const response = await GET(createRequest(), routeContext);
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.pendingBookings).toBe(3);
+    expect(data.pendingBookings).toBe(0);
     expect(data.activeConversations).toBe(5);
   });
 

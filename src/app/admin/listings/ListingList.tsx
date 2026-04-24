@@ -11,7 +11,6 @@ import {
   MapPin,
   DollarSign,
   Flag,
-  Calendar,
   Trash2,
   Play,
   Pause,
@@ -21,8 +20,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-import ListingMigrationReviewPanel from "@/components/ListingMigrationReviewPanel";
-import type { ListingMigrationReviewState } from "@/lib/migration/review";
 
 type ListingStatus = "ACTIVE" | "PAUSED" | "RENTED";
 
@@ -46,13 +43,11 @@ interface Listing {
   } | null;
   _count: {
     reports: number;
-    bookings: number;
   };
 }
 
 interface ListingListProps {
   initialListings: Listing[];
-  migrationReviewByListingId: Record<string, ListingMigrationReviewState>;
   totalListings: number;
 }
 
@@ -72,7 +67,6 @@ const statusConfig = {
 
 export default function ListingList({
   initialListings,
-  migrationReviewByListingId,
   totalListings,
 }: ListingListProps) {
   const [listings, setListings] = useState(initialListings);
@@ -272,43 +266,11 @@ export default function ListingList({
                             <Eye className="w-3 h-3" />
                             {listing.viewCount} views
                           </span>
-                          <Link
-                            href={`/admin/bookings?listingId=${listing.id}`}
-                            className="flex items-center gap-1 text-primary hover:underline"
-                          >
-                            <Calendar className="w-3 h-3" />
-                            {listing._count.bookings} bookings
-                          </Link>
                         </div>
                         <p className="text-xs text-on-surface-variant mt-1">
                           Owner: {listing.owner.name || "Unknown"} (
                           {listing.owner.email})
                         </p>
-
-                        <div className="mt-3">
-                          <ListingMigrationReviewPanel
-                            actor="admin"
-                            listingId={listing.id}
-                            expectedVersion={listing.version}
-                            reviewState={
-                              migrationReviewByListingId[listing.id] ?? null
-                            }
-                            editHref={`/listings/${listing.id}`}
-                            onReviewed={(result) => {
-                              setListings((prev) =>
-                                prev.map((current) =>
-                                  current.id === listing.id
-                                    ? {
-                                        ...current,
-                                        status: result.status,
-                                        version: result.version,
-                                      }
-                                    : current
-                                )
-                              );
-                            }}
-                          />
-                        </div>
                       </div>
 
                       {/* Actions */}

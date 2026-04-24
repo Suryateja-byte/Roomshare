@@ -8,7 +8,6 @@ import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { sanitizeUnicode } from "@/lib/schemas";
 import { features } from "@/lib/env";
 import { generateViewToken } from "@/app/api/metrics/hmac";
-import { getAvailability } from "@/lib/availability";
 import { resolveListingDetailDateParams } from "@/lib/search/listing-detail-link";
 import { resolvePublicAvailability } from "@/lib/search/public-availability";
 import { getPublicListingDetail } from "@/lib/listings/public-detail";
@@ -205,17 +204,7 @@ export default async function ListingPage({ params, searchParams }: PageProps) {
   // Start similar listings fetch early (runs in parallel with remaining queries)
   const similarListingsPromise = getSimilarListings(id);
 
-  const legacyAvailabilityPromise =
-    listing.availabilitySource === "LEGACY_BOOKING"
-      ? initialAvailabilityRange.startDate && initialAvailabilityRange.endDate
-        ? getAvailability(listing.id, {
-            startDate: initialAvailabilityRange.startDate,
-            endDate: initialAvailabilityRange.endDate,
-          })
-        : getAvailability(listing.id)
-      : Promise.resolve(null);
-
-  const [coordinates, reviews, legacyAvailability] = await Promise.all([
+  const [coordinates, reviews] = await Promise.all([
     (async () => {
       if (!canViewExactLocation || !listing.location) {
         return null;
@@ -252,25 +241,21 @@ export default async function ListingPage({ params, searchParams }: PageProps) {
       return null;
     })(),
     getReviews(listing.id),
-    legacyAvailabilityPromise,
   ]);
 
-  const resolvedAvailability = resolvePublicAvailability(listing, {
-    legacySnapshot: legacyAvailability,
-  });
-  const availability =
-    legacyAvailability ?? {
-      listingId: listing.id,
-      totalSlots: resolvedAvailability.totalSlots,
-      effectiveAvailableSlots: resolvedAvailability.effectiveAvailableSlots,
-      heldSlots: 0,
-      acceptedSlots: 0,
-      rangeVersion: 0,
-      asOf: new Date().toISOString(),
-      availabilitySource: resolvedAvailability.availabilitySource,
-      isValid: resolvedAvailability.isValid,
-      isPubliclyAvailable: resolvedAvailability.isPubliclyAvailable,
-    };
+  const resolvedAvailability = resolvePublicAvailability(listing);
+  const availability = {
+    listingId: listing.id,
+    totalSlots: resolvedAvailability.totalSlots,
+    effectiveAvailableSlots: resolvedAvailability.effectiveAvailableSlots,
+    heldSlots: 0,
+    acceptedSlots: 0,
+    rangeVersion: listing.version,
+    asOf: new Date().toISOString(),
+    availabilitySource: resolvedAvailability.availabilitySource,
+    isValid: resolvedAvailability.isValid,
+    isPubliclyAvailable: resolvedAvailability.isPubliclyAvailable,
+  };
 
   const similarListingsRaw = await similarListingsPromise;
 
@@ -364,7 +349,7 @@ export default async function ListingPage({ params, searchParams }: PageProps) {
           availableSlots: resolvedAvailability.effectiveAvailableSlots,
           version: listing.version,
           availabilitySource: resolvedAvailability.availabilitySource,
-          bookingMode: listing.bookingMode ?? "SHARED",
+          bookingMode: "SHARED",
           status: listing.status,
           statusReason: listing.statusReason,
           viewCount: listing.viewCount,

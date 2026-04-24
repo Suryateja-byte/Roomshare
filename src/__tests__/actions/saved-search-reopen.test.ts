@@ -18,6 +18,15 @@ jest.mock("@/lib/search/search-telemetry", () => ({
   recordLegacyUrlUsage: jest.fn(),
 }));
 
+const mockEvaluateSavedSearchAlertPaywall = jest.fn();
+jest.mock("@/lib/payments/search-alert-paywall", () => ({
+  evaluateSavedSearchAlertPaywall: (...args: unknown[]) =>
+    mockEvaluateSavedSearchAlertPaywall(...args),
+  resolveSavedSearchEffectiveAlertState: jest.requireActual(
+    "@/lib/payments/search-alert-paywall"
+  ).resolveSavedSearchEffectiveAlertState,
+}));
+
 import { auth } from "@/auth";
 import { getMySavedSearches } from "@/app/actions/saved-search";
 import { prisma } from "@/lib/prisma";
@@ -83,6 +92,13 @@ describe("saved search reopen canonicalization", () => {
     jest.clearAllMocks();
     (auth as jest.Mock).mockResolvedValue({
       user: { id: "user-123" },
+    });
+    mockEvaluateSavedSearchAlertPaywall.mockResolvedValue({
+      enabled: true,
+      mode: "PASS_ACTIVE",
+      activePassExpiresAt: "2026-12-31T00:00:00.000Z",
+      requiresPurchase: false,
+      offers: [],
     });
   });
 

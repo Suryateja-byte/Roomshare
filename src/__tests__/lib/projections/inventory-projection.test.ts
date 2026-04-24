@@ -16,8 +16,11 @@ import {
 import type { TransactionClient } from "@/lib/db/with-actor";
 
 let fixture: Phase02Fixture;
+const originalPhase03ProjectionWrites =
+  process.env.FEATURE_PHASE03_SEMANTIC_PROJECTION_WRITES;
 
 beforeAll(async () => {
+  process.env.FEATURE_PHASE03_SEMANTIC_PROJECTION_WRITES = "false";
   fixture = await createPGlitePhase02Fixture();
   __setProjectionEpochForTesting(BigInt(1));
 }, 30_000);
@@ -25,6 +28,12 @@ beforeAll(async () => {
 afterAll(async () => {
   await fixture.close();
   __setProjectionEpochForTesting(null);
+  if (originalPhase03ProjectionWrites === undefined) {
+    delete process.env.FEATURE_PHASE03_SEMANTIC_PROJECTION_WRITES;
+  } else {
+    process.env.FEATURE_PHASE03_SEMANTIC_PROJECTION_WRITES =
+      originalPhase03ProjectionWrites;
+  }
 });
 
 afterEach(() => {

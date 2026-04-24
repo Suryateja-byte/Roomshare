@@ -102,11 +102,11 @@ describe("CFM-602 legacy map eligibility cutover", () => {
       unknown[],
     ];
 
-    expect(sql).toContain(`COALESCE(l."needsMigrationReview", FALSE) = FALSE`);
+    expect(sql).toContain(`COALESCE(FALSE, FALSE) = FALSE`);
     expect(sql).toContain(
       `COALESCE(l."statusReason", '') <> 'MIGRATION_REVIEW'`
     );
-    expect(sql).toContain(`l."needsMigrationReview"`);
+    expect(sql).not.toContain(`l."needsMigrationReview"`);
     expect(params.slice(0, 2)).toEqual([1, 1]);
 
     expect(results.map((listing) => listing.id)).toEqual([

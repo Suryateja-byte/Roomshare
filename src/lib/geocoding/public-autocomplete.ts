@@ -51,7 +51,7 @@ export interface PublicAutocompleteSearchOptions {
 export const PUBLIC_AUTOCOMPLETE_SELECT_SQL = `
   SELECT
     l.id,
-    l."availabilitySource"::text AS "availabilitySource",
+    'HOST_MANAGED'::text AS "availabilitySource",
     l."availableSlots" AS "availableSlots",
     l."openSlots" AS "openSlots",
     l."totalSlots" AS "totalSlots",
@@ -61,7 +61,7 @@ export const PUBLIC_AUTOCOMPLETE_SELECT_SQL = `
     l."lastConfirmedAt" AS "lastConfirmedAt",
     l.status::text AS status,
     l."statusReason" AS "statusReason",
-    l."needsMigrationReview" AS "needsMigrationReview",
+    FALSE AS "needsMigrationReview",
     loc.city,
     loc.state,
     pu.public_area_name AS "publicAreaName",

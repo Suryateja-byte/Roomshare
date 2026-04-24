@@ -4,8 +4,6 @@
 // Uses Resend API for sending emails
 
 import { emailTemplates } from "./email-templates";
-import { BOOKING_EMAIL_TEMPLATE_KEYS } from "./email-booking-gate";
-import { features } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { hashIdForLog } from "@/lib/messaging/cfm-messaging-telemetry";
 import { prisma } from "@/lib/prisma";
@@ -45,8 +43,6 @@ function sleep(ms: number): Promise<void> {
 
 // Notification preference keys that map to email types
 interface NotificationPreferences {
-  emailBookingRequests?: boolean;
-  emailBookingUpdates?: boolean;
   emailMessages?: boolean;
   emailReviews?: boolean;
   emailSearchAlerts?: boolean;
@@ -193,7 +189,7 @@ export async function sendEmail({
 export async function sendNotificationEmail(
   type: keyof typeof emailTemplates,
   email: string,
-  data: Parameters<(typeof emailTemplates)[typeof type]>[0]
+  data: Record<string, unknown>
 ): Promise<{ success: boolean; error?: string }> {
   try {
     // @ts-expect-error - TypeScript has trouble with the dynamic template selection
@@ -212,14 +208,6 @@ export async function sendNotificationEmail(
 // Map email types to user preference keys
 const emailTypeToPreferenceKey: Record<string, keyof NotificationPreferences> =
   {
-    bookingRequest: "emailBookingRequests",
-    bookingAccepted: "emailBookingUpdates",
-    bookingRejected: "emailBookingUpdates",
-    bookingCancelled: "emailBookingUpdates",
-    bookingHoldRequest: "emailBookingRequests",
-    bookingExpired: "emailBookingUpdates",
-    bookingHoldExpired: "emailBookingUpdates",
-    listingFreshnessReminder: "emailBookingUpdates",
     // listingStaleWarning and listingAutoPaused are intentionally omitted:
     // both are safety-critical freshness messages and must always send.
     newMessage: "emailMessages",
@@ -241,17 +229,9 @@ export async function sendNotificationEmailWithPreference(
   type: keyof typeof emailTemplates,
   userId: string,
   email: string,
-  data: Parameters<(typeof emailTemplates)[typeof type]>[0]
+  data: Record<string, unknown>
 ): Promise<{ success: boolean; skipped?: boolean; error?: string }> {
   try {
-    if (BOOKING_EMAIL_TEMPLATE_KEYS.has(type) && !features.bookingNotifications) {
-      logger.sync.info("cfm.notifications.booking_emission_blocked_count", {
-        type,
-        kind: "email",
-      });
-      return { success: true, skipped: true };
-    }
-
     // Check if this email type has a preference mapping
     const prefKey = emailTypeToPreferenceKey[type];
 

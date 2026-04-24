@@ -38,10 +38,8 @@ type FreshnessListingSnapshot = {
   id: string;
   title: string;
   version: number;
-  availabilitySource: "LEGACY_BOOKING" | "HOST_MANAGED";
   status: "ACTIVE" | "PAUSED" | "RENTED";
   statusReason: string | null;
-  needsMigrationReview: boolean;
   lastConfirmedAt: Date | null;
   freshnessReminderSentAt: Date | null;
   freshnessWarningSentAt: Date | null;
@@ -125,10 +123,8 @@ const listingSelection = {
   id: true,
   title: true,
   version: true,
-  availabilitySource: true,
   status: true,
   statusReason: true,
-  needsMigrationReview: true,
   lastConfirmedAt: true,
   freshnessReminderSentAt: true,
   freshnessWarningSentAt: true,
@@ -198,7 +194,7 @@ function compareCandidates(left: QueryCandidate, right: QueryCandidate): number 
 function buildListingLogMeta(
   listing: Pick<
     FreshnessListingSnapshot,
-    "id" | "availabilitySource" | "status" | "statusReason"
+    "id" | "status" | "statusReason"
   >,
   kind: FreshnessNotificationKind
 ): Record<string, unknown> {
@@ -206,7 +202,6 @@ function buildListingLogMeta(
     event: "cfm.cron.freshness_reminder",
     kind,
     listingIdHash: hashIdForLog(listing.id),
-    availabilitySource: listing.availabilitySource,
     listingStatus: listing.status,
     statusReason: listing.statusReason,
   };
@@ -294,9 +289,7 @@ async function fetchDueCandidates(now: Date): Promise<QueryCandidate[]> {
   const [warningRows, reminderRows] = await Promise.all([
     prisma.listing.findMany({
       where: {
-        availabilitySource: "HOST_MANAGED",
         status: "ACTIVE",
-        needsMigrationReview: false,
         lastConfirmedAt: {
           lte: warningAtOrBefore,
           gt: autoPauseAtOrBefore,
@@ -312,9 +305,7 @@ async function fetchDueCandidates(now: Date): Promise<QueryCandidate[]> {
     }),
     prisma.listing.findMany({
       where: {
-        availabilitySource: "HOST_MANAGED",
         status: "ACTIVE",
-        needsMigrationReview: false,
         lastConfirmedAt: {
           lte: reminderAtOrBefore,
           gt: warningAtOrBefore,
@@ -405,10 +396,8 @@ async function markFreshnessNotificationSent(
 
 export function classifyFreshnessDispatch(
   listing: {
-    availabilitySource: "LEGACY_BOOKING" | "HOST_MANAGED" | null | undefined;
     status: string | null | undefined;
     statusReason: string | null | undefined;
-    needsMigrationReview?: boolean | null | undefined;
     lastConfirmedAt: Date | string | null | undefined;
     freshnessReminderSentAt?: Date | null | undefined;
     freshnessWarningSentAt?: Date | null | undefined;
@@ -416,26 +405,10 @@ export function classifyFreshnessDispatch(
   },
   now: Date = new Date()
 ): FreshnessDispatchDecision {
-  if (listing.availabilitySource !== "HOST_MANAGED") {
-    return {
-      action: "skip",
-      reason: "not_host_managed",
-      freshnessBucket: "NOT_APPLICABLE",
-    };
-  }
-
   if (listing.status !== "ACTIVE") {
     return {
       action: "skip",
       reason: "not_active",
-      freshnessBucket: buildFreshnessReadModel(listing, { now }).freshnessBucket,
-    };
-  }
-
-  if (listing.needsMigrationReview) {
-    return {
-      action: "skip",
-      reason: "needs_migration_review",
       freshnessBucket: buildFreshnessReadModel(listing, { now }).freshnessBucket,
     };
   }

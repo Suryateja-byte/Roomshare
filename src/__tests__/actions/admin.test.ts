@@ -1183,7 +1183,6 @@ describe("admin actions", () => {
         .mockResolvedValueOnce(40); // activeListings
       (prisma.verificationRequest.count as jest.Mock).mockResolvedValue(10);
       (prisma.report.count as jest.Mock).mockResolvedValue(3);
-      (prisma.booking.count as jest.Mock).mockResolvedValue(200);
       (prisma.message.count as jest.Mock).mockResolvedValue(1000);
 
       const result = await getAdminStats();
@@ -1333,7 +1332,6 @@ describe("admin actions", () => {
       (prisma.listing.count as jest.Mock).mockResolvedValue(0);
       (prisma.verificationRequest.count as jest.Mock).mockResolvedValue(0);
       (prisma.report.count as jest.Mock).mockResolvedValue(0);
-      (prisma.booking.count as jest.Mock).mockResolvedValue(0);
       (prisma.message.count as jest.Mock).mockResolvedValue(0);
 
       await getAdminStats();

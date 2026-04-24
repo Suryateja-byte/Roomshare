@@ -1,0 +1,18 @@
+Phase 09 v1 was produced in a dirty worktree with the approved destructive cutover changes plus pre-existing unrelated local artifacts.
+
+Pre-existing unrelated untracked items preserved:
+- .claude/artifacts/
+- .claude/task-tracker.json
+- .claude/task-tracker.json.followups
+- .env.test
+- .omc/
+- playwright/.cache/
+- roomshare_final_production_plan_v10*.docx
+- tmp_production_plan_extract.txt
+
+Primary Phase 09 tracked changes:
+- destructive Prisma schema and migration
+- booking runtime/test/tooling removals
+- contact-first route/listing/search/paywall/alert updates
+- seed-e2e rewrite
+- Phase 09 tests and orchestrator artifacts

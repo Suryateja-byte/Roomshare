@@ -178,18 +178,18 @@ function buildListSearchAvailabilitySqlFragments(options: {
   return {
     effectiveAvailableSql: `(
       CASE
-        WHEN l."availabilitySource" = 'HOST_MANAGED'
+        WHEN 'HOST_MANAGED' = 'HOST_MANAGED'
           THEN GREATEST(COALESCE(l."openSlots", 0), 0)::int
         ELSE ${legacyEffectiveAvailableSql}
       END
     )`,
     slotConditionSql: `(
       (
-        l."availabilitySource" = 'HOST_MANAGED'
+        'HOST_MANAGED' = 'HOST_MANAGED'
         AND ${hostManagedSlotConditionSql}
       )
       OR (
-        l."availabilitySource" <> 'HOST_MANAGED'
+        'HOST_MANAGED' <> 'HOST_MANAGED'
         AND ${legacyEffectiveAvailableSql} >= ${hostManagedMinSlotsParam}
       )
     )`,
@@ -477,7 +477,7 @@ export async function getMapListings(
   const conditions: string[] = [
     slotConditionSql,
     "l.status = 'ACTIVE'",
-    `COALESCE(l."needsMigrationReview", FALSE) = FALSE`,
+    `COALESCE(FALSE, FALSE) = FALSE`,
     `COALESCE(l."statusReason", '') <> 'MIGRATION_REVIEW'`,
     "ST_X(loc.coords::geometry) IS NOT NULL",
     "ST_Y(loc.coords::geometry) IS NOT NULL",
@@ -572,7 +572,7 @@ export async function getMapListings(
 
   // Booking mode filter (SQL level, case-insensitive)
   if (bookingMode && bookingMode !== "any") {
-    conditions.push(`l."booking_mode" = $${paramIndex++}`);
+    conditions.push(`'SHARED' = $${paramIndex++}`);
     queryParams.push(bookingMode);
   }
 
@@ -634,13 +634,13 @@ export async function getMapListings(
             l.price,
             ${effectiveAvailableSql} as "availableSlots",
             l."totalSlots",
-            l."availabilitySource",
+            'HOST_MANAGED',
             l."openSlots",
             l."availableUntil",
             l."minStayMonths",
             l."lastConfirmedAt",
             l."statusReason",
-            l."needsMigrationReview",
+            FALSE,
             l.status,
             l."moveInDate",
             l."roomType",
@@ -849,7 +849,7 @@ export async function getListingsPaginated(
     const conditions: string[] = [
       slotConditionSql,
       "l.status = 'ACTIVE'",
-      `COALESCE(l."needsMigrationReview", FALSE) = FALSE`,
+      `COALESCE(FALSE, FALSE) = FALSE`,
       `COALESCE(l."statusReason", '') <> 'MIGRATION_REVIEW'`,
       // Exclude listings with invalid coordinates (null, zero, or out of range)
       "ST_X(loc.coords::geometry) IS NOT NULL",
@@ -945,7 +945,7 @@ export async function getListingsPaginated(
 
     // Booking mode filter (SQL level, case-insensitive)
     if (bookingMode && bookingMode !== "any") {
-      conditions.push(`l."booking_mode" = $${paramIndex++}`);
+      conditions.push(`'SHARED' = $${paramIndex++}`);
       queryParams.push(bookingMode);
     }
 
@@ -1056,13 +1056,13 @@ export async function getListingsPaginated(
             l."leaseDuration",
             l."roomType",
             l."moveInDate",
-            l."availabilitySource",
+            'HOST_MANAGED',
             l."openSlots",
             l."availableUntil",
             l."minStayMonths",
             l."lastConfirmedAt",
             l."statusReason",
-            l."needsMigrationReview",
+            FALSE,
             l.status,
             l."createdAt",
             l."viewCount",
@@ -1243,7 +1243,7 @@ async function getListingsCountEfficient(
   const conditions: string[] = [
     slotConditionSql,
     "l.status = 'ACTIVE'",
-    `COALESCE(l."needsMigrationReview", FALSE) = FALSE`,
+    `COALESCE(FALSE, FALSE) = FALSE`,
     `COALESCE(l."statusReason", '') <> 'MIGRATION_REVIEW'`,
     // Exclude listings with invalid coordinates
     "ST_X(loc.coords::geometry) IS NOT NULL",

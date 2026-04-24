@@ -8,9 +8,8 @@ describe("vercel cron budget", () => {
       crons?: Array<{ path: string; schedule: string }>;
     };
 
-    expect(vercelConfig.crons).toHaveLength(2);
+    expect(vercelConfig.crons).toHaveLength(1);
     expect(vercelConfig.crons?.map((cron) => cron.path)).toEqual([
-      "/api/cron/sweep-expired-holds",
       "/api/cron/daily-maintenance",
     ]);
   });

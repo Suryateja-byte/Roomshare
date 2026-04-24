@@ -191,8 +191,6 @@ export async function revealHostPhoneForListing(
       ownerId: true,
       status: true,
       statusReason: true,
-      needsMigrationReview: true,
-      availabilitySource: true,
       availableSlots: true,
       totalSlots: true,
       openSlots: true,

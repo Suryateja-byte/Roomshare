@@ -1,9 +1,3 @@
-// Viewer-state contract:
-// - `canBook` and `canHold` are permanent-false compatibility fields under
-//   contact-first. They remain in the response so older client bundles don't
-//   crash; `bookingDisabledReason` is the explanation channel for why booking
-//   UI should not render. New clients should rely on `primaryCta`,
-//   `canContact`, and `publicAvailability` instead.
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -34,13 +28,13 @@ type ReviewEligibilityReason =
   | "LOGIN_REQUIRED"
   | "ELIGIBLE"
   | "ALREADY_REVIEWED"
-  | "ACCEPTED_BOOKING_REQUIRED";
+  | "CONFIRMED_STAY_REQUIRED";
 
 function buildReviewEligibility(options: {
   isLoggedIn: boolean;
   isOwner: boolean;
   isEmailVerified: boolean;
-  hasAcceptedBooking: boolean;
+  hasConfirmedStay: boolean;
   hasExistingReview: boolean;
   hasPriorConversation: boolean;
   hasExistingPrivateFeedback: boolean;
@@ -50,22 +44,22 @@ function buildReviewEligibility(options: {
   if (options.isLoggedIn) {
     if (options.hasExistingReview) {
       reason = "ALREADY_REVIEWED";
-    } else if (options.hasAcceptedBooking) {
+    } else if (options.hasConfirmedStay) {
       reason = "ELIGIBLE";
     } else {
-      reason = "ACCEPTED_BOOKING_REQUIRED";
+      reason = "CONFIRMED_STAY_REQUIRED";
     }
   }
 
   return {
-    canPublicReview: options.isLoggedIn && options.hasAcceptedBooking,
-    hasLegacyAcceptedBooking: options.hasAcceptedBooking,
+    canPublicReview: options.isLoggedIn && options.hasConfirmedStay,
+    hasLegacyAcceptedBooking: false,
     canLeavePrivateFeedback: canLeavePrivateFeedback({
       isLoggedIn: options.isLoggedIn,
       isOwner: options.isOwner,
       isEmailVerified: options.isEmailVerified,
       hasPriorConversation: options.hasPriorConversation,
-      hasAcceptedBooking: options.hasAcceptedBooking,
+      hasAcceptedBooking: false,
       hasExistingPrivateFeedback: options.hasExistingPrivateFeedback,
     }),
     reason,
@@ -86,7 +80,6 @@ export async function GET(request: Request, { params }: RouteContext) {
     select: {
       ownerId: true,
       status: true,
-      availabilitySource: true,
       availableSlots: true,
       totalSlots: true,
       openSlots: true,
@@ -95,14 +88,13 @@ export async function GET(request: Request, { params }: RouteContext) {
       minStayMonths: true,
       lastConfirmedAt: true,
       statusReason: true,
-      needsMigrationReview: true,
       physicalUnitId: true,
     },
   });
 
   const isOwner = !!session?.user?.id && listing?.ownerId === session.user.id;
   const isEmailVerified = !!session?.user?.emailVerified;
-  const needsMigrationReview = listing?.needsMigrationReview === true;
+  const needsMigrationReview = false;
   const paywallSummaryPromise = listing
     ? evaluateMessageStartPaywall({
         userId: session?.user?.id ?? null,
@@ -138,7 +130,7 @@ export async function GET(request: Request, { params }: RouteContext) {
         isLoggedIn: false,
         isOwner: false,
         isEmailVerified: false,
-        hasAcceptedBooking: false,
+        hasConfirmedStay: false,
         hasExistingReview: false,
         hasPriorConversation: false,
         hasExistingPrivateFeedback: false,
@@ -151,7 +143,6 @@ export async function GET(request: Request, { params }: RouteContext) {
   try {
     const [
       existingReview,
-      bookingExists,
       conversationExists,
       existingPrivateFeedback,
       paywallSummary,
@@ -167,16 +158,6 @@ export async function GET(request: Request, { params }: RouteContext) {
           rating: true,
           comment: true,
           createdAt: true,
-        },
-      }),
-      prisma.booking.findFirst({
-        where: {
-          listingId: id,
-          tenantId: session.user.id,
-          status: "ACCEPTED",
-        },
-        select: {
-          id: true,
         },
       }),
         features.privateFeedback && !isOwner && listing
@@ -236,7 +217,7 @@ export async function GET(request: Request, { params }: RouteContext) {
 
     const response = NextResponse.json({
       isLoggedIn: true,
-      hasBookingHistory: !!bookingExists,
+      hasBookingHistory: false,
       existingReview: existingReview
         ? {
             id: existingReview.id,
@@ -253,7 +234,7 @@ export async function GET(request: Request, { params }: RouteContext) {
         isLoggedIn: true,
         isOwner,
         isEmailVerified,
-        hasAcceptedBooking: !!bookingExists,
+        hasConfirmedStay: false,
         hasExistingReview: !!existingReview,
         hasPriorConversation: !!conversationExists,
         hasExistingPrivateFeedback: !!existingPrivateFeedback,
@@ -311,7 +292,7 @@ export async function GET(request: Request, { params }: RouteContext) {
           isLoggedIn: true,
           isOwner,
           isEmailVerified,
-          hasAcceptedBooking: false,
+          hasConfirmedStay: false,
           hasExistingReview: false,
           hasPriorConversation: false,
           hasExistingPrivateFeedback: false,

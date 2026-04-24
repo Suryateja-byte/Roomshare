@@ -98,22 +98,12 @@ export async function POST(request: Request) {
 
     // Check for existing review (duplicate prevention)
     if (listingId) {
-      // P1-20 FIX: Parallelize independent queries
-      const [existingReview, hasBooking] = await Promise.all([
-        prisma.review.findFirst({
-          where: {
-            authorId: session.user.id,
-            listingId,
-          },
-        }),
-        prisma.booking.findFirst({
-          where: {
-            listingId,
-            tenantId: session.user.id,
-            status: "ACCEPTED",
-          },
-        }),
-      ]);
+      const existingReview = await prisma.review.findFirst({
+        where: {
+          authorId: session.user.id,
+          listingId,
+        },
+      });
 
       if (existingReview) {
         return NextResponse.json(
@@ -122,69 +112,63 @@ export async function POST(request: Request) {
         );
       }
 
-      // Require booking history before allowing review (prevents fake reviews)
-      if (!hasBooking) {
-        recordUnauthorizedReviewCreate({
-          listingId,
-          reviewerId: session.user.id,
-          scope: "listing",
-        });
+      recordUnauthorizedReviewCreate({
+        listingId,
+        reviewerId: session.user.id,
+        scope: "listing",
+      });
 
-        const listing = await prisma.listing.findUnique({
-          where: { id: listingId },
-          select: { ownerId: true },
-        });
+      const listing = await prisma.listing.findUnique({
+        where: { id: listingId },
+        select: { ownerId: true },
+      });
+
+      if (listing) {
+        const [priorConversation, existingPrivateFeedback] = await Promise.all([
+          prisma.conversation.findFirst({
+            where: {
+              listingId,
+              AND: [
+                { participants: { some: { id: session.user.id } } },
+                { participants: { some: { id: listing.ownerId } } },
+              ],
+              messages: { some: { senderId: session.user.id } },
+            },
+            select: { id: true },
+          }),
+          prisma.report.findFirst({
+            where: {
+              reporterId: session.user.id,
+              listingId,
+              kind: "PRIVATE_FEEDBACK",
+              status: { in: [...ACTIVE_REPORT_STATUSES] },
+            },
+            select: { id: true },
+          }),
+        ]);
 
         if (
-          listing
+          canLeavePrivateFeedback({
+            isLoggedIn: true,
+            isOwner: listing.ownerId === session.user.id,
+            isEmailVerified: true,
+            hasPriorConversation: Boolean(priorConversation),
+            hasAcceptedBooking: false,
+            hasExistingPrivateFeedback: Boolean(existingPrivateFeedback),
+          })
         ) {
-          const [priorConversation, existingPrivateFeedback] =
-            await Promise.all([
-              prisma.conversation.findFirst({
-                where: {
-                  listingId,
-                  AND: [
-                    { participants: { some: { id: session.user.id } } },
-                    { participants: { some: { id: listing.ownerId } } },
-                  ],
-                  messages: { some: { senderId: session.user.id } },
-                },
-                select: { id: true },
-              }),
-              prisma.report.findFirst({
-                where: {
-                  reporterId: session.user.id,
-                  listingId,
-                  kind: "PRIVATE_FEEDBACK",
-                  status: { in: [...ACTIVE_REPORT_STATUSES] },
-                },
-                select: { id: true },
-              }),
-            ]);
-
-          if (
-            canLeavePrivateFeedback({
-              isLoggedIn: true,
-              isOwner: listing.ownerId === session.user.id,
-              isEmailVerified: true,
-              hasPriorConversation: Boolean(priorConversation),
-              hasAcceptedBooking: false,
-              hasExistingPrivateFeedback: Boolean(existingPrivateFeedback),
-            })
-          ) {
-            recordContactOnlyReviewAttempt({
-              listingId,
-              reviewerId: session.user.id,
-              targetUserId: listing.ownerId,
-            });
-          }
+          recordContactOnlyReviewAttempt({
+            listingId,
+            reviewerId: session.user.id,
+            targetUserId: listing.ownerId,
+          });
         }
-
-        return NextResponse.json(
-          { error: PUBLIC_REVIEW_CONFIRMED_STAY_MESSAGE },
-          { status: 403 }
-        );
       }
+
+      return NextResponse.json(
+        { error: PUBLIC_REVIEW_CONFIRMED_STAY_MESSAGE },
+        { status: 403 }
+      );
     }
 
     // Check for user review guards
@@ -197,48 +181,19 @@ export async function POST(request: Request) {
         );
       }
 
-      // BIZ-03: Require at least one ACCEPTED booking between parties
-      const hasInteraction = await prisma.booking.findFirst({
-        where: {
-          status: "ACCEPTED",
-          OR: [
-            // Reviewer was tenant, target was host
-            { tenantId: session.user.id, listing: { ownerId: targetUserId } },
-            // Reviewer was host, target was tenant
-            { tenantId: targetUserId, listing: { ownerId: session.user.id } },
-          ],
-        },
+      recordUnauthorizedReviewCreate({
+        reviewerId: session.user.id,
+        targetUserId,
+        scope: "user",
       });
-
-      if (!hasInteraction) {
-        recordUnauthorizedReviewCreate({
-          reviewerId: session.user.id,
-          targetUserId,
-          scope: "user",
-        });
-        return NextResponse.json(
-          {
-            error:
-              "You can only review users you have a completed booking with",
-          },
-          { status: 403 }
-        );
-      }
-
-      // Check for existing user review (duplicate prevention)
-      const existingUserReview = await prisma.review.findFirst({
-        where: {
-          authorId: session.user.id,
-          targetUserId,
+      return NextResponse.json(
+        {
+          error:
+            "Public user reviews are unavailable until confirmed stays are supported.",
         },
-      });
+        { status: 403 }
+      );
 
-      if (existingUserReview) {
-        return NextResponse.json(
-          { error: "You have already reviewed this user" },
-          { status: 409 }
-        );
-      }
     }
 
     let review;

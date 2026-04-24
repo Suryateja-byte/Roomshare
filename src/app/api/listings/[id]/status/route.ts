@@ -43,7 +43,6 @@ export async function GET(
         id: true,
         ownerId: true,
         version: true,
-        availabilitySource: true,
         status: true,
         statusReason: true,
         availableSlots: true,
@@ -53,7 +52,6 @@ export async function GET(
         availableUntil: true,
         minStayMonths: true,
         lastConfirmedAt: true,
-        needsMigrationReview: true,
       },
     });
 

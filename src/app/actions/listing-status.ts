@@ -12,17 +12,8 @@ import {
   RATE_LIMITS,
   getClientIPFromHeaders,
 } from "@/lib/rate-limit";
-import {
-  HOST_MANAGED_WRITE_ERROR_MESSAGES,
-  type HostManagedListingWriteCurrent,
-  prepareHostManagedListingWrite,
-} from "@/lib/listings/host-managed-write";
 import { features } from "@/lib/env";
 import { getModerationWriteLockResult } from "@/lib/listings/moderation-write-lock";
-import {
-  executeLockedListingMigrationReview,
-  fetchLockedListingMigrationReviewRecord,
-} from "@/lib/migration/review";
 import { recordFreshnessRecovered } from "@/lib/metrics/cfm-ops-telemetry";
 // Basic listingId format check — rejects empty/absurdly long strings
 // without being as strict as CUID/UUID validation (allows test IDs)
@@ -38,7 +29,23 @@ export type HostManagedRecoveryMode = "RECONFIRM" | "REOPEN";
 const statusSchema = z.enum(["ACTIVE", "PAUSED", "RENTED"]);
 const versionSchema = z.number().int().min(0);
 const recoveryModeSchema = z.enum(["RECONFIRM", "REOPEN"]);
-type LockedListingRow = HostManagedListingWriteCurrent & { ownerId: string };
+type LockedListingRow = {
+  id: string;
+  ownerId: string;
+  version: number;
+  status: ListingStatus;
+  statusReason: string | null;
+  openSlots: number;
+  availableSlots: number;
+  totalSlots: number;
+  moveInDate: Date | null;
+  availableUntil: Date | null;
+  minStayMonths: number | null;
+  lastConfirmedAt: Date | null;
+  freshnessReminderSentAt: Date | null;
+  freshnessWarningSentAt: Date | null;
+  autoPausedAt: Date | null;
+};
 
 export async function updateListingStatus(
   listingId: string,
@@ -78,10 +85,8 @@ export async function updateListingStatus(
           "id",
           "ownerId",
           "version",
-          "availabilitySource",
           "status",
           "statusReason",
-          "needsMigrationReview",
           "openSlots",
           "availableSlots",
           "totalSlots",
@@ -123,69 +128,9 @@ export async function updateListingStatus(
 
         if (currentListing.version !== expectedVersion) {
           return {
-            error: HOST_MANAGED_WRITE_ERROR_MESSAGES.VERSION_CONFLICT,
-            code: "VERSION_CONFLICT",
-          } as const;
-        }
-
-        if (currentListing.needsMigrationReview && status === "ACTIVE") {
-          return {
             error:
-              HOST_MANAGED_WRITE_ERROR_MESSAGES.HOST_MANAGED_MIGRATION_REVIEW_REQUIRED,
-            code: "HOST_MANAGED_MIGRATION_REVIEW_REQUIRED",
-          } as const;
-        }
-
-        if (
-          currentListing.availabilitySource === "LEGACY_BOOKING" &&
-          status === "PAUSED"
-        ) {
-          const activeBookings = await tx.booking.count({
-            where: {
-              listingId,
-              status: { in: ["ACCEPTED", "PENDING", "HELD"] },
-            },
-          });
-          if (activeBookings > 0) {
-            return {
-              error:
-                "Cannot pause a listing with active, pending, or held bookings. Please resolve them first.",
-            } as const;
-          }
-        }
-
-        if (currentListing.availabilitySource === "HOST_MANAGED") {
-          const preparedWrite = prepareHostManagedListingWrite(
-            currentListing,
-            {
-              expectedVersion,
-              status,
-            },
-            {
-              actor: "host",
-              now: new Date(),
-            }
-          );
-
-          if (!preparedWrite.ok) {
-            return {
-              error: preparedWrite.error,
-              code: preparedWrite.code,
-            } as const;
-          }
-
-          await tx.listing.update({
-            where: { id: listingId },
-            data: preparedWrite.data,
-          });
-
-          await markListingDirtyInTx(tx, listingId, "status_changed");
-
-          return {
-            success: true,
-            status: preparedWrite.status,
-            statusReason: preparedWrite.statusReason,
-            version: preparedWrite.nextVersion,
+              "This listing changed while you were editing it. Refresh and try again.",
+            code: "VERSION_CONFLICT",
           } as const;
         }
 
@@ -253,61 +198,12 @@ export async function reviewListingMigration(
     return { error: suspension.error || "Account suspended" };
   }
 
-  try {
-    const now = new Date();
-    const result = await prisma.$transaction(
-      async (tx) => {
-        const currentListing = await fetchLockedListingMigrationReviewRecord(
-          tx,
-          listingId,
-          now
-        );
-
-        if (!currentListing) {
-          return { error: "Listing not found" } as const;
-        }
-
-        if (currentListing.ownerId !== session.user.id) {
-          return { error: "You can only update your own listings" } as const;
-        }
-
-        const reviewResult = await executeLockedListingMigrationReview(
-          tx,
-          currentListing,
-          {
-            actor: "host",
-            expectedVersion,
-            now,
-          }
-        );
-
-        if ("success" in reviewResult && reviewResult.success) {
-          await markListingDirtyInTx(tx, listingId, "listing_updated");
-        }
-
-        return reviewResult;
-      },
-      { timeout: 10000 }
-    );
-
-    if (!("success" in result) || !result.success) {
-      return result;
-    }
-
-    revalidatePath(`/listings/${listingId}`);
-    revalidatePath(`/listings/${listingId}/edit`);
-    revalidatePath("/profile");
-    revalidatePath("/search");
-
-    return result;
-  } catch (error) {
-    logger.sync.error("Failed to review listing migration", {
-      action: "reviewListingMigration",
-      listingId,
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-    return { error: "Failed to review listing migration" };
-  }
+  void listingId;
+  void expectedVersion;
+  return {
+    error: "Listing migration review was retired with the contact-first cutover.",
+    code: "MIGRATION_REVIEW_RETIRED",
+  };
 }
 
 export async function recoverHostManagedListing(
@@ -345,10 +241,8 @@ export async function recoverHostManagedListing(
           "id",
           "ownerId",
           "version",
-          "availabilitySource",
           "status",
           "statusReason",
-          "needsMigrationReview",
           "openSlots",
           "availableSlots",
           "totalSlots",
@@ -388,49 +282,42 @@ export async function recoverHostManagedListing(
           } as const;
         }
 
-        if (currentListing.availabilitySource !== "HOST_MANAGED") {
+        if (currentListing.version !== expectedVersion) {
           return {
-            error: HOST_MANAGED_WRITE_ERROR_MESSAGES.HOST_MANAGED_WRITE_PATH_REQUIRED,
-            code: "HOST_MANAGED_WRITE_PATH_REQUIRED",
+            error:
+              "This listing changed while you were editing it. Refresh and try again.",
+            code: "VERSION_CONFLICT",
           } as const;
         }
 
-        const preparedWrite = prepareHostManagedListingWrite(
-          currentListing,
-          {
-            expectedVersion,
-            openSlots: currentListing.openSlots,
-            totalSlots: currentListing.totalSlots,
-            moveInDate: currentListing.moveInDate,
-            availableUntil: currentListing.availableUntil,
-            minStayMonths: currentListing.minStayMonths,
-            status: mode === "REOPEN" ? "ACTIVE" : currentListing.status,
-          },
-          {
-            actor: "host",
-            now: new Date(),
-          }
-        );
-
-        if (!preparedWrite.ok) {
-          return {
-            error: preparedWrite.error,
-            code: preparedWrite.code,
-          } as const;
-        }
+        const nextStatus = mode === "REOPEN" ? "ACTIVE" : currentListing.status;
+        const nextStatusReason =
+          currentListing.statusReason === "STALE_AUTO_PAUSE" ||
+          currentListing.statusReason === "FRESHNESS_WARNING"
+            ? null
+            : currentListing.statusReason;
+        const nextVersion = currentListing.version + 1;
 
         await tx.listing.update({
           where: { id: listingId },
-          data: preparedWrite.data,
+          data: {
+            status: nextStatus,
+            statusReason: nextStatusReason,
+            version: nextVersion,
+            lastConfirmedAt: new Date(),
+            freshnessReminderSentAt: null,
+            freshnessWarningSentAt: null,
+            autoPausedAt: null,
+          },
         });
 
         await markListingDirtyInTx(tx, listingId, "status_changed");
 
         return {
           success: true,
-          status: preparedWrite.status,
-          statusReason: preparedWrite.statusReason,
-          version: preparedWrite.nextVersion,
+          status: nextStatus,
+          statusReason: nextStatusReason,
+          version: nextVersion,
         } as const;
       },
       { timeout: 10000 }

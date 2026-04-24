@@ -3,6 +3,7 @@ jest.mock("@/lib/payments/telemetry", () => ({
   recordDisputeResolved: jest.fn(),
   recordFrozenGrantRestored: jest.fn(),
   recordPaymentAdjustmentMissingLink: jest.fn(),
+  recordEntitlementStateRebuild: jest.fn(),
   recordRefundEntitlementAdjustmentApplied: jest.fn(),
   recordRefundRecorded: jest.fn(),
   recordWebhookAdjustmentReplayIgnored: jest.fn(),
@@ -43,10 +44,17 @@ function buildTx() {
     },
     entitlementGrant: {
       findUnique: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
+      findFirst: jest.fn().mockResolvedValue(null),
       update: jest.fn(),
     },
     contactConsumption: {
       count: jest.fn(),
+      groupBy: jest.fn().mockResolvedValue([]),
+    },
+    entitlementState: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      upsert: jest.fn().mockResolvedValue({}),
     },
     auditEvent: {
       create: jest.fn().mockResolvedValue({ id: "audit-123" }),

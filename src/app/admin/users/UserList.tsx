@@ -12,12 +12,10 @@ import {
   Search,
   Loader2,
   Home,
-  Calendar,
   Star,
   Mail,
   MoreVertical,
 } from "lucide-react";
-import Link from "next/link";
 
 interface User {
   id: string;
@@ -30,7 +28,6 @@ interface User {
   emailVerified: Date | null;
   _count: {
     listings: number;
-    bookings: number;
     reviewsWritten: number;
   };
 }
@@ -199,13 +196,6 @@ export default function UserList({
                         <Home className="w-3 h-3" />
                         {user._count.listings} listings
                       </span>
-                      <Link
-                        href={`/admin/bookings?tenantId=${user.id}`}
-                        className="flex items-center gap-1 text-primary hover:underline"
-                      >
-                        <Calendar className="w-3 h-3" />
-                        {user._count.bookings} bookings
-                      </Link>
                       <span className="flex items-center gap-1">
                         <Star className="w-3 h-3" />
                         {user._count.reviewsWritten} reviews

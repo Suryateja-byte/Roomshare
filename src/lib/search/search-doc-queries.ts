@@ -776,18 +776,18 @@ function buildSearchDocListAvailabilitySqlFragments(options: {
   return {
     effectiveAvailableSql: `(
       CASE
-        WHEN l."availabilitySource" = 'HOST_MANAGED'
+        WHEN 'HOST_MANAGED' = 'HOST_MANAGED'
           THEN GREATEST(COALESCE(l."openSlots", 0), 0)::int
         ELSE ${legacyEffectiveAvailableSql}
       END
     )`,
     slotConditionSql: `(
       (
-        l."availabilitySource" = 'HOST_MANAGED'
+        'HOST_MANAGED' = 'HOST_MANAGED'
         AND ${hostManagedSlotConditionSql}
       )
       OR (
-        l."availabilitySource" <> 'HOST_MANAGED'
+        'HOST_MANAGED' <> 'HOST_MANAGED'
         AND ${legacyEffectiveAvailableSql} >= ${hostManagedMinSlotsParam}
       )
     )`,
@@ -836,7 +836,7 @@ function buildSearchDocWhereConditionsInternal(
   const conditions: string[] = [
     slotConditionSql,
     `l.status = 'ACTIVE'`,
-    `COALESCE(l."needsMigrationReview", FALSE) = FALSE`,
+    `COALESCE(FALSE, FALSE) = FALSE`,
     `l."statusReason" IS DISTINCT FROM 'MIGRATION_REVIEW'`,
     "d.lat IS NOT NULL",
     "d.lng IS NOT NULL",
@@ -1269,14 +1269,14 @@ export async function getSearchDocListingsByIds(
       d.images,
       l."availableSlots" as "availableSlots",
       l."totalSlots" as "totalSlots",
-      l."availabilitySource" as "availabilitySource",
+      'HOST_MANAGED' as "availabilitySource",
       l."openSlots" as "openSlots",
       l."availableUntil" as "availableUntil",
       l."minStayMonths" as "minStayMonths",
       l."lastConfirmedAt" as "lastConfirmedAt",
       l.status::text as status,
       l."statusReason" as "statusReason",
-      l."needsMigrationReview" as "needsMigrationReview",
+      FALSE as "needsMigrationReview",
       l."ownerId" as "ownerId",
       l."normalizedAddress" as "normalizedAddress",
       d.amenities,
@@ -1369,14 +1369,14 @@ async function getSearchDocMapListingsInternal(
       d.price,
       ${effectiveAvailableSql} as "availableSlots",
       l."totalSlots" as "totalSlots",
-      l."availabilitySource" as "availabilitySource",
+      'HOST_MANAGED' as "availabilitySource",
       l."openSlots" as "openSlots",
       l."availableUntil" as "availableUntil",
       l."minStayMonths" as "minStayMonths",
       l."lastConfirmedAt" as "lastConfirmedAt",
       l.status::text as status,
       l."statusReason" as "statusReason",
-      l."needsMigrationReview" as "needsMigrationReview",
+      FALSE as "needsMigrationReview",
       d.images[1] as "primaryImage",
       d.room_type as "roomType",
       l."moveInDate" as "moveInDate",
@@ -1588,14 +1588,14 @@ async function getSearchDocListingsPaginatedInternal(
         d.images,
         ${effectiveAvailableSql} as "availableSlots",
         l."totalSlots" as "totalSlots",
-        l."availabilitySource" as "availabilitySource",
+        'HOST_MANAGED' as "availabilitySource",
         l."openSlots" as "openSlots",
         l."availableUntil" as "availableUntil",
         l."minStayMonths" as "minStayMonths",
         l."lastConfirmedAt" as "lastConfirmedAt",
         l.status::text as status,
         l."statusReason" as "statusReason",
-        l."needsMigrationReview" as "needsMigrationReview",
+        FALSE as "needsMigrationReview",
         l."ownerId" as "ownerId",
         l."normalizedAddress" as "normalizedAddress",
         d.amenities,
@@ -1803,14 +1803,14 @@ export async function getSearchDocListingsWithKeyset(
         d.images,
         ${effectiveAvailableSql} as "availableSlots",
         l."totalSlots" as "totalSlots",
-        l."availabilitySource" as "availabilitySource",
+        'HOST_MANAGED' as "availabilitySource",
         l."openSlots" as "openSlots",
         l."availableUntil" as "availableUntil",
         l."minStayMonths" as "minStayMonths",
         l."lastConfirmedAt" as "lastConfirmedAt",
         l.status::text as status,
         l."statusReason" as "statusReason",
-        l."needsMigrationReview" as "needsMigrationReview",
+        FALSE as "needsMigrationReview",
         l."ownerId" as "ownerId",
         l."normalizedAddress" as "normalizedAddress",
         d.amenities,
@@ -2011,14 +2011,14 @@ export async function getSearchDocListingsFirstPage(
         d.images,
         ${effectiveAvailableSql} as "availableSlots",
         l."totalSlots" as "totalSlots",
-        l."availabilitySource" as "availabilitySource",
+        'HOST_MANAGED' as "availabilitySource",
         l."openSlots" as "openSlots",
         l."availableUntil" as "availableUntil",
         l."minStayMonths" as "minStayMonths",
         l."lastConfirmedAt" as "lastConfirmedAt",
         l.status::text as status,
         l."statusReason" as "statusReason",
-        l."needsMigrationReview" as "needsMigrationReview",
+        FALSE as "needsMigrationReview",
         l."ownerId" as "ownerId",
         l."normalizedAddress" as "normalizedAddress",
         d.amenities,

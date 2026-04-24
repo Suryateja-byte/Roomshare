@@ -4,7 +4,6 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import EditListingForm from "./EditListingForm";
 import { features } from "@/lib/env";
-import { getListingMigrationReviewState } from "@/lib/migration/review";
 
 export const metadata: Metadata = {
   title: "Edit Listing | RoomShare",
@@ -39,10 +38,6 @@ export default async function EditListingPage({ params }: PageProps) {
     redirect(`/listings/${id}`);
   }
 
-  const migrationReview = await getListingMigrationReviewState(id, {
-    actor: "host",
-  });
-
   return (
     <div className="min-h-screen bg-surface-canvas py-12">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -56,13 +51,11 @@ export default async function EditListingPage({ params }: PageProps) {
           listing={{
             ...listing,
             price: Number(listing.price),
-            needsMigrationReview: listing.needsMigrationReview,
             moveInDate: listing.moveInDate?.toISOString() ?? null,
             availableUntil: listing.availableUntil?.toISOString() ?? null,
             lastConfirmedAt: listing.lastConfirmedAt?.toISOString() ?? null,
             updatedAt: listing.updatedAt.toISOString(),
           }}
-          migrationReview={migrationReview}
           enableWholeUnitMode={features.wholeUnitMode}
           moderationWriteLocksEnabled={features.moderationWriteLocks}
         />

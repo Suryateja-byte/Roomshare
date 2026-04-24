@@ -24,13 +24,10 @@ export const publicListingDetailSelect = {
   availableUntil: true,
   minStayMonths: true,
   lastConfirmedAt: true,
-  availabilitySource: true,
-  needsMigrationReview: true,
   statusReason: true,
   status: true,
   viewCount: true,
   version: true,
-  bookingMode: true,
   genderPreference: true,
   householdGender: true,
   owner: {
