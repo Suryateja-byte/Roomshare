@@ -1,13 +1,20 @@
 "use client";
 
 import React, { Suspense, lazy } from "react";
-import { LazyMotion, domAnimation, m } from "framer-motion";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-const SearchForm = lazy(() => import("@/components/SearchForm"));
+import {
+  ArrowRight,
+  Check,
+  Home,
+  MessageCircle,
+  ShieldCheck,
+  Sparkles,
+  UserCheck,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ShieldCheck, Zap, Coffee, ArrowRight } from "lucide-react";
-import { fadeInUp, staggerContainer } from "@/lib/motion-variants";
+
+const SearchForm = lazy(() => import("@/components/SearchForm"));
 
 class SearchFormErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -17,51 +24,49 @@ class SearchFormErrorBoundary extends React.Component<
     super(props);
     this.state = { hasError: false };
   }
+
   static getDerivedStateFromError() {
     return { hasError: true };
   }
+
   render() {
     if (this.state.hasError) {
       return (
-        <div className="w-full max-w-5xl mx-auto px-4 py-16 text-center">
-          <h1 className="font-display text-4xl md:text-5xl font-normal tracking-tight text-on-surface mb-4">
-            Find Your People, Not Just a Place
+        <div className="w-full rounded-[1.375rem] bg-surface-container-lowest p-6 text-center shadow-ambient-lg">
+          <h1 className="font-display text-4xl font-normal tracking-tight text-on-surface md:text-5xl">
+            Better Rooms. Better People.
           </h1>
-          <p className="text-on-surface-variant text-lg mb-6">
-            Verified roommates. Real listings. People who actually show up to the tour.
+          <p className="mx-auto mt-3 max-w-xl text-on-surface-variant">
+            Verified roommates. Real listings. People who actually show up to
+            the tour.
           </p>
-          <a
-            href="/search"
-            className="inline-flex items-center gap-2 bg-primary text-on-primary px-6 py-3 rounded-full font-medium hover:opacity-90 transition-opacity"
-          >
-            Start searching &rarr;
-          </a>
+          <Button asChild className="mt-6 rounded-full">
+            <Link href="/search">Start searching</Link>
+          </Button>
         </div>
       );
     }
+
     return this.props.children;
   }
 }
 
 function AuthCTA() {
   const { data: session, status } = useSession();
-  const isLoggedIn = !!session?.user;
 
-  if (status === "loading" || isLoggedIn) return null;
+  if (status === "loading" || session?.user) return null;
 
   return (
-    <m.div
-      variants={fadeInUp}
-      className="mt-8 flex items-center justify-center gap-3 text-sm bg-surface-container-high/50 rounded-full px-6 py-3"
-    >
-      <span className="text-on-surface-variant">New here?</span>
+    <div className="animate-editorial-rise flex flex-wrap items-center justify-center gap-2 text-sm">
+      <span className="text-on-surface">New here?</span>
       <Link
         href="/signup"
-        className="font-medium text-primary hover:underline underline-offset-4 transition-colors"
+        className="inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-surface-container-lowest px-3 py-1 font-semibold text-primary shadow-[0_12px_30px_rgba(29,30,28,0.14)] transition-colors hover:border-primary/45 hover:bg-primary hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface-canvas"
       >
         Create an account
+        <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
       </Link>
-    </m.div>
+    </div>
   );
 }
 
@@ -70,222 +75,690 @@ export default function HomeClient() {
   const isLoggedIn = !!session?.user;
 
   return (
-    <LazyMotion features={domAnimation}>
-      <div className="flex flex-col bg-surface-canvas text-on-surface font-body">
-        {/* ================================================================
-            HERO SECTION — Editorial Hero
-            ================================================================ */}
-        <section
-          aria-label="Search for rooms"
-          className="relative pt-24 pb-16 md:pt-32 md:pb-20 min-h-[60dvh] md:min-h-[70dvh] flex flex-col justify-center overflow-x-hidden"
-        >
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
-            <div className="flex flex-col items-center text-center">
-              <div className="w-full flex flex-col items-center justify-center mb-8 md:mb-12">
-                {/* CSS-only hero animation — immune to React re-renders
-                    that interrupt Framer Motion's LazyMotion init */}
-                <div className="w-full flex flex-col items-center">
-                  {/* Editorial label */}
-                  <div
-                    className="font-body text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-6 animate-hero-fade-in"
-                    style={{ animationDelay: "0ms" }}
-                  >
-                    Find Your People
-                  </div>
-
-                  {/* Newsreader display heading with italic emphasis */}
-                  <h1
-                    className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-[5.5rem] font-normal tracking-tight text-on-surface mb-6 leading-[1.05] text-balance animate-hero-fade-in"
-                    style={{ animationDelay: "80ms" }}
-                  >
-                    Finding <em className="italic">Your</em> People,{" "}
-                    <br className="hidden lg:block" />
-                    Not Just a Place
-                  </h1>
-
-                  {/* Manrope subheading */}
-                  <p
-                    className="text-lg md:text-xl text-on-surface-variant mb-10 max-w-2xl mx-auto leading-relaxed animate-hero-fade-in"
-                    style={{ animationDelay: "160ms" }}
-                  >
-                    Verified roommates. Real listings. People who actually show
-                    up to the tour.
-                  </p>
-
-                  {/* Glassmorphism search bar */}
-                  <div
-                    className="w-full mx-auto max-w-4xl relative z-20 animate-hero-fade-in"
-                    style={{ animationDelay: "240ms" }}
-                  >
-                    <div className="bg-transparent border-0 shadow-none p-0 md:bg-surface-container-lowest md:backdrop-blur-xl md:border md:border-outline-variant/30 md:rounded-2xl md:shadow-ambient md:p-2 lg:p-3">
-                      <SearchFormErrorBoundary>
-                        <Suspense
-                          fallback={
-                            <div className="h-16 animate-shimmer bg-gradient-to-r from-surface-container-high via-surface-canvas to-surface-container-high bg-[length:200%_100%] rounded-xl" />
-                          }
-                        >
-                          <SearchForm variant="home" />
-                        </Suspense>
-                      </SearchFormErrorBoundary>
-                    </div>
-                  </div>
-
-                  {/* CTA for logged-out users */}
-                  <AuthCTA />
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ================================================================
-            FEATURES — "Cozy Spaces, Real People"
-            Surface container high background for tonal shift
-            ================================================================ */}
-        <section
-          aria-label="Why RoomShare"
-          className="py-16 md:py-20 bg-surface-container-high"
-        >
-          <div className="max-w-7xl mx-auto px-4 sm:px-6">
-            <m.div
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, margin: "-80px" }}
-              variants={staggerContainer}
-              className="text-center mb-16 md:mb-20"
-            >
-              <m.div
-                variants={fadeInUp}
-                className="font-body text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-6"
-              >
-                Why RoomShare
-              </m.div>
-              <m.h2
-                variants={fadeInUp}
-                className="font-display text-3xl md:text-5xl font-normal tracking-tight text-on-surface mb-6"
-              >
-                Cozy Spaces, Real People
-              </m.h2>
-              <m.p
-                variants={fadeInUp}
-                className="text-on-surface-variant text-lg font-light max-w-xl mx-auto"
-              >
-                Less guesswork. Less ghosting. More &ldquo;I actually like
-                living here.&rdquo;
-              </m.p>
-            </m.div>
-
-            <m.div
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, margin: "-80px" }}
-              variants={staggerContainer}
-              className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-8 lg:gap-10 max-w-5xl mx-auto"
-            >
-              <FeatureCard
-                icon={ShieldCheck}
-                title="No catfishing"
-                description="Every person verifies their ID and phone number before they can message you. No bots, no fakes."
-              />
-              <FeatureCard
-                icon={Zap}
-                title="Matched on what matters"
-                description="Sleep schedule, noise tolerance, guests policy — not just budget. You'll know before you visit."
-              />
-              <FeatureCard
-                icon={Coffee}
-                title="Filters that actually help"
-                description="Clean freak or organized chaos? Early bird or night owl? Set your deal-breakers upfront."
-              />
-            </m.div>
-          </div>
-        </section>
-
-        {/* ================================================================
-            CTA SECTION — "Your next roommate is already here"
-            Surface canvas with generous whitespace
-            ================================================================ */}
-        <section
-          aria-label="Get started"
-          className="py-16 pb-24 md:py-20 md:pb-20 bg-surface-canvas text-center"
-        >
-          <m.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-80px" }}
-            variants={fadeInUp}
-            className="max-w-3xl mx-auto px-4 sm:px-6"
-          >
-            <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-normal tracking-tight mb-6 text-on-surface text-balance">
-              {isLoggedIn
-                ? "Find your perfect room."
-                : "Your next roommate is already here."}
-            </h2>
-            <p className="text-lg text-on-surface-variant mb-10 max-w-xl mx-auto font-light">
-              {isLoggedIn
-                ? "Browse verified listings and connect with roommates who match your lifestyle."
-                : "Takes 2 minutes to set up a profile. Then start browsing rooms tonight."}
-            </p>
-
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Button
-                asChild
-                size="lg"
-                className="w-full sm:w-auto rounded-full px-8 h-12 text-base font-medium"
-              >
-                <Link href={isLoggedIn ? "/search" : "/signup"}>
-                  {isLoggedIn ? "Browse Rooms" : "Create Your Profile"}
-                </Link>
-              </Button>
-              <Button
-                asChild
-                variant="outline"
-                size="lg"
-                className="group w-full sm:w-auto rounded-full px-8 h-12 text-base font-medium gap-2 bg-surface-container-high sm:bg-transparent"
-              >
-                <Link href={isLoggedIn ? "/listings/create" : "/search"}>
-                  {isLoggedIn ? "List Your Room" : "See Rooms Near You"}{" "}
-                  <ArrowRight
-                    size={16}
-                    className="group-hover:translate-x-1 transition-transform"
-                  />
-                </Link>
-              </Button>
-            </div>
-          </m.div>
-        </section>
-      </div>
-    </LazyMotion>
+    <div className="flex flex-col bg-surface-canvas text-on-surface font-body">
+      <HeroSection />
+      <WhyBand />
+      <HowItWorks isLoggedIn={isLoggedIn} />
+    </div>
   );
 }
 
-/* ================================================================
-   FEATURE CARD — Editorial styling
-   ================================================================ */
-function FeatureCard({
-  icon: Icon,
-  title,
-  description,
-}: {
-  icon: React.ComponentType<{ className?: string; size?: number }>;
-  title: string;
-  description: string;
-}) {
+function HeroSection() {
   return (
-    <m.div
-      variants={fadeInUp}
-      className="flex flex-col items-center text-center group bg-surface-container-lowest rounded-xl p-6 sm:p-8 shadow-ambient-sm h-full"
+    <section
+      aria-label="Search for rooms"
+      className="relative isolate flex min-h-[100dvh] flex-col justify-center overflow-hidden bg-surface-canvas pb-14 pt-[5.75rem] md:pb-12 md:pt-28"
     >
       <div
         aria-hidden="true"
-        className="mb-6 flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary transition-[transform,background-color,color] duration-200 group-hover:bg-primary group-hover:text-on-primary group-hover:scale-110"
-      >
-        <Icon className="w-5 h-5" />
+        className="home-hero-photo relative order-first h-80 w-screen bg-[url('/images/home/hero-living-room.png')] bg-cover bg-center md:absolute md:inset-0 md:order-none md:h-auto md:w-auto md:bg-[center_right]"
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 hidden bg-[linear-gradient(90deg,rgb(251_249_244/0.97)_0%,rgb(251_249_244/0.9)_28%,rgb(251_249_244/0.58)_43%,rgb(251_249_244/0)_56%)] md:block"
+      />
+
+      <div className="container relative z-10 w-full">
+        <div className="grid items-center gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:gap-14">
+          <div className="max-w-[36rem]">
+            <div className="animate-editorial-rise mb-4 text-micro-label text-primary md:mb-5">
+              Find your people
+            </div>
+            <h1
+              className="animate-editorial-rise font-display text-[2.75rem] font-normal leading-[0.98] tracking-[-0.03em] text-on-surface sm:text-6xl lg:text-[5.8rem]"
+              style={{ animationDelay: "80ms" }}
+            >
+              Better Rooms. <br />
+              <em className="font-normal text-primary">Better People.</em>
+            </h1>
+            <p
+              className="animate-editorial-rise mt-5 max-w-md text-base leading-relaxed text-on-surface-variant md:text-lg"
+              style={{ animationDelay: "150ms" }}
+            >
+              Verified roommates. Real listings.
+              <br className="hidden sm:block" />
+              <span className="sm:hidden"> </span>People who actually show up to
+              the tour.
+            </p>
+
+            <div
+              className="animate-editorial-rise mt-7 grid grid-cols-1 gap-4 sm:grid-cols-3 md:mt-8"
+              style={{ animationDelay: "210ms" }}
+            >
+              <TrustChip
+                icon={ShieldCheck}
+                title="Verified People"
+                sub="ID & phone checked"
+              />
+              <TrustChip
+                icon={Home}
+                title="Quality Listings"
+                sub="Hand-checked homes"
+              />
+              <TrustChip
+                icon={Sparkles}
+                title="Better Matches"
+                sub="Compatibility first"
+              />
+            </div>
+          </div>
+          <div className="hidden md:block" aria-hidden="true" />
+        </div>
+
+        <div
+          className="animate-editorial-rise mt-8 w-full md:mt-9"
+          style={{ animationDelay: "280ms" }}
+        >
+          <SearchFormErrorBoundary>
+            <Suspense
+              fallback={
+                <div className="mx-auto h-[23.5rem] max-w-[22.5rem] rounded-[2rem] bg-surface-container-lowest shadow-ambient md:h-[5.75rem] md:max-w-5xl md:rounded-[1.375rem]">
+                  <div className="h-full animate-shimmer rounded-[inherit] bg-gradient-to-r from-surface-container-high via-surface-canvas to-surface-container-high bg-[length:200%_100%]" />
+                </div>
+              }
+            >
+              <SearchForm variant="home" />
+            </Suspense>
+          </SearchFormErrorBoundary>
+        </div>
+
+        <div className="mt-6">
+          <AuthCTA />
+        </div>
       </div>
-      <h3 className="font-display text-lg font-medium mb-3 text-on-surface tracking-tight">
-        {title}
-      </h3>
-      <p className="text-on-surface-variant leading-relaxed">{description}</p>
-    </m.div>
+    </section>
+  );
+}
+
+function TrustChip({
+  icon: Icon,
+  title,
+  sub,
+}: {
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  title: string;
+  sub: string;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-3">
+      <Icon
+        className="h-5 w-5 shrink-0 text-primary"
+        strokeWidth={1.7}
+        aria-hidden="true"
+      />
+      <div className="min-w-0 leading-tight">
+        <div className="truncate text-[0.8rem] font-semibold text-on-surface">
+          {title}
+        </div>
+        <div className="truncate text-xs text-on-surface-variant">{sub}</div>
+      </div>
+    </div>
+  );
+}
+
+function WhyBand() {
+  const pillars = [
+    {
+      icon: UserCheck,
+      kicker: "Verified humans",
+      title: "No catfish, no ghosts.",
+      body: "Every profile starts with ID and phone checks, so messages come from real people with real intent.",
+      featured: false,
+    },
+    {
+      icon: Home,
+      kicker: "Curated listings",
+      title: "Rooms, not inventory.",
+      body: "Homes are reviewed for clarity, availability, and the small details that make a tour worth your time.",
+      featured: true,
+    },
+    {
+      icon: Sparkles,
+      kicker: "Slow matching",
+      title: "Compatibility, not queries.",
+      body: "Lifestyle signals help surface households where the rent works and the daily rhythm does too.",
+      featured: false,
+    },
+    {
+      icon: MessageCircle,
+      kicker: "Move-in support",
+      title: "Handholds, not helplines.",
+      body: "From tour scheduling to first messages, RoomShare keeps the path practical and human.",
+      featured: false,
+    },
+  ];
+
+  return (
+    <section
+      aria-labelledby="why-roomshare-heading"
+      className="bg-surface-container-high py-20 md:py-28"
+    >
+      <div className="container">
+        <div className="mb-14 max-w-2xl md:mb-16">
+          <div className="text-micro-label text-primary">Why RoomShare</div>
+          <h2
+            id="why-roomshare-heading"
+            className="mt-4 font-display text-4xl font-normal leading-[1.04] tracking-tight text-on-surface md:text-6xl"
+          >
+            Cozy spaces. <em className="text-primary">Real</em> people.
+          </h2>
+          <p className="mt-5 max-w-xl text-lg leading-relaxed text-on-surface-variant">
+            Four small promises that add up to a move-in you actually look
+            forward to.
+          </p>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-4 md:gap-0">
+          {pillars.map((pillar) => (
+            <article
+              key={pillar.kicker}
+              className={`flex min-h-64 flex-col p-6 md:p-8 ${
+                pillar.featured
+                  ? "-translate-y-0 rounded-[1.25rem] bg-surface-container-lowest shadow-ghost md:-translate-y-4"
+                  : "rounded-[1.25rem] bg-surface-container-lowest md:rounded-none md:bg-transparent"
+              }`}
+            >
+              <div
+                className={`mb-5 grid h-14 w-14 place-items-center rounded-2xl text-primary ${
+                  pillar.featured
+                    ? "bg-primary/10"
+                    : "bg-surface-canvas md:bg-surface-container-lowest"
+                }`}
+              >
+                <pillar.icon className="h-6 w-6" strokeWidth={1.6} />
+              </div>
+              <div className="text-micro-label text-on-surface-variant">
+                {pillar.kicker}
+              </div>
+              <h3 className="mt-2 font-display text-2xl font-normal leading-tight text-on-surface">
+                {pillar.title}
+              </h3>
+              <p className="mt-3 text-sm leading-relaxed text-on-surface-variant">
+                {pillar.body}
+              </p>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function HowItWorks({ isLoggedIn }: { isLoggedIn: boolean }) {
+  const steps = [
+    {
+      n: "01",
+      kicker: "Introduce yourself",
+      title: "A profile that reads like a letter, not a form.",
+      body: "Answer a few warm questions about your mornings, guests, quiet hours, and home rhythm.",
+    },
+    {
+      n: "02",
+      kicker: "Meet the household",
+      title: "Verified rooms. Real humans who show up.",
+      body: "Browse live listings, compare household expectations, and message when the room actually fits.",
+    },
+    {
+      n: "03",
+      kicker: "Move in on purpose",
+      title: "Lease the room and the rapport together.",
+      body: "Start with shared expectations already visible, so the first week feels less like guesswork.",
+    },
+  ];
+
+  return (
+    <section
+      aria-labelledby="how-roomshare-heading"
+      className="bg-surface-container-high py-20 md:py-28"
+    >
+      <div className="container grid gap-12 lg:grid-cols-[5fr_7fr] lg:gap-20">
+        <div>
+          <div className="text-micro-label text-primary">How it works</div>
+          <h2
+            id="how-roomshare-heading"
+            className="mt-4 font-display text-4xl font-normal leading-[1.04] tracking-tight text-on-surface md:text-6xl"
+          >
+            Less <em className="text-primary">guesswork.</em>
+            <br />
+            Less ghosting.
+            <br />
+            More <em className="text-primary">actually</em> living there.
+          </h2>
+          <p className="mt-6 max-w-md text-lg leading-relaxed text-on-surface-variant">
+            RoomShare turns awkward DMs and no-show tours into a slower, clearer
+            path toward the right household.
+          </p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Button asChild className="rounded-full">
+              <Link href={isLoggedIn ? "/profile" : "/signup"}>
+                {isLoggedIn ? "Update your profile" : "Create your profile"}
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="rounded-full">
+              <Link href="/search">See rooms near you</Link>
+            </Button>
+          </div>
+        </div>
+
+        <ol className="flex list-none flex-col gap-2 p-0">
+          {steps.map((step, index) => (
+            <li
+              key={step.n}
+              className={`grid gap-5 rounded-[1.25rem] p-6 sm:grid-cols-[auto_1fr] md:p-9 ${
+                index === 0
+                  ? "bg-surface-container-lowest shadow-ghost"
+                  : "bg-surface-canvas"
+              }`}
+            >
+              <div className="w-16 font-display text-5xl italic leading-none tracking-tight text-primary">
+                {step.n}
+              </div>
+              <div>
+                <div className="text-micro-label text-on-surface-variant">
+                  {step.kicker}
+                </div>
+                <h3 className="mt-2 font-display text-2xl font-normal leading-tight text-on-surface md:text-3xl">
+                  {step.title}
+                </h3>
+                <p className="mt-3 max-w-xl leading-relaxed text-on-surface-variant">
+                  {step.body}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </section>
+  );
+}
+
+export function PostListingsHomeSections() {
+  return (
+    <>
+      <MatchingSection />
+      <StoriesSection />
+      <FinalCTA />
+    </>
+  );
+}
+
+function MatchingSection() {
+  const traits = [
+    ["Mornings", "Slow, quiet", "Slow, quiet", true],
+    ["Cleanliness", "Tidy-ish", "Tidy-ish", true],
+    ["Guests", "Rarely overnight", "Weekend dinners", false],
+    ["Cooking", "Every night", "Shared meals", true],
+    ["Quiet hours", "After 10 pm", "After 10 pm", true],
+  ] as const;
+
+  return (
+    <section
+      aria-labelledby="matching-heading"
+      className="overflow-hidden bg-[#ded9d0] py-20 md:py-28"
+    >
+      <div className="container grid items-center gap-12 lg:grid-cols-[5fr_7fr] lg:gap-20">
+        <div>
+          <div className="text-micro-label text-primary">
+            The connection score
+          </div>
+          <h2
+            id="matching-heading"
+            className="mt-4 font-display text-4xl font-normal leading-[1.04] tracking-tight text-on-surface md:text-6xl"
+          >
+            A match, <em className="text-primary">in writing.</em>
+          </h2>
+          <p className="mt-6 max-w-md text-lg leading-relaxed text-on-surface-variant">
+            Compatibility goes beyond rent and square footage. The small rituals
+            matter: quiet hours, shared dinners, guests, and the state of the
+            sink.
+          </p>
+          <ul className="mt-8 flex list-none flex-col gap-3 p-0">
+            {[
+              "Lifestyle signals without invasive questions",
+              "Weighted by what you care about most",
+              "Both sides see fit before a message starts",
+            ].map((item, index) => (
+              <li
+                key={item}
+                className={`flex items-start gap-3 rounded-2xl p-4 ${
+                  index === 0 ? "bg-surface-container-lowest shadow-ghost" : ""
+                }`}
+              >
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary font-display italic text-on-primary">
+                  {index + 1}
+                </span>
+                <span className="text-sm font-medium leading-relaxed text-on-surface">
+                  {item}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="relative">
+          <div className="rounded-[1.5rem] bg-surface-container-lowest p-6 shadow-ambient-lg md:p-10">
+            <div className="mb-7 flex items-center justify-between border-b border-outline-variant/20 pb-6">
+              <div>
+                <div className="text-micro-label text-on-surface-variant">
+                  The match report
+                </div>
+                <div className="mt-1 font-display text-lg italic text-on-surface-variant">
+                  No. 042 · Maya & Jordan
+                </div>
+              </div>
+              <ConnectionRing value={94} />
+            </div>
+
+            <div className="mb-7 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+              <PersonTag name="Maya" role="Grad student · Austin" />
+              <div className="font-display text-2xl italic text-on-surface-variant">
+                &amp;
+              </div>
+              <PersonTag name="Jordan" role="Illustrator · Austin" alignRight />
+            </div>
+
+            <div className="space-y-2">
+              {traits.map(([label, a, b, match], index) => (
+                <div
+                  key={label}
+                  className={`rounded-xl p-3 ${
+                    index % 2 ? "bg-surface-canvas" : ""
+                  }`}
+                >
+                  <div className="mb-2 text-center text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-on-surface-variant">
+                    {label}
+                  </div>
+                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-sm">
+                    <span className="text-right text-on-surface">{a}</span>
+                    <span
+                      className={`grid h-9 w-9 place-items-center rounded-full ${
+                        match
+                          ? "bg-primary/10 text-primary"
+                          : "bg-surface-container-high text-on-surface-variant"
+                      }`}
+                    >
+                      {match ? <Check className="h-4 w-4" /> : "~"}
+                    </span>
+                    <span className="text-on-surface">{b}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <blockquote className="mt-7 rounded-2xl bg-surface-container-high p-5 font-display text-xl italic leading-relaxed text-on-surface">
+              “A rare high match. Both prefer quiet evenings and agree on
+              weekend rhythms.”
+              <footer className="mt-3 font-body text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-on-surface-variant">
+                The matching editor
+              </footer>
+            </blockquote>
+          </div>
+          <div className="absolute right-4 top-0 -translate-y-1/2 rotate-3 rounded-full bg-primary px-5 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-on-primary shadow-ambient">
+            Recommended
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ConnectionRing({ value }: { value: number }) {
+  const radius = 26;
+  const circumference = 2 * Math.PI * radius;
+  const dash = (value / 100) * circumference;
+
+  return (
+    <div className="relative h-[68px] w-[68px]">
+      <svg
+        width="68"
+        height="68"
+        viewBox="0 0 68 68"
+        className="-rotate-90"
+        aria-hidden="true"
+      >
+        <circle
+          cx="34"
+          cy="34"
+          r={radius}
+          fill="none"
+          stroke="rgb(27 28 25 / 0.08)"
+          strokeWidth="4"
+        />
+        <circle
+          cx="34"
+          cy="34"
+          r={radius}
+          fill="none"
+          stroke="var(--color-primary)"
+          strokeLinecap="round"
+          strokeWidth="4"
+          strokeDasharray={`${dash} ${circumference}`}
+        />
+      </svg>
+      <div className="absolute inset-0 grid place-items-center font-display text-2xl italic tracking-tight text-primary">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function PersonTag({
+  name,
+  role,
+  alignRight = false,
+}: {
+  name: string;
+  role: string;
+  alignRight?: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-center gap-3 ${
+        alignRight ? "flex-row-reverse text-right" : ""
+      }`}
+    >
+      <div className="grid h-11 w-11 place-items-center rounded-full bg-primary font-display text-lg italic text-on-primary">
+        {name[0]}
+      </div>
+      <div>
+        <div className="font-display text-xl tracking-tight text-on-surface">
+          {name}
+        </div>
+        <div className="text-xs text-on-surface-variant">{role}</div>
+      </div>
+    </div>
+  );
+}
+
+function StoriesSection() {
+  const quotes = [
+    {
+      q: "I had been on three other apps and every tour was a ghost. On RoomShare I met Jordan on Tuesday and was unpacking by the weekend.",
+      name: "Maya K.",
+      role: "Moved into a Victorian in East Austin",
+    },
+    {
+      q: "The matching report is oddly practical. It knew we both wanted quiet Sundays before we did.",
+      name: "Jordan P.",
+      role: "Illustrator, Austin",
+      dark: true,
+    },
+    {
+      q: "I listed a spare room on a whim. The tenant I found still lives here two years later.",
+      name: "Hana M.",
+      role: "Homeowner, Brooklyn",
+    },
+  ];
+
+  return (
+    <section
+      aria-labelledby="stories-heading"
+      className="bg-surface-canvas py-20 md:py-28"
+    >
+      <div className="container">
+        <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end">
+          <div>
+            <div className="text-micro-label text-primary">Field notes</div>
+            <h2
+              id="stories-heading"
+              className="mt-4 max-w-3xl font-display text-4xl font-normal leading-[1.04] tracking-tight text-on-surface md:text-6xl"
+            >
+              Stories from <em className="text-primary">the other side</em> of
+              the lease.
+            </h2>
+          </div>
+        </div>
+
+        <div className="grid gap-5 md:grid-cols-3">
+          {quotes.map((quote) => (
+            <figure
+              key={quote.name}
+              className={`m-0 flex min-h-80 flex-col rounded-[1.25rem] p-7 shadow-ghost md:p-9 ${
+                quote.dark
+                  ? "bg-on-surface text-surface-canvas md:translate-y-5"
+                  : "bg-surface-container-lowest text-on-surface"
+              }`}
+            >
+              <blockquote className="flex-1 font-display text-2xl leading-snug tracking-tight">
+                “{quote.q}”
+              </blockquote>
+              <figcaption className="mt-7 flex items-center gap-3 border-t border-current/10 pt-5">
+                <div className="grid h-10 w-10 place-items-center rounded-full bg-primary font-display italic text-on-primary">
+                  {quote.name[0]}
+                </div>
+                <div>
+                  <div className="font-display italic">{quote.name}</div>
+                  <div
+                    className={`text-xs ${
+                      quote.dark
+                        ? "text-surface-canvas/60"
+                        : "text-on-surface-variant"
+                    }`}
+                  >
+                    {quote.role}
+                  </div>
+                </div>
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+
+        <div className="mt-16 grid overflow-hidden rounded-[1.25rem] bg-surface-container-high py-6 md:grid-cols-4 md:py-8">
+          {[
+            ["94%", "Matches accept the first tour"],
+            ["2.4 days", "Average time from match to tour"],
+            ["12k", "Verified roommates this season"],
+            ["31 cities", "Active across the US & Europe"],
+          ].map(([number, label], index) => (
+            <div
+              key={number}
+              className={`px-6 py-5 text-center ${
+                index > 0 ? "md:border-l md:border-on-surface/10" : ""
+              }`}
+            >
+              <div className="font-display text-4xl tracking-tight text-on-surface md:text-5xl">
+                {number}
+              </div>
+              <div className="mx-auto mt-2 max-w-44 text-sm leading-relaxed text-on-surface-variant">
+                {label}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FinalCTA() {
+  const { data: session } = useSession();
+  const isLoggedIn = !!session?.user;
+
+  return (
+    <section
+      aria-labelledby="home-final-cta-heading"
+      className="bg-surface-canvas py-14 md:py-20"
+    >
+      <div className="container">
+        <div className="relative overflow-hidden rounded-[2rem] bg-[linear-gradient(135deg,#9a4027_0%,#b9583c_62%,#6b2f1c_100%)] p-8 text-on-primary shadow-[0_40px_80px_-30px_rgb(154_64_39/0.42)] md:p-14 lg:p-20">
+          <div
+            aria-hidden="true"
+            className="absolute -right-24 -top-24 h-80 w-80 rounded-full bg-[radial-gradient(circle,rgb(255_225_180/0.35),transparent_65%)]"
+          />
+          <div className="relative grid items-center gap-10 lg:grid-cols-[1.35fr_1fr] lg:gap-16">
+            <div>
+              <div className="text-micro-label text-on-primary/70">
+                The next chapter
+              </div>
+              <h2
+                id="home-final-cta-heading"
+                className="mt-4 max-w-3xl font-display text-4xl font-normal leading-[1.02] tracking-tight md:text-6xl"
+              >
+                Your next <em>roommate</em> is already writing their profile.
+              </h2>
+              <p className="mt-6 max-w-xl text-lg leading-relaxed text-on-primary/85">
+                Takes three minutes. No credit card, no lease pressure, just the
+                start of a better-curated home life.
+              </p>
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Button
+                  asChild
+                  className="rounded-full bg-surface-container-lowest text-on-surface hover:bg-surface-canvas"
+                >
+                  <Link href={isLoggedIn ? "/search" : "/signup"}>
+                    {isLoggedIn ? "Browse rooms" : "Create your profile"}
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+                <Button
+                  asChild
+                  variant="outline"
+                  className="rounded-full border-on-primary/25 bg-transparent text-on-primary hover:bg-on-primary/10 hover:text-on-primary"
+                >
+                  <Link href={isLoggedIn ? "/listings/create" : "/search"}>
+                    {isLoggedIn ? "List your room" : "See rooms near you"}
+                  </Link>
+                </Button>
+              </div>
+              <div className="mt-8 flex items-center gap-4">
+                <div className="flex">
+                  {["#ead7c3", "#c9a685", "#7a5034", "#b58b65"].map(
+                    (color, index) => (
+                      <span
+                        key={color}
+                        className="h-9 w-9 rounded-full shadow-[0_0_0_2px_#9a4027]"
+                        style={{
+                          backgroundColor: color,
+                          marginLeft: index === 0 ? 0 : -10,
+                        }}
+                      />
+                    )
+                  )}
+                </div>
+                <div className="text-sm text-on-primary/75">
+                  <strong className="text-on-primary">212 people</strong> joined
+                  this week
+                </div>
+              </div>
+            </div>
+
+            <div className="rotate-2 rounded-[1.25rem] bg-surface-container-lowest p-3 text-on-surface shadow-[0_30px_60px_-20px_rgb(0_0_0/0.22)]">
+              <div className="aspect-[4/3] rounded-2xl bg-[url('/images/home/hero-living-room.png')] bg-cover bg-center" />
+              <div className="p-4">
+                <div className="mb-3 flex items-center justify-between text-[0.65rem] uppercase tracking-[0.14em] text-on-surface-variant">
+                  <span>Dispatch from</span>
+                  <span>04 · 2026</span>
+                </div>
+                <p className="font-display text-2xl italic leading-snug">
+                  “Moved into a sunny bedroom with a stranger. She is now my
+                  emergency contact.”
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
