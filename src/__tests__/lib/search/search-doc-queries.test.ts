@@ -5,10 +5,16 @@
  */
 
 import {
+  SEARCH_DOC_ALLOWED_SQL_LITERALS,
   isSearchDocEnabled,
   buildOrderByClause,
+  buildSearchDocListWhereConditions,
   buildSearchDocWhereConditions,
+  mapRawListingsToPublic,
+  mapRawMapListingsToPublic,
 } from "@/lib/search/search-doc-queries";
+import { buildPublicAvailability } from "@/lib/search/public-availability";
+import { joinWhereClauseWithSecurityInvariant } from "@/lib/sql-safety";
 
 describe("buildSearchDocWhereConditions", () => {
   it("excludes listings with null coordinates from map results (F1.1)", () => {
@@ -25,38 +31,73 @@ describe("buildSearchDocWhereConditions", () => {
 
     // Base conditions must filter to ACTIVE status only
     // PAUSED, DRAFT, ARCHIVED, etc. listings must never appear in search
-    expect(conditions).toContain("d.status = 'ACTIVE'");
+    expect(conditions).toContain(`l.status = 'ACTIVE'`);
+    expect(conditions).toContain(
+      `COALESCE(FALSE, FALSE) = FALSE`
+    );
+    expect(conditions).toContain(`l."statusReason" IS DISTINCT FROM 'MIGRATION_REVIEW'`);
     // Verify no other status values are included
-    const statusConditions = conditions.filter((c) => c.includes("d.status"));
+    const statusConditions = conditions.filter((c) =>
+      c.includes(`l.status = 'ACTIVE'`)
+    );
     expect(statusConditions).toHaveLength(1);
   });
 
-  it("requires available slots >= $1 in base conditions (parameterized)", () => {
+  it("requires range-aware availability >= $1 in base conditions", () => {
     const { conditions } = buildSearchDocWhereConditions({});
 
-    expect(conditions).toContain("d.available_slots >= $1");
+    expect(conditions[0]).toContain(`'HOST_MANAGED' = 'HOST_MANAGED'`);
+    expect(conditions[0]).toContain(`l."openSlots" >= $2`);
+    expect(conditions[0]).toContain(`l."availableUntil"`);
   });
 
   it("defaults to >= 1 when minAvailableSlots is undefined", () => {
     const result = buildSearchDocWhereConditions({});
 
-    expect(result.params[0]).toBe(1);
+    expect(result.params).toEqual([1, 1]);
   });
 
   it("parameterizes >= N when minAvailableSlots is set", () => {
     const result = buildSearchDocWhereConditions({ minAvailableSlots: 3 });
 
-    expect(result.params[0]).toBe(3);
-    expect(result.conditions).toContain("d.available_slots >= $1");
+    expect(result.params).toEqual([3, 3]);
+    expect(result.conditions[0]).toContain(">= $2");
   });
 
   it("starts with paramIndex 2 and no FTS when no filters applied", () => {
     const result = buildSearchDocWhereConditions({});
 
-    // With parameterized slot threshold at $1, params starts with [1]
-    expect(result.params).toHaveLength(1);
-    expect(result.paramIndex).toBe(2);
+    expect(result.params).toHaveLength(2);
+    expect(result.paramIndex).toBe(3);
     expect(result.ftsQueryParamIndex).toBeNull();
+  });
+
+  it("uses the same canonical eligibility predicate as list search", () => {
+    const mapResult = buildSearchDocWhereConditions({});
+    const listResult = buildSearchDocListWhereConditions({});
+
+    expect(mapResult.conditions).toEqual(listResult.conditions);
+    expect(mapResult.params).toEqual(listResult.params);
+    expect(mapResult.paramIndex).toBe(listResult.paramIndex);
+  });
+
+  it("joins map/searchdoc conditions under the scoped SQL-literal allowlist", () => {
+    const { conditions } = buildSearchDocWhereConditions({
+      query: "studio",
+      bounds: {
+        minLng: -122.5,
+        minLat: 37.7,
+        maxLng: -122.3,
+        maxLat: 37.8,
+      },
+    });
+
+    expect(() =>
+      joinWhereClauseWithSecurityInvariant(
+        conditions,
+        SEARCH_DOC_ALLOWED_SQL_LITERALS
+      )
+    ).not.toThrow();
   });
 
   describe("price filter conditions", () => {
@@ -236,6 +277,43 @@ describe("buildSearchDocWhereConditions", () => {
   });
 });
 
+describe("buildSearchDocListWhereConditions", () => {
+  it("adds migration-review and host-managed freshness guards to list search", () => {
+    const result = buildSearchDocListWhereConditions({});
+
+    expect(result.conditions).toContain(`COALESCE(FALSE, FALSE) = FALSE`);
+    expect(result.conditions).toContain(`l."statusReason" IS DISTINCT FROM 'MIGRATION_REVIEW'`);
+    expect(result.conditions[0]).toContain(`'HOST_MANAGED' = 'HOST_MANAGED'`);
+    expect(result.conditions[0]).toContain(`NOW() - INTERVAL '21 days'`);
+    expect(result.params).toEqual([1, 1]);
+  });
+
+  it("enforces the requested move-in lower bound inside the host-managed list predicate", () => {
+    const result = buildSearchDocListWhereConditions({
+      moveInDate: "2026-05-01",
+    });
+
+    expect(result.conditions[0]).toContain(`l."moveInDate"::date <= $3::date`);
+    expect(result.conditions[0]).toContain(
+      `l."availableUntil"::date >= $3::date`
+    );
+  });
+
+  it("joins list/searchdoc conditions under the scoped SQL-literal allowlist", () => {
+    const { conditions } = buildSearchDocListWhereConditions({
+      query: "studio",
+      moveInDate: "2026-05-01",
+    });
+
+    expect(() =>
+      joinWhereClauseWithSecurityInvariant(
+        conditions,
+        SEARCH_DOC_ALLOWED_SQL_LITERALS
+      )
+    ).not.toThrow();
+  });
+});
+
 describe("buildOrderByClause", () => {
   it("includes ts_rank_cd for offset pagination with FTS", () => {
     const result = buildOrderByClause("recommended", 3, false);
@@ -282,6 +360,207 @@ describe("buildOrderByClause", () => {
       // All must end with id ASC for stable ordering
       expect(result).toContain("d.id ASC");
     }
+  });
+});
+
+describe("SearchDoc projection mapping", () => {
+  function createHostManagedRaw(overrides: Record<string, unknown> = {}) {
+    return {
+      id: "listing-1",
+      title: "Host Managed Listing",
+      description: "Quiet room",
+      price: 1200,
+      images: ["img-1.jpg"],
+      availableSlots: 2,
+      totalSlots: 4,
+      availabilitySource: "HOST_MANAGED" as const,
+      openSlots: 2,
+      availableUntil: "2026-12-01",
+      minStayMonths: 3,
+      lastConfirmedAt: "2026-04-15T12:30:00.000Z",
+      status: "ACTIVE",
+      statusReason: null,
+      needsMigrationReview: false,
+      amenities: ["WiFi"],
+      houseRules: ["No Smoking"],
+      householdLanguages: ["English"],
+      primaryHomeLanguage: "English",
+      leaseDuration: "6_months",
+      roomType: "private",
+      moveInDate: "2026-06-01",
+      viewCount: 10,
+      city: "San Francisco",
+      state: "CA",
+      lat: 37.7749,
+      lng: -122.4194,
+      avgRating: 4.5,
+      reviewCount: 8,
+      primaryImage: "img-1.jpg",
+      recommendedScore: 12.4,
+      createdAt: "2026-01-15T00:00:00.000Z",
+      ...overrides,
+    };
+  }
+
+  it("suppresses invalid HOST_MANAGED rows from list projection", () => {
+    const results = mapRawListingsToPublic([
+      createHostManagedRaw({
+        openSlots: 0,
+      }),
+    ]);
+
+    expect(results).toEqual([]);
+  });
+
+  it("suppresses stale HOST_MANAGED rows from list projection", () => {
+    const results = mapRawListingsToPublic([
+      createHostManagedRaw({
+        lastConfirmedAt: "2026-03-20T12:30:00.000Z",
+      }),
+    ]);
+
+    expect(results).toEqual([]);
+  });
+
+  it("suppresses migration-review rows from list projection even with positive slots", () => {
+    const results = mapRawListingsToPublic([
+      createHostManagedRaw({
+        availabilitySource: "LEGACY_BOOKING",
+        openSlots: null,
+        availableSlots: 2,
+        totalSlots: 2,
+        needsMigrationReview: true,
+      }),
+      createHostManagedRaw({
+        availabilitySource: "LEGACY_BOOKING",
+        openSlots: null,
+        availableSlots: 2,
+        totalSlots: 2,
+        needsMigrationReview: false,
+        statusReason: "MIGRATION_REVIEW",
+      }),
+    ]);
+
+    expect(results).toEqual([]);
+  });
+
+  it("suppresses invalid HOST_MANAGED rows from map projection", () => {
+    const results = mapRawMapListingsToPublic([
+      createHostManagedRaw({
+        openSlots: 0,
+      }),
+    ]);
+
+    expect(results).toEqual([]);
+  });
+
+  it("keeps valid HOST_MANAGED rows in map projection", () => {
+    const results = mapRawMapListingsToPublic([createHostManagedRaw()]);
+
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({
+      id: "listing-1",
+      availabilitySource: "HOST_MANAGED",
+      availableSlots: 2,
+      totalSlots: 4,
+      status: "ACTIVE",
+      statusReason: null,
+    });
+  });
+
+  it("suppresses stale HOST_MANAGED rows from map projection", () => {
+    const results = mapRawMapListingsToPublic([
+      createHostManagedRaw({
+        lastConfirmedAt: "2026-03-20T12:30:00.000Z",
+      }),
+    ]);
+
+    expect(results).toEqual([]);
+  });
+
+  it("suppresses migration-review rows from map projection even with positive slots", () => {
+    const results = mapRawMapListingsToPublic([
+      createHostManagedRaw({
+        availabilitySource: "LEGACY_BOOKING",
+        openSlots: null,
+        availableSlots: 2,
+        totalSlots: 2,
+        needsMigrationReview: true,
+      }),
+      createHostManagedRaw({
+        availabilitySource: "LEGACY_BOOKING",
+        openSlots: null,
+        availableSlots: 2,
+        totalSlots: 2,
+        needsMigrationReview: false,
+        statusReason: "MIGRATION_REVIEW",
+      }),
+    ]);
+
+    expect(results).toEqual([]);
+  });
+
+  it("keeps map and list availability fields aligned for valid HOST_MANAGED rows", () => {
+    const listResult = mapRawListingsToPublic([createHostManagedRaw()])[0];
+    const mapResult = mapRawMapListingsToPublic([createHostManagedRaw()])[0];
+
+    expect(listResult.publicAvailability).toMatchObject(
+      buildPublicAvailability({
+        availabilitySource: "HOST_MANAGED",
+        openSlots: 2,
+        totalSlots: 4,
+        availableFrom: "2026-06-01",
+        availableUntil: "2026-12-01",
+        minStayMonths: 3,
+        lastConfirmedAt: "2026-04-15T12:30:00.000Z",
+      })
+    );
+    expect(mapResult.publicAvailability).toMatchObject(
+      listResult.publicAvailability
+    );
+    expect(mapResult.availabilitySource).toBe(
+      mapResult.publicAvailability.availabilitySource
+    );
+    expect(mapResult.availableSlots).toBe(mapResult.publicAvailability.openSlots);
+    expect(mapResult.totalSlots).toBe(mapResult.publicAvailability.totalSlots);
+  });
+
+  it("keeps map and list inclusion aligned across representative public-discovery fixtures", () => {
+    const fixtures = [
+      createHostManagedRaw({ id: "eligible-host-managed" }),
+      createHostManagedRaw({
+        id: "invalid-host-managed",
+        openSlots: 0,
+      }),
+      createHostManagedRaw({
+        id: "stale-host-managed",
+        lastConfirmedAt: "2026-03-20T12:30:00.000Z",
+      }),
+      createHostManagedRaw({
+        id: "needs-migration-review",
+        availabilitySource: "LEGACY_BOOKING",
+        openSlots: null,
+        availableSlots: 2,
+        totalSlots: 2,
+        needsMigrationReview: true,
+      }),
+      createHostManagedRaw({
+        id: "status-migration-review",
+        availabilitySource: "LEGACY_BOOKING",
+        openSlots: null,
+        availableSlots: 2,
+        totalSlots: 2,
+        needsMigrationReview: false,
+        statusReason: "MIGRATION_REVIEW",
+      }),
+    ];
+
+    expect(mapRawListingsToPublic(fixtures).map((listing) => listing.id)).toEqual([
+      "eligible-host-managed",
+    ]);
+    expect(
+      mapRawMapListingsToPublic(fixtures).map((listing) => listing.id)
+    ).toEqual(["eligible-host-managed"]);
   });
 });
 

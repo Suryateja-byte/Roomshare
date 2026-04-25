@@ -59,6 +59,15 @@ describe("assertParameterizedWhereClause", () => {
         )
       ).not.toThrow();
     });
+
+    it("allows trusted scoped literals only when explicitly passed", () => {
+      expect(() =>
+        assertParameterizedWhereClause(
+          "d.status = 'ACTIVE' AND d.source = 'HOST_MANAGED'",
+          ["HOST_MANAGED"]
+        )
+      ).not.toThrow();
+    });
   });
 
   describe("disallowed literals — security violations", () => {
@@ -92,6 +101,15 @@ describe("assertParameterizedWhereClause", () => {
       expect(() => assertParameterizedWhereClause("d.city = 'London'")).toThrow(
         "SECURITY"
       );
+    });
+
+    it("still rejects literals outside the scoped allow-list", () => {
+      expect(() =>
+        assertParameterizedWhereClause(
+          "d.source = 'HOST_MANAGED' AND d.city = 'London'",
+          ["HOST_MANAGED"]
+        )
+      ).toThrow("SECURITY");
     });
   });
 
@@ -149,6 +167,14 @@ describe("joinWhereClauseWithSecurityInvariant", () => {
     expect(() =>
       joinWhereClauseWithSecurityInvariant(["d.status = 'PAUSED'"])
     ).toThrow("SECURITY");
+  });
+
+  it("allows scoped literals without changing the global default", () => {
+    const result = joinWhereClauseWithSecurityInvariant(
+      ["d.status = 'ACTIVE'", "d.source = 'HOST_MANAGED'"],
+      ["HOST_MANAGED"]
+    );
+    expect(result).toBe("d.status = 'ACTIVE' AND d.source = 'HOST_MANAGED'");
   });
 });
 

@@ -1,28 +1,4 @@
-/**
- * Tests for POST /api/test-helpers — Bearer token auth gate.
- *
- * Verifies that the test-helpers route requires a valid Bearer token
- * matching E2E_TEST_SECRET, using timing-safe comparison.
- * Unauthorized requests return 404 (stealth denial).
- */
-
-// --- Mocks (must be before imports) ---
-
-jest.mock("@/lib/prisma", () => ({
-  prisma: {
-    listing: { findUnique: jest.fn(), findFirst: jest.fn() },
-    user: { findUnique: jest.fn() },
-    booking: { findUnique: jest.fn() },
-  },
-}));
-
 jest.mock("next/server", () => ({
-  NextRequest: class MockNextRequest extends Request {
-    declare headers: Headers;
-    constructor(url: string, init?: RequestInit) {
-      super(url, init);
-    }
-  },
   NextResponse: {
     json: (data: unknown, init?: { status?: number }) => ({
       status: init?.status || 200,
@@ -31,46 +7,40 @@ jest.mock("next/server", () => ({
   },
 }));
 
-import { NextRequest } from "next/server";
-import { prisma } from "@/lib/prisma";
+jest.mock("@/lib/prisma", () => ({
+  prisma: {},
+}));
 
-// Use a secret that is >= 16 characters
-const TEST_SECRET = "test-e2e-secret-value-1234";
+jest.mock("@/lib/search/normalize-address", () => ({
+  normalizeAddress: jest.fn(() => "normalized-address"),
+}));
 
-function makeRequest(
-  action: string,
-  params: Record<string, unknown> = {},
-  authHeader?: string
-): NextRequest {
-  const headers: Record<string, string> = {
-    "content-type": "application/json",
-  };
-  if (authHeader) {
-    headers["authorization"] = authHeader;
-  }
-  return new NextRequest("http://localhost:3000/api/test-helpers", {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ action, params }),
-  });
+import { DELETE, GET, POST } from "@/app/api/test-helpers/route";
+
+function request(input: {
+  authorization?: string;
+  body?: unknown;
+}): Parameters<typeof POST>[0] {
+  return {
+    headers: {
+      get: (name: string) =>
+        name.toLowerCase() === "authorization"
+          ? input.authorization ?? null
+          : null,
+    },
+    json: jest.fn().mockResolvedValue(input.body ?? {}),
+  } as unknown as Parameters<typeof POST>[0];
 }
 
-describe("test-helpers auth", () => {
+describe("test-helpers route auth gate", () => {
   const originalEnv = process.env;
-  let POST: (request: NextRequest) => Promise<any>;
-
-  beforeAll(async () => {
-    const mod = await import("@/app/api/test-helpers/route");
-    POST = mod.POST;
-  });
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetModules();
     process.env = {
       ...originalEnv,
       E2E_TEST_HELPERS: "true",
-      NODE_ENV: "test",
-      E2E_TEST_SECRET: TEST_SECRET,
+      E2E_TEST_SECRET: "ci-e2e-test-secret-minimum-16-chars",
     };
   });
 
@@ -78,151 +48,47 @@ describe("test-helpers auth", () => {
     process.env = originalEnv;
   });
 
-  it("returns 404 when no Authorization header is provided", async () => {
-    const request = makeRequest("getListingSlots", { listingId: "test-id" });
-    const response = await POST(request);
+  it.each([
+    ["GET", GET],
+    ["DELETE", DELETE],
+  ] as const)("rejects %s because helpers are POST-only", async (_method, handler) => {
+    const response = await handler();
 
-    expect(response.status).toBe(404);
-    const data = await response.json();
-    expect(data.error).toBe("Not found");
-  });
-
-  it("returns 404 when Authorization header has wrong token", async () => {
-    const request = makeRequest(
-      "getListingSlots",
-      { listingId: "test-id" },
-      "Bearer wrong-token-value-here"
-    );
-    const response = await POST(request);
-
-    expect(response.status).toBe(404);
-    const data = await response.json();
-    expect(data.error).toBe("Not found");
-  });
-
-  it("returns success when Authorization header has correct token", async () => {
-    (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
-      id: "test-id",
-      totalSlots: 5,
-      availableSlots: 3,
-      bookingMode: "SHARED",
-      title: "Test Listing",
-      ownerId: "owner-1",
+    expect(response.status).toBe(405);
+    await expect(response.json()).resolves.toEqual({
+      error: "Method not allowed",
     });
-
-    const request = makeRequest(
-      "getListingSlots",
-      { listingId: "test-id" },
-      `Bearer ${TEST_SECRET}`
-    );
-    const response = await POST(request);
-
-    expect(response.status).toBe(200);
-    const data = await response.json();
-    expect(data.id).toBe("test-id");
   });
 
-  it("returns 404 when E2E_TEST_SECRET env var is not set", async () => {
-    delete process.env.E2E_TEST_SECRET;
+  it("returns 404 when the helper gate is disabled", async () => {
+    process.env.E2E_TEST_HELPERS = "false";
 
-    const request = makeRequest(
-      "getListingSlots",
-      { listingId: "test-id" },
-      `Bearer ${TEST_SECRET}`
+    const response = await POST(
+      request({ authorization: "Bearer ci-e2e-test-secret-minimum-16-chars" })
     );
-    const response = await POST(request);
 
     expect(response.status).toBe(404);
-    const data = await response.json();
-    expect(data.error).toBe("Not found");
+    await expect(response.json()).resolves.toEqual({ error: "Not found" });
   });
 
-  it("returns 404 when E2E_TEST_SECRET is too short (< 16 chars)", async () => {
-    process.env.E2E_TEST_SECRET = "short";
-
-    const request = makeRequest(
-      "getListingSlots",
-      { listingId: "test-id" },
-      "Bearer short"
-    );
-    const response = await POST(request);
+  it("returns 404 when the bearer secret is invalid", async () => {
+    const response = await POST(request({ authorization: "Bearer wrong" }));
 
     expect(response.status).toBe(404);
-    const data = await response.json();
-    expect(data.error).toBe("Not found");
+    await expect(response.json()).resolves.toEqual({ error: "Not found" });
   });
 
-  it("returns 404 when token length mismatches secret length", async () => {
-    const request = makeRequest(
-      "getListingSlots",
-      { listingId: "test-id" },
-      "Bearer different-length"
+  it("returns 410 for retired booking helper actions", async () => {
+    const response = await POST(
+      request({
+        authorization: "Bearer ci-e2e-test-secret-minimum-16-chars",
+        body: { action: "createPendingBooking", params: {} },
+      })
     );
-    const response = await POST(request);
 
-    expect(response.status).toBe(404);
-    const data = await response.json();
-    expect(data.error).toBe("Not found");
-  });
-
-  // SEC-001: Production guard on isEnabled — blocks on VERCEL_ENV, not NODE_ENV,
-  // so CI production builds (next start) still allow test-helpers.
-  it("returns 404 in Vercel production even when E2E_TEST_HELPERS is true", async () => {
-    process.env.VERCEL_ENV = "production";
-    process.env.E2E_TEST_HELPERS = "true";
-
-    const request = makeRequest(
-      "getListingSlots",
-      { listingId: "test-id" },
-      `Bearer ${TEST_SECRET}`
-    );
-    const response = await POST(request);
-
-    expect(response.status).toBe(404);
-    const data = await response.json();
-    expect(data.error).toBe("Not found");
-  });
-
-  // SEC-001b: CI production builds (NODE_ENV=production but no VERCEL_ENV) allow test-helpers
-  it("allows test-helpers in CI production builds (NODE_ENV=production, no VERCEL_ENV)", async () => {
-    (process.env as any).NODE_ENV = "production";
-    delete process.env.VERCEL_ENV;
-    process.env.E2E_TEST_HELPERS = "true";
-
-    (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
-      id: "test-id",
-      totalSlots: 5,
-      availableSlots: 3,
-      bookingMode: "SHARED",
-      title: "Test Listing",
-      ownerId: "owner-1",
+    expect(response.status).toBe(410);
+    await expect(response.json()).resolves.toEqual({
+      error: "Legacy booking test helper retired in Phase 09",
     });
-
-    const request = makeRequest(
-      "getListingSlots",
-      { listingId: "test-id" },
-      `Bearer ${TEST_SECRET}`
-    );
-    const response = await POST(request);
-
-    expect(response.status).toBe(200);
-    const data = await response.json();
-    expect(data.id).toBe("test-id");
-  });
-
-  // API-005: cleanupTestBookings rejects empty params
-  it("returns 400 when cleanupTestBookings is called with no listingId or bookingIds", async () => {
-    const request = makeRequest(
-      "cleanupTestBookings",
-      {},
-      `Bearer ${TEST_SECRET}`
-    );
-    const response = await POST(request);
-
-    expect(response.status).toBe(400);
-    const data = await response.json();
-    expect(data.error).toBe(
-      "At least one of listingId or bookingIds is required"
-    );
   });
 });

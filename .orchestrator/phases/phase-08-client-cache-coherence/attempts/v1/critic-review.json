@@ -1,0 +1,27 @@
+{
+  "phase": "08",
+  "slug": "client-cache-coherence",
+  "attempt": "v1",
+  "verdict": "approved",
+  "reviewer": "Codex GPT-5 in-thread Critic",
+  "generator": "Codex GPT-5 in-thread Generating agent",
+  "findings": [],
+  "rationale": "Phase 08 satisfies the approved plan: schema changes are additive, cache_invalidations now carry fanout state, push subscriptions are endpoint-hashed and encrypted, public cache state exposes a signed cursor and projection floor, SSE and push fanout are kill-switch guarded, public JSON responses carry projection/cache metadata, listing detail uses short static cache headers plus client metadata handoff, and the service worker evicts unit-keyed cached entries and rejects cached responses below the server floor. Public invalidation payloads expose only opaque unit cache keys and coarse reason classes.",
+  "checks_reviewed": [
+    "pnpm test --runInBand src/__tests__/db/phase08-schema.test.ts src/__tests__/lib/public-cache/cache-policy.test.ts src/__tests__/lib/public-cache/state.test.ts src/__tests__/lib/public-cache/headers.test.ts src/__tests__/api/public-cache-state.test.ts src/__tests__/api/public-cache-events.test.ts src/__tests__/api/public-cache-push-subscription.test.ts src/__tests__/components/ServiceWorkerRegistration.public-cache.test.tsx src/__tests__/app/listings/ListingPageClient.public-cache.test.tsx src/__tests__/components/search/SearchResultsClient.public-cache.test.tsx",
+    "pnpm test --runInBand <Phase 07 saved-search/alerts regression set>",
+    "pnpm test --runInBand <Phase 04 search regression set>",
+    "pnpm test --runInBand <Phase 02 outbox/projection regression set>",
+    "pnpm exec prisma validate",
+    "pnpm typecheck",
+    "pnpm lint"
+  ],
+  "residual_risks": [
+    "No broad Jest run was executed.",
+    "No dedicated Playwright mobile hide-SLA script was added or run in this attempt."
+  ],
+  "approval": {
+    "status": "APPROVED",
+    "next_phase": "phase_09_pending"
+  }
+}

@@ -14,7 +14,7 @@ import { withRateLimitRedis } from "@/lib/with-rate-limit-redis";
 import { createListingApiSchema } from "@/lib/schemas";
 import { checkListingLanguageCompliance } from "@/lib/listing-language-guard";
 import { isValidLanguageCode } from "@/lib/languages";
-import { markListingDirty } from "@/lib/search/search-doc-dirty";
+import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 import { checkSuspension, checkEmailVerified } from "@/app/actions/suspension";
 import { withIdempotency } from "@/lib/idempotency";
 import { upsertSearchDocSync } from "@/lib/search/search-doc-sync";
@@ -28,6 +28,28 @@ import {
 } from "@/lib/profile-completion";
 import { features } from "@/lib/env";
 import { syncListingEmbedding } from "@/lib/embeddings/sync";
+import { normalizeAddress } from "@/lib/search/normalize-address";
+import {
+  checkCollisionRateLimit,
+  findCollisions,
+  type CollisionSibling,
+} from "@/lib/listings/collision-detector";
+import {
+  getOwnerHashPrefix8,
+  recordListingCreateCollisionDetected,
+  recordListingCreateCollisionModerationGated,
+  recordListingCreateCollisionResolved,
+} from "@/lib/search/search-telemetry";
+
+class ListingCollisionCandidatesError extends Error {
+  readonly siblings: CollisionSibling[];
+
+  constructor(siblings: CollisionSibling[]) {
+    super("COLLISION_CANDIDATES");
+    this.name = "ListingCollisionCandidatesError";
+    this.siblings = siblings;
+  }
+}
 
 export async function GET(request: Request) {
   // Use Redis-backed limiter for high-volume read path consistency.
@@ -270,7 +292,6 @@ export async function POST(request: Request) {
       householdLanguages,
       primaryHomeLanguage,
       moveInDate,
-      bookingMode,
     } = validatedFields.data;
 
     // 8. Language compliance check on title AND description (2G)
@@ -367,17 +388,6 @@ export async function POST(request: Request) {
       }
     }
 
-    // Phase 3: Feature flag gate for WHOLE_UNIT booking mode
-    if (bookingMode === "WHOLE_UNIT") {
-      const { features } = await import("@/lib/env");
-      if (!features.wholeUnitMode) {
-        return NextResponse.json(
-          { error: "Whole-unit booking mode is not currently available." },
-          { status: 400 }
-        );
-      }
-    }
-
     // Build listing create data from validated fields
     const listingCreateData = {
       title,
@@ -397,7 +407,6 @@ export async function POST(request: Request) {
       totalSlots,
       availableSlots: totalSlots,
       moveInDate: moveInDate ? new Date(moveInDate) : null,
-      bookingMode: bookingMode || "SHARED",
       ownerId: userId,
     };
 
@@ -417,7 +426,64 @@ export async function POST(request: Request) {
         throw new Error("MAX_LISTINGS_EXCEEDED");
       }
 
-      const listing = await tx.listing.create({ data: listingCreateData });
+      let normalizedAddressForCreate: string | undefined;
+
+      if (features.listingCreateCollisionWarn) {
+        normalizedAddressForCreate = normalizeAddress({
+          address,
+          city,
+          state,
+          zip,
+        });
+
+        const collisionAckHeader = request.headers.get("x-collision-ack");
+        const ownerHashPrefix8 = getOwnerHashPrefix8(userId);
+
+        if (collisionAckHeader !== "1") {
+          const siblings = await findCollisions({
+            ownerId: userId,
+            normalizedAddress: normalizedAddressForCreate,
+            moveInDate: listingCreateData.moveInDate,
+            availableUntil: null,
+            tx,
+          });
+
+          if (siblings.length > 0) {
+            recordListingCreateCollisionDetected({
+              ownerHashPrefix8,
+              siblingCount: siblings.length,
+            });
+            throw new ListingCollisionCandidatesError(siblings);
+          }
+        } else {
+          const rateLimit = await checkCollisionRateLimit({
+            ownerId: userId,
+            normalizedAddress: normalizedAddressForCreate ?? "",
+            tx,
+          });
+
+          if (rateLimit.needsModeration) {
+            recordListingCreateCollisionModerationGated({
+              ownerHashPrefix8,
+              windowCount24h: rateLimit.windowCount,
+            });
+          }
+
+          recordListingCreateCollisionResolved({
+            ownerHashPrefix8,
+            action: rateLimit.needsModeration ? "moderation_gated" : "proceed",
+          });
+        }
+      }
+
+      const listing = await tx.listing.create({
+        data: {
+          ...listingCreateData,
+          ...(normalizedAddressForCreate !== undefined
+            ? { normalizedAddress: normalizedAddressForCreate }
+            : {}),
+        },
+      });
 
       const location = await tx.location.create({
         data: {
@@ -435,6 +501,8 @@ export async function POST(request: Request) {
                 SET coords = ST_SetSRID(ST_MakePoint(${coords.lng}::float8, ${coords.lat}::float8), 4326)
                 WHERE id = ${location.id}
             `;
+
+      await markListingDirtyInTx(tx, listing.id, "listing_created");
 
       return listing;
     };
@@ -496,15 +564,9 @@ export async function POST(request: Request) {
         });
       });
 
-      // 17. Fire-and-forget: mark listing dirty as backup
-      markListingDirty(listing.id, "listing_created").catch((err) => {
-        logger.sync.warn("Failed to mark listing dirty", {
-          route: "/api/listings",
-          method: "POST",
-          listingId: listing.id,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      });
+      // markListingDirty is now committed atomically inside createListingInTx
+      // (CFM-405c) so a crash between tx commit and mark cannot leave the
+      // search doc stale.
     };
 
     // 11. Check for idempotency key header (1F) — validate format (M-S6)
@@ -556,6 +618,15 @@ export async function POST(request: Request) {
         await fireSideEffects({ ...result, price: Number(result.price) });
       }
     } catch (txError) {
+      if (txError instanceof ListingCollisionCandidatesError) {
+        return NextResponse.json(
+          {
+            error: "COLLISION_CANDIDATES",
+            siblings: txError.siblings,
+          },
+          { status: 409 }
+        );
+      }
       if (
         txError instanceof Error &&
         txError.message === "MAX_LISTINGS_EXCEEDED"

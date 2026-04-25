@@ -1,5 +1,7 @@
 # Playwright Test Blueprint: Booking System Stability
 
+> Note: CFM-701 removed the public booking CTA and form from listing pages. The UI-driven stability specs that depended on that surface have been deleted; keep this blueprint only for API-backed helpers and host-legacy `/bookings` flows until it is rewritten.
+
 > **Version**: 1.0 | **Date**: 2026-03-13 | **Status**: Ready for implementation
 > **Source**: `02-stability-contract.md` (invariants, boundary conditions, test matrix) + existing E2E infrastructure audit
 

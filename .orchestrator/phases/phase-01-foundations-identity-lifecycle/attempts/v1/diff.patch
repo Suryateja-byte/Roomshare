@@ -1,0 +1,1416 @@
+diff --git a/.gitignore b/.gitignore
+index 666a144f..99ab7235 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -79,7 +79,15 @@ memory-bank/activeContext.md
+ # AI tool configs (not project code)
+ .superpowers/
+ .agent/
+-.agents/
++.agents/*
++!.agents/workflows/
++.agents/workflows/*
++!.agents/workflows/implementation-triad.md
++!.agents/skills/
++.agents/skills/*
++!.agents/skills/implementation-triad/
++.agents/skills/implementation-triad/*
++!.agents/skills/implementation-triad/SKILL.md
+ .cline/
+ .codex/
+ .commandcode/
+diff --git a/AGENTS.md b/AGENTS.md
+index 3ea749eb..c3dd005c 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -1,12 +1,55 @@
+ # Roomshare — Codex Project Rules
+ 
+-All project-specific operating rules, guidelines, and conventions live in:
+-
+-**[`.Codex/AGENTS.md`](.Codex/AGENTS.md)**
+-
+-That file contains: mission priorities, non-negotiables, agent operating rules,
+-architecture boundaries, reliability/security rules, testing rules, code style,
+-DB/migration safety, and the PR/delivery checklist.
++This `AGENTS.md` file is the canonical source of truth for project-specific
++operating rules, guidelines, and conventions.
++
++Reusable task playbooks may live under [`.agents/workflows`](.agents/workflows).
++Those workflow files extend this document, but they do not replace it.
++
++These repo instructions guide Codex behavior inside this workspace. They do not
++override higher-priority platform, system, developer, or tool constraints.
++
++## Implementation Triad Workflow
++
++For this repo, `implementation` means any task that mutates repo-tracked files
++or otherwise applies repo-tracked changes.
++
++Implementation work uses a phase-gated workflow coordinated by
++`Workflow Orchestrator` and these exact role names:
++
++- `Workflow Orchestrator`
++- `Planning agent`
++- `Generating agent`
++- `Critic`
++
++### Required Workflow
++
++- `Workflow Orchestrator` controls the sequence and approves plans for
++  normal-risk tasks.
++- Require user approval before leaving `Plan` for high-risk changes: schema or
++  migration changes, new production dependencies, external API contract changes,
++  auth/security-sensitive behavior changes, or destructive operations.
++- `Planning agent` runs first. It must scan the local repo first and browse
++  primary sources only when external APIs, libraries, standards, security, or
++  best-practice choices materially affect the plan.
++- `Planning agent` must produce an approved planning artifact before any edits
++  begin.
++- `Generating agent` is the only role allowed to edit repo-tracked files.
++- `Critic` is review-only and may review only after a concrete slice artifact
++  exists.
++- Do not advance to the next slice until the current slice has explicit
++  `Critic` approval.
++- Escalate to `Replan` if a slice fails review twice, critique feedback
++  conflicts across rounds, or the requested fix would change plan assumptions.
++- Use real subagents only when the user explicitly asks for delegation or
++  subagents. Otherwise run the same stages sequentially in-thread.
++- Optional helper subagents may be used only for read-only research, tests, log
++  analysis, security review, or other specialist review. Never run parallel
++  writers.
++- Follow the detailed procedure in
++  [`.agents/workflows/implementation-triad.md`](.agents/workflows/implementation-triad.md)
++  and the reusable skill in
++  [`.agents/skills/implementation-triad/SKILL.md`](.agents/skills/implementation-triad/SKILL.md).
+ 
+ ## Code Navigation
+ 
+diff --git a/docs/TROUBLESHOOTING.md b/docs/TROUBLESHOOTING.md
+index 05336647..fbcf92de 100644
+--- a/docs/TROUBLESHOOTING.md
++++ b/docs/TROUBLESHOOTING.md
+@@ -186,18 +186,33 @@ If startup is still unreliable, move the repo to the Linux filesystem (`~/...`)
+ 
+ 4. **Existing data conflicts** -- Check the migration SQL for compatibility with existing rows. Review rollback notes in the PR that added the migration.
+ 
+-### Prisma Client out of sync
+-
+-**Symptoms**: `The table 'X' does not exist in the current database` or missing model fields.
+-
+-**Solution**:
++### Prisma Client out of sync
++
++**Symptoms**: `The table 'X' does not exist in the current database` or missing model fields.
++
++**Solution**:
+ 
+ ```bash
+ npx prisma generate   # Regenerate the client
+-npx prisma migrate dev # Apply any pending migrations
+-```
+-
+-### Connection pool exhaustion
++npx prisma migrate dev # Apply any pending migrations
++```
++
++### Homepage or search crashes with `Database query failed: getListingsPaginated`
++
++**Symptoms**: The homepage or search page throws a `QueryError` or `SchemaMismatchError`, often with a nested message like `column "openSlots" does not exist`.
++
++**Cause**: Your local database is behind the repo's Prisma migrations, so `getListingsPaginated` is querying fields that are present in code but not in the connected schema yet.
++
++**Solution**:
++
++```bash
++pnpm prisma migrate deploy
++pnpm prisma migrate status
++```
++
++After `migrate status` reports no pending migrations, restart `pnpm dev` and reload the page.
++
++### Connection pool exhaustion
+ 
+ **Symptoms**: `Timed out fetching a new connection from the connection pool` in production or under load.
+ 
+diff --git a/jest.setup.js b/jest.setup.js
+index aa709907..aaa9cd9f 100644
+--- a/jest.setup.js
++++ b/jest.setup.js
+@@ -203,6 +203,13 @@ const mockPrismaClient = {
+   blockedUser: { ...mockPrismaModel },
+   verificationRequest: { ...mockPrismaModel },
+   auditLog: { ...mockPrismaModel },
++  physicalUnit: { ...mockPrismaModel },
++  hostUnitClaim: { ...mockPrismaModel },
++  listingInventory: { ...mockPrismaModel },
++  identityMutation: { ...mockPrismaModel },
++  outboxEvent: { ...mockPrismaModel },
++  cacheInvalidation: { ...mockPrismaModel },
++  auditEvent: { ...mockPrismaModel },
+   typingStatus: { ...mockPrismaModel },
+   conversationDeletion: { ...mockPrismaModel },
+   passwordResetToken: { ...mockPrismaModel },
+diff --git a/prisma/schema.prisma b/prisma/schema.prisma
+index e36409fd..4f42e73c 100644
+--- a/prisma/schema.prisma
++++ b/prisma/schema.prisma
+@@ -100,22 +100,23 @@ model PasswordResetToken {
+   @@index([expires])
+ }
+ 
+-model Listing {
+-  id                      String                    @id @default(cuid())
+-  ownerId                 String
+-  title                   String
+-  description             String
+-  price                   Decimal                   @db.Decimal(10, 2)
+-  images                  String[]                  @default([])
+-  amenities               String[]
+-  houseRules              String[]
+-  leaseDuration           String?
+-  roomType                String?
+-  normalizedAddress       String?
+-  householdLanguages      String[]                  @default([]) @map("household_languages")
+-  primaryHomeLanguage     String?                   @map("primary_home_language")
+-  genderPreference        String?
+-  householdGender         String?
++model Listing {
++  id                      String                    @id @default(cuid())
++  ownerId                 String
++  title                   String
++  description             String
++  price                   Decimal                   @db.Decimal(10, 2)
++  images                  String[]                  @default([])
++  amenities               String[]
++  houseRules              String[]
++  leaseDuration           String?
++  roomType                String?
++  normalizedAddress       String?
++  physicalUnitId          String?                   @map("physical_unit_id")
++  householdLanguages      String[]                  @default([]) @map("household_languages")
++  primaryHomeLanguage     String?                   @map("primary_home_language")
++  genderPreference        String?
++  householdGender         String?
+   totalSlots              Int
+   availableSlots          Int
+   openSlots               Int?
+@@ -548,18 +549,159 @@ model TypingStatus {
+ // Idempotency Keys for preventing duplicate submissions (e.g., booking, payment)
+ // Keys are stored with cached results and expire after 24 hours
+ // P0-04: Uses INSERT ON CONFLICT + FOR UPDATE for atomic claim with no race window
+-model IdempotencyKey {
+-  id          String   @id @default(cuid())
+-  key         String // Client-provided key (unique per user+endpoint)
+-  userId      String // User who made the request
+-  endpoint    String // Which endpoint (e.g., "createBooking")
++model IdempotencyKey {
++  id          String   @id @default(cuid())
++  key         String // Client-provided key (unique per user+endpoint)
++  userId      String // User who made the request
++  endpoint    String // Which endpoint (e.g., "createBooking")
+   status      String   @default("processing") // 'processing' | 'completed'
+   requestHash String // SHA-256 hash of request body for replay detection
+   resultData  Json? // Cached result of the operation
+   createdAt   DateTime @default(now())
+   expiresAt   DateTime // Auto-expire after 24 hours
+ 
+-  @@unique([userId, endpoint, key], map: "IdempotencyKey_user_endpoint_key_idx")
+-  @@index([expiresAt])
+-  @@index([userId, endpoint])
+-}
++  @@unique([userId, endpoint, key], map: "IdempotencyKey_user_endpoint_key_idx")
++  @@index([expiresAt])
++  @@index([userId, endpoint])
++}
++
++model PhysicalUnit {
++  id                   String   @id @default(cuid())
++  unitIdentityEpoch    Int      @default(1) @map("unit_identity_epoch")
++  canonicalAddressHash String   @map("canonical_address_hash")
++  canonicalUnit        String   @default("_none_") @map("canonical_unit")
++  canonicalizerVersion String   @map("canonicalizer_version")
++  privacyVersion       Int      @default(1) @map("privacy_version")
++  geocodeStatus        String   @default("PENDING") @map("geocode_status")
++  lifecycleStatus      String   @default("ACTIVE") @map("lifecycle_status")
++  publishStatus        String   @default("DRAFT") @map("publish_status")
++  supersedesUnitIds    String[] @default([]) @map("supersedes_unit_ids")
++  supersededByUnitId   String?  @map("superseded_by_unit_id")
++  sourceVersion        BigInt   @default(1) @map("source_version")
++  rowVersion           BigInt   @default(1) @map("row_version")
++  createdAt            DateTime @default(now()) @map("created_at")
++  updatedAt            DateTime @updatedAt @map("updated_at")
++
++  @@unique([canonicalAddressHash, canonicalUnit], map: "physical_units_canonical_unique_idx")
++  @@index([lifecycleStatus])
++  @@index([publishStatus])
++  @@map("physical_units")
++}
++
++model HostUnitClaim {
++  id                       String   @id @default(cuid())
++  unitId                   String   @map("unit_id")
++  hostUserId               String   @map("host_user_id")
++  claimStatus              String   @default("UNVERIFIED") @map("claim_status")
++  unitIdentityEpochWrittenAt Int    @map("unit_identity_epoch_written_at")
++  sourceVersion            BigInt   @default(1) @map("source_version")
++  rowVersion               BigInt   @default(1) @map("row_version")
++  lifecycleStatus          String   @default("ACTIVE") @map("lifecycle_status")
++  publishStatus            String   @default("DRAFT") @map("publish_status")
++  privacyVersion           Int      @default(1) @map("privacy_version")
++  canonicalAddressHash     String   @map("canonical_address_hash")
++  canonicalizerVersion     String   @map("canonicalizer_version")
++  createdAt                DateTime @default(now()) @map("created_at")
++  updatedAt                DateTime @updatedAt @map("updated_at")
++
++  @@unique([unitId, hostUserId])
++  @@map("host_unit_claims")
++}
++
++model ListingInventory {
++  id                        String                  @id @default(cuid())
++  unitId                    String                  @map("unit_id")
++  unitIdentityEpochWrittenAt Int                    @map("unit_identity_epoch_written_at")
++  inventoryKey              String                  @map("inventory_key")
++  roomCategory              String                  @map("room_category")
++  spaceLabel                String?                 @map("space_label")
++  capacityGuests            Int?                    @map("capacity_guests")
++  totalBeds                 Int?                    @map("total_beds")
++  openBeds                  Int?                    @map("open_beds")
++  availableFrom             DateTime                @db.Date @map("available_from")
++  availableUntil            DateTime?               @db.Date @map("available_until")
++  availabilityRange         Unsupported("tstzrange") @map("availability_range")
++  price                     Decimal                 @db.Decimal(10, 2)
++  leaseMinMonths            Int?                    @map("lease_min_months")
++  leaseMaxMonths            Int?                    @map("lease_max_months")
++  leaseNegotiable           Boolean                 @default(false) @map("lease_negotiable")
++  genderPreference          String?                 @map("gender_preference")
++  householdGender           String?                 @map("household_gender")
++  lifecycleStatus           String                  @default("ACTIVE") @map("lifecycle_status")
++  publishStatus             String                  @default("DRAFT") @map("publish_status")
++  sourceVersion             BigInt                  @default(1) @map("source_version")
++  rowVersion                BigInt                  @default(1) @map("row_version")
++  lastPublishedVersion      BigInt?                 @map("last_published_version")
++  lastEmbeddedVersion       String?                 @map("last_embedded_version")
++  canonicalizerVersion      String                  @map("canonicalizer_version")
++  canonicalAddressHash      String                  @map("canonical_address_hash")
++  privacyVersion            Int                     @default(1) @map("privacy_version")
++  supersedesUnitIds         String[]                @default([]) @map("supersedes_unit_ids")
++  supersededByUnitId        String?                 @map("superseded_by_unit_id")
++  createdAt                 DateTime                @default(now()) @map("created_at")
++  updatedAt                 DateTime                @updatedAt @map("updated_at")
++
++  @@unique([unitId, inventoryKey])
++  @@map("listing_inventories")
++}
++
++model IdentityMutation {
++  id             String   @id @default(cuid())
++  kind           String
++  fromUnitIds    String[] @map("from_unit_ids")
++  toUnitIds      String[] @map("to_unit_ids")
++  reasonCode     String   @map("reason_code")
++  operatorId     String?  @map("operator_id")
++  resultingEpoch Int      @map("resulting_epoch")
++  createdAt      DateTime @default(now()) @map("created_at")
++
++  @@map("identity_mutations")
++}
++
++model OutboxEvent {
++  id                String   @id @default(cuid())
++  aggregateType     String   @map("aggregate_type")
++  aggregateId       String   @map("aggregate_id")
++  kind              String
++  payload           Json
++  sourceVersion     BigInt   @map("source_version")
++  unitIdentityEpoch Int      @map("unit_identity_epoch")
++  priority          Int      @default(100)
++  status            String   @default("PENDING")
++  attemptCount      Int      @default(0) @map("attempt_count")
++  nextAttemptAt     DateTime @default(now()) @map("next_attempt_at")
++  lastError         String?  @map("last_error")
++  dlqReason         String?  @map("dlq_reason")
++  createdAt         DateTime @default(now()) @map("created_at")
++  updatedAt         DateTime @updatedAt @map("updated_at")
++
++  @@map("outbox_events")
++}
++
++model CacheInvalidation {
++  id                String   @id @default(cuid())
++  unitId            String   @map("unit_id")
++  projectionEpoch   BigInt   @map("projection_epoch")
++  unitIdentityEpoch Int      @map("unit_identity_epoch")
++  reason            String
++  enqueuedAt        DateTime @default(now()) @map("enqueued_at")
++  consumedAt        DateTime? @map("consumed_at")
++  consumedBy        String?  @map("consumed_by")
++
++  @@map("cache_invalidations")
++}
++
++model AuditEvent {
++  id                String   @id @default(cuid())
++  kind              String
++  actorRole         String   @map("actor_role")
++  actorId           String?  @map("actor_id")
++  aggregateType     String   @map("aggregate_type")
++  aggregateId       String   @map("aggregate_id")
++  details           Json
++  requestId         String?  @map("request_id")
++  unitIdentityEpoch Int?     @map("unit_identity_epoch")
++  createdAt         DateTime @default(now()) @map("created_at")
++
++  @@map("audit_events")
++}
+diff --git a/src/__tests__/app/search/actions.test.ts b/src/__tests__/app/search/actions.test.ts
+index 383a90e1..bc2677d9 100644
+--- a/src/__tests__/app/search/actions.test.ts
++++ b/src/__tests__/app/search/actions.test.ts
+@@ -19,6 +19,12 @@ jest.mock("@/lib/env", () => ({
+   features: { searchV2: true },
+ }));
+ 
++jest.mock("@/lib/search/search-telemetry", () => ({
++  recordSearchLoadMoreError: jest.fn(),
++  recordSearchRequestLatency: jest.fn(),
++  recordSearchV2Fallback: jest.fn(),
++}));
++
+ // Mock search-params helpers
+ jest.mock("@/lib/search-params", () => ({
+   parseSearchParams: jest.fn((raw: { q?: string }) => ({
+@@ -50,6 +56,27 @@ jest.mock("@/lib/search-params", () => ({
+     },
+   })),
+   buildRawParamsFromSearchParams: jest.fn().mockReturnValue({ q: "test" }),
++  normalizeSearchFilters: jest.fn((raw: { q?: string; query?: string }) => ({
++    query: raw.query ?? raw.q,
++    locationLabel: undefined,
++    vibeQuery: undefined,
++    minPrice: undefined,
++    maxPrice: undefined,
++    amenities: undefined,
++    moveInDate: undefined,
++    endDate: undefined,
++    leaseDuration: undefined,
++    houseRules: undefined,
++    languages: undefined,
++    roomType: undefined,
++    genderPreference: undefined,
++    householdGender: undefined,
++    bookingMode: undefined,
++    bounds: undefined,
++    minAvailableSlots: undefined,
++    nearMatches: undefined,
++    sort: "recommended",
++  })),
+ }));
+ 
+ // Mock V2 search service
+@@ -171,4 +198,30 @@ describe("fetchMoreListings", () => {
+     );
+     expect(result.meta).toBeTruthy();
+   });
++
++  it("returns a structured snapshotExpired result when the pinned search cursor is stale", async () => {
++    mockExecuteSearchV2.mockResolvedValue({
++      response: null,
++      paginatedResult: null,
++      snapshotExpired: {
++        queryHash: "query-hash-1",
++        reason: "search_contract_changed",
++      },
++    });
++
++    const result = await fetchMoreListings("cursor-1", { q: "test" });
++
++    expect(result).toEqual(
++      expect.objectContaining({
++        items: [],
++        nextCursor: null,
++        hasNextPage: false,
++        snapshotExpired: {
++          queryHash: "query-hash-1",
++          reason: "search_contract_changed",
++        },
++      })
++    );
++    expect(result.meta).toBeTruthy();
++  });
+ });
+diff --git a/src/__tests__/components/search/SearchResultsClient.test.tsx b/src/__tests__/components/search/SearchResultsClient.test.tsx
+index 4406c400..e7afd277 100644
+--- a/src/__tests__/components/search/SearchResultsClient.test.tsx
++++ b/src/__tests__/components/search/SearchResultsClient.test.tsx
+@@ -16,6 +16,8 @@ import { getFilterSuggestions } from "@/app/actions/filter-suggestions";
+ import { findSplitStays } from "@/lib/search/split-stay";
+ import { buildPublicAvailability } from "@/lib/search/public-availability";
+ 
++const mockRouterRefresh = jest.fn();
++
+ const mockListingCard = jest.fn(
+   ({
+     listing,
+@@ -48,6 +50,13 @@ jest.mock("@/app/actions/filter-suggestions", () => ({
+   getFilterSuggestions: jest.fn(async () => []),
+ }));
+ 
++jest.mock("next/navigation", () => ({
++  useSearchParams: () => new URLSearchParams("q=test"),
++  useRouter: () => ({
++    refresh: mockRouterRefresh,
++  }),
++}));
++
+ // Mock next/link
+ jest.mock("next/link", () => {
+   return function MockLink({
+@@ -201,6 +210,7 @@ const defaultProps = {
+ describe("SearchResultsClient", () => {
+   beforeEach(() => {
+     jest.clearAllMocks();
++    (fetchMoreListings as jest.Mock).mockReset();
+     Object.keys(mockSessionStorage).forEach(
+       (key) => delete mockSessionStorage[key]
+     );
+@@ -209,6 +219,7 @@ describe("SearchResultsClient", () => {
+       json: async () => ({ savedIds: [] }),
+     });
+     (getFilterSuggestions as jest.Mock).mockResolvedValue([]);
++    mockRouterRefresh.mockReset();
+   });
+ 
+   describe("rendering", () => {
+@@ -687,6 +698,43 @@ describe("SearchResultsClient", () => {
+       });
+     });
+ 
++    it("refreshes the search and clears appended listings when load more returns snapshotExpired", async () => {
++      const mockFetch = fetchMoreListings as jest.Mock;
++      mockFetch
++        .mockResolvedValueOnce({
++          items: [createMockListing("3")],
++          nextCursor: "cursor-2",
++          hasNextPage: true,
++        })
++        .mockResolvedValueOnce({
++          items: [],
++          nextCursor: null,
++          hasNextPage: false,
++          snapshotExpired: {
++            queryHash: "query-hash-1",
++            reason: "search_contract_changed",
++          },
++        });
++
++      render(<SearchResultsClient {...defaultProps} />);
++
++      fireEvent.click(screen.getByRole("button", { name: /show more/i }));
++
++      await waitFor(() => {
++        expect(screen.getByTestId("listing-3")).toBeInTheDocument();
++      });
++
++      fireEvent.click(screen.getByRole("button", { name: /show more/i }));
++
++      await waitFor(() => {
++        expect(mockRouterRefresh).toHaveBeenCalledTimes(1);
++        expect(
++          screen.getByText(/Results refreshed to keep ordering accurate/i)
++        ).toBeInTheDocument();
++        expect(screen.queryByTestId("listing-3")).not.toBeInTheDocument();
++      });
++    });
++
+     it("retries loading when Try again is clicked", async () => {
+       const mockFetch = fetchMoreListings as jest.Mock;
+       mockFetch.mockRejectedValueOnce(new Error("Network error"));
+diff --git a/src/__tests__/lib/search/cursor.test.ts b/src/__tests__/lib/search/cursor.test.ts
+index 029331fa..d1c29e6f 100644
+--- a/src/__tests__/lib/search/cursor.test.ts
++++ b/src/__tests__/lib/search/cursor.test.ts
+@@ -13,6 +13,7 @@ import {
+   SORT_OPTIONS,
+   type KeysetCursor,
+   type CursorRowData,
++  type SearchPaginationSnapshot,
+ } from "@/lib/search/cursor";
+ 
+ describe("search/cursor", () => {
+@@ -28,6 +29,13 @@ describe("search/cursor", () => {
+   });
+ 
+   describe("encodeKeysetCursor / decodeKeysetCursor roundtrip", () => {
++    const snapshot: SearchPaginationSnapshot = {
++      engine: "searchdoc-keyset",
++      responseVersion: "searchdoc-keyset.v1",
++      projectionVersion: 3,
++      embeddingVersion: null,
++    };
++
+     it("should encode and decode recommended cursor", () => {
+       const cursor: KeysetCursor = {
+         v: 1,
+@@ -42,6 +50,21 @@ describe("search/cursor", () => {
+       expect(decoded).toEqual(cursor);
+     });
+ 
++    it("should encode and decode version-pinned cursor", () => {
++      const cursor: KeysetCursor = {
++        v: 2,
++        s: "newest",
++        k: ["2024-01-15T10:00:00.000Z"],
++        id: "clxversioned",
++        snapshot,
++      };
++
++      const encoded = encodeKeysetCursor(cursor);
++      const decoded = decodeKeysetCursor(encoded);
++
++      expect(decoded).toEqual(cursor);
++    });
++
+     it("should encode and decode newest cursor", () => {
+       const cursor: KeysetCursor = {
+         v: 1,
+@@ -143,7 +166,7 @@ describe("search/cursor", () => {
+     it("should return null for wrong version", () => {
+       const wrongVersion = Buffer.from(
+         JSON.stringify({
+-          v: 2, // Wrong version
++          v: 3, // Wrong version
+           s: "newest",
+           k: ["2024-01-15T10:00:00.000Z"],
+           id: "clxtest",
+@@ -323,6 +346,12 @@ describe("search/cursor", () => {
+       avg_rating: "4.50",
+       review_count: "10",
+     };
++    const snapshot: SearchPaginationSnapshot = {
++      engine: "searchdoc-keyset",
++      responseVersion: "searchdoc-keyset.v1",
++      projectionVersion: 3,
++      embeddingVersion: null,
++    };
+ 
+     it("should build recommended cursor with correct keys", () => {
+       const cursor = buildCursorFromRow(baseRow, "recommended");
+@@ -398,6 +427,18 @@ describe("search/cursor", () => {
+         expect(decoded).toEqual(cursor);
+       }
+     });
++
++    it("should build a version-pinned cursor when a snapshot is provided", () => {
++      const cursor = buildCursorFromRow(baseRow, "recommended", snapshot);
++
++      expect(cursor).toEqual({
++        v: 2,
++        s: "recommended",
++        k: ["85.50", "2024-01-15T10:00:00.000Z"],
++        id: "clxtestlisting",
++        snapshot,
++      });
++    });
+   });
+ 
+   describe("decodeLegacyCursor", () => {
+diff --git a/src/__tests__/lib/search/search-v2-service.test.ts b/src/__tests__/lib/search/search-v2-service.test.ts
+index 6d7b0dc4..4a085d46 100644
+--- a/src/__tests__/lib/search/search-v2-service.test.ts
++++ b/src/__tests__/lib/search/search-v2-service.test.ts
+@@ -1800,8 +1800,54 @@ describe("search-v2-service", () => {
+       );
+       expect(mockGetSearchDocListingsWithKeyset).toHaveBeenCalledWith(
+         expect.any(Object),
+-        keysetCursor
++        keysetCursor,
++        expect.objectContaining({
++          engine: "searchdoc-keyset",
++          embeddingVersion: null,
++        })
+       );
+     });
++
++    it("returns snapshotExpired when a version-pinned keyset cursor no longer matches the server snapshot", async () => {
++      (features as Record<string, unknown>).searchKeyset = true;
++      setupDefaultMocks({ useSearchDoc: true });
++      mockIsSearchDocEnabled.mockReturnValue(true);
++
++      mockDecodeCursorAny.mockReturnValue({
++        type: "keyset" as const,
++        cursor: {
++          v: 2 as const,
++          s: "recommended" as const,
++          k: ["85.50", "2024-01-15T10:00:00.000Z"],
++          id: "abc",
++          snapshot: {
++            engine: "searchdoc-keyset" as const,
++            responseVersion: "stale-contract",
++            projectionVersion: 0,
++            embeddingVersion: null,
++          },
++        },
++      });
++
++      const result = await executeSearchV2({
++        rawParams: {
++          minLat: "37.7",
++          maxLat: "37.85",
++          minLng: "-122.52",
++          maxLng: "-122.35",
++          cursor: "keyset-cursor-token",
++        },
++      });
++
++      expect(result).toEqual({
++        response: null,
++        paginatedResult: null,
++        snapshotExpired: {
++          queryHash: "abcdef1234567890",
++          reason: "search_contract_changed",
++        },
++      });
++      expect(mockGetSearchDocListingsWithKeyset).not.toHaveBeenCalled();
++    });
+   });
+ });
+diff --git a/src/app/api/test-helpers/route.ts b/src/app/api/test-helpers/route.ts
+index 103e1f6f..d4076abb 100644
+--- a/src/app/api/test-helpers/route.ts
++++ b/src/app/api/test-helpers/route.ts
+@@ -9,6 +9,7 @@
+ import crypto from "crypto";
+ import { NextRequest, NextResponse } from "next/server";
+ import { prisma } from "@/lib/prisma";
++import { normalizeAddress } from "@/lib/search/normalize-address";
+ 
+ function isEnabled(): boolean {
+   // Block in actual Vercel production deployments, not CI production builds.
+@@ -408,6 +409,154 @@ export async function POST(request: NextRequest) {
+         });
+       }
+ 
++      case "seedCollisionListings": {
++        const owner = await prisma.user.findUnique({
++          where: { email: params.ownerEmail },
++          select: { id: true },
++        });
++        if (!owner) {
++          return NextResponse.json(
++            { error: "Owner not found" },
++            { status: 404 }
++          );
++        }
++
++        const count = Math.max(1, Number(params.count) || 1);
++        const address = String(params.address || "");
++        const city = String(params.city || "");
++        const state = String(params.state || "");
++        const zip = String(params.zip || "");
++        const title = String(params.title || "E2E Collision Seed");
++        const description = String(
++          params.description || "Seed listing for collision-flow e2e coverage."
++        );
++        const price = Number(params.price) || 1200;
++        const totalSlots = Math.max(1, Number(params.totalSlots) || 2);
++        const availableSlots = Math.max(
++          0,
++          Math.min(totalSlots, Number(params.availableSlots) || 1)
++        );
++        const roomType = String(params.roomType || "Private Room");
++        const createdAtOffsetsHours = Array.isArray(params.createdAtOffsetsHours)
++          ? params.createdAtOffsetsHours
++          : [];
++        const moveInDateOffsetsDays = Array.isArray(params.moveInDateOffsetsDays)
++          ? params.moveInDateOffsetsDays
++          : [];
++        const normalizedAddress = normalizeAddress({
++          address,
++          city,
++          state,
++          zip,
++        });
++
++        const listingIds: string[] = [];
++
++        for (let index = 0; index < count; index += 1) {
++          const createdAtOffsetHours = Number(createdAtOffsetsHours[index] ?? index);
++          const moveInOffsetDays = Number(moveInDateOffsetsDays[index] ?? -1);
++
++          const createdAt = new Date(Date.now() - createdAtOffsetHours * 60 * 60 * 1000);
++          const moveInDate = new Date();
++          moveInDate.setUTCHours(12, 0, 0, 0);
++          moveInDate.setUTCDate(moveInDate.getUTCDate() + moveInOffsetDays);
++
++          const listing = await prisma.listing.create({
++            data: {
++              id: `e2e-collision-${crypto.randomUUID()}`,
++              ownerId: owner.id,
++              title,
++              description,
++              price,
++              roomType,
++              amenities: ["Wifi", "Kitchen"],
++              houseRules: ["No Smoking"],
++              householdLanguages: ["en"],
++              totalSlots,
++              availableSlots,
++              moveInDate,
++              createdAt,
++              images: [
++                "https://qolpgfdmkqvxraafucvu.supabase.co/storage/v1/object/public/images/listings/e2e-collision-seed.jpg",
++              ],
++              location: {
++                create: {
++                  address,
++                  city,
++                  state,
++                  zip,
++                },
++              },
++            },
++            select: { id: true },
++          });
++
++          await prisma.$executeRaw`
++            UPDATE "Listing"
++            SET "normalizedAddress" = ${normalizedAddress}
++            WHERE id = ${listing.id}
++          `;
++
++          listingIds.push(listing.id);
++        }
++
++        return NextResponse.json({ listingIds });
++      }
++
++      case "deleteListings": {
++        const listingIds = Array.isArray(params.listingIds)
++          ? params.listingIds.filter(
++              (value: unknown): value is string => typeof value === "string"
++            )
++          : [];
++
++        if (listingIds.length === 0) {
++          return NextResponse.json(
++            { error: "listingIds is required" },
++            { status: 400 }
++          );
++        }
++
++        const result = await prisma.listing.deleteMany({
++          where: {
++            id: { in: listingIds },
++          },
++        });
++
++        return NextResponse.json({ deleted: result.count });
++      }
++
++      case "getListingCollisionState": {
++        const [listing] = await prisma.$queryRaw<
++          Array<{
++            id: string;
++            normalizedAddress: string | null;
++            needsMigrationReview: boolean | null;
++          }>
++        >`
++          SELECT
++            id,
++            "normalizedAddress",
++            "needsMigrationReview"
++          FROM "Listing"
++          WHERE id = ${params.listingId}
++          LIMIT 1
++        `;
++
++        if (!listing) {
++          return NextResponse.json(
++            { error: "Listing not found" },
++            { status: 404 }
++          );
++        }
++
++        return NextResponse.json({
++          id: listing.id,
++          normalizedAddress: listing.normalizedAddress,
++          needsMigrationReview: listing.needsMigrationReview === true,
++        });
++      }
++
+       default:
+         return NextResponse.json(
+           { error: `Unknown action: ${action}` },
+diff --git a/src/app/search/actions.ts b/src/app/search/actions.ts
+index e9a1af77..496da1bd 100644
+--- a/src/app/search/actions.ts
++++ b/src/app/search/actions.ts
+@@ -35,6 +35,10 @@ export interface FetchMoreResult {
+   nextCursor: string | null;
+   hasNextPage: boolean;
+   meta?: SearchResponseMeta;
++  snapshotExpired?: {
++    queryHash: string;
++    reason: "search_contract_changed";
++  };
+   /** True when V2 is unavailable and V1 can't continue cursor pagination */
+   degraded?: boolean;
+   /** True when request was rate limited — client should show friendly message */
+@@ -167,6 +171,9 @@ export async function fetchMoreListings(
+             DEFAULT_TIMEOUTS.DATABASE,
+             "fetchMoreListings-executeSearchV2"
+           );
++          if (result.snapshotExpired) {
++            return result;
++          }
+           // Throw on V2 failures so circuit breaker counts them
+           if (!result.response || !result.paginatedResult) {
+             throw new Error(result.error || "V2 search returned no response");
+@@ -174,6 +181,34 @@ export async function fetchMoreListings(
+           return result;
+         });
+ 
++        if (v2Result.snapshotExpired) {
++          const meta = createSearchResponseMeta(normalizedQuery, "v2");
++          const finalMeta =
++            queryHash && queryHash.trim().length > 0
++              ? { ...meta, queryHash }
++              : meta;
++          recordSearchLoadMoreError({
++            route: "search-load-more",
++            queryHash: finalMeta.queryHash,
++            reason: "snapshot-expired",
++          });
++          recordSearchRequestLatency({
++            route: "search-load-more",
++            durationMs: performance.now() - requestStartTime,
++            backendSource: finalMeta.backendSource,
++            stateKind: "degraded",
++            queryHash: finalMeta.queryHash,
++            resultCount: 0,
++          });
++          return {
++            items: [],
++            nextCursor: null,
++            hasNextPage: false,
++            snapshotExpired: v2Result.snapshotExpired,
++            meta: finalMeta,
++          };
++        }
++
+         if (v2Result.paginatedResult) {
+           const meta = createSearchResponseMeta(normalizedQuery, "v2");
+           const finalMeta =
+diff --git a/src/components/search/SearchResultsClient.tsx b/src/components/search/SearchResultsClient.tsx
+index e7ce1ab3..7c04f21c 100644
+--- a/src/components/search/SearchResultsClient.tsx
++++ b/src/components/search/SearchResultsClient.tsx
+@@ -8,7 +8,7 @@ import {
+   useEffect,
+   Fragment,
+ } from "react";
+-import { useSearchParams } from "next/navigation";
++import { useRouter, useSearchParams } from "next/navigation";
+ import { safeMark, safeMeasure } from "@/lib/perf";
+ import { Search, Loader2 } from "lucide-react";
+ import Link from "next/link";
+@@ -123,6 +123,7 @@ export function SearchResultsClient({
+   );
+   const resolvedInitialStateKind =
+     initialStateKind ?? (hasConfirmedZeroResults ? "zero-results" : "ok");
++  const router = useRouter();
+   const { setSearchResultsLabel } = useMobileSearch();
+   const testScenario = useSearchTestScenario();
+   const [isHydrated, setIsHydrated] = useState(false);
+@@ -135,6 +136,7 @@ export function SearchResultsClient({
+   // F2 FIX: Ref for total count avoids allListings in handleLoadMore deps
+   const totalCountRef = useRef(initialListings.length);
+   const [loadError, setLoadError] = useState<string | null>(null);
++  const [refreshNotice, setRefreshNotice] = useState<string | null>(null);
+   const [isDegraded, setIsDegraded] = useState(false);
+   const [loadMoreAnnouncement, setLoadMoreAnnouncement] = useState("");
+   const [showTotalPrice, setShowTotalPrice] = useState(false);
+@@ -367,6 +369,7 @@ export function SearchResultsClient({
+       setExtraListings([]);
+       setNextCursor(initialNextCursor);
+       setLoadMoreAnnouncement("");
++      setRefreshNotice(null);
+       seenIdsRef.current = new Set(initialListings.map((l) => l.id));
+       seenGroupKeysRef.current = getSeenGroupKeys(initialListings);
+       fetchedFavIdsRef.current = new Set(); // Reset favorites tracking on new search
+@@ -382,6 +385,10 @@ export function SearchResultsClient({
+     () => [...effectiveListings, ...extraListings],
+     [effectiveListings, extraListings]
+   );
++  const effectiveListingsRef = useRef(effectiveListings);
++  useEffect(() => {
++    effectiveListingsRef.current = effectiveListings;
++  }, [effectiveListings]);
+   // F8 FIX: Stable string key for effects that depend on listing IDs, not array reference
+   const allListingIdsKey = useMemo(
+     () => allListings.map((l) => l.id).join(","),
+@@ -476,6 +483,22 @@ export function SearchResultsClient({
+         testScenario
+       );
+ 
++      if (result.snapshotExpired) {
++        const currentListings = effectiveListingsRef.current;
++        setLoadError(null);
++        setIsDegraded(false);
++        setExtraListings([]);
++        setNextCursor(null);
++        totalCountRef.current = currentListings.length;
++        seenIdsRef.current = new Set(currentListings.map((listing) => listing.id));
++        seenGroupKeysRef.current = getSeenGroupKeys(currentListings);
++        fetchedFavIdsRef.current = new Set();
++        setRefreshNotice("Results refreshed to keep ordering accurate.");
++        setLoadMoreAnnouncement("Results refreshed. Ordering changed.");
++        router.refresh();
++        return;
++      }
++
+       if (
+         result.meta?.queryHash &&
+         (result.meta.queryHash !== requestQueryHash ||
+@@ -512,6 +535,7 @@ export function SearchResultsClient({
+       safeMark("load-more-end");
+       safeMeasure("load-more", "load-more-start", "load-more-end");
+       setIsDegraded(false);
++      setRefreshNotice(null);
+ 
+       // Defensive guard: ensure items is an array (protects against malformed server responses)
+       const items = Array.isArray(result.items) ? result.items : [];
+@@ -582,7 +606,14 @@ export function SearchResultsClient({
+       setIsLoadingMore(false);
+     }
+     // F2 FIX: Removed allListings dep — count read from totalCountRef instead
+-  }, [nextCursor, rawParams, effectiveTotal, effectiveListings.length, testScenario]);
++  }, [
++    nextCursor,
++    rawParams,
++    effectiveTotal,
++    effectiveListings.length,
++    router,
++    testScenario,
++  ]);
+ 
+   const total = effectiveTotal;
+   // When client-fetched data is active, derive zero-results from effective total
+@@ -942,6 +973,14 @@ export function SearchResultsClient({
+           )}
+ 
+           {/* Load error */}
++          {refreshNotice && !loadError && (
++            <div className="flex justify-center mt-4" role="status">
++              <p className="text-sm text-on-surface-variant">
++                {refreshNotice}
++              </p>
++            </div>
++          )}
++
+           {loadError && (
+             <div className="flex justify-center mt-4" role="alert">
+               <p className="text-sm text-red-600">
+diff --git a/src/lib/env.ts b/src/lib/env.ts
+index 08863ac2..f201ffbc 100644
+--- a/src/lib/env.ts
++++ b/src/lib/env.ts
+@@ -571,6 +571,9 @@ export const features = {
+   get listingCreateCollisionWarn() {
+     return process.env.FEATURE_LISTING_CREATE_COLLISION_WARN === "true";
+   },
++  get phase01CanonicalWrites() {
++    return process.env.FEATURE_PHASE01_CANONICAL_WRITES === "true";
++  },
+   // Search debug ranking (only allowed in non-production, or with explicit env override)
+   // This gates ?debugRank=1 and ?ranker=1 URL overrides to prevent leaking debug signals
+   get searchDebugRanking() {
+diff --git a/src/lib/idempotency.ts b/src/lib/idempotency.ts
+index c390f4e4..c0b2d9a1 100644
+--- a/src/lib/idempotency.ts
++++ b/src/lib/idempotency.ts
+@@ -294,3 +294,9 @@ export function idempotencyResponse<T>(result: IdempotencyResult<T>): {
+     headers: result.cached ? { "X-Idempotency-Replayed": "true" } : undefined,
+   };
+ }
++
++export const IDEMPOTENCY_ENDPOINT_RESOLVE_UNIT =
++  "identity:resolveOrCreateUnit" as const;
++export const IDEMPOTENCY_ENDPOINT_MUTATE_UNIT =
++  "identity:mutateUnit" as const;
++export const IDEMPOTENCY_ENDPOINT_CONTACT = "identity:contact" as const;
+diff --git a/src/lib/search/cursor.ts b/src/lib/search/cursor.ts
+index 84fb572d..f1859512 100644
+--- a/src/lib/search/cursor.ts
++++ b/src/lib/search/cursor.ts
+@@ -67,6 +67,13 @@ export const SORT_OPTIONS: readonly SortOption[] = [
+   "rating",
+ ] as const;
+ 
++export interface SearchPaginationSnapshot {
++  engine: "searchdoc-keyset";
++  responseVersion: string;
++  projectionVersion: number;
++  embeddingVersion: string | null;
++}
++
+ /**
+  * Keyset cursor structure for pagination.
+  *
+@@ -75,13 +82,23 @@ export const SORT_OPTIONS: readonly SortOption[] = [
+  * - k: Key values in ORDER BY column sequence (as strings for float precision)
+  * - id: Tie-breaker listing ID (CUID)
+  */
+-export interface KeysetCursor {
++export interface KeysetCursorV1 {
+   v: 1;
+   s: SortOption;
+   k: (string | null)[];
+   id: string;
+ }
+ 
++export interface KeysetCursorV2 {
++  v: 2;
++  s: SortOption;
++  k: (string | null)[];
++  id: string;
++  snapshot: SearchPaginationSnapshot;
++}
++
++export type KeysetCursor = KeysetCursorV1 | KeysetCursorV2;
++
+ // ============================================================================
+ // Zod Schema
+ // ============================================================================
+@@ -90,15 +107,43 @@ export interface KeysetCursor {
+  * Zod schema for validating decoded cursor payloads.
+  * Strict validation ensures malformed cursors are rejected.
+  */
+-const KeysetCursorSchema = z
++const SortOptionSchema = z.enum([
++  "recommended",
++  "newest",
++  "price_asc",
++  "price_desc",
++  "rating",
++]);
++
++const SearchPaginationSnapshotSchema = z
+   .object({
+-    v: z.literal(1),
+-    s: z.enum(["recommended", "newest", "price_asc", "price_desc", "rating"]),
+-    k: z.array(z.union([z.string(), z.null()])),
+-    id: z.string().min(1),
++    engine: z.literal("searchdoc-keyset"),
++    responseVersion: z.string().min(1),
++    projectionVersion: z.number().int().nonnegative(),
++    embeddingVersion: z.string().nullable(),
+   })
+   .strict();
+ 
++const KeysetCursorSchema = z.union([
++  z
++    .object({
++      v: z.literal(1),
++      s: SortOptionSchema,
++      k: z.array(z.union([z.string(), z.null()])),
++      id: z.string().min(1),
++    })
++    .strict(),
++  z
++    .object({
++      v: z.literal(2),
++      s: SortOptionSchema,
++      k: z.array(z.union([z.string(), z.null()])),
++      id: z.string().min(1),
++      snapshot: SearchPaginationSnapshotSchema,
++    })
++    .strict(),
++]);
++
+ /**
+  * Expected key counts per sort option.
+  * Used for validation to ensure cursor matches sort requirements.
+@@ -254,7 +299,8 @@ export interface CursorRowData {
+  */
+ export function buildCursorFromRow(
+   row: CursorRowData,
+-  sort: SortOption
++  sort: SortOption,
++  snapshot?: SearchPaginationSnapshot
+ ): KeysetCursor {
+   let keys: (string | null)[];
+ 
+@@ -289,6 +335,16 @@ export function buildCursorFromRow(
+       keys = [row.recommended_score ?? null, row.listing_created_at];
+   }
+ 
++  if (snapshot) {
++    return {
++      v: 2,
++      s: sort,
++      k: keys,
++      id: row.id,
++      snapshot,
++    };
++  }
++
+   return {
+     v: 1,
+     s: sort,
+diff --git a/src/lib/search/search-doc-queries.ts b/src/lib/search/search-doc-queries.ts
+index 30f446a9..77e37d8c 100644
+--- a/src/lib/search/search-doc-queries.ts
++++ b/src/lib/search/search-doc-queries.ts
+@@ -46,7 +46,12 @@ import {
+ } from "@/lib/constants";
+ import { features } from "@/lib/env";
+ import { parseLocalDate } from "@/lib/utils";
+-import type { KeysetCursor, SortOption, CursorRowData } from "./cursor";
++import type {
++  KeysetCursor,
++  SortOption,
++  CursorRowData,
++  SearchPaginationSnapshot,
++} from "./cursor";
+ import { buildCursorFromRow, encodeKeysetCursor } from "./cursor";
+ import {
+   buildPublicAvailability,
+@@ -1665,10 +1670,11 @@ export interface KeysetPaginatedResult<T> extends PaginatedResultHybrid<T> {
+  * @param cursor - Optional decoded keyset cursor from previous page
+  * @returns Paginated results with nextCursor for next page
+  */
+-export async function getSearchDocListingsWithKeyset(
+-  params: FilterParams = {},
+-  cursor: KeysetCursor | null = null
+-): Promise<KeysetPaginatedResult<ListingData>> {
++export async function getSearchDocListingsWithKeyset(
++  params: FilterParams = {},
++  cursor: KeysetCursor | null = null,
++  snapshot?: SearchPaginationSnapshot
++): Promise<KeysetPaginatedResult<ListingData>> {
+   // Defense in depth: block unbounded text searches
+   if (params.query && !params.bounds) {
+     throw new Error(
+@@ -1813,9 +1819,13 @@ export async function getSearchDocListingsWithKeyset(
+         avg_rating: lastRawItem._cursorAvgRating,
+         review_count: lastRawItem._cursorReviewCount,
+       };
+-      const keysetCursor = buildCursorFromRow(cursorRowData, sortOption);
+-      nextCursor = encodeKeysetCursor(keysetCursor);
+-    }
++      const keysetCursor = buildCursorFromRow(
++        cursorRowData,
++        sortOption,
++        snapshot
++      );
++      nextCursor = encodeKeysetCursor(keysetCursor);
++    }
+ 
+     // Near-match expansion for keyset pagination (only on first page, i.e., no cursor)
+     // Since we have a cursor, we're not on the first page, so skip near-match logic
+@@ -1874,9 +1884,10 @@ export async function getSearchDocListingsWithKeyset(
+  * @param params - Filter parameters
+  * @returns Paginated results with nextCursor for next page
+  */
+-export async function getSearchDocListingsFirstPage(
+-  params: FilterParams = {}
+-): Promise<KeysetPaginatedResult<ListingData>> {
++export async function getSearchDocListingsFirstPage(
++  params: FilterParams = {},
++  snapshot?: SearchPaginationSnapshot
++): Promise<KeysetPaginatedResult<ListingData>> {
+   // Defense in depth: block unbounded text searches
+   if (params.query && !params.bounds) {
+     throw new Error(
+@@ -2033,9 +2044,13 @@ export async function getSearchDocListingsFirstPage(
+         avg_rating: lastRawItem._cursorAvgRating,
+         review_count: lastRawItem._cursorReviewCount,
+       };
+-      const keysetCursor = buildCursorFromRow(cursorRowData, sortOption);
+-      nextCursor = encodeKeysetCursor(keysetCursor);
+-    }
++      const keysetCursor = buildCursorFromRow(
++        cursorRowData,
++        sortOption,
++        snapshot
++      );
++      nextCursor = encodeKeysetCursor(keysetCursor);
++    }
+ 
+     return {
+       items,
+diff --git a/src/lib/search/search-v2-service.ts b/src/lib/search/search-v2-service.ts
+index 4ac3bf8d..2abd1c0e 100644
+--- a/src/lib/search/search-v2-service.ts
++++ b/src/lib/search/search-v2-service.ts
+@@ -30,6 +30,7 @@ import {
+   type KeysetCursor,
+   type SortOption,
+ } from "@/lib/search/hash";
++import { SEARCH_DOC_PROJECTION_VERSION } from "@/lib/search/search-doc-sync";
+ import {
+   transformToListItems,
+   transformToMapResponse,
+@@ -47,6 +48,7 @@ import {
+   type RankableListing,
+ } from "@/lib/search/ranking";
+ import type { SearchV2Response } from "@/lib/search/types";
++import { SEARCH_RESPONSE_VERSION } from "@/lib/search/search-response";
+ import type {
+   PaginatedResultHybrid,
+   ListingData,
+@@ -69,6 +71,7 @@ import {
+ import type { FilterParams } from "@/lib/search-types";
+ 
+ const VIBE_SOFT_FALLBACK_WARNING = "VIBE_SOFT_FALLBACK";
++const SEARCH_PAGINATION_SNAPSHOT_VERSION = `${SEARCH_RESPONSE_VERSION}.searchdoc-keyset`;
+ 
+ function normalizeForVibeMatch(value: string | undefined | null): string {
+   return sanitizeSearchQuery(value ?? "").toLowerCase();
+@@ -354,6 +357,11 @@ export interface SearchV2Result {
+   paginatedResult: PaginatedResultHybrid<ListingData> | null;
+   /** Error message if failed */
+   error?: string;
++  /** The cursor's pinned search snapshot no longer matches current server state. */
++  snapshotExpired?: {
++    queryHash: string;
++    reason: "search_contract_changed";
++  };
+   /**
+    * True when the search was blocked because it had a text query but no
+    * geographic bounds. UI should prompt user to select a location.
+@@ -395,12 +403,36 @@ export async function executeSearchV2(
+     );
+     const useKeyset = features.searchKeyset && useSearchDoc;
+ 
++    const queryHash = generateQueryHash({
++      query: parsed.filterParams.query,
++      vibeQuery: parsed.filterParams.vibeQuery,
++      minPrice: parsed.filterParams.minPrice,
++      maxPrice: parsed.filterParams.maxPrice,
++      amenities: parsed.filterParams.amenities,
++      houseRules: parsed.filterParams.houseRules,
++      languages: parsed.filterParams.languages,
++      roomType: parsed.filterParams.roomType,
++      leaseDuration: parsed.filterParams.leaseDuration,
++      moveInDate: parsed.filterParams.moveInDate,
++      endDate: parsed.filterParams.endDate,
++      bounds: parsed.filterParams.bounds,
++      nearMatches: parsed.filterParams.nearMatches,
++    });
++
+     // Get sort option from parsed params (default to recommended)
+     const sortOption: SortOption =
+       (parsed.filterParams.sort as SortOption) || "recommended";
+     const vibeQuery = parsed.filterParams.vibeQuery?.trim();
+     const shouldUseRecommendedVibeRanking =
+       Boolean(vibeQuery) && sortOption === "recommended";
++    const keysetSnapshot = useKeyset
++      ? {
++          engine: "searchdoc-keyset" as const,
++          responseVersion: SEARCH_PAGINATION_SNAPSHOT_VERSION,
++          projectionVersion: SEARCH_DOC_PROJECTION_VERSION,
++          embeddingVersion: null,
++        }
++      : undefined;
+ 
+     // Handle cursor-based pagination
+     const cursorStr = getFirstValue(params.rawParams.cursor);
+@@ -411,6 +443,26 @@ export async function executeSearchV2(
+       // Try to decode as keyset or legacy cursor
+       const decoded = decodeCursorAny(cursorStr, sortOption);
+       if (decoded?.type === "keyset") {
++        if (
++          keysetSnapshot &&
++          decoded.cursor.v === 2 &&
++          (decoded.cursor.snapshot.engine !== keysetSnapshot.engine ||
++            decoded.cursor.snapshot.responseVersion !==
++              keysetSnapshot.responseVersion ||
++            decoded.cursor.snapshot.projectionVersion !==
++              keysetSnapshot.projectionVersion ||
++            decoded.cursor.snapshot.embeddingVersion !==
++              keysetSnapshot.embeddingVersion)
++        ) {
++          return {
++            response: null,
++            paginatedResult: null,
++            snapshotExpired: {
++              queryHash,
++              reason: "search_contract_changed",
++            },
++          };
++        }
+         keysetCursor = decoded.cursor;
+       } else if (decoded?.type === "legacy") {
+         // Legacy cursor - use page number, but return keyset cursor going forward
+@@ -493,7 +545,8 @@ export async function executeSearchV2(
+           // Use keyset cursor for stable pagination
+           const keysetResult = await getSearchDocListingsWithKeyset(
+             filterParams,
+-            keysetCursor
++            keysetCursor,
++            keysetSnapshot
+           );
+           return finalizeListResult(keysetResult, keysetResult.nextCursor);
+         } else if (page > 1) {
+@@ -508,7 +561,10 @@ export async function executeSearchV2(
+         } else {
+           // First page - get first page with keyset cursor
+           const firstPageResult =
+-            await getSearchDocListingsFirstPage(filterParams);
++            await getSearchDocListingsFirstPage(
++              filterParams,
++              keysetSnapshot
++            );
+           return finalizeListResult(
+             firstPageResult,
+             firstPageResult.nextCursor
+@@ -643,23 +699,6 @@ export async function executeSearchV2(
+     // Determine mode based on mapListings count (not list total)
+     const mode = determineMode(mapListings.length);
+ 
+-    // Generate query hash for caching (excludes pagination)
+-    const queryHash = generateQueryHash({
+-      query: parsed.filterParams.query,
+-      vibeQuery: parsed.filterParams.vibeQuery,
+-      minPrice: parsed.filterParams.minPrice,
+-      maxPrice: parsed.filterParams.maxPrice,
+-      amenities: parsed.filterParams.amenities,
+-      houseRules: parsed.filterParams.houseRules,
+-      languages: parsed.filterParams.languages,
+-      roomType: parsed.filterParams.roomType,
+-      leaseDuration: parsed.filterParams.leaseDuration,
+-      moveInDate: parsed.filterParams.moveInDate,
+-      endDate: parsed.filterParams.endDate,
+-      bounds: parsed.filterParams.bounds,
+-      nearMatches: parsed.filterParams.nearMatches,
+-    });
+-
+     // Transform list items
+     const listItems = transformToListItems(listResult.items);
+ 
+diff --git a/tests/e2e/page-objects/create-listing.page.ts b/tests/e2e/page-objects/create-listing.page.ts
+index 5abfcb81..4ff46f7f 100644
+--- a/tests/e2e/page-objects/create-listing.page.ts
++++ b/tests/e2e/page-objects/create-listing.page.ts
+@@ -224,6 +224,8 @@ export class CreateListingPage {
+    */
+   async mockImageUpload() {
+     let uploadCount = 0;
++    const supabaseBaseUrl =
++      process.env.NEXT_PUBLIC_SUPABASE_URL || "https://fake.supabase.co";
+     await this.page.route("**/api/upload", async (route) => {
+       uploadCount++;
+       const id = `mock-${Date.now()}-${uploadCount}`;
+@@ -231,7 +233,7 @@ export class CreateListingPage {
+         status: 200,
+         contentType: "application/json",
+         body: JSON.stringify({
+-          url: `https://fake.supabase.co/storage/v1/object/public/images/listings/${id}.jpg`,
++          url: `${supabaseBaseUrl}/storage/v1/object/public/images/listings/${id}.jpg`,
+         }),
+       });
+     });

@@ -353,7 +353,9 @@ test.describe("30 Advanced Search Page Journeys", () => {
         .isVisible({ timeout: 5000 })
         .catch(() => false)
     ) {
-      await clearBtn.first().click();
+      await clearBtn
+        .first()
+        .evaluate((element) => (element as HTMLElement).click());
       // Wait for navigation to clear filters
       await expect
         .poll(
@@ -1015,34 +1017,42 @@ test.describe("30 Advanced Search Page Journeys", () => {
       timeout: 30000,
     });
 
-    // Find a removable pill — wait for pills to render after hydration
-    const pills = page.locator('button[aria-label*="Remove"]');
-    const hasPills = await pills
-      .first()
+    const appliedFilters = page
+      .getByRole("region", { name: "Applied filters" })
+      .filter({ visible: true })
+      .first();
+    const hasAppliedFilters = await appliedFilters
       .isVisible({ timeout: 10000 })
       .catch(() => false);
-    if (hasPills && (await pills.count()) >= 2) {
-      const urlBefore = page.url();
-      // Remove the first pill
-      await pills.first().click();
-      // Wait for URL to change after pill removal via soft navigation
-      await expect
-        .poll(() => page.url(), {
-          timeout: 30000,
-          message: "URL to change after pill removal",
-        })
-        .not.toBe(urlBefore);
-      await page.waitForLoadState("domcontentloaded");
+    test.skip(!hasAppliedFilters, "Applied filters region not visible");
 
-      // Other filters should still be in URL
-      const url = new URL(page.url());
-      // At least one of the other filters should remain
-      const hasRemaining =
-        url.searchParams.has("minPrice") ||
-        url.searchParams.has("maxPrice") ||
-        url.searchParams.has("roomType");
-      expect(hasRemaining).toBeTruthy();
-    }
+    const priceChip = appliedFilters
+      .getByRole("button", { name: /remove filter:.*\$/i })
+      .filter({ visible: true })
+      .first();
+    await expect(priceChip).toBeVisible({ timeout: 10000 });
+
+    await priceChip.click();
+    await expect
+      .poll(
+        () => {
+          const params = new URL(page.url()).searchParams;
+          return (
+            params.has("minPrice") ||
+            params.has("maxPrice") ||
+            params.has("minBudget") ||
+            params.has("maxBudget")
+          );
+        },
+        {
+          timeout: 30000,
+          message: "price params to be removed after pill removal",
+        }
+      )
+      .toBe(false);
+
+    const params = new URL(page.url()).searchParams;
+    expect(params.get("roomType")).toBe("Private Room");
   });
 
   // ─────────────────────────────────────────────────

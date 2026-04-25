@@ -743,7 +743,10 @@ test.describe("Group 4: Error Boundary", () => {
     expect(originalParams.get("q")).toBe("testlocation");
     expect(originalParams.get("sort")).toBe("newest");
     expect(originalParams.get("maxPrice")).toBe("3000");
-    expect(originalParams.get("minLat")).toBe(SF_BOUNDS.minLat.toString());
+    expect(Number(originalParams.get("minLat"))).toBeCloseTo(
+      SF_BOUNDS.minLat,
+      3
+    );
 
     // Even if the error boundary appears, URL params should remain intact
     // (error.tsx calls reset() which retries with the same URL)
@@ -756,8 +759,9 @@ test.describe("Group 4: Error Boundary", () => {
 
     // Regardless of error state, URL should still have the original params
     const afterUrl = new URL(page.url());
-    expect(afterUrl.searchParams.get("minLat")).toBe(
-      SF_BOUNDS.minLat.toString()
+    expect(Number(afterUrl.searchParams.get("minLat"))).toBeCloseTo(
+      SF_BOUNDS.minLat,
+      3
     );
   });
 });

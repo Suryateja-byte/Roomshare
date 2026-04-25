@@ -9,10 +9,49 @@
  */
 
 import { MIN_QUERY_LENGTH, MAX_QUERY_LENGTH } from "@/lib/constants";
+import type {
+  PublicAvailability,
+  PublicAvailabilitySource,
+} from "@/lib/search/public-availability";
 
 // ============================================
 // Core Types
 // ============================================
+
+export interface GroupSummary {
+  groupKey: string;
+  siblingIds: string[];
+  availableFromDates: string[];
+  combinedOpenSlots: number;
+  combinedTotalSlots: number;
+  groupOverflow: boolean;
+  members?: GroupSummaryMember[];
+  windows?: Array<{
+    availableFrom: string;
+    availableUntil: string | null;
+    openSlots: number;
+  }>;
+}
+
+export interface GroupSummaryMember {
+  listingId: string;
+  availableFrom: string;
+  availableUntil: string | null;
+  startDate?: string;
+  endDate?: string;
+  openSlots: number;
+  totalSlots: number;
+  isCanonical: boolean;
+  roomType?: string | null;
+}
+
+export interface GroupContextPresentation {
+  siblingCount: number;
+  dateCount: number;
+  completeness: "complete" | "partial";
+  secondaryLabel?: string;
+  contextKey: string;
+}
 
 export interface ListingData {
   id: string;
@@ -40,6 +79,17 @@ export interface ListingData {
     lat: number;
     lng: number;
   };
+  publicAvailability: PublicAvailability;
+  availabilitySource?: PublicAvailabilitySource;
+  openSlots?: number | null;
+  availableUntil?: Date | null;
+  minStayMonths?: number;
+  lastConfirmedAt?: Date | null;
+  status?: string;
+  statusReason?: string | null;
+  groupKey?: string | null;
+  groupSummary?: GroupSummary | null;
+  groupContext?: GroupContextPresentation | null;
   // Near-match indicator for search results that partially match filters
   isNearMatch?: boolean;
 }
@@ -60,6 +110,7 @@ export interface FilterParams {
   maxPrice?: number;
   amenities?: string[];
   moveInDate?: string;
+  endDate?: string;
   leaseDuration?: string;
   houseRules?: string[];
   roomType?: string;
@@ -121,14 +172,27 @@ export interface MapListingData {
   title: string;
   price: number;
   availableSlots: number;
+  totalSlots?: number;
   images: string[];
   roomType?: string;
+  moveInDate?: Date;
   location: {
     city?: string;
     state?: string;
     lat: number;
     lng: number;
   };
+  publicAvailability: PublicAvailability;
+  availabilitySource?: PublicAvailabilitySource;
+  openSlots?: number | null;
+  availableUntil?: Date | null;
+  minStayMonths?: number;
+  lastConfirmedAt?: Date | null;
+  status?: string;
+  statusReason?: string | null;
+  groupKey?: string | null;
+  groupSummary?: GroupSummary | null;
+  groupContext?: GroupContextPresentation | null;
   /** Pin tier for V2 mode: primary = larger pin, mini = smaller pin */
   tier?: "primary" | "mini";
   /** Average rating for ranking pins (optional — not all query paths populate this) */

@@ -13,6 +13,7 @@ import {
   Clock,
   CheckCheck,
   Search,
+  AlertTriangle,
 } from "lucide-react";
 import {
   getNotifications,
@@ -44,6 +45,9 @@ const notificationIcons: Record<NotificationType, typeof Bell> = {
   NEW_REVIEW: Star,
   LISTING_SAVED: Heart,
   SEARCH_ALERT: Search,
+  LISTING_FRESHNESS_REMINDER: Clock,
+  LISTING_STALE_WARNING: AlertTriangle,
+  LISTING_AUTO_PAUSED: AlertTriangle,
 };
 
 const notificationColors: Record<NotificationType, string> = {
@@ -58,6 +62,9 @@ const notificationColors: Record<NotificationType, string> = {
   NEW_REVIEW: "bg-yellow-100 text-yellow-600",
   LISTING_SAVED: "bg-pink-100 text-pink-600",
   SEARCH_ALERT: "bg-orange-100 text-orange-600",
+  LISTING_FRESHNESS_REMINDER: "bg-sky-100 text-sky-700",
+  LISTING_STALE_WARNING: "bg-amber-100 text-amber-700",
+  LISTING_AUTO_PAUSED: "bg-amber-100 text-amber-700",
 };
 
 function formatTimeAgo(date: Date) {

@@ -25,11 +25,25 @@ jest.mock("@/lib/prisma", () => ({
   prisma: {
     listing: { findUnique: jest.fn() },
     report: { findFirst: jest.fn(), create: jest.fn() },
+    conversation: { findFirst: jest.fn() },
   },
 }));
 jest.mock("@/auth", () => ({ auth: jest.fn() }));
+jest.mock("@/app/actions/suspension", () => ({
+  checkSuspension: jest.fn().mockResolvedValue({ suspended: false }),
+}));
+jest.mock("@/lib/env", () => ({
+  features: { privateFeedback: false },
+}));
 jest.mock("@/lib/with-rate-limit", () => ({
   withRateLimit: jest.fn().mockResolvedValue(null),
+}));
+jest.mock("@/lib/csrf", () => ({
+  validateCsrf: jest.fn().mockReturnValue(null),
+}));
+jest.mock("@/lib/reports/private-feedback-telemetry", () => ({
+  recordPrivateFeedbackDenied: jest.fn(),
+  recordPrivateFeedbackSubmission: jest.fn(),
 }));
 jest.mock("@/lib/api-error-handler", () => ({
   captureApiError: jest.fn().mockImplementation(() => {
@@ -53,7 +67,13 @@ function createRequest(body?: object, url = "http://localhost/api/reports") {
 }
 
 describe("POST /api/reports", () => {
-  const mockSession = { user: { id: "user-123", name: "Test User" } };
+  const mockSession = {
+    user: {
+      id: "user-123",
+      name: "Test User",
+      emailVerified: new Date("2026-04-01T12:00:00.000Z"),
+    },
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -150,6 +170,7 @@ describe("POST /api/reports", () => {
         reporterId: "user-123",
         reason: "spam",
         details: "Fake listing",
+        kind: "ABUSE_REPORT",
       },
     });
   });
@@ -172,6 +193,7 @@ describe("POST /api/reports", () => {
         reporterId: "user-123",
         reason: "spam",
         details: "Details here",
+        kind: "ABUSE_REPORT",
       },
     });
   });

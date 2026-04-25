@@ -12,6 +12,7 @@ import {
   markConversationMessagesAsReadForUser,
   userCanAccessConversation,
 } from "@/lib/messages";
+import { evaluateListingContactable } from "@/lib/messaging/listing-contactable";
 import { getClientIP } from "@/lib/rate-limit";
 import {
   parsePaginationParams,
@@ -362,7 +363,22 @@ export async function POST(request: Request) {
 
     const conversation = await prisma.conversation.findUnique({
       where: { id: conversationId },
-      include: { participants: { select: { id: true } } },
+      include: {
+        participants: { select: { id: true } },
+        listing: {
+          select: {
+            status: true,
+            statusReason: true,
+            availableSlots: true,
+            totalSlots: true,
+            openSlots: true,
+            moveInDate: true,
+            availableUntil: true,
+            minStayMonths: true,
+            lastConfirmedAt: true,
+          },
+        },
+      },
     });
 
     if (
@@ -373,6 +389,14 @@ export async function POST(request: Request) {
       )
     ) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
+
+    const contactable = evaluateListingContactable(conversation.listing);
+    if (!contactable.ok) {
+      return NextResponse.json(
+        { error: contactable.message, code: contactable.code },
+        { status: 403 },
+      );
     }
 
     const otherParticipant = conversation.participants.find(

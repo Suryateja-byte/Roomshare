@@ -83,6 +83,13 @@ const serverEnvSchema = z
     // Google Places (server-side, IP-restricted key)
     GOOGLE_PLACES_API_KEY: z.string().optional(),
 
+    // Stripe payments (optional until contact paywall is enabled)
+    STRIPE_SECRET_KEY: z.string().optional(),
+    STRIPE_WEBHOOK_SECRET: z.string().optional(),
+    STRIPE_PRICE_CONTACT_PACK_3: z.string().optional(),
+    STRIPE_PRICE_MOVERS_PASS_30D: z.string().optional(),
+    PHONE_REVEAL_ENCRYPTION_KEY: z.string().optional(),
+
     // Supabase service key (server-side)
     SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
 
@@ -98,6 +105,11 @@ const serverEnvSchema = z
     // Search optimization (optional - defaults to slow LIKE queries if not enabled)
     // CRITICAL: Should be enabled in production for performance
     ENABLE_SEARCH_DOC: z.enum(["true", "false"]).optional(),
+    ENABLE_SEARCH_DOC_RESCAN: z.enum(["true", "false"]).optional(),
+    ENABLE_SEARCH_SNAPSHOT_CONTRACT: z.enum(["true", "false"]).optional(),
+    FEATURE_PHASE03_SEMANTIC_PROJECTION_WRITES: z
+      .enum(["true", "false"])
+      .optional(),
 
     // Cloudflare Turnstile (bot protection - required in production)
     TURNSTILE_SECRET_KEY: z.string().optional(),
@@ -108,6 +120,44 @@ const serverEnvSchema = z
     ENABLE_WHOLE_UNIT_MODE: z.enum(["true", "false"]).optional(),
     ENABLE_SOFT_HOLDS: z.enum(["on", "drain", "off"]).optional(),
     ENABLE_BOOKING_AUDIT: z.enum(["true", "false"]).optional(),
+    ENABLE_CONTACT_FIRST_LISTINGS: z.enum(["true", "false"]).optional(),
+    FEATURE_MODERATION_WRITE_LOCKS: z.enum(["true", "false"]).optional(),
+    FEATURE_PUBLIC_CACHE_COHERENCE: z.enum(["true", "false"]).optional(),
+    KILL_SWITCH_DISABLE_PUBLIC_CACHE_PUSH: z
+      .enum(["true", "false"])
+      .optional(),
+    PUBLIC_CACHE_CURSOR_SECRET: z.string().optional(),
+    PUBLIC_CACHE_KEY_SECRET: z.string().optional(),
+    PUBLIC_CACHE_PUSH_ENCRYPTION_KEY: z.string().optional(),
+    PUBLIC_CACHE_VAPID_PUBLIC_KEY: z.string().optional(),
+    PUBLIC_CACHE_VAPID_PRIVATE_KEY: z.string().optional(),
+    PUBLIC_CACHE_VAPID_SUBJECT: z.string().optional(),
+    NEXT_PUBLIC_PUBLIC_CACHE_VAPID_KEY: z.string().optional(),
+    FEATURE_PUBLIC_AUTOCOMPLETE_CONTRACT: z
+      .enum(["true", "false"])
+      .optional(),
+    ENABLE_BOOKING_RETIREMENT_FREEZE: z.enum(["true", "false"]).optional(),
+    ENABLE_CONTACT_PAYWALL: z.enum(["true", "false"]).optional(),
+    ENABLE_CONTACT_PAYWALL_ENFORCEMENT: z.enum(["true", "false"]).optional(),
+    ENABLE_SEARCH_ALERT_PAYWALL: z.enum(["true", "false"]).optional(),
+    ENABLE_ENTITLEMENT_STATE: z.enum(["true", "false"]).optional(),
+    ENABLE_CONTACT_RESTORATION_AUTOMATION: z
+      .enum(["true", "false"])
+      .optional(),
+    KILL_SWITCH_DISABLE_PHONE_REVEAL: z.enum(["true", "false"]).optional(),
+    KILL_SWITCH_DISABLE_PAYMENTS: z.enum(["true", "false"]).optional(),
+    KILL_SWITCH_FREEZE_NEW_GRANTS: z.enum(["true", "false"]).optional(),
+    KILL_SWITCH_EMERGENCY_OPEN_PAYWALL: z.enum(["true", "false"]).optional(),
+    KILL_SWITCH_DISABLE_ALERTS: z.enum(["true", "false"]).optional(),
+    ENABLE_BOOKING_NOTIFICATIONS: z.enum(["on", "off"]).optional(),
+    ENABLE_LEGACY_CRONS: z.enum(["on", "off"]).optional(),
+    ENABLE_PRIVATE_FEEDBACK: z.enum(["true", "false"]).optional(),
+    ENABLE_FRESHNESS_NOTIFICATIONS: z.enum(["on", "off"]).optional(),
+    ENABLE_STALE_AUTO_PAUSE: z.enum(["on", "off"]).optional(),
+    FEATURE_SEARCH_LISTING_DEDUP: z.enum(["true", "false"]).optional(),
+    FEATURE_LISTING_CREATE_COLLISION_WARN: z
+      .enum(["true", "false"])
+      .optional(),
 
     // AI / Embeddings
     GEMINI_API_KEY: z.string().min(1).optional(),
@@ -115,6 +165,10 @@ const serverEnvSchema = z
     ENABLE_IMAGE_EMBEDDINGS: z.enum(["true", "false"]).optional(),
     ENABLE_CLIENT_SIDE_SEARCH: z.enum(["true", "false"]).optional(),
     ENABLE_SEARCH_TEST_SCENARIOS: z.enum(["true", "false"]).optional(),
+    KILL_SWITCH_DISABLE_SEMANTIC_SEARCH: z.enum(["true", "false"]).optional(),
+    KILL_SWITCH_PAUSE_EMBED_PUBLISH: z.enum(["true", "false"]).optional(),
+    KILL_SWITCH_ROLLBACK_EMBEDDING_VERSION: z.string().optional(),
+    EMBEDDING_TOKEN_BUDGET_PER_MINUTE: z.coerce.number().int().positive().optional(),
     SEMANTIC_WEIGHT: z.coerce.number().min(0).max(1).optional(),
 
     // Node environment
@@ -179,6 +233,17 @@ const serverEnvSchema = z
       });
     }
     if (
+      data.ENABLE_STALE_AUTO_PAUSE === "on" &&
+      data.ENABLE_FRESHNESS_NOTIFICATIONS !== "on"
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "ENABLE_STALE_AUTO_PAUSE=on requires ENABLE_FRESHNESS_NOTIFICATIONS=on",
+        path: ["ENABLE_STALE_AUTO_PAUSE"],
+      });
+    }
+    if (
       data.ENABLE_SOFT_HOLDS === "on" &&
       data.ENABLE_MULTI_SLOT_BOOKING !== "true"
     ) {
@@ -197,6 +262,73 @@ const serverEnvSchema = z
         message: "ENABLE_IMAGE_EMBEDDINGS requires ENABLE_SEMANTIC_SEARCH=true",
         path: ["ENABLE_IMAGE_EMBEDDINGS"],
       });
+    }
+    if (
+      data.ENABLE_CONTACT_PAYWALL_ENFORCEMENT === "true" &&
+      data.ENABLE_CONTACT_PAYWALL !== "true"
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "ENABLE_CONTACT_PAYWALL_ENFORCEMENT=true requires ENABLE_CONTACT_PAYWALL=true",
+        path: ["ENABLE_CONTACT_PAYWALL_ENFORCEMENT"],
+      });
+    }
+    if (
+      data.ENABLE_ENTITLEMENT_STATE === "true" &&
+      data.ENABLE_CONTACT_PAYWALL !== "true"
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "ENABLE_ENTITLEMENT_STATE=true requires ENABLE_CONTACT_PAYWALL=true",
+        path: ["ENABLE_ENTITLEMENT_STATE"],
+      });
+    }
+    if (
+      data.ENABLE_CONTACT_RESTORATION_AUTOMATION === "true" &&
+      data.ENABLE_ENTITLEMENT_STATE !== "true"
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "ENABLE_CONTACT_RESTORATION_AUTOMATION=true requires ENABLE_ENTITLEMENT_STATE=true",
+        path: ["ENABLE_CONTACT_RESTORATION_AUTOMATION"],
+      });
+    }
+    if (
+      data.ENABLE_CONTACT_PAYWALL === "true" ||
+      data.ENABLE_CONTACT_PAYWALL_ENFORCEMENT === "true" ||
+      data.ENABLE_ENTITLEMENT_STATE === "true" ||
+      data.ENABLE_CONTACT_RESTORATION_AUTOMATION === "true" ||
+      data.ENABLE_SEARCH_ALERT_PAYWALL === "true"
+    ) {
+      for (const [key, value] of [
+        ["STRIPE_SECRET_KEY", data.STRIPE_SECRET_KEY],
+        ["STRIPE_WEBHOOK_SECRET", data.STRIPE_WEBHOOK_SECRET],
+        ["STRIPE_PRICE_MOVERS_PASS_30D", data.STRIPE_PRICE_MOVERS_PASS_30D],
+      ] as const) {
+        if (!value) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `${key} is required when Stripe paywall features are enabled`,
+            path: [key],
+          });
+        }
+      }
+    }
+    if (
+      data.ENABLE_CONTACT_PAYWALL === "true" ||
+      data.ENABLE_CONTACT_PAYWALL_ENFORCEMENT === "true"
+    ) {
+      if (!data.STRIPE_PRICE_CONTACT_PACK_3) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "STRIPE_PRICE_CONTACT_PACK_3 is required when contact paywall is enabled",
+          path: ["STRIPE_PRICE_CONTACT_PACK_3"],
+        });
+      }
     }
   });
 
@@ -409,6 +541,12 @@ function hasStrongSecret(value: string | undefined): boolean {
   );
 }
 
+function phaseCutoverDefault(value: string | undefined): boolean {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return process.env.NODE_ENV !== "production";
+}
+
 // Helper to check if a feature is available
 // Uses direct env reads so unrelated secret validation cannot break public page renders.
 export const features = {
@@ -484,6 +622,18 @@ export const features = {
   get searchDoc() {
     return process.env.ENABLE_SEARCH_DOC === "true";
   },
+  get searchSnapshotContract() {
+    return process.env.ENABLE_SEARCH_SNAPSHOT_CONTRACT === "true";
+  },
+  get searchDocRescan() {
+    if (process.env.ENABLE_SEARCH_DOC_RESCAN) {
+      return process.env.ENABLE_SEARCH_DOC_RESCAN === "true";
+    }
+    if (process.env.SEARCH_DOC_RESCAN_ENABLED) {
+      return process.env.SEARCH_DOC_RESCAN_ENABLED === "true";
+    }
+    return true;
+  },
   // Cloudflare Turnstile bot protection
   get turnstile() {
     return (
@@ -494,19 +644,130 @@ export const features = {
   },
   // Multi-slot booking feature flags
   get multiSlotBooking() {
-    return process.env.ENABLE_MULTI_SLOT_BOOKING === "true";
+    return false;
   },
   get wholeUnitMode() {
-    return process.env.ENABLE_WHOLE_UNIT_MODE === "true";
+    return false;
   },
   get softHoldsEnabled() {
-    return process.env.ENABLE_SOFT_HOLDS === "on";
+    return false;
   },
   get softHoldsDraining() {
-    return process.env.ENABLE_SOFT_HOLDS === "drain";
+    return false;
   },
   get bookingAudit() {
-    return process.env.ENABLE_BOOKING_AUDIT === "true";
+    return false;
+  },
+  get contactFirstListings() {
+    return phaseCutoverDefault(process.env.ENABLE_CONTACT_FIRST_LISTINGS);
+  },
+  get moderationWriteLocks() {
+    return phaseCutoverDefault(process.env.FEATURE_MODERATION_WRITE_LOCKS);
+  },
+  get publicCacheCoherence() {
+    return phaseCutoverDefault(process.env.FEATURE_PUBLIC_CACHE_COHERENCE);
+  },
+  get disablePublicCachePush() {
+    return process.env.KILL_SWITCH_DISABLE_PUBLIC_CACHE_PUSH === "true";
+  },
+  get publicAutocompleteContract() {
+    return phaseCutoverDefault(process.env.FEATURE_PUBLIC_AUTOCOMPLETE_CONTRACT);
+  },
+  get bookingRetirementFreeze() {
+    return false;
+  },
+  get contactPaywall() {
+    return phaseCutoverDefault(process.env.ENABLE_CONTACT_PAYWALL);
+  },
+  get contactPaywallEnforcement() {
+    return phaseCutoverDefault(process.env.ENABLE_CONTACT_PAYWALL_ENFORCEMENT);
+  },
+  get searchAlertPaywall() {
+    return phaseCutoverDefault(process.env.ENABLE_SEARCH_ALERT_PAYWALL);
+  },
+  get entitlementState() {
+    return phaseCutoverDefault(process.env.ENABLE_ENTITLEMENT_STATE);
+  },
+  get contactRestorationAutomation() {
+    return phaseCutoverDefault(
+      process.env.ENABLE_CONTACT_RESTORATION_AUTOMATION
+    );
+  },
+  get disablePhoneReveal() {
+    return process.env.KILL_SWITCH_DISABLE_PHONE_REVEAL === "true";
+  },
+  get disablePayments() {
+    return process.env.KILL_SWITCH_DISABLE_PAYMENTS === "true";
+  },
+  get freezeNewGrants() {
+    return process.env.KILL_SWITCH_FREEZE_NEW_GRANTS === "true";
+  },
+  get emergencyOpenPaywall() {
+    return process.env.KILL_SWITCH_EMERGENCY_OPEN_PAYWALL === "true";
+  },
+  get disableAlerts() {
+    return process.env.KILL_SWITCH_DISABLE_ALERTS === "true";
+  },
+  get bookingNotifications() {
+    return false;
+  },
+  get legacyCrons() {
+    return false;
+  },
+  get privateFeedback() {
+    return phaseCutoverDefault(process.env.ENABLE_PRIVATE_FEEDBACK);
+  },
+  get freshnessNotifications() {
+    return process.env.ENABLE_FRESHNESS_NOTIFICATIONS === "on";
+  },
+  get staleAutoPause() {
+    return process.env.ENABLE_STALE_AUTO_PAUSE === "on";
+  },
+  get searchListingDedup() {
+    return phaseCutoverDefault(process.env.FEATURE_SEARCH_LISTING_DEDUP);
+  },
+  get listingCreateCollisionWarn() {
+    return phaseCutoverDefault(process.env.FEATURE_LISTING_CREATE_COLLISION_WARN);
+  },
+  get phase01CanonicalWrites() {
+    return phaseCutoverDefault(process.env.FEATURE_PHASE01_CANONICAL_WRITES);
+  },
+  // Phase 02: projection writes master gate
+  get phase02ProjectionWrites() {
+    return phaseCutoverDefault(process.env.FEATURE_PHASE02_PROJECTION_WRITES);
+  },
+  get phase03SemanticProjectionWrites() {
+    return phaseCutoverDefault(
+      process.env.FEATURE_PHASE03_SEMANTIC_PROJECTION_WRITES
+    );
+  },
+  get phase04ProjectionReads() {
+    return phaseCutoverDefault(process.env.FEATURE_PHASE04_PROJECTION_READS);
+  },
+  // Phase 02: kill switch — disable new publication (all projection writes pause)
+  get disableNewPublication() {
+    return process.env.KILL_SWITCH_DISABLE_NEW_PUBLICATION === "true";
+  },
+  // Phase 02: kill switch — pause geocode publish pipeline
+  get pauseGeocodePublish() {
+    return process.env.KILL_SWITCH_PAUSE_GEOCODE_PUBLISH === "true";
+  },
+  // Phase 02: kill switch — pause backfills and repair jobs
+  get pauseBackfillsAndRepairs() {
+    return process.env.KILL_SWITCH_PAUSE_BACKFILLS_AND_REPAIRS === "true";
+  },
+  get pauseEmbedPublish() {
+    return process.env.KILL_SWITCH_PAUSE_EMBED_PUBLISH === "true";
+  },
+  get rollbackEmbeddingVersion(): string | null {
+    const value = process.env.KILL_SWITCH_ROLLBACK_EMBEDDING_VERSION?.trim();
+    return value && value.length > 0 ? value : null;
+  },
+  get forceListOnly() {
+    return process.env.KILL_SWITCH_FORCE_LIST_ONLY === "true";
+  },
+  get forceClustersOnly() {
+    return process.env.KILL_SWITCH_FORCE_CLUSTERS_ONLY === "true";
   },
   // Search debug ranking (only allowed in non-production, or with explicit env override)
   // This gates ?debugRank=1 and ?ranker=1 URL overrides to prevent leaking debug signals
@@ -520,7 +781,10 @@ export const features = {
     return process.env.ENABLE_CLIENT_SIDE_SEARCH === "true";
   },
   get semanticSearch() {
-    return process.env.ENABLE_SEMANTIC_SEARCH === "true";
+    return (
+      process.env.ENABLE_SEMANTIC_SEARCH === "true" &&
+      process.env.KILL_SWITCH_DISABLE_SEMANTIC_SEARCH !== "true"
+    );
   },
   get imageEmbeddings() {
     return (

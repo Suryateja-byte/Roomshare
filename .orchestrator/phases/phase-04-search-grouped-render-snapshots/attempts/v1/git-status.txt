@@ -1,0 +1,42 @@
+Phase 04 scoped status snapshot captured 2026-04-23.
+
+Phase 04 tracked and newly-created paths changed:
+- prisma/schema.prisma
+- prisma/migrations/20260504000000_phase04_projection_search_snapshots/migration.sql
+- src/lib/env.ts
+- src/lib/flags/phase04.ts
+- src/lib/projections/unit-projection.ts
+- src/lib/search/cursor.ts
+- src/lib/search/hash.ts
+- src/lib/search/projection-search.ts
+- src/lib/search/query-hash.ts
+- src/lib/search/query-snapshots.ts
+- src/lib/search/search-response.ts
+- src/lib/search/search-spec.ts
+- src/lib/search/search-telemetry-client.ts
+- src/lib/search/search-telemetry.ts
+- src/lib/search/search-v2-service.ts
+- src/lib/search/types.ts
+- src/app/api/search/v2/route.ts
+- src/app/api/search/listings/route.ts
+- src/app/api/map-listings/route.ts
+- src/app/api/search-count/route.ts
+- src/app/api/metrics/search/route.ts
+- src/app/api/metrics/ops/route.ts
+- src/components/search/SearchResultsClient.tsx
+- src/__tests__/db/phase04-schema.test.ts
+- src/__tests__/utils/pglite-phase04.ts
+- src/__tests__/lib/search/projection-search.test.ts
+- src/__tests__/lib/search/search-spec.test.ts
+- src/__tests__/lib/search/cursor.test.ts
+- src/__tests__/lib/search/query-snapshots.test.ts
+- src/__tests__/lib/search/search-telemetry.test.ts
+- src/__tests__/lib/search/hash.test.ts
+- src/__tests__/lib/search/transform.test.ts
+- src/__tests__/lib/search/keyset-pagination.test.ts
+- src/__tests__/api/search-telemetry.test.ts
+- src/__tests__/api/metrics-ops.test.ts
+- src/__tests__/components/search/SearchResultsClient.test.tsx
+
+The repo had extensive unrelated dirty worktree changes before Phase 04 work.
+Those changes were preserved and not reverted.

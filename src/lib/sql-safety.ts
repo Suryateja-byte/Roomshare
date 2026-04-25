@@ -24,18 +24,42 @@ import "server-only";
  */
 const ALLOWED_SQL_STRING_LITERALS = new Set(["ACTIVE", "english", "%", "HELD"]);
 
+function buildAllowedSqlStringLiterals(
+  allowedLiterals?: Iterable<string>
+): Set<string> {
+  const effectiveAllowedLiterals = new Set(ALLOWED_SQL_STRING_LITERALS);
+
+  if (!allowedLiterals) {
+    return effectiveAllowedLiterals;
+  }
+
+  for (const literal of allowedLiterals) {
+    effectiveAllowedLiterals.add(literal);
+  }
+
+  return effectiveAllowedLiterals;
+}
+
 /**
  * Assert that a WHERE clause string contains no raw user-supplied string
  * literals.  Scans for single-quoted values and rejects any that are not in
  * the explicit allow-list above.
  *
+ * Use `allowedLiterals` for scoped additions at trusted call sites that need a
+ * few extra hard-coded SQL literals without relaxing the global default.
+ *
  * @throws if a disallowed literal is detected.
  */
-export function assertParameterizedWhereClause(whereClause: string): void {
+export function assertParameterizedWhereClause(
+  whereClause: string,
+  allowedLiterals?: Iterable<string>
+): void {
+  const effectiveAllowedLiterals =
+    buildAllowedSqlStringLiterals(allowedLiterals);
   const literalPattern = /'([^']*)'/g;
   for (const match of whereClause.matchAll(literalPattern)) {
     const literalValue = match[1];
-    if (!ALLOWED_SQL_STRING_LITERALS.has(literalValue)) {
+    if (!effectiveAllowedLiterals.has(literalValue)) {
       throw new Error(
         "SECURITY: Raw string detected in whereClause — use parameterized $N placeholders"
       );
@@ -51,10 +75,11 @@ export function assertParameterizedWhereClause(whereClause: string): void {
  * call site so the security assertion is never accidentally skipped.
  */
 export function joinWhereClauseWithSecurityInvariant(
-  conditions: string[]
+  conditions: string[],
+  allowedLiterals?: Iterable<string>
 ): string {
   const whereClause = conditions.join(" AND ");
-  assertParameterizedWhereClause(whereClause);
+  assertParameterizedWhereClause(whereClause, allowedLiterals);
   return whereClause;
 }
 

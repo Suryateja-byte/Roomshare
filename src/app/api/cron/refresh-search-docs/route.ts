@@ -1,252 +1,254 @@
 /**
- * SearchDoc Refresh Cron Route
+ * SearchDoc refresh cron.
  *
- * Processes listing_search_doc_dirty entries and updates corresponding
- * search docs. Uses the dirty flag sweeper pattern for incremental updates.
- *
- * Schedule: Every 5 minutes (recommended) or on-demand
- *
- * Features:
- * - Batch processing (100 listings at a time)
- * - Oldest-first ordering (fairness)
- * - Cleans up processed dirty flags
- * - Logs processing stats without PII
+ * Processes dirty listing ids oldest-first and routes every listing through the
+ * shared SearchDoc projection helper used by immediate sync.
  */
 
+import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { logger, sanitizeErrorMessage } from "@/lib/logger";
-import { computeRecommendedScore } from "@/lib/search/recommended-score";
+
 import { validateCronAuth } from "@/lib/cron-auth";
+import { features } from "@/lib/env";
+import { logger, sanitizeErrorMessage } from "@/lib/logger";
+import { hashIdForLog } from "@/lib/messaging/cfm-messaging-telemetry";
+import { prisma } from "@/lib/prisma";
+import {
+  recordSearchDocCronRun,
+  type SearchDocCronCasSuppressionReasonLabel,
+  toSearchDocCronReasonLabel,
+  type SearchDocCronReasonLabel,
+} from "@/lib/search/search-doc-cron-telemetry";
+import {
+  projectSearchDocument,
+  type SearchDocProjectionResult,
+} from "@/lib/search/search-doc-sync";
 
-// Number of dirty listings to process per cron run
-const BATCH_SIZE = parseInt(process.env.SEARCH_DOC_BATCH_SIZE || "100", 10);
+export const maxDuration = 30;
 
-interface ListingWithData {
-  id: string;
-  ownerId: string;
-  title: string;
-  description: string;
-  price: number;
-  images: string[];
-  amenities: string[];
-  houseRules: string[];
-  householdLanguages: string[];
-  primaryHomeLanguage: string | null;
-  leaseDuration: string | null;
-  roomType: string | null;
-  moveInDate: Date | null;
-  totalSlots: number;
-  availableSlots: number;
-  viewCount: number;
-  status: string;
-  bookingMode: string;
-  createdAt: Date;
-  // Location data
-  address: string;
-  city: string;
-  state: string;
-  zip: string;
-  lat: number | null;
-  lng: number | null;
-  // Review aggregation
-  avgRating: number;
-  reviewCount: number;
+const DEFAULT_BATCH_SIZE = 100;
+const DEFAULT_RESCAN_SAMPLE_SIZE = 50;
+const DEFAULT_TIME_BUDGET_MS = 20_000;
+const MAX_DURATION_MS = maxDuration * 1000;
+const RESCAN_CHUNK_SAFETY_MARGIN_MS = 3_000;
+const UPSERT_CONCURRENCY = 10;
+const RESCAN_CONCURRENCY = 5;
+
+type OutcomeCounters = {
+  upsert: number;
+  suppress_delete: number;
+  defer_retry: number;
+  confirmed_orphan: number;
+};
+
+type ReasonCounters = Record<SearchDocCronReasonLabel, number>;
+type CasSuppressionCounters = Record<
+  SearchDocCronCasSuppressionReasonLabel,
+  number
+>;
+
+type DirtyListingEntry = {
+  listing_id: string;
+  marked_at: Date | string | null;
+};
+
+function parsePositiveIntEnv(
+  value: string | undefined,
+  fallback: number
+): number {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-/**
- * Fetch dirty listing IDs (oldest first)
- */
-async function fetchDirtyListingIds(limit: number): Promise<string[]> {
-  const dirtyEntries = await prisma.$queryRaw<{ listing_id: string }[]>`
-    SELECT listing_id
+function getBatchSize(): number {
+  return parsePositiveIntEnv(
+    process.env.SEARCH_DOC_BATCH_SIZE,
+    DEFAULT_BATCH_SIZE
+  );
+}
+
+function getRescanSampleSize(): number {
+  return parsePositiveIntEnv(
+    process.env.SEARCH_DOC_RESCAN_SAMPLE_SIZE,
+    DEFAULT_RESCAN_SAMPLE_SIZE
+  );
+}
+
+function getTimeBudgetMs(): number {
+  return parsePositiveIntEnv(
+    process.env.SEARCH_DOC_CRON_TIME_BUDGET_MS,
+    DEFAULT_TIME_BUDGET_MS
+  );
+}
+
+function createOutcomeCounters(): OutcomeCounters {
+  return {
+    upsert: 0,
+    suppress_delete: 0,
+    defer_retry: 0,
+    confirmed_orphan: 0,
+  };
+}
+
+function createReasonCounters(): ReasonCounters {
+  return {
+    missing: 0,
+    stale: 0,
+    version_skew: 0,
+  };
+}
+
+function createCasSuppressionCounters(): CasSuppressionCounters {
+  return {
+    older_source_version: 0,
+    older_projection_version: 0,
+  };
+}
+
+function addOutcomeCounters(
+  target: OutcomeCounters,
+  source: OutcomeCounters
+): void {
+  target.upsert += source.upsert;
+  target.suppress_delete += source.suppress_delete;
+  target.defer_retry += source.defer_retry;
+  target.confirmed_orphan += source.confirmed_orphan;
+}
+
+function addReasonCounters(target: ReasonCounters, source: ReasonCounters): void {
+  target.missing += source.missing;
+  target.stale += source.stale;
+  target.version_skew += source.version_skew;
+}
+
+function addCasSuppressionCounters(
+  target: CasSuppressionCounters,
+  source: CasSuppressionCounters
+): void {
+  target.older_source_version += source.older_source_version;
+  target.older_projection_version += source.older_projection_version;
+}
+
+function sumReasonCounters(counts: ReasonCounters): number {
+  return counts.missing + counts.stale + counts.version_skew;
+}
+
+function toMarkedAtDate(markedAt: DirtyListingEntry["marked_at"]): Date | null {
+  if (!markedAt) {
+    return null;
+  }
+
+  const parsed = markedAt instanceof Date ? markedAt : new Date(markedAt);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function computeDirtyQueueAgeSeconds(
+  dirtyEntries: DirtyListingEntry[],
+  nowMs: number
+): number[] {
+  return dirtyEntries
+    .map((entry) => {
+      const markedAt = toMarkedAtDate(entry.marked_at);
+      if (!markedAt) {
+        return null;
+      }
+
+      const ageSeconds = Math.max(0, (nowMs - markedAt.getTime()) / 1000);
+      return Math.round(ageSeconds * 100) / 100;
+    })
+    .filter((ageSeconds): ageSeconds is number => ageSeconds != null);
+}
+
+function computePercentile(sortedSamples: number[], percentile: number): number {
+  if (sortedSamples.length === 0) {
+    return 0;
+  }
+
+  const index = Math.ceil((percentile / 100) * sortedSamples.length) - 1;
+  return sortedSamples[Math.max(0, index)];
+}
+
+function summarizeDirtyQueueAgeSeconds(samples: number[]) {
+  const sortedSamples = [...samples].sort((left, right) => left - right);
+
+  return {
+    p50: computePercentile(sortedSamples, 50),
+    p95: computePercentile(sortedSamples, 95),
+  };
+}
+
+async function fetchDirtyListingEntries(limit: number): Promise<DirtyListingEntry[]> {
+  return prisma.$queryRaw<DirtyListingEntry[]>`
+    SELECT listing_id, marked_at
     FROM listing_search_doc_dirty
     ORDER BY marked_at ASC
     LIMIT ${limit}
   `;
-  return dirtyEntries.map((e) => e.listing_id);
 }
 
-/**
- * Fetch full listing data for given IDs
- * Returns listings with location and review aggregation
- */
-async function fetchListingsWithData(
-  listingIds: string[]
-): Promise<ListingWithData[]> {
-  if (listingIds.length === 0) return [];
+async function fetchRescanListingIds(
+  sampleSize: number,
+  excludedListingIds: string[]
+): Promise<string[]> {
+  if (sampleSize <= 0) {
+    return [];
+  }
 
-  const results = await prisma.$queryRaw<ListingWithData[]>`
-    SELECT
-      l.id,
-      l."ownerId" as "ownerId",
-      l.title,
-      l.description,
-      l.price,
-      l.images,
-      l.amenities,
-      l."houseRules" as "houseRules",
-      l."household_languages" as "householdLanguages",
-      l."primary_home_language" as "primaryHomeLanguage",
-      l."leaseDuration" as "leaseDuration",
-      l."roomType" as "roomType",
-      l."moveInDate" as "moveInDate",
-      l."totalSlots" as "totalSlots",
-      l."availableSlots" as "availableSlots",
-      l."viewCount" as "viewCount",
-      l.status::text as status,
-      l."booking_mode" as "bookingMode",
-      l."createdAt" as "createdAt",
-      loc.address,
-      loc.city,
-      loc.state,
-      loc.zip,
-      ST_X(loc.coords::geometry) as lng,
-      ST_Y(loc.coords::geometry) as lat,
-      COALESCE(AVG(r.rating), 0)::float as "avgRating",
-      COUNT(r.id)::int as "reviewCount"
-    FROM "Listing" l
-    JOIN "Location" loc ON l.id = loc."listingId"
-    LEFT JOIN "Review" r ON l.id = r."listingId"
-    WHERE l.id = ANY(${listingIds})
-      AND loc.coords IS NOT NULL
-    GROUP BY l.id, loc.id
-  `;
+  const sampleClause = Prisma.raw(`SYSTEM_ROWS(${sampleSize})`);
+  const excludedListingClause =
+    excludedListingIds.length > 0
+      ? Prisma.sql`AND id <> ALL(${excludedListingIds})`
+      : Prisma.empty;
 
-  return results;
-}
-
-/**
- * Upsert a single search doc
- */
-async function upsertSearchDoc(listing: ListingWithData): Promise<void> {
-  const recommendedScore = computeRecommendedScore(
-    listing.avgRating,
-    listing.viewCount,
-    listing.reviewCount,
-    listing.createdAt
+  const rescanEntries = await prisma.$queryRaw<{ id: string }[]>(
+    Prisma.sql`
+      SELECT id
+      FROM listing_search_docs
+      TABLESAMPLE ${sampleClause}
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM listing_search_doc_dirty dirty
+        WHERE dirty.listing_id = listing_search_docs.id
+      )
+      ${excludedListingClause}
+      LIMIT ${sampleSize}
+    `
   );
 
-  // Compute lowercase arrays for case-insensitive filtering
-  const amenitiesLower = listing.amenities.map((a) => a.toLowerCase());
-  const houseRulesLower = listing.houseRules.map((r) => r.toLowerCase());
-  const householdLanguagesLower = listing.householdLanguages.map((l) =>
-    l.toLowerCase()
-  );
-
-  // Note: search_tsv (tsvector) is auto-populated by a BEFORE INSERT/UPDATE
-  // trigger defined in migration 20260116000000_search_doc_fts. The trigger
-  // builds a weighted tsvector from title (A), city/state (B), description (C).
-  // No need to set it here — the DB handles it on every INSERT and UPDATE.
-  await prisma.$executeRaw`
-    INSERT INTO listing_search_docs (
-      id, owner_id, title, description, price, images,
-      amenities, house_rules, household_languages, primary_home_language,
-      lease_duration, room_type, move_in_date, total_slots, available_slots,
-      view_count, status, listing_created_at,
-      address, city, state, zip, location_geog, lat, lng,
-      avg_rating, review_count, recommended_score,
-      amenities_lower, house_rules_lower, household_languages_lower,
-      booking_mode,
-      doc_created_at, doc_updated_at
-    ) VALUES (
-      ${listing.id}, ${listing.ownerId}, ${listing.title}, ${listing.description}, ${listing.price}, ${listing.images},
-      ${listing.amenities}, ${listing.houseRules}, ${listing.householdLanguages}, ${listing.primaryHomeLanguage},
-      ${listing.leaseDuration}, ${listing.roomType}, ${listing.moveInDate}, ${listing.totalSlots}, ${listing.availableSlots},
-      ${listing.viewCount}, ${listing.status}, ${listing.createdAt},
-      ${listing.address}, ${listing.city}, ${listing.state}, ${listing.zip},
-      ST_SetSRID(ST_MakePoint(${listing.lng}, ${listing.lat}), 4326)::geography,
-      ${listing.lat}, ${listing.lng},
-      ${listing.avgRating}, ${listing.reviewCount}, ${recommendedScore},
-      ${amenitiesLower}, ${houseRulesLower}, ${householdLanguagesLower},
-      ${listing.bookingMode},
-      NOW(), NOW()
-    )
-    ON CONFLICT (id) DO UPDATE SET
-      owner_id = EXCLUDED.owner_id,
-      title = EXCLUDED.title,
-      description = EXCLUDED.description,
-      price = EXCLUDED.price,
-      images = EXCLUDED.images,
-      amenities = EXCLUDED.amenities,
-      house_rules = EXCLUDED.house_rules,
-      household_languages = EXCLUDED.household_languages,
-      primary_home_language = EXCLUDED.primary_home_language,
-      lease_duration = EXCLUDED.lease_duration,
-      room_type = EXCLUDED.room_type,
-      move_in_date = EXCLUDED.move_in_date,
-      total_slots = EXCLUDED.total_slots,
-      available_slots = EXCLUDED.available_slots,
-      view_count = EXCLUDED.view_count,
-      status = EXCLUDED.status,
-      listing_created_at = EXCLUDED.listing_created_at,
-      address = EXCLUDED.address,
-      city = EXCLUDED.city,
-      state = EXCLUDED.state,
-      zip = EXCLUDED.zip,
-      location_geog = EXCLUDED.location_geog,
-      lat = EXCLUDED.lat,
-      lng = EXCLUDED.lng,
-      avg_rating = EXCLUDED.avg_rating,
-      review_count = EXCLUDED.review_count,
-      recommended_score = EXCLUDED.recommended_score,
-      amenities_lower = EXCLUDED.amenities_lower,
-      house_rules_lower = EXCLUDED.house_rules_lower,
-      household_languages_lower = EXCLUDED.household_languages_lower,
-      booking_mode = EXCLUDED.booking_mode,
-      doc_updated_at = NOW()
-  `;
+  return rescanEntries.map((entry) => entry.id);
 }
 
-/**
- * Delete dirty flags for processed listings
- */
 async function clearDirtyFlags(listingIds: string[]): Promise<number> {
-  if (listingIds.length === 0) return 0;
+  if (listingIds.length === 0) {
+    return 0;
+  }
 
-  const result = await prisma.$executeRaw`
+  return prisma.$executeRaw`
     DELETE FROM listing_search_doc_dirty
     WHERE listing_id = ANY(${listingIds})
   `;
-
-  return result;
-}
-
-/**
- * Delete search docs for listings that no longer exist or lack location
- * These are "orphan" dirty flags for deleted listings
- */
-async function handleOrphanDirtyFlags(
-  dirtyIds: string[],
-  foundIds: Set<string>
-): Promise<number> {
-  const orphanIds = dirtyIds.filter((id) => !foundIds.has(id));
-  if (orphanIds.length === 0) return 0;
-
-  // Delete any search docs for these orphan listings (listing was deleted)
-  await prisma.$executeRaw`
-    DELETE FROM listing_search_docs
-    WHERE id = ANY(${orphanIds})
-  `;
-
-  // Clear the dirty flags
-  await prisma.$executeRaw`
-    DELETE FROM listing_search_doc_dirty
-    WHERE listing_id = ANY(${orphanIds})
-  `;
-
-  return orphanIds.length;
 }
 
 async function processWithConcurrency<I, T>(
   items: I[],
   fn: (item: I) => Promise<T>,
-  concurrency: number
-): Promise<{ fulfilled: T[]; rejected: { item: I; error: unknown }[] }> {
+  concurrency: number,
+  shouldContinue: () => boolean = () => true
+): Promise<{
+  fulfilled: T[];
+  rejected: { item: I; error: unknown }[];
+  truncated: boolean;
+}> {
   const fulfilled: T[] = [];
   const rejected: { item: I; error: unknown }[] = [];
+  let truncated = false;
 
   for (let i = 0; i < items.length; i += concurrency) {
+    if (!shouldContinue()) {
+      truncated = i < items.length;
+      break;
+    }
+
     const chunk = items.slice(i, i + concurrency);
     const results = await Promise.allSettled(chunk.map(fn));
     for (let j = 0; j < results.length; j++) {
@@ -259,73 +261,228 @@ async function processWithConcurrency<I, T>(
     }
   }
 
-  return { fulfilled, rejected };
+  return { fulfilled, rejected, truncated };
+}
+
+function shouldClearDirtyFlag(result: SearchDocProjectionResult): boolean {
+  return result.outcome !== "defer_retry";
+}
+
+function countProjectionResults(results: SearchDocProjectionResult[]): {
+  outcomes: OutcomeCounters;
+  divergences: ReasonCounters;
+  repaired: ReasonCounters;
+} {
+  const outcomes = createOutcomeCounters();
+  const divergences = createReasonCounters();
+  const repaired = createReasonCounters();
+
+  for (const result of results) {
+    outcomes[result.outcome] += 1;
+
+    const reason = toSearchDocCronReasonLabel(result.divergenceReason);
+    if (!reason) {
+      continue;
+    }
+
+    divergences[reason] += 1;
+
+    if (result.outcome === "upsert" && result.writeApplied) {
+      repaired[reason] += 1;
+    }
+  }
+
+  return { outcomes, divergences, repaired };
+}
+
+function reportProjectionResults(
+  results: SearchDocProjectionResult[],
+  phase: "dirty" | "rescan"
+): { casSuppressed: CasSuppressionCounters } {
+  const casSuppressed = createCasSuppressionCounters();
+
+  for (const result of results) {
+    if (result.outcome !== "upsert") {
+      continue;
+    }
+
+    if (result.writeApplied) {
+      const reason = toSearchDocCronReasonLabel(result.divergenceReason);
+      if (!reason) {
+        continue;
+      }
+
+      logger.sync.info("cfm.search.doc.divergence_detected", {
+        event: "cfm.search.doc.divergence_detected",
+        phase,
+        listingIdHash: hashIdForLog(result.listingId),
+        reason,
+        listingVersion: result.listingVersion ?? undefined,
+        docSourceVersion: result.docSourceVersion ?? undefined,
+        docProjectionVersion: result.docProjectionVersion ?? undefined,
+      });
+      continue;
+    }
+
+    if (result.casSuppressionReason) {
+      casSuppressed[result.casSuppressionReason] += 1;
+    }
+  }
+
+  return { casSuppressed };
 }
 
 export async function GET(request: NextRequest) {
+  let cronStarted = false;
+  let partial = true;
+  let responsePartial = false;
+  let cronStartMs = 0;
+  const totalOutcomes = createOutcomeCounters();
+  const totalDivergences = createReasonCounters();
+  const totalRepaired = createReasonCounters();
+  const totalCasSuppressed = createCasSuppressionCounters();
+  let totalErrors = 0;
+  let rescanned = 0;
+  let dirtyIds: string[] = [];
+  let dirtyQueueAgeSeconds: number[] = [];
+
   try {
     const authError = validateCronAuth(request);
-    if (authError) return authError;
-
-    const startTime = Date.now();
-
-    // 1. Fetch dirty listing IDs (oldest first)
-    const dirtyIds = await fetchDirtyListingIds(BATCH_SIZE);
-
-    if (dirtyIds.length === 0) {
-      return NextResponse.json({
-        success: true,
-        processed: 0,
-        orphans: 0,
-        durationMs: Date.now() - startTime,
-        timestamp: new Date().toISOString(),
-      });
+    if (authError) {
+      return authError;
     }
 
-    // 2. Fetch full listing data for dirty listings
-    const listings = await fetchListingsWithData(dirtyIds);
-    const foundIds = new Set(listings.map((l) => l.id));
+    cronStartMs = Date.now();
+    cronStarted = true;
+    const dirtyEntries = await fetchDirtyListingEntries(getBatchSize());
+    dirtyIds = dirtyEntries.map((entry) => entry.listing_id);
+    dirtyQueueAgeSeconds = computeDirtyQueueAgeSeconds(dirtyEntries, Date.now());
 
-    // 3. Upsert search docs for each listing (concurrent batches)
-    const UPSERT_CONCURRENCY = 10;
-    const { fulfilled, rejected } = await processWithConcurrency(
-      listings,
-      async (listing) => {
-        await upsertSearchDoc(listing);
-        return listing.id;
-      },
+    const dirtyPhase = await processWithConcurrency(
+      dirtyIds,
+      async (listingId) => projectSearchDocument(listingId),
       UPSERT_CONCURRENCY
     );
 
-    const upsertedCount = fulfilled.length;
-    const errors: string[] = rejected.map(
-      ({ item, error }) => `Listing ${item.id}: ${sanitizeErrorMessage(error)}`
+    const clearableIds = dirtyPhase.fulfilled
+      .filter(shouldClearDirtyFlag)
+      .map((result) => result.listingId);
+    await clearDirtyFlags(clearableIds);
+
+    const dirtyCounts = countProjectionResults(dirtyPhase.fulfilled);
+    addOutcomeCounters(totalOutcomes, dirtyCounts.outcomes);
+    addReasonCounters(totalDivergences, dirtyCounts.divergences);
+    addReasonCounters(totalRepaired, dirtyCounts.repaired);
+    totalErrors += dirtyPhase.rejected.length;
+    addCasSuppressionCounters(
+      totalCasSuppressed,
+      reportProjectionResults(dirtyPhase.fulfilled, "dirty").casSuppressed
     );
 
-    // 4. Clear dirty flags for successfully processed listings
-    const processedIds = fulfilled;
-    await clearDirtyFlags(processedIds);
+    const shouldRunRescan =
+      features.searchDocRescan &&
+      Date.now() - cronStartMs < getTimeBudgetMs() &&
+      getRescanSampleSize() > 0;
 
-    // 5. Handle orphan dirty flags (listing deleted or missing location)
-    const orphanCount = await handleOrphanDirtyFlags(dirtyIds, foundIds);
+    if (shouldRunRescan) {
+      try {
+        const rescanIds = await fetchRescanListingIds(
+          getRescanSampleSize(),
+          dirtyIds
+        );
+        rescanned = rescanIds.length;
 
-    const durationMs = Date.now() - startTime;
+        const rescanPhase = await processWithConcurrency(
+          rescanIds,
+          async (listingId) => projectSearchDocument(listingId),
+          RESCAN_CONCURRENCY,
+          () =>
+            MAX_DURATION_MS - (Date.now() - cronStartMs) >=
+            RESCAN_CHUNK_SAFETY_MARGIN_MS
+        );
+
+        const rescanCounts = countProjectionResults(rescanPhase.fulfilled);
+        addOutcomeCounters(totalOutcomes, rescanCounts.outcomes);
+        addReasonCounters(totalDivergences, rescanCounts.divergences);
+        addReasonCounters(totalRepaired, rescanCounts.repaired);
+        totalErrors += rescanPhase.rejected.length;
+        addCasSuppressionCounters(
+          totalCasSuppressed,
+          reportProjectionResults(rescanPhase.fulfilled, "rescan").casSuppressed
+        );
+
+        if (rescanPhase.truncated) {
+          logger.sync.warn("[SearchDoc Cron] Rescan truncated by time budget", {
+            event: "search_doc_cron_rescan_truncated",
+            processed: rescanPhase.fulfilled.length,
+            dropped:
+              rescanIds.length -
+              rescanPhase.fulfilled.length -
+              rescanPhase.rejected.length,
+            durationMs: Date.now() - cronStartMs,
+          });
+        }
+
+        responsePartial = rescanPhase.truncated;
+      } catch (error) {
+        logger.sync.warn("[SearchDoc Cron] Rescan skipped", {
+          event: "search_doc_cron_rescan_skipped",
+          error: sanitizeErrorMessage(error),
+          sampleSize: getRescanSampleSize(),
+        });
+        responsePartial = false;
+      }
+    } else {
+      responsePartial = false;
+    }
+
+    const processed = totalOutcomes.upsert;
+    const repaired = sumReasonCounters(totalRepaired);
+    const queueAgeSummary = summarizeDirtyQueueAgeSeconds(dirtyQueueAgeSeconds);
+    const durationMs = Date.now() - cronStartMs;
 
     logger.sync.info("[SearchDoc Cron] Complete", {
       event: "search_doc_cron_complete",
-      processed: upsertedCount,
-      orphans: orphanCount,
-      errors: errors.length,
+      processed,
+      repaired,
+      suppressed: totalOutcomes.suppress_delete,
+      deferred: totalOutcomes.defer_retry,
+      orphans: totalOutcomes.confirmed_orphan,
+      divergentMissingDoc: totalDivergences.missing,
+      divergentStaleDoc: totalDivergences.stale,
+      divergentVersionSkew: totalDivergences.version_skew,
+      casSuppressedOlderSourceVersion: totalCasSuppressed.older_source_version,
+      casSuppressedOlderProjectionVersion:
+        totalCasSuppressed.older_projection_version,
+      dirtyQueueAgeP50Sec: queueAgeSummary.p50,
+      dirtyQueueAgeP95Sec: queueAgeSummary.p95,
+      errors: totalErrors,
       totalDirty: dirtyIds.length,
+      rescanned,
       durationMs,
+      partial: responsePartial,
     });
 
+    partial = responsePartial;
+
     return NextResponse.json({
-      success: errors.length === 0,
-      processed: upsertedCount,
-      orphans: orphanCount,
-      errors: errors.length,
+      success: totalErrors === 0,
+      processed,
+      repaired,
+      orphans: totalOutcomes.confirmed_orphan,
+      suppressed: totalOutcomes.suppress_delete,
+      deferred: totalOutcomes.defer_retry,
+      divergentMissingDoc: totalDivergences.missing,
+      divergentStaleDoc: totalDivergences.stale,
+      divergentVersionSkew: totalDivergences.version_skew,
+      casSuppressedOlderSourceVersion: totalCasSuppressed.older_source_version,
+      casSuppressedOlderProjectionVersion:
+        totalCasSuppressed.older_projection_version,
+      dirtyQueueAgeP50Sec: queueAgeSummary.p50,
+      dirtyQueueAgeP95Sec: queueAgeSummary.p95,
+      errors: totalErrors,
       durationMs,
+      partial: responsePartial,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
@@ -336,5 +493,28 @@ export async function GET(request: NextRequest) {
       { error: "SearchDoc refresh failed" },
       { status: 500 }
     );
+  } finally {
+    if (cronStarted) {
+      // JS finally blocks do not run on SIGKILL/maxDuration termination. The
+      // per-chunk rescan budget above is the primary defense for timeout exits.
+      recordSearchDocCronRun({
+        divergenceCounts: totalDivergences,
+        repairedCounts: totalRepaired,
+        casSuppressedCounts: totalCasSuppressed,
+        processedCount: totalOutcomes.upsert,
+        errorCounts: { projection_error: totalErrors },
+        dirtyQueueAgeSeconds,
+        partial,
+      });
+
+      if (partial) {
+        logger.sync.warn("[SearchDoc Cron] Partial run recorded", {
+          event: "search_doc_cron_partial",
+          processed: totalOutcomes.upsert,
+          errors: totalErrors,
+          durationMs: cronStartMs === 0 ? 0 : Date.now() - cronStartMs,
+        });
+      }
+    }
   }
 }

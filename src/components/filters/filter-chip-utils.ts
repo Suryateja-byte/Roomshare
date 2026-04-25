@@ -42,6 +42,7 @@ export interface FilterChipData {
  */
 const PRESERVED_PARAMS = [
   "q",
+  "locationLabel",
   "where",
   "lat",
   "lng",
@@ -374,6 +375,7 @@ export function removeFilterFromUrl(
     nextQuery = applySearchQueryChange(currentQuery, "filter", simplePatch);
   }
 
+  // CFM-604: canonical-on-write guarantee — chip rewrites serialize via the canonical query builder.
   return serializeSearchQuery(nextQuery).toString();
 }
 
@@ -383,6 +385,7 @@ export function removeFilterFromUrl(
  */
 export function clearAllFilters(searchParams: URLSearchParams): string {
   const currentQuery = normalizeSearchQuery(searchParams);
+  // CFM-604: canonical-on-write guarantee — clear-all rewrites serialize via the canonical query builder.
   return serializeSearchQuery({
     query: currentQuery.query,
     locationLabel: currentQuery.locationLabel,

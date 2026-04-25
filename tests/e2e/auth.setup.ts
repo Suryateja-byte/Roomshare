@@ -148,3 +148,24 @@ setup("authenticate as user2", async ({ page }) => {
       .or(page.locator('[aria-label*="user"]'))
   ).toBeVisible({ timeout: 10000 });
 });
+
+setup("authenticate as reviewer", async ({ page }) => {
+  const reviewerAuthFile = path.join(
+    __dirname,
+    "../../playwright/.auth/reviewer.json"
+  );
+
+  await loginAndSaveState(
+    page,
+    "e2e-reviewer@roomshare.dev",
+    "TestPassword123!",
+    reviewerAuthFile
+  );
+
+  await expect(
+    page
+      .getByRole("button", { name: /menu|profile|account/i })
+      .or(page.locator('[data-testid="user-menu"]'))
+      .or(page.locator('[aria-label*="user"]'))
+  ).toBeVisible({ timeout: 10000 });
+});

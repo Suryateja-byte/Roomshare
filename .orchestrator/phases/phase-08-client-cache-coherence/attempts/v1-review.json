@@ -1,0 +1,49 @@
+{
+  "phase": "08",
+  "slug": "client-cache-coherence",
+  "attempt": "v1",
+  "verdict": "approved",
+  "reviewer": "Codex GPT-5 in-thread Critic",
+  "generator": "Codex GPT-5 in-thread Generating agent",
+  "findings": [],
+  "rationale": "Phase 08 is approved. The implementation is additive and flag-gated, public invalidation metadata is opaque, push subscription storage avoids raw endpoint exposure, SSE/poll/push contracts are no-store and rate-limited, public route cache headers are wired, service-worker eviction honors projection floors and unit cache keys, and rollback can pause the whole system or only push fanout.",
+  "checks": [
+    {
+      "command": "pnpm test --runInBand <Phase 08 focused public-cache set>",
+      "status": "passed",
+      "result": "10 suites, 28 tests"
+    },
+    {
+      "command": "pnpm test --runInBand <Phase 07 saved-search/alerts regression set>",
+      "status": "passed",
+      "result": "9 suites, 100 tests"
+    },
+    {
+      "command": "pnpm test --runInBand <Phase 04 search regression set>",
+      "status": "passed",
+      "result": "8 suites, 85 tests"
+    },
+    {
+      "command": "pnpm test --runInBand <Phase 02 outbox/projection regression set>",
+      "status": "passed",
+      "result": "19 suites, 158 tests"
+    },
+    {
+      "command": "pnpm exec prisma validate",
+      "status": "passed"
+    },
+    {
+      "command": "pnpm typecheck",
+      "status": "passed"
+    },
+    {
+      "command": "pnpm lint",
+      "status": "passed",
+      "result": "0 errors; existing warnings only"
+    }
+  ],
+  "approval": {
+    "status": "APPROVED",
+    "next_phase": "phase_09_pending"
+  }
+}

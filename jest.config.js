@@ -22,6 +22,10 @@ const customJestConfig = {
     // Stub server-only — it throws at import time in non-server environments.
     // All tests that transitively import modules using `import "server-only"` need this.
     "^server-only$": "<rootDir>/src/__tests__/utils/empty-module.js",
+    // Map @electric-sql/pglite to its explicit CJS build to avoid ESM dynamic-import
+    // errors when Jest runs without --experimental-vm-modules.
+    "^@electric-sql/pglite$":
+      "<rootDir>/node_modules/@electric-sql/pglite/dist/index.cjs",
   },
   testPathIgnorePatterns: [
     "<rootDir>/node_modules/",
@@ -30,6 +34,7 @@ const customJestConfig = {
     "<rootDir>/.claude/worktrees/",
     "<rootDir>/src/__tests__/utils/",
     "<rootDir>/src/__tests__/fixtures/",
+    "<rootDir>/src/__tests__/lib/listings/collision-detector-test-utils.ts",
     "<rootDir>/tests/e2e/",
   ],
   modulePathIgnorePatterns: [
@@ -47,6 +52,38 @@ const customJestConfig = {
     "!src/app/layout.tsx",
     "!src/app/global-error.tsx",
   ],
+  coverageThreshold: {
+    "src/lib/identity/**/*.ts": {
+      statements: 90,
+      functions: 90,
+      lines: 90,
+    },
+    "src/lib/validation/category/**/*.ts": {
+      statements: 90,
+      functions: 90,
+      lines: 90,
+    },
+    "src/lib/db/**/*.ts": {
+      statements: 90,
+      functions: 90,
+      lines: 90,
+    },
+    "src/lib/outbox/**/*.ts": {
+      statements: 90,
+      functions: 90,
+      lines: 90,
+    },
+    "src/lib/audit/**/*.ts": {
+      statements: 90,
+      functions: 90,
+      lines: 90,
+    },
+    "src/lib/flags/**/*.ts": {
+      statements: 90,
+      functions: 90,
+      lines: 90,
+    },
+  },
   forceExit: process.env.CI === "true",
   workerIdleMemoryLimit: "512MB",
   moduleDirectories: ["node_modules", "<rootDir>/"],

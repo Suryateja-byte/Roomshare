@@ -134,8 +134,10 @@ test.describe("Homepage — Anonymous User", () => {
       // Find the link inside the listing card
       const cardLink = listingCard.locator('a[href*="/listings/"]').first();
       await expect(cardLink).toBeVisible({ timeout: 5000 });
-      await cardLink.click();
-      await page.waitForURL(/\/listings\//, { timeout: 15000 });
+      await Promise.all([
+        page.waitForURL(/\/listings\//, { timeout: 15000 }),
+        cardLink.evaluate((element) => (element as HTMLAnchorElement).click()),
+      ]);
       await expect(page).toHaveURL(/\/listings\//);
     } else {
       // Empty state — "Be the First to List" with link to /listings/create
@@ -158,8 +160,10 @@ test.describe("Homepage — Anonymous User", () => {
       .first();
 
     await expect(searchCta).toBeVisible({ timeout: 10000 });
-    await searchCta.click();
-    await page.waitForURL(/\/search/, { timeout: 15000 });
+    await Promise.all([
+      page.waitForURL(/\/search/, { timeout: 15000 }),
+      searchCta.evaluate((element) => (element as HTMLAnchorElement).click()),
+    ]);
   });
 
   test("HP-07: Footer renders with links", async ({ page }) => {

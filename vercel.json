@@ -1,12 +1,8 @@
 {
   "crons": [
     {
-      "path": "/api/cron/sweep-expired-holds",
-      "schedule": "0 3 * * *"
-    },
-    {
       "path": "/api/cron/daily-maintenance",
-      "schedule": "0 9 * * *"
+      "schedule": "2 7 * * *"
     }
   ]
 }

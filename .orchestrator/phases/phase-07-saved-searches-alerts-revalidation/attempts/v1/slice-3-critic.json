@@ -1,0 +1,20 @@
+{
+  "slice": "durable-match-delivery-workers",
+  "verdict": "approved",
+  "findings": [
+    {
+      "severity": "medium",
+      "status": "fixed",
+      "summary": "The duplicate idempotency path was implemented but did not have direct regression coverage.",
+      "resolution": "Added a saved-search alert test proving P2002 duplicate delivery creation is not counted as sent or errored and does not enqueue duplicate outbox work."
+    }
+  ],
+  "rationale": "Match code no longer sends email or creates in-app notifications directly, durable delivery records are queued with stable idempotency keys, outbox supports ALERT_MATCH and ALERT_DELIVER, and focused tests cover queueing, duplicate suppression, telemetry compatibility, and routing.",
+  "checks_reviewed": [
+    "pnpm test -- --runTestsByPath src/__tests__/lib/search-alerts.test.ts --runInBand",
+    "pnpm test -- --runTestsByPath src/__tests__/lib/search-alerts-telemetry.test.ts --runInBand",
+    "pnpm test -- --runTestsByPath src/__tests__/lib/outbox/handlers.test.ts --runInBand",
+    "pnpm exec tsc --noEmit --pretty false"
+  ],
+  "next_action": "Proceed to final revalidation, kill switch, and runbook slice."
+}

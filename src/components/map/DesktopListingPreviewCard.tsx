@@ -6,16 +6,24 @@ import { Home, MapPin, Star, X } from "lucide-react";
 import type { Ref } from "react";
 import { Button } from "@/components/ui/button";
 import { formatPrice } from "@/lib/format";
+import {
+  getAvailabilityPresentation,
+  type AvailabilityPublicAvailability,
+} from "@/lib/search/availability-presentation";
+import type { GroupContextPresentation } from "@/lib/search-types";
 
 type PreviewListing = {
   id: string;
   title: string;
   price: number;
   availableSlots: number;
+  totalSlots?: number;
   images?: string[];
   avgRating?: number;
   reviewCount?: number;
   roomType?: string;
+  publicAvailability?: AvailabilityPublicAvailability;
+  groupContext?: GroupContextPresentation | null;
   location: {
     city?: string;
     state?: string;
@@ -24,6 +32,7 @@ type PreviewListing = {
 
 interface DesktopListingPreviewCardProps {
   listing: PreviewListing;
+  href: string;
   isDarkMode: boolean;
   onClose: () => void;
   cardRef?: Ref<HTMLDivElement>;
@@ -58,6 +67,7 @@ function formatLocationLine(location: PreviewListing["location"]): string | null
 
 export default function DesktopListingPreviewCard({
   listing,
+  href,
   isDarkMode,
   onClose,
   cardRef,
@@ -65,6 +75,12 @@ export default function DesktopListingPreviewCard({
 }: DesktopListingPreviewCardProps) {
   const roomTypeLabel = formatRoomType(listing.roomType);
   const locationLine = formatLocationLine(listing.location);
+  const availabilityPresentation = getAvailabilityPresentation({
+    availableSlots: listing.availableSlots,
+    totalSlots: listing.totalSlots,
+    publicAvailability: listing.publicAvailability,
+    groupContext: listing.groupContext,
+  });
   const hasRating =
     Number.isFinite(listing.avgRating) && (listing.reviewCount ?? 0) > 0;
 
@@ -119,19 +135,18 @@ export default function DesktopListingPreviewCard({
           ) : null}
           <span
             className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold shadow-ambient-sm ${
-              listing.availableSlots > 0
+              availabilityPresentation.state === "available" ||
+              availabilityPresentation.state === "partial"
                 ? "bg-emerald-500 text-white"
                 : "bg-on-surface text-white"
             }`}
           >
-            {listing.availableSlots > 0
-              ? `${listing.availableSlots} available`
-              : "Filled"}
+            {availabilityPresentation.primaryLabel}
           </span>
         </div>
       </div>
 
-      <div className="space-y-3 p-4">
+        <div className="space-y-3 p-4">
         <div className="space-y-1.5">
           {hasRating ? (
             <div className="flex items-center gap-1.5 text-xs font-medium text-on-surface-variant">
@@ -157,6 +172,11 @@ export default function DesktopListingPreviewCard({
               <span className="line-clamp-1">{locationLine}</span>
             </p>
           ) : null}
+          {availabilityPresentation.secondaryGroupLabel ? (
+            <p className="text-xs font-medium text-on-surface-variant">
+              {availabilityPresentation.secondaryGroupLabel}
+            </p>
+          ) : null}
         </div>
 
         <div className="flex items-baseline gap-1.5">
@@ -170,7 +190,7 @@ export default function DesktopListingPreviewCard({
           <span className="text-sm text-on-surface-variant">/month</span>
         </div>
 
-        <Link href={`/listings/${listing.id}`} className="block">
+        <Link href={href} className="block">
           <Button
             size="sm"
             data-testid="map-popup-view-details"

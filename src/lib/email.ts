@@ -4,6 +4,8 @@
 // Uses Resend API for sending emails
 
 import { emailTemplates } from "./email-templates";
+import { logger } from "@/lib/logger";
+import { hashIdForLog } from "@/lib/messaging/cfm-messaging-telemetry";
 import { prisma } from "@/lib/prisma";
 import { fetchWithTimeout, FetchTimeoutError } from "./fetch-with-timeout";
 import { circuitBreakers, isCircuitOpenError } from "./circuit-breaker";
@@ -41,8 +43,6 @@ function sleep(ms: number): Promise<void> {
 
 // Notification preference keys that map to email types
 interface NotificationPreferences {
-  emailBookingRequests?: boolean;
-  emailBookingUpdates?: boolean;
   emailMessages?: boolean;
   emailReviews?: boolean;
   emailSearchAlerts?: boolean;
@@ -189,7 +189,7 @@ export async function sendEmail({
 export async function sendNotificationEmail(
   type: keyof typeof emailTemplates,
   email: string,
-  data: Parameters<(typeof emailTemplates)[typeof type]>[0]
+  data: Record<string, unknown>
 ): Promise<{ success: boolean; error?: string }> {
   try {
     // @ts-expect-error - TypeScript has trouble with the dynamic template selection
@@ -208,13 +208,8 @@ export async function sendNotificationEmail(
 // Map email types to user preference keys
 const emailTypeToPreferenceKey: Record<string, keyof NotificationPreferences> =
   {
-    bookingRequest: "emailBookingRequests",
-    bookingAccepted: "emailBookingUpdates",
-    bookingRejected: "emailBookingUpdates",
-    bookingCancelled: "emailBookingUpdates",
-    bookingHoldRequest: "emailBookingRequests",
-    bookingExpired: "emailBookingUpdates",
-    bookingHoldExpired: "emailBookingUpdates",
+    // listingStaleWarning and listingAutoPaused are intentionally omitted:
+    // both are safety-critical freshness messages and must always send.
     newMessage: "emailMessages",
     newReview: "emailReviews",
     searchAlert: "emailSearchAlerts",
@@ -234,7 +229,7 @@ export async function sendNotificationEmailWithPreference(
   type: keyof typeof emailTemplates,
   userId: string,
   email: string,
-  data: Parameters<(typeof emailTemplates)[typeof type]>[0]
+  data: Record<string, unknown>
 ): Promise<{ success: boolean; skipped?: boolean; error?: string }> {
   try {
     // Check if this email type has a preference mapping
@@ -258,9 +253,10 @@ export async function sendNotificationEmailWithPreference(
       // If preference is explicitly set to false, skip sending
       // Default behavior (undefined/missing key) = enabled (send email)
       if (prefs[prefKey] === false) {
-        console.log(
-          `[EMAIL] Skipped ${type} email to ${userId} - user preference disabled`
-        );
+        logger.sync.info("email.preference_skipped", {
+          type,
+          userIdHash: hashIdForLog(userId),
+        });
         return { success: true, skipped: true };
       }
     }

@@ -1,0 +1,75 @@
+{
+  "verdict": "REJECT",
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "category": "tests",
+      "location": "src/__tests__/utils/phase01-test-db.ts:246-263",
+      "issue": "TransactionQueue serializes every $transaction call through a single Promise tail (run() awaits this.tail before executing fn, and Phase01TestDb.$transaction routes every call through this.queue.run at line 905). Transactions can never run concurrently in this harness. As a direct consequence, the AC#5 advisory-lock test at src/__tests__/db/phase01-advisory-lock-contention.test.ts:32-58 cannot prove what it claims. Ten Promise.all-launched callers are silently serialized; the unique index on physical_units(canonical_address_hash, canonical_unit) plus ON CONFLICT upsert guarantees 1 row / 9 created:false regardless of advisory-lock behavior. Deleting every acquireXactLock() call in resolve-or-create-unit.ts would leave this test still green. The AdvisoryLockManager at lines 204-244 is effectively dead code because owners.has(key) is always false by the time the next queued tx runs. v1 BLOCKER on AC#5 is not fixed; it is substituted with a vacuous test.",
+      "required-outcome": "AC#5 must be proven against a substrate that permits genuine concurrent transactions so the test can distinguish correct lock code from no lock code. Remove the TransactionQueue serialization (or do not rely on a single-writer SQLite file-backed store), and exercise resolveOrCreateUnit concurrently such that removing the advisory-lock acquisition would cause the test to produce >1 physical_units rows or visible ordering inversions. The harness must be capable of interleaving two in-flight transactions."
+    },
+    {
+      "severity": "BLOCKER",
+      "category": "tests",
+      "location": "src/__tests__/db/phase01-schema.test.ts:22-54",
+      "issue": "AC#1 (migration applies cleanly; the seven canonical tables and required indexes exist) is still not proven. The test asserts db.listTables() and db.listIndexes() on the SQLite harness, which has hand-written DDL in createSchema() at src/__tests__/utils/phase01-test-db.ts:608-881. The actual Prisma migrations at prisma/migrations/20260501000000_phase01_canonical_identity_tables/migration.sql are never applied, parsed, or executed. PG-specific syntax that exists only in the migrations never gets exercised: TSTZRANGE column type, JSONB column type, TEXT[] arrays with ARRAY[]::TEXT[] defaults, partial indexes with WHERE status IN ('PENDING','IN_FLIGHT') / WHERE status = 'DLQ' / WHERE consumed_at IS NULL, ALTER TABLE ... ADD CONSTRAINT ... NOT VALID then VALIDATE CONSTRAINT, SMALLINT, NUMERIC(10,2), TIMESTAMPTZ, and the plpgsql trigger functions. Any PG-syntax regression in the migration files would ship undetected. v1 BLOCKER on AC#1 remains UNFIXED; the required-outcome demanded a real (or testcontainer) Postgres apply with information_schema / pg_indexes verification.",
+      "required-outcome": "AC#1 must be proven by applying the actual prisma/migrations/20260501*.sql files to a real Postgres (or a Postgres-compatible engine such as PGlite) and querying information_schema.tables / pg_indexes to confirm the seven tables and every required index exist. A hand-written SQLite schema that mirrors the intent of the migration is not a substitute; PG-specific types and constraints must be exercised by the same parser that will run them in production."
+    },
+    {
+      "severity": "MAJOR",
+      "category": "tests",
+      "location": "jest.config.js:50-61",
+      "issue": "AC#9 requires >=90% coverage on src/lib/identity/**, src/lib/validation/category/**, src/lib/db/**, src/lib/outbox/**, src/lib/audit/**, and src/lib/flags/**. The coverageThreshold block in v2 only enforces the first two scopes. Coverage for src/lib/db/**, src/lib/outbox/**, src/lib/audit/**, and src/lib/flags/** is not enforced by the config and is not reported in stdout.txt. v1 flagged this as MAJOR; v2 has only partially addressed it.",
+      "required-outcome": "Extend coverageThreshold in jest.config.js to also enforce >=90% statements/functions/lines on src/lib/db/**/*.ts, src/lib/outbox/**/*.ts, src/lib/audit/**/*.ts, and src/lib/flags/**/*.ts. Re-run pnpm test --coverage scoped to Phase 01 paths and attach the coverage summary for those four additional scopes."
+    },
+    {
+      "severity": "MAJOR",
+      "category": "tests",
+      "location": "src/__tests__/db/phase01-moderation-precedence.test.ts:9-198",
+      "issue": "AC#3 trigger fidelity is only partially proven. The SQLite trigger encoding at src/__tests__/utils/phase01-test-db.ts:815-880 hoists the role test into a WHEN clause (WHEN COALESCE(current_setting('app.actor_role'), 'system') = 'host' AND (...)), whereas the real migration at prisma/migrations/20260501010000_phase01_moderation_precedence_trigger/migration.sql:16-41 places the check inside a plpgsql function body using RAISE EXCEPTION with ERRCODE = 'P0001' and HINT = 'moderation'. The ModerationLockedError wrapping in src/lib/db/with-actor.ts:25-38 specifically inspects error.meta.hint === 'moderation' — a path that is never exercised in this harness because SQLite's RAISE(ABORT) produces no .meta.hint. The tests do see ModerationLockedError today only because the fallback message-includes('MODERATION_LOCKED') match happens to fire. The trigger's actual PG behavior — including plpgsql function SET search_path, P0001 error code propagation, and HINT metadata — is never executed.",
+      "required-outcome": "AC#3 must also be exercised against the actual plpgsql trigger (real or Postgres-compatible engine) so the ERRCODE/HINT metadata path in isModerationLockedError is verified end-to-end, and so the SECURITY attribute and SET search_path on enforce_moderation_precedence() are actually loaded and invoked."
+    },
+    {
+      "severity": "MAJOR",
+      "category": "tests",
+      "location": "src/__tests__/db/phase01-schema.test.ts:56-110",
+      "issue": "AC#2 CHECK-constraint fidelity is proven for the SQLite analog only. The harness re-declares the three category CHECK constraints inline in createSchema() at src/__tests__/utils/phase01-test-db.ts:714-740, using the same predicate shape as the migration. This is an acceptable narrow substitution because the CHECKs use only IS NOT NULL / IS NULL / numeric comparison (all PG/SQLite-shared semantics). However, the CHECKs are never tested against the real migration DDL, and the NOT VALID + VALIDATE CONSTRAINT two-phase attach from migration.sql:99-151 is not exercised. A constraint-name regression in the Prisma migration would ship undetected.",
+      "required-outcome": "Once AC#1 is proven against the actual migrations, AC#2 should ride on that same substrate: insert the six bad-row shapes (ENTIRE_PLACE with total_beds; SHARED_ROOM with null open_beds; PRIVATE_ROOM with total_beds; SHARED_ROOM with open_beds > total_beds; ENTIRE_PLACE with gender_preference; valid ENTIRE_PLACE) against the real migrated schema and confirm each CHECK rejects by constraint name."
+    },
+    {
+      "severity": "MINOR",
+      "category": "tests",
+      "location": "src/__tests__/utils/phase01-test-db.ts:265-283",
+      "issue": "The harness registers hashtext(value) as String(value ?? '') — an identity function, not a hash. This renders the pg_advisory_xact_lock(hashtext(<key>)) path in setActorContext / resolve-or-create-unit indistinguishable from pg_advisory_xact_lock('p1:unit:<hash>') directly. Unrelated to correctness in the current tests but a fidelity gap worth noting: the harness cannot observe a hashtext collision (spec Edge Case #10). Also, the hashtext() SQLite function isn't invoked at all once the advisory-lock path takes the $executeRaw branch at lines 389-394, which matches on 'pg_advisory_xact_lock(hashtext(' and uses the raw key verbatim — further masking the real-PG code path.",
+      "required-outcome": "Document in the harness README that hashtext() is stubbed and advisory-lock keys are not hashed, so harness-based tests cannot observe hashtext collision edge cases. In a future iteration, route lock acquisition through the same SQL the production code actually emits."
+    },
+    {
+      "severity": "MINOR",
+      "category": "code-quality",
+      "location": "src/lib/identity/mutate-unit.ts:108-109",
+      "issue": "resultingEpoch is computed as Math.max(...units.map(unit => unit.unitIdentityEpoch), 0) + 1. For MERGE across units with heterogeneous epochs (e.g., A=2, B=5, target T=7), all four affected rows (A, B, T) receive unit_identity_epoch = 8. The spec's §6.2/§14 semantics treat epoch as monotonic-per-unit, not global-max-plus-one; this implementation advances low-epoch units by more than +1 in a single mutation. The outbox event carries unitIdentityEpoch = resultingEpoch = 8 regardless of which underlying unit the consumer keys on. Covered tests (phase01-identity-mutation.test.ts:59-128) assert this exact behavior, but the behavior itself may diverge from the spec intent.",
+      "required-outcome": "Clarify in spec or mutate-unit.ts whether unit_identity_epoch is a per-unit monotonic counter (+1 per mutation on that unit) or a global ceiling (max + 1 applied to all affected units). If per-unit, bump each row independently. If global ceiling, document that invariant explicitly and add a test that pins the multi-unit spread behavior to spec."
+    },
+    {
+      "severity": "MINOR",
+      "category": "tests",
+      "location": "src/__tests__/db/phase01-advisory-lock-contention.test.ts",
+      "issue": "The test only covers the happy path (all 10 callers succeed, 1 created, 9 not-created). The spec's edge case T11 (SERIALIZABLE retry converges on SQLSTATE 40001) is not exercised; the harness cannot synthesize a serialization failure. Additionally, AdvisoryLockContentionError (spec §Function Signatures) has no corresponding test: no scenario is constructed where acquireXactLock must time out.",
+      "required-outcome": "Add tests for (a) SERIALIZABLE retry converging after a 40001 injection, and (b) AdvisoryLockContentionError being thrown when the lock cannot be acquired within the configured timeout. Both require a substrate that models genuine concurrent transactions."
+    },
+    {
+      "severity": "NIT",
+      "category": "plan-adherence",
+      "location": "src/lib/identity/resolve-or-create-unit.ts:34-36",
+      "issue": "The v1 MINOR finding called for picking one model: either remove setActorContext(tx, input.actor) here and require callers to use withActor, OR keep it and document it as defensive. v2 keeps the call with a comment 'Defensive guard: callers are expected to use withActor(), but keeping the local set_config calls here preserves the actor context for direct tx users.' That is the 'keep and document' choice. Acceptable. However the docblock above the function (line 28) still does not declare the 'MUST be inside withActor' contract or the defensive-guard rationale; future readers will repeat the question.",
+      "required-outcome": "Upgrade the function-level docblock to name both the recommended caller contract (withActor wraps this) and the defensive behavior (safe to call outside withActor; set_config is idempotent within a tx)."
+    }
+  ],
+  "convergence": "improving",
+  "deferred": [
+    "Install PGlite or a Postgres testcontainer so AC#1 (migration apply) and AC#5 (concurrent advisory-lock) can be proven against real Postgres semantics. Manager verified network is available in their sandbox — this is a tooling-availability decision for v3, not a generator-authoring failure.",
+    "Lint/ESLint rule banning direct Prisma calls to physical_units / host_unit_claims / listing_inventories outside withActor (spec §Edge Cases #4).",
+    "Migration rollback-runbook.md referenced in spec §Rollback is still not authored.",
+    "Document in the Phase 01 README that the SQLite harness deliberately sequentializes transactions and cannot prove concurrency invariants; the full-fidelity concurrency tests require the Postgres substrate."
+  ]
+}

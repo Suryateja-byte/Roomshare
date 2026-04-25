@@ -1,4 +1,11 @@
+import { createHash, createHmac } from "crypto";
 import { logger } from "@/lib/logger";
+import {
+  LEGACY_URL_ALIASES,
+  LEGACY_URL_SURFACES,
+  type LegacyUrlAlias,
+  type LegacyUrlSurface,
+} from "@/lib/search-params";
 import type { SearchBackendSource } from "./search-response";
 
 export type SearchTelemetryRoute =
@@ -22,11 +29,42 @@ interface SearchTelemetryStore {
   v2FallbackTotal: number;
   mapListMismatchTotal: number;
   loadMoreErrorTotal: number;
+  snapshotExpiredTotal: number;
+  snapshotHoleResponsesTotal: number;
+  snapshotHoleRatioSum: number;
   zeroResultsTotal: number;
   clientAbortTotal: number;
+  dedupAppliedTotal: number;
+  dedupOverflowTotal: number;
+  listingCreateCollisionDetectedTotal: number;
+  listingCreateCollisionResolvedTotal: number;
+  listingCreateCollisionModerationGatedTotal: number;
+  dedupOpenPanelClickTotal: number;
+  dedupMemberClickTotal: number;
+  listingCreateCollisionActionSelectedTotal: number;
+  legacyUrlCounts: Record<LegacyUrlSurface, Record<LegacyUrlAlias, number>>;
 }
 
 const MAX_REQUEST_LATENCY_SAMPLES = 1000;
+
+function createLegacyUrlCounts(): Record<
+  LegacyUrlSurface,
+  Record<LegacyUrlAlias, number>
+> {
+  const surfaces = Array.isArray(LEGACY_URL_SURFACES)
+    ? LEGACY_URL_SURFACES
+    : [];
+  const aliases = Array.isArray(LEGACY_URL_ALIASES)
+    ? LEGACY_URL_ALIASES
+    : [];
+
+  return Object.fromEntries(
+    surfaces.map((surface) => [
+      surface,
+      Object.fromEntries(aliases.map((alias) => [alias, 0])),
+    ])
+  ) as Record<LegacyUrlSurface, Record<LegacyUrlAlias, number>>;
+}
 
 const telemetryStore: SearchTelemetryStore = {
   requestLatencies: new Array<SearchRequestLatencyRecord | undefined>(
@@ -43,8 +81,20 @@ const telemetryStore: SearchTelemetryStore = {
   v2FallbackTotal: 0,
   mapListMismatchTotal: 0,
   loadMoreErrorTotal: 0,
+  snapshotExpiredTotal: 0,
+  snapshotHoleResponsesTotal: 0,
+  snapshotHoleRatioSum: 0,
   zeroResultsTotal: 0,
   clientAbortTotal: 0,
+  dedupAppliedTotal: 0,
+  dedupOverflowTotal: 0,
+  listingCreateCollisionDetectedTotal: 0,
+  listingCreateCollisionResolvedTotal: 0,
+  listingCreateCollisionModerationGatedTotal: 0,
+  dedupOpenPanelClickTotal: 0,
+  dedupMemberClickTotal: 0,
+  listingCreateCollisionActionSelectedTotal: 0,
+  legacyUrlCounts: createLegacyUrlCounts(),
 };
 
 function computePercentile(samples: number[], percentile: number): number {
@@ -68,6 +118,23 @@ function recordLatencySample(durationMs: number): void {
   telemetryStore.requestLatencyIndex += 1;
   telemetryStore.requestLatencyCount += 1;
   telemetryStore.requestLatencySum += durationMs;
+}
+
+function getOwnerHash16(ownerId: string): string {
+  const ownerHashSalt = process.env.OWNER_HASH_SALT;
+
+  if (ownerHashSalt && ownerHashSalt.length > 0) {
+    return createHmac("sha256", ownerHashSalt)
+      .update(ownerId)
+      .digest("hex")
+      .slice(0, 16);
+  }
+
+  return createHash("sha256").update(ownerId).digest("hex").slice(0, 16);
+}
+
+export function getOwnerHashPrefix8(ownerId: string): string {
+  return getOwnerHash16(ownerId).slice(0, 8);
 }
 
 export function recordSearchRequestLatency({
@@ -159,6 +226,24 @@ export function recordSearchLoadMoreError({
   });
 }
 
+export function recordSearchSnapshotExpired({
+  route,
+  queryHash,
+  reason,
+}: {
+  route: Extract<SearchTelemetryRoute, "search-client" | "search-load-more">;
+  queryHash?: string;
+  reason: "search_contract_changed" | "snapshot_missing" | "snapshot_expired";
+}): void {
+  telemetryStore.snapshotExpiredTotal += 1;
+  logger.sync.warn("search_snapshot_expired_total", {
+    route,
+    queryHash,
+    reason,
+    total: telemetryStore.snapshotExpiredTotal,
+  });
+}
+
 export function recordSearchZeroResults({
   route,
   queryHash,
@@ -174,6 +259,36 @@ export function recordSearchZeroResults({
     queryHash,
     backendSource,
     total: telemetryStore.zeroResultsTotal,
+  });
+}
+
+export function recordSearchSnapshotHoleRatio({
+  route,
+  queryHash,
+  querySnapshotId,
+  holeCount,
+  consideredCount,
+}: {
+  route: Exclude<SearchTelemetryRoute, "search-client" | "search-map-client">;
+  queryHash?: string;
+  querySnapshotId?: string;
+  holeCount: number;
+  consideredCount: number;
+}): void {
+  const ratio =
+    consideredCount > 0
+      ? Math.max(0, Math.min(1, holeCount / consideredCount))
+      : 0;
+  telemetryStore.snapshotHoleResponsesTotal += 1;
+  telemetryStore.snapshotHoleRatioSum += ratio;
+  logger.sync.info("snapshot_hole_ratio", {
+    route,
+    queryHash,
+    querySnapshotId,
+    holeCount,
+    consideredCount,
+    ratio,
+    total: telemetryStore.snapshotHoleResponsesTotal,
   });
 }
 
@@ -195,11 +310,154 @@ export function recordSearchClientAbort({
   });
 }
 
+export function recordSearchDedupApplied({
+  rowsIn,
+  groupsOut,
+  maxGroupSize,
+}: {
+  rowsIn: number;
+  groupsOut: number;
+  maxGroupSize: number;
+}): void {
+  telemetryStore.dedupAppliedTotal += 1;
+  logger.sync.info("search_dedup_applied_total", {
+    rowsIn,
+    groupsOut,
+    maxGroupSize,
+    total: telemetryStore.dedupAppliedTotal,
+  });
+}
+
+export function recordSearchDedupOverflow({
+  groupKeyPrefix8,
+  queryHashPrefix8,
+}: {
+  groupKeyPrefix8: string;
+  queryHashPrefix8: string;
+}): void {
+  telemetryStore.dedupOverflowTotal += 1;
+  logger.sync.warn("search_dedup_overflow_total", {
+    groupKeyPrefix8,
+    queryHashPrefix8,
+    total: telemetryStore.dedupOverflowTotal,
+  });
+}
+
+export function recordListingCreateCollisionDetected({
+  ownerHashPrefix8,
+  siblingCount,
+}: {
+  ownerHashPrefix8: string;
+  siblingCount: number;
+}): void {
+  telemetryStore.listingCreateCollisionDetectedTotal += 1;
+  logger.sync.info("listing_create_collision_detected_total", {
+    ownerHashPrefix8,
+    siblingCount,
+    total: telemetryStore.listingCreateCollisionDetectedTotal,
+  });
+}
+
+export function recordListingCreateCollisionResolved({
+  ownerHashPrefix8,
+  action,
+}: {
+  ownerHashPrefix8: string;
+  action: "proceed" | "moderation_gated";
+}): void {
+  telemetryStore.listingCreateCollisionResolvedTotal += 1;
+  logger.sync.info("listing_create_collision_resolved_total", {
+    ownerHashPrefix8,
+    action,
+    total: telemetryStore.listingCreateCollisionResolvedTotal,
+  });
+}
+
+export function recordListingCreateCollisionModerationGated({
+  ownerHashPrefix8,
+  windowCount24h,
+}: {
+  ownerHashPrefix8: string;
+  windowCount24h: number;
+}): void {
+  telemetryStore.listingCreateCollisionModerationGatedTotal += 1;
+  logger.sync.warn("listing_create_collision_moderation_gated_total", {
+    ownerHashPrefix8,
+    windowCount24h,
+    total: telemetryStore.listingCreateCollisionModerationGatedTotal,
+  });
+}
+
+export function recordSearchDedupOpenPanelClick({
+  groupSize,
+  queryHashPrefix8,
+}: {
+  groupSize: number;
+  queryHashPrefix8: string;
+}): void {
+  telemetryStore.dedupOpenPanelClickTotal += 1;
+  logger.sync.info("search_dedup_open_panel_click", {
+    groupSize,
+    queryHashPrefix8,
+    total: telemetryStore.dedupOpenPanelClickTotal,
+  });
+}
+
+export function recordSearchDedupMemberClick({
+  groupSize,
+  memberIndex,
+}: {
+  groupSize: number;
+  memberIndex: number;
+}): void {
+  telemetryStore.dedupMemberClickTotal += 1;
+  logger.sync.info("search_dedup_member_click", {
+    groupSize,
+    memberIndex,
+    total: telemetryStore.dedupMemberClickTotal,
+  });
+}
+
+export function recordListingCreateCollisionActionSelected({
+  action,
+}: {
+  action: "update" | "add_date" | "create_separate" | "cancel";
+}): void {
+  telemetryStore.listingCreateCollisionActionSelectedTotal += 1;
+  logger.sync.info("listing_create_collision_action_selected", {
+    action,
+    total: telemetryStore.listingCreateCollisionActionSelectedTotal,
+  });
+}
+
+export function recordLegacyUrlUsage({
+  alias,
+  surface,
+}: {
+  alias: LegacyUrlAlias;
+  surface: LegacyUrlSurface;
+}): void {
+  telemetryStore.legacyUrlCounts[surface][alias] += 1;
+  logger.sync.info("cfm.search.legacy_url_count", {
+    alias,
+    surface,
+    total: telemetryStore.legacyUrlCounts[surface][alias],
+  });
+}
+
 export function getSearchTelemetrySnapshot() {
   const validLatencies = telemetryStore.requestLatencies
     .filter((entry): entry is SearchRequestLatencyRecord => entry !== undefined)
     .map((entry) => entry.durationMs)
     .sort((left, right) => left - right);
+  const legacyUrlCounts = createLegacyUrlCounts();
+
+  for (const surface of LEGACY_URL_SURFACES) {
+    for (const alias of LEGACY_URL_ALIASES) {
+      legacyUrlCounts[surface][alias] =
+        telemetryStore.legacyUrlCounts[surface][alias];
+    }
+  }
 
   return {
     requestLatency: {
@@ -215,8 +473,28 @@ export function getSearchTelemetrySnapshot() {
     v2FallbackTotal: telemetryStore.v2FallbackTotal,
     mapListMismatchTotal: telemetryStore.mapListMismatchTotal,
     loadMoreErrorTotal: telemetryStore.loadMoreErrorTotal,
+    snapshotExpiredTotal: telemetryStore.snapshotExpiredTotal,
+    snapshotHoleResponsesTotal: telemetryStore.snapshotHoleResponsesTotal,
+    snapshotHoleRatioAverage:
+      telemetryStore.snapshotHoleResponsesTotal > 0
+        ? telemetryStore.snapshotHoleRatioSum /
+          telemetryStore.snapshotHoleResponsesTotal
+        : 0,
     zeroResultsTotal: telemetryStore.zeroResultsTotal,
     clientAbortTotal: telemetryStore.clientAbortTotal,
+    dedupAppliedTotal: telemetryStore.dedupAppliedTotal,
+    dedupOverflowTotal: telemetryStore.dedupOverflowTotal,
+    dedupOpenPanelClickTotal: telemetryStore.dedupOpenPanelClickTotal,
+    dedupMemberClickTotal: telemetryStore.dedupMemberClickTotal,
+    listingCreateCollisionDetectedTotal:
+      telemetryStore.listingCreateCollisionDetectedTotal,
+    listingCreateCollisionResolvedTotal:
+      telemetryStore.listingCreateCollisionResolvedTotal,
+    listingCreateCollisionModerationGatedTotal:
+      telemetryStore.listingCreateCollisionModerationGatedTotal,
+    listingCreateCollisionActionSelectedTotal:
+      telemetryStore.listingCreateCollisionActionSelectedTotal,
+    legacyUrlCounts,
   };
 }
 
@@ -235,6 +513,18 @@ export function resetSearchTelemetryForTests(): void {
   telemetryStore.v2FallbackTotal = 0;
   telemetryStore.mapListMismatchTotal = 0;
   telemetryStore.loadMoreErrorTotal = 0;
+  telemetryStore.snapshotExpiredTotal = 0;
+  telemetryStore.snapshotHoleResponsesTotal = 0;
+  telemetryStore.snapshotHoleRatioSum = 0;
   telemetryStore.zeroResultsTotal = 0;
   telemetryStore.clientAbortTotal = 0;
+  telemetryStore.dedupAppliedTotal = 0;
+  telemetryStore.dedupOverflowTotal = 0;
+  telemetryStore.listingCreateCollisionDetectedTotal = 0;
+  telemetryStore.listingCreateCollisionResolvedTotal = 0;
+  telemetryStore.listingCreateCollisionModerationGatedTotal = 0;
+  telemetryStore.dedupOpenPanelClickTotal = 0;
+  telemetryStore.dedupMemberClickTotal = 0;
+  telemetryStore.listingCreateCollisionActionSelectedTotal = 0;
+  telemetryStore.legacyUrlCounts = createLegacyUrlCounts();
 }

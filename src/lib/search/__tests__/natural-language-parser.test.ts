@@ -96,6 +96,25 @@ describe("parseNaturalLanguageQuery", () => {
     const result = parseNaturalLanguageQuery("under $1,500");
     expect(result?.maxPrice).toBe("1500");
   });
+
+  it('maps "book" language to availability intent without booking params', () => {
+    const result = parseNaturalLanguageQuery("book a room in Austin");
+
+    expect(result).not.toBeNull();
+    expect(result?.availabilityIntent).toBe("availability");
+    expect(result?.location).toBe("Austin");
+    expect(result?.roomType).toBeUndefined();
+  });
+
+  it('maps "reserve" and "hold" language to availability intent only', () => {
+    const reserve = parseNaturalLanguageQuery("reserve a place in Austin");
+    const hold = parseNaturalLanguageQuery("hold a spot in Austin");
+
+    expect(reserve?.availabilityIntent).toBe("availability");
+    expect(reserve?.location).toBe("Austin");
+    expect(hold?.availabilityIntent).toBe("availability");
+    expect(hold?.location).toBe("Austin");
+  });
 });
 
 describe("nlQueryToSearchParams", () => {
@@ -141,6 +160,19 @@ describe("nlQueryToSearchParams", () => {
 
     expect(params.get("minSlots")).toBe("3");
     expect(params.has("minAvailableSlots")).toBe(false);
+  });
+
+  it("does not serialize internal availability intent", () => {
+    const params = nlQueryToSearchParams({
+      location: "Austin",
+      amenities: [],
+      houseRules: [],
+      availabilityIntent: "availability",
+    });
+
+    expect(params.get("q")).toBe("Austin");
+    expect(params.has("availabilityIntent")).toBe(false);
+    expect(params.has("bookingMode")).toBe(false);
   });
 });
 

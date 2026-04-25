@@ -96,7 +96,7 @@ describe("parseSearchParams - vibe cases", () => {
     expect(result.filterParams.vibeQuery).toBe("quiet roommates");
   });
 
-  it("parses canonical where separately from the hard query", () => {
+  it("parses legacy where separately from the hard query", () => {
     const result = parseSearchParams({
       where: "Irving",
       what: "dark room",
@@ -106,6 +106,23 @@ describe("parseSearchParams - vibe cases", () => {
 
     expect(result.locationLabel).toBe("Irving");
     expect(result.filterParams.locationLabel).toBe("Irving");
+    expect(result.q).toBeUndefined();
+    expect(result.filterParams.query).toBeUndefined();
+    expect(result.filterParams.vibeQuery).toBe("dark room");
+    expect(result.boundsRequired).toBe(false);
+  });
+
+  it("prefers locationLabel over where when both are present", () => {
+    const result = parseSearchParams({
+      locationLabel: "Dallas",
+      where: "Irving",
+      what: "dark room",
+      lat: "32.814",
+      lng: "-96.9489",
+    });
+
+    expect(result.locationLabel).toBe("Dallas");
+    expect(result.filterParams.locationLabel).toBe("Dallas");
     expect(result.q).toBeUndefined();
     expect(result.filterParams.query).toBeUndefined();
     expect(result.filterParams.vibeQuery).toBe("dark room");
@@ -364,6 +381,23 @@ describe("parseSearchParams - enum cases", () => {
   });
 });
 
+describe("parseSearchParams - booking mode cases", () => {
+  const cases: Array<[string, string | undefined, string | undefined]> = [
+    ["shared preserved", "SHARED", "SHARED"],
+    ["whole unit preserved", "WHOLE_UNIT", "WHOLE_UNIT"],
+    ["per slot maps to shared", "PER_SLOT", "SHARED"],
+    ["legacy instant ignored", "INSTANT", undefined],
+    ["legacy request ignored", "REQUEST", undefined],
+    ["any ignored", "any", undefined],
+    ["invalid ignored", "not-real", undefined],
+  ];
+
+  test.each(cases)("%s", (_label, bookingMode, expected) => {
+    const result = parseSearchParams({ bookingMode });
+    expect(result.filterParams.bookingMode).toBe(expected);
+  });
+});
+
 describe("parseSearchParams - date cases", () => {
   const cases: Array<[string, string | undefined, string | undefined]> = [
     ["today valid", today, today],
@@ -381,6 +415,49 @@ describe("parseSearchParams - date cases", () => {
   test.each(cases)("%s", (_label, moveInDate, expected) => {
     const result = parseSearchParams({ moveInDate });
     expect(result.filterParams.moveInDate).toBe(expected);
+  });
+
+  test("accepts startDate as a legacy inbound alias for moveInDate", () => {
+    const result = parseSearchParams({
+      startDate: tomorrow,
+      endDate: nextYear,
+    });
+
+    expect(result.filterParams.moveInDate).toBe(tomorrow);
+    expect(result.filterParams.endDate).toBe(nextYear);
+  });
+
+  test("prefers moveInDate over startDate when both are present", () => {
+    const validEndDate = formatLocalDate(
+      new Date(nextYearDate.getTime() + 24 * 60 * 60 * 1000)
+    );
+    const result = parseSearchParams({
+      moveInDate: nextYear,
+      startDate: tomorrow,
+      endDate: validEndDate,
+    });
+
+    expect(result.filterParams.moveInDate).toBe(nextYear);
+    expect(result.filterParams.endDate).toBe(validEndDate);
+  });
+
+  test("drops orphan endDate when no valid start date exists", () => {
+    const result = parseSearchParams({
+      endDate: nextYear,
+    });
+
+    expect(result.filterParams.moveInDate).toBeUndefined();
+    expect(result.filterParams.endDate).toBeUndefined();
+  });
+
+  test("drops endDate when it is not after the moveInDate", () => {
+    const result = parseSearchParams({
+      moveInDate: nextYear,
+      endDate: tomorrow,
+    });
+
+    expect(result.filterParams.moveInDate).toBe(nextYear);
+    expect(result.filterParams.endDate).toBeUndefined();
   });
 });
 
@@ -877,7 +954,7 @@ describe("buildCanonicalFilterParamsFromSearchParams", () => {
     );
     const result = buildCanonicalFilterParamsFromSearchParams(searchParams);
 
-    expect(result.getAll("languages")).toEqual(["te", "en"]);
+    expect(result.getAll("languages")).toEqual(["en", "te"]);
   });
 
   it("excludes pagination and sort keys", () => {
@@ -900,5 +977,26 @@ describe("buildCanonicalFilterParamsFromSearchParams", () => {
     expect(result.get("maxPrice")).toBe("1400");
     expect(result.has("minBudget")).toBe(false);
     expect(result.has("maxBudget")).toBe(false);
+  });
+
+  it("normalizes legacy move-in and booking mode aliases into the same canonical params", () => {
+    const legacyParams = new URLSearchParams(
+      `startDate=${tomorrow}&bookingMode=PER_SLOT&minSlots=2&minBudget=700&maxBudget=1400`
+    );
+    const currentParams = new URLSearchParams(
+      `moveInDate=${tomorrow}&bookingMode=SHARED&minSlots=2&minPrice=700&maxPrice=1400`
+    );
+
+    expect(
+      buildCanonicalFilterParamsFromSearchParams(legacyParams).toString()
+    ).toBe(buildCanonicalFilterParamsFromSearchParams(currentParams).toString());
+  });
+
+  it("drops deprecated booking-only values from canonical params", () => {
+    const searchParams = new URLSearchParams("bookingMode=INSTANT&minSlots=2");
+    const result = buildCanonicalFilterParamsFromSearchParams(searchParams);
+
+    expect(result.has("bookingMode")).toBe(false);
+    expect(result.get("minSlots")).toBe("2");
   });
 });

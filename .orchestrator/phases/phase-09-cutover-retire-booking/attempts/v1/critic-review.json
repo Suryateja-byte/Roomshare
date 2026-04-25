@@ -1,0 +1,33 @@
+{
+  "phase": "09",
+  "slug": "cutover-retire-booking",
+  "attempt": "v1",
+  "verdict": "approved",
+  "reviewer": "Codex GPT-5 in-thread Critic",
+  "generator": "Codex GPT-5 in-thread Generating agent",
+  "findings": [],
+  "rationale": "Phase 09 satisfies the approved destructive pre-launch cutover plan: booking-era Prisma models, runtime routes, actions, crons, utilities, UI surfaces, load tests, and booking-specific tests were retired; legacy bookmark routes redirect without Booking reads; contact-first listing/update/delete/review behavior is preserved; non-production Phase 01-08 defaults are enabled with production still conservative; projection/search/paywall/alert regression sets pass; and static scans over active runtime/test/tooling surfaces show no Booking model or retired cron/action entry points.",
+  "checks_reviewed": [
+    "pnpm test -- --runTestsByPath src/__tests__/phase09/cutover-retire-booking.test.ts src/__tests__/db/phase09-schema.test.ts src/__tests__/api/listing-can-delete.test.ts src/__tests__/api/cron/vercel-cron-budget.test.ts --runInBand",
+    "pnpm test -- --runTestsByPath <Phase 08 public-cache focused set> --runInBand",
+    "pnpm test -- --runTestsByPath <Phase 07 saved-search/alerts focused set> --runInBand",
+    "pnpm test -- --runTestsByPath <Phase 06 payments focused set> --runInBand",
+    "pnpm test -- --runTestsByPath <Phase 04 search focused set> --runInBand",
+    "pnpm test -- --runTestsByPath <Phase 02 outbox/projection focused set> --runInBand",
+    "pnpm test -- --runTestsByPath src/__tests__/lib/search/search-doc-queries.test.ts src/__tests__/lib/freshness/ops-metrics.test.ts src/__tests__/fixes/cfm-602-map-eligibility.test.ts --runInBand",
+    "pnpm exec prisma validate",
+    "pnpm typecheck",
+    "pnpm lint",
+    "node --check scripts/seed-e2e.js",
+    "git grep active retirement scan over src scripts tests package.json vercel.json"
+  ],
+  "residual_risks": [
+    "pnpm run seed:e2e could not complete because no Postgres server was reachable at localhost:5433 and Docker is not installed in this WSL distro.",
+    "Broad Jest and Playwright were not run.",
+    "Historic docs and old migration files still mention booking-era terms as historical context."
+  ],
+  "approval": {
+    "status": "APPROVED",
+    "next_phase": "phase_10_pending"
+  }
+}

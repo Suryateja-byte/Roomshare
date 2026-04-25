@@ -32,23 +32,6 @@ export async function GET(
       return NextResponse.json({ error: "Listing not found" }, { status: 404 });
     }
 
-    // Count active ACCEPTED bookings (blocks deletion)
-    const activeBookings = await prisma.booking.count({
-      where: {
-        listingId: id,
-        status: "ACCEPTED",
-        endDate: { gte: new Date() },
-      },
-    });
-
-    // Count pending bookings (warning - will be cancelled)
-    const pendingBookings = await prisma.booking.count({
-      where: {
-        listingId: id,
-        status: "PENDING",
-      },
-    });
-
     // Count active conversations (warning - will be deleted)
     const activeConversations = await prisma.conversation.count({
       where: {
@@ -57,9 +40,9 @@ export async function GET(
     });
 
     return NextResponse.json({
-      canDelete: activeBookings === 0,
-      activeBookings,
-      pendingBookings,
+      canDelete: true,
+      activeBookings: 0,
+      pendingBookings: 0,
       activeConversations,
     });
   } catch (error) {

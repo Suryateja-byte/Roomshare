@@ -3,21 +3,12 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import {
-  Trash2,
-  AlertTriangle,
-  Loader2,
-  MessageSquare,
-  Calendar,
-} from "lucide-react";
+import { Trash2, AlertTriangle, Loader2, MessageSquare } from "lucide-react";
 import { PasswordConfirmationModal } from "@/components/auth/PasswordConfirmationModal";
 import { hasPasswordSet } from "@/app/actions/settings";
 
 interface DeletionInfo {
-  activeBookings: number;
-  pendingBookings: number;
   activeConversations: number;
 }
 
@@ -30,7 +21,6 @@ export default function DeleteListingButton({
   const [isChecking, setIsChecking] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [deletionInfo, setDeletionInfo] = useState<DeletionInfo | null>(null);
-  const [isBlocked, setIsBlocked] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [hasPassword, setHasPassword] = useState(false);
   const router = useRouter();
@@ -38,29 +28,16 @@ export default function DeleteListingButton({
   const handleDeleteClick = async () => {
     setIsChecking(true);
     setDeletionInfo(null);
-    setIsBlocked(false);
 
     try {
       // Check if listing can be deleted
       const checkRes = await fetch(`/api/listings/${listingId}/can-delete`);
-      const {
-        canDelete,
-        activeBookings,
-        pendingBookings,
-        activeConversations,
-      } = await checkRes.json();
+      const { activeConversations } = await checkRes.json();
 
       const info: DeletionInfo = {
-        activeBookings,
-        pendingBookings,
         activeConversations,
       };
       setDeletionInfo(info);
-
-      if (!canDelete) {
-        setIsBlocked(true);
-        return;
-      }
 
       // Safe to show confirmation (but may have warnings)
       setShowConfirm(true);
@@ -115,50 +92,12 @@ export default function DeleteListingButton({
   const handleCancel = () => {
     setShowConfirm(false);
     setDeletionInfo(null);
-    setIsBlocked(false);
     setShowPasswordModal(false);
   };
 
-  // Show blocking message for active bookings
-  if (isBlocked && deletionInfo && deletionInfo.activeBookings > 0) {
-    return (
-      <div className="space-y-3 p-3 border border-destructive/50 rounded-lg bg-destructive/5">
-        <div className="flex items-start gap-2">
-          <AlertTriangle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
-          <div className="space-y-1">
-            <p className="text-sm font-medium text-destructive">
-              Cannot delete listing
-            </p>
-            <p className="text-sm text-muted-foreground">
-              You have {deletionInfo.activeBookings} active booking
-              {deletionInfo.activeBookings > 1 ? "s" : ""} for this listing.
-              Please wait for them to end or cancel them before deleting.
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-1"
-            onClick={handleCancel}
-          >
-            Dismiss
-          </Button>
-          <Button size="sm" className="flex-1" asChild>
-            <Link href="/bookings">Manage Bookings</Link>
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   // Show confirmation with warnings
   if (showConfirm) {
-    const hasWarnings =
-      deletionInfo &&
-      (deletionInfo.pendingBookings > 0 ||
-        deletionInfo.activeConversations > 0);
+    const hasWarnings = deletionInfo && deletionInfo.activeConversations > 0;
 
     return (
       <div className="space-y-3">
@@ -172,16 +111,6 @@ export default function DeleteListingButton({
             </div>
 
             <ul className="text-sm text-amber-600 space-y-1.5 ml-7">
-              {deletionInfo!.pendingBookings > 0 && (
-                <li className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4" />
-                  <span>
-                    <strong>{deletionInfo!.pendingBookings}</strong> pending
-                    booking{deletionInfo!.pendingBookings > 1 ? "s" : ""} will
-                    be cancelled
-                  </span>
-                </li>
-              )}
               {deletionInfo!.activeConversations > 0 && (
                 <li className="flex items-center gap-2">
                   <MessageSquare className="w-4 h-4" />
@@ -237,7 +166,7 @@ export default function DeleteListingButton({
           onClose={() => setShowPasswordModal(false)}
           onConfirm={handleDelete}
           title="Delete Listing"
-          description="This action will permanently delete your listing and all associated data including bookings and conversations."
+          description="This action will permanently delete your listing and associated conversations."
           confirmText="Delete Listing"
           confirmVariant="destructive"
           hasPassword={hasPassword}
@@ -276,7 +205,7 @@ export default function DeleteListingButton({
         onClose={() => setShowPasswordModal(false)}
         onConfirm={handleDelete}
         title="Delete Listing"
-        description="This action will permanently delete your listing and all associated data including bookings and conversations."
+        description="This action will permanently delete your listing and associated conversations."
         confirmText="Delete Listing"
         confirmVariant="destructive"
         hasPassword={hasPassword}

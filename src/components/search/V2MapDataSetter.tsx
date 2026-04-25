@@ -9,23 +9,20 @@ interface V2MapDataSetterProps {
 }
 
 /**
- * INACTIVE: Not currently rendered in any production code path.
- * V2 search LIST data works via executeSearchV2, but V2 MAP data
- * (GeoJSON/pins via this component) is not yet wired into page.tsx.
- * See TODO in page.tsx:436-438 for wiring instructions.
+ * Injects unified V2 map data into SearchV2DataContext.
  *
- * When activated, this component injects v2 map data into SearchV2DataContext.
- * It would be rendered by page.tsx when v2 mode is enabled, setting
- * context data before PersistentMapWrapper reads it.
- *
- * Data flow: page.tsx → V2MapDataSetter → context → PersistentMapWrapper
+ * Data flow: page.tsx or SearchResultsClient → V2MapDataSetter/context setter
+ * → PersistentMapWrapper. The setter only carries the current query contract,
+ * so stale map payloads are ignored when URL state changes mid-flight.
  */
 export function V2MapDataSetter({ data }: V2MapDataSetterProps) {
-  const { setV2MapData, setIsV2Enabled } = useSearchV2Setters();
+  const { setPendingQueryHash, setV2MapData, setIsV2Enabled } =
+    useSearchV2Setters();
 
   useEffect(() => {
     // Mark v2 as enabled so PersistentMapWrapper knows to wait/skip fetch
     setIsV2Enabled(true);
+    setPendingQueryHash(null);
     // P2-FIX (#135): Don't pass dataVersion - page.tsx data is always fresh for current URL.
     // Passing dataVersion caused race condition: when URL changes, context's effect increments
     // dataVersionRef immediately but state update is batched. This effect would then pass
@@ -38,7 +35,7 @@ export function V2MapDataSetter({ data }: V2MapDataSetterProps) {
     // would set v2MapData to null BEFORE new data arrives, causing markers
     // to briefly disappear. Let new data overwrite old data instead.
     // Cleanup for leaving /search entirely is handled by layout unmount.
-  }, [data, setV2MapData, setIsV2Enabled]);
+  }, [data, setPendingQueryHash, setV2MapData, setIsV2Enabled]);
 
   // Renders nothing - just sets context
   return null;

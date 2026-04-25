@@ -7,7 +7,7 @@ import {
 } from "@/lib/search/search-query";
 
 describe("search-query", () => {
-  it("normalizes array params, swaps invalid price ranges, and canonicalizes pagination", () => {
+  it("normalizes array params, drops invalid price ranges, and canonicalizes pagination", () => {
     const query = normalizeSearchQuery(
       new URLSearchParams(
         "amenities=Parking&amenities=Wifi&amenities=Parking&minPrice=1800&maxPrice=900&page=2&pageNumber=3"
@@ -15,15 +15,15 @@ describe("search-query", () => {
     );
 
     expect(query.amenities).toEqual(["Parking", "Wifi"]);
-    expect(query.minPrice).toBe(900);
-    expect(query.maxPrice).toBe(1800);
+    expect(query.minPrice).toBeUndefined();
+    expect(query.maxPrice).toBeUndefined();
     expect(query.page).toBe(2);
     expect(query.cursor).toBeUndefined();
 
     const params = serializeSearchQuery(query);
     expect(params.getAll("amenities")).toEqual(["Parking", "Wifi"]);
-    expect(params.get("minPrice")).toBe("900");
-    expect(params.get("maxPrice")).toBe("1800");
+    expect(params.has("minPrice")).toBe(false);
+    expect(params.has("maxPrice")).toBe(false);
     expect(params.get("page")).toBe("2");
     expect(params.get("pageNumber")).toBeNull();
   });
@@ -127,7 +127,98 @@ describe("search-query", () => {
     );
 
     expect(url).toBe(
-      "/search?amenities=Parking&amenities=Wifi&what=quiet+roommates&where=San+Francisco"
+      "/search?amenities=Parking&amenities=Wifi&locationLabel=San+Francisco&what=quiet+roommates"
+    );
+  });
+
+  it("prefers locationLabel over where during normalization", () => {
+    const query = normalizeSearchQuery(
+      new URLSearchParams("locationLabel=Dallas&where=Austin&lat=32.7767&lng=-96.797")
+    );
+
+    expect(query.locationLabel).toBe("Dallas");
+    expect(buildCanonicalSearchUrl(query, { includePagination: false })).toContain(
+      "locationLabel=Dallas"
+    );
+    expect(buildCanonicalSearchUrl(query, { includePagination: false })).not.toContain(
+      "where="
+    );
+  });
+
+  it("preserves explicit endDate values through normalization and serialization", () => {
+    const query = normalizeSearchQuery(
+      new URLSearchParams("moveInDate=2026-05-01&endDate=2026-06-01")
+    );
+
+    expect(query.moveInDate).toBe("2026-05-01");
+    expect(query.endDate).toBe("2026-06-01");
+
+    const params = serializeSearchQuery(query);
+    expect(params.get("moveInDate")).toBe("2026-05-01");
+    expect(params.get("endDate")).toBe("2026-06-01");
+
+    expect(buildCanonicalSearchUrl(query, { includePagination: false })).toBe(
+      "/search?endDate=2026-06-01&moveInDate=2026-05-01"
+    );
+  });
+
+  it("normalizes inbound startDate aliases back to canonical search params", () => {
+    const query = normalizeSearchQuery(
+      new URLSearchParams("startDate=2026-05-01&endDate=2026-06-01")
+    );
+
+    expect(query.moveInDate).toBe("2026-05-01");
+    expect(query.endDate).toBe("2026-06-01");
+
+    expect(buildCanonicalSearchUrl(query, { includePagination: false })).toBe(
+      "/search?endDate=2026-06-01&moveInDate=2026-05-01"
+    );
+  });
+
+  it("normalizes structural booking mode aliases in query serialization", () => {
+    const query = normalizeSearchQuery(
+      new URLSearchParams("bookingMode=PER_SLOT&minSlots=2")
+    );
+
+    expect(query.bookingMode).toBe("SHARED");
+
+    expect(buildCanonicalSearchUrl(query, { includePagination: false })).toBe(
+      "/search?bookingMode=SHARED&minSlots=2"
+    );
+  });
+
+  it("drops deprecated booking-only values from canonical URLs", () => {
+    const query = normalizeSearchQuery(
+      new URLSearchParams("bookingMode=INSTANT&minSlots=2")
+    );
+
+    expect(query.bookingMode).toBeUndefined();
+
+    expect(buildCanonicalSearchUrl(query, { includePagination: false })).toBe(
+      "/search?minSlots=2"
+    );
+  });
+
+  it("drops malformed manual price ranges during serialization to match parser semantics", () => {
+    const params = serializeSearchQuery({
+      minPrice: 1800,
+      maxPrice: 900,
+    });
+
+    expect(params.has("minPrice")).toBe(false);
+    expect(params.has("maxPrice")).toBe(false);
+  });
+
+  it("drops orphan endDate values from canonical search URLs", () => {
+    const query = normalizeSearchQuery(
+      new URLSearchParams("endDate=2026-06-01")
+    );
+
+    expect(query.moveInDate).toBeUndefined();
+    expect(query.endDate).toBeUndefined();
+
+    expect(buildCanonicalSearchUrl(query, { includePagination: false })).toBe(
+      "/search"
     );
   });
 

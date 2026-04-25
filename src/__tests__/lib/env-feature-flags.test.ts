@@ -97,7 +97,7 @@ describe("Multi-slot booking feature flag cross-validation", () => {
     consoleSpy.mockRestore();
   });
 
-  it("feature getters do not throw on unrelated invalid production secrets", async () => {
+  it("retired booking feature getters do not throw on unrelated invalid production secrets", async () => {
     process.env.CRON_SECRET = "change-in-production-aaaa-bbbb-cccc-dddd-eeee";
     process.env.ENABLE_MULTI_SLOT_BOOKING = "true";
     process.env.ENABLE_SOFT_HOLDS = "on";
@@ -105,8 +105,74 @@ describe("Multi-slot booking feature flag cross-validation", () => {
     const { features } = await import("@/lib/env");
 
     expect(() => features.softHoldsEnabled).not.toThrow();
-    expect(features.softHoldsEnabled).toBe(true);
-    expect(features.multiSlotBooking).toBe(true);
+    expect(features.softHoldsEnabled).toBe(false);
+    expect(features.multiSlotBooking).toBe(false);
+  });
+
+  it("exposes contact-first listing flag when enabled", async () => {
+    process.env.ENABLE_CONTACT_FIRST_LISTINGS = "true";
+
+    const { features } = await import("@/lib/env");
+
+    expect(features.contactFirstListings).toBe(true);
+  });
+
+  it("keeps private feedback disabled by default and exposes the flag when enabled", async () => {
+    let envModule = await import("@/lib/env");
+    expect(envModule.features.privateFeedback).toBe(false);
+
+    jest.resetModules();
+    process.env = {
+      ...baseEnv,
+      ENABLE_PRIVATE_FEEDBACK: "true",
+    } as unknown as NodeJS.ProcessEnv;
+
+    envModule = await import("@/lib/env");
+    expect(envModule.features.privateFeedback).toBe(true);
+  });
+
+  it("keeps freshness notifications disabled by default and exposes the flag when enabled", async () => {
+    let envModule = await import("@/lib/env");
+    expect(envModule.features.freshnessNotifications).toBe(false);
+
+    jest.resetModules();
+    process.env = {
+      ...baseEnv,
+      ENABLE_FRESHNESS_NOTIFICATIONS: "on",
+    } as unknown as NodeJS.ProcessEnv;
+
+    envModule = await import("@/lib/env");
+    expect(envModule.features.freshnessNotifications).toBe(true);
+  });
+
+  it("keeps stale auto-pause disabled by default and exposes the flag when enabled", async () => {
+    let envModule = await import("@/lib/env");
+    expect(envModule.features.staleAutoPause).toBe(false);
+
+    jest.resetModules();
+    process.env = {
+      ...baseEnv,
+      ENABLE_FRESHNESS_NOTIFICATIONS: "on",
+      ENABLE_STALE_AUTO_PAUSE: "on",
+    } as unknown as NodeJS.ProcessEnv;
+
+    envModule = await import("@/lib/env");
+    expect(envModule.features.staleAutoPause).toBe(true);
+  });
+
+  it("throws when STALE_AUTO_PAUSE=on without FRESHNESS_NOTIFICATIONS=on", async () => {
+    process.env.ENABLE_STALE_AUTO_PAUSE = "on";
+
+    const consoleSpy = jest.spyOn(console, "error").mockImplementation();
+    const { getServerEnv } = await import("@/lib/env");
+
+    expect(() => getServerEnv()).toThrow("Invalid environment configuration");
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "ENABLE_STALE_AUTO_PAUSE=on requires ENABLE_FRESHNESS_NOTIFICATIONS=on"
+      )
+    );
+    consoleSpy.mockRestore();
   });
 
   it("disables keyset pagination when CURSOR_SECRET is invalid", async () => {

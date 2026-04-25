@@ -67,6 +67,34 @@ export const SORT_OPTIONS: readonly SortOption[] = [
   "rating",
 ] as const;
 
+export interface SearchPaginationSnapshot {
+  engine: "searchdoc-keyset";
+  responseVersion: string;
+  projectionVersion: number;
+  embeddingVersion: string | null;
+}
+
+export interface SnapshotCursorV3 {
+  v: 3;
+  snapshotId: string;
+  offset: number;
+  limit: number;
+  queryHash: string;
+  responseVersion: string;
+}
+
+export interface SnapshotCursorV4 {
+  v: 4;
+  snapshotId: string;
+  page: number;
+  pageSize: number;
+  queryHash: string;
+  responseVersion: string;
+  snapshotVersion: string;
+}
+
+export type SnapshotCursor = SnapshotCursorV3 | SnapshotCursorV4;
+
 /**
  * Keyset cursor structure for pagination.
  *
@@ -75,12 +103,22 @@ export const SORT_OPTIONS: readonly SortOption[] = [
  * - k: Key values in ORDER BY column sequence (as strings for float precision)
  * - id: Tie-breaker listing ID (CUID)
  */
-export interface KeysetCursor {
+export interface KeysetCursorV1 {
   v: 1;
   s: SortOption;
   k: (string | null)[];
   id: string;
 }
+
+export interface KeysetCursorV2 {
+  v: 2;
+  s: SortOption;
+  k: (string | null)[];
+  id: string;
+  snapshot: SearchPaginationSnapshot;
+}
+
+export type KeysetCursor = KeysetCursorV1 | KeysetCursorV2;
 
 // ============================================================================
 // Zod Schema
@@ -90,14 +128,66 @@ export interface KeysetCursor {
  * Zod schema for validating decoded cursor payloads.
  * Strict validation ensures malformed cursors are rejected.
  */
-const KeysetCursorSchema = z
+const SortOptionSchema = z.enum([
+  "recommended",
+  "newest",
+  "price_asc",
+  "price_desc",
+  "rating",
+]);
+
+const SearchPaginationSnapshotSchema = z
   .object({
-    v: z.literal(1),
-    s: z.enum(["recommended", "newest", "price_asc", "price_desc", "rating"]),
-    k: z.array(z.union([z.string(), z.null()])),
-    id: z.string().min(1),
+    engine: z.literal("searchdoc-keyset"),
+    responseVersion: z.string().min(1),
+    projectionVersion: z.number().int().nonnegative(),
+    embeddingVersion: z.string().nullable(),
   })
   .strict();
+
+const SnapshotCursorSchema = z.union([
+  z
+    .object({
+      v: z.literal(3),
+      snapshotId: z.string().min(1),
+      offset: z.number().int().nonnegative(),
+      limit: z.number().int().positive().max(256),
+      queryHash: z.string().min(1),
+      responseVersion: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      v: z.literal(4),
+      snapshotId: z.string().min(1),
+      page: z.number().int().positive().max(10_000),
+      pageSize: z.number().int().positive().max(256),
+      queryHash: z.string().min(1),
+      responseVersion: z.string().min(1),
+      snapshotVersion: z.string().min(1),
+    })
+    .strict(),
+]);
+
+const KeysetCursorSchema = z.union([
+  z
+    .object({
+      v: z.literal(1),
+      s: SortOptionSchema,
+      k: z.array(z.union([z.string(), z.null()])),
+      id: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      v: z.literal(2),
+      s: SortOptionSchema,
+      k: z.array(z.union([z.string(), z.null()])),
+      id: z.string().min(1),
+      snapshot: SearchPaginationSnapshotSchema,
+    })
+    .strict(),
+]);
 
 /**
  * Expected key counts per sort option.
@@ -122,6 +212,20 @@ const EXPECTED_KEY_COUNTS: Record<SortOption, number> = {
  * @returns Base64url encoded cursor string
  */
 export function encodeKeysetCursor(cursor: KeysetCursor): string {
+  const payload = JSON.stringify(cursor);
+  const cursorSecret = getCursorSecret();
+  if (!cursorSecret) {
+    return toBase64Url(payload);
+  }
+
+  const signature = createHmac("sha256", cursorSecret)
+    .update(payload)
+    .digest("base64url");
+  const envelope = JSON.stringify({ p: payload, s: signature });
+  return toBase64Url(envelope);
+}
+
+export function encodeSnapshotCursor(cursor: SnapshotCursor): string {
   const payload = JSON.stringify(cursor);
   const cursorSecret = getCursorSecret();
   if (!cursorSecret) {
@@ -225,6 +329,66 @@ export function decodeKeysetCursor(
   }
 }
 
+export function decodeSnapshotCursor(
+  cursorStr: string
+): SnapshotCursor | null {
+  try {
+    const decoded = fromBase64Url(cursorStr);
+    let payload = decoded;
+
+    const cursorSecret = getCursorSecret();
+    if (cursorSecret) {
+      const parsedEnvelope = JSON.parse(decoded) as unknown;
+      if (
+        parsedEnvelope === null ||
+        typeof parsedEnvelope !== "object" ||
+        !("p" in parsedEnvelope) ||
+        !("s" in parsedEnvelope) ||
+        typeof parsedEnvelope.p !== "string" ||
+        typeof parsedEnvelope.s !== "string"
+      ) {
+        return null;
+      }
+
+      const expectedSignature = createHmac("sha256", cursorSecret)
+        .update(parsedEnvelope.p)
+        .digest("base64url");
+
+      const provided = Buffer.from(parsedEnvelope.s);
+      const expected = Buffer.from(expectedSignature);
+      if (
+        provided.length !== expected.length ||
+        !timingSafeEqual(provided, expected)
+      ) {
+        return null;
+      }
+
+      payload = parsedEnvelope.p;
+    } else {
+      const parsedEnvelope = JSON.parse(decoded) as unknown;
+      if (
+        parsedEnvelope !== null &&
+        typeof parsedEnvelope === "object" &&
+        "p" in parsedEnvelope &&
+        "s" in parsedEnvelope &&
+        typeof parsedEnvelope.p === "string"
+      ) {
+        payload = parsedEnvelope.p;
+      }
+    }
+
+    const parsed = JSON.parse(payload);
+    const result = SnapshotCursorSchema.safeParse(parsed);
+    if (!result.success) {
+      return null;
+    }
+
+    return result.data;
+  } catch {
+    return null;
+  }
+}
+
 // ============================================================================
 // Cursor Building from Query Results
 // ============================================================================
@@ -254,7 +418,8 @@ export interface CursorRowData {
  */
 export function buildCursorFromRow(
   row: CursorRowData,
-  sort: SortOption
+  sort: SortOption,
+  snapshot?: SearchPaginationSnapshot
 ): KeysetCursor {
   let keys: (string | null)[];
 
@@ -287,6 +452,16 @@ export function buildCursorFromRow(
     default:
       // Fallback to recommended
       keys = [row.recommended_score ?? null, row.listing_created_at];
+  }
+
+  if (snapshot) {
+    return {
+      v: 2,
+      s: sort,
+      k: keys,
+      id: row.id,
+      snapshot,
+    };
   }
 
   return {
@@ -392,9 +567,15 @@ export function decodeCursorAny(
   cursorStr: string,
   expectedSort: SortOption
 ):
+  | { type: "snapshot"; cursor: SnapshotCursor }
   | { type: "keyset"; cursor: KeysetCursor }
   | { type: "legacy"; page: number }
   | null {
+  const snapshotCursor = decodeSnapshotCursor(cursorStr);
+  if (snapshotCursor) {
+    return { type: "snapshot", cursor: snapshotCursor };
+  }
+
   // Try keyset first (newer format)
   const keysetCursor = decodeKeysetCursor(cursorStr, expectedSort);
   if (keysetCursor) {

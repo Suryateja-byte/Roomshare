@@ -32,6 +32,9 @@ import {
   MAP_FETCH_MAX_LAT_SPAN,
   MAP_FETCH_MAX_LNG_SPAN,
 } from "@/lib/constants";
+import { isPhase04ProjectionReadsEnabled } from "@/lib/flags/phase04";
+import { getProjectionSearchCount } from "@/lib/search/projection-search";
+import { buildPublicCacheHeaders } from "@/lib/public-cache/headers";
 
 // Disable static caching - counts must be fresh
 export const dynamic = "force-dynamic";
@@ -90,6 +93,36 @@ export async function GET(request: NextRequest) {
         );
       }
 
+      if (isPhase04ProjectionReadsEnabled()) {
+        const projectionCount = await getProjectionSearchCount({
+          parsed,
+          rawParams,
+        });
+        if (!projectionCount.ok) {
+          return NextResponse.json(
+            {
+              error: "admission_rejected",
+              admissionError: projectionCount.error,
+            },
+            {
+              status: projectionCount.error.status,
+              headers: {
+                "Cache-Control": "private, no-store",
+              },
+            }
+          );
+        }
+        return NextResponse.json(
+          { count: projectionCount.count },
+          {
+            headers: {
+              "Cache-Control": "public, s-maxage=15, stale-while-revalidate=30",
+              ...buildPublicCacheHeaders(),
+            },
+          }
+        );
+      }
+
       // Clamp oversized bounds for consistency with /api/search/facets and /api/map-listings.
       // LIMIT 101 subquery already caps row scan, but clamping prevents unnecessarily broad ST_MakeEnvelope.
       const effectiveFilterParams = filterParams.bounds
@@ -119,6 +152,7 @@ export async function GET(request: NextRequest) {
           headers: {
             // Short CDN cache for identical requests; private fallback for auth-dependent counts
             "Cache-Control": "public, s-maxage=15, stale-while-revalidate=30",
+            ...buildPublicCacheHeaders(),
           },
         }
       );

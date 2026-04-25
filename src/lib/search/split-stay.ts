@@ -43,6 +43,7 @@ export function findSplitStays(
     const first = sorted[i];
     const second = sorted[sorted.length - 1 - i];
     if (first.id === second.id) continue;
+    if (first.groupKey && first.groupKey === second.groupKey) continue;
 
     pairs.push({
       first,

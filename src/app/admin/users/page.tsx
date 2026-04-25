@@ -42,7 +42,6 @@ export default async function AdminUsersPage() {
         _count: {
           select: {
             listings: true,
-            bookings: true,
             reviewsWritten: true,
           },
         },

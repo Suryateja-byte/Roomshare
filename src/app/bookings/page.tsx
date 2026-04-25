@@ -1,44 +1,17 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import { getMyBookings } from "@/app/actions/manage-booking";
-import BookingsClient from "./BookingsClient";
 
 export const metadata = {
-  title: "My Bookings | RoomShare",
-  description: "Manage your booking requests",
+  title: "Messages | RoomShare",
+  description: "Booking has been retired. Continue conversations in messages.",
 };
 
-export default async function BookingsPage() {
+export default async function BookingsRedirectPage() {
   const session = await auth();
 
   if (!session?.user?.id) {
-    redirect("/login");
+    redirect("/login?callbackUrl=/messages");
   }
 
-  const { sentBookings, receivedBookings, error } = await getMyBookings();
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-surface-canvas pt-4 pb-20">
-        <div className="container mx-auto max-w-5xl px-6 py-10">
-          <p className="text-red-500">{error}</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Convert Prisma Decimal fields to plain numbers at the query boundary
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma Decimal→number conversion at query boundary
-  const convertBooking = (b: any) => ({
-    ...b,
-    totalPrice: Number(b.totalPrice),
-    listing: { ...b.listing, price: Number(b.listing.price) },
-  });
-
-  return (
-    <BookingsClient
-      sentBookings={(sentBookings || []).map(convertBooking)}
-      receivedBookings={(receivedBookings || []).map(convertBooking)}
-    />
-  );
+  redirect("/messages");
 }

@@ -1,0 +1,27 @@
+Phase 02 v1 implementation closeout
+
+Role sequence:
+- Workflow Orchestrator: accepted the user-provided Phase 02 finish plan as the planning artifact for a normal-risk, no-schema-change slice.
+- Planning agent: scoped the remaining gap to INVENTORY_UPSERTED identity handling and regression coverage.
+- Generating agent: implemented the handler/test fixes listed below.
+- Critic: reviewed the resulting slice and approved it after validation.
+
+Implemented changes:
+- src/lib/outbox/handlers.ts now treats INVENTORY_UPSERTED aggregateId as the inventory id and resolves the unit id from payload.unitId, with a defensive fallback through listing_inventories for legacy or malformed events.
+- src/__tests__/lib/outbox/handlers.test.ts now covers distinct unitId/inventoryId processing, cache invalidation keyed by unit, stale-event behavior, and payload-missing fallback.
+- src/__tests__/integration/phase02-outbox-to-projection.test.ts now seeds realistic unit/inventory ids and asserts ISP, UPP, and cache invalidation rows use the correct identities.
+- src/__tests__/integration/phase02-source-version-ordering.test.ts no longer relies on inventory id equaling unit id.
+
+Validation:
+- Targeted regression slice: PASS, 5 suites / 41 tests.
+- Full Phase 02 focused Jest set: PASS, 20 suites / 165 tests.
+- pnpm typecheck: PASS.
+- pnpm lint: PASS with 45 existing warnings and 0 errors.
+- Optional full pnpm test: attempted with pnpm test --runInBand; aborted from Node heap exhaustion during unrelated component/UI suites, with no Phase 02 assertion failure observed before OOM.
+
+Acceptance notes:
+- No Phase 02 INVENTORY_UPSERTED/projection regression test now depends on inventoryId === unitId.
+- The geocode worker emits aggregateType LISTING_INVENTORY, aggregateId inventory id, and payload.unitId; the drain handler now processes that contract.
+- Projection rows and cache invalidations are keyed to the resolved unit id while inventory projection writes use the inventory id.
+- Projection reads remain dark per the Phase 02 spec; public read cutover stays out of scope for later phases.
+- No schema or migration changes were made.

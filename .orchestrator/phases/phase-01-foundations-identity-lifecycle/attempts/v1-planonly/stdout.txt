@@ -1,0 +1,3 @@
+Per this repo’s workflow, I can’t start editing yet because Phase 01 includes schema migrations and moderation-trigger behavior, which requires explicit approval before leaving `Plan`.
+
+The plan artifact is in the update above. Reply `approve` and I’ll implement it, run `pnpm lint`, `pnpm typecheck`, and `pnpm test`, then return the unified diff, test results, and any deviations from the spec.

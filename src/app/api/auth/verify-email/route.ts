@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if token is expired
-    if (verificationToken.expires < new Date()) {
+    if (!verificationToken.expires || verificationToken.expires < new Date()) {
       // Delete expired token
       await prisma.verificationToken.delete({
         where: { tokenHash },

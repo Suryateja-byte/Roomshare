@@ -19,16 +19,67 @@ import {
   markConversationMessagesAsReadForUser,
   userCanAccessConversation,
 } from "@/lib/messages";
+import {
+  hashIdForLog,
+  recordConversationStartPath,
+  type ConversationStartPath,
+} from "@/lib/messaging/cfm-messaging-telemetry";
+import { evaluateListingContactable } from "@/lib/messaging/listing-contactable";
+import {
+  attachConsumptionToConversation,
+  consumeMessageStartEntitlement,
+} from "@/lib/payments/contact-paywall";
+import {
+  HOST_NOT_ACCEPTING_CONTACT_MESSAGE,
+  recordContactAttempt,
+} from "@/lib/contact/contact-attempts";
+import {
+  recordOutboundContentSoftFlag,
+  scanOutboundMessageContent,
+} from "@/lib/messaging/outbound-content-guard";
+import {
+  recordStartConversationBlockedPaywall,
+  recordStartConversationPaywallUnavailable,
+} from "@/lib/payments/telemetry";
 
 const sendMessageSchema = z.object({
   conversationId: z.string().trim().min(1).max(100),
   content: z.string().trim().min(1).max(2000),
 });
 
-export async function startConversation(listingId: string) {
+const startConversationObjectSchema = z.object({
+  listingId: z.string().trim().min(1).max(100),
+  clientIdempotencyKey: z.string().trim().min(1).max(200).optional(),
+  unitIdentityEpochObserved: z.number().int().positive().optional(),
+});
+
+export async function startConversation(
+  input:
+    | string
+    | {
+        listingId: string;
+        clientIdempotencyKey?: string;
+        unitIdentityEpochObserved?: number;
+      }
+) {
   const session = await auth();
   if (!session?.user?.id)
     return { error: "Unauthorized", code: "SESSION_EXPIRED" };
+
+  const parsedInput =
+    typeof input === "string"
+      ? { success: true as const, data: { listingId: input } }
+      : startConversationObjectSchema.safeParse(input);
+
+  if (!parsedInput.success) {
+    return { error: "Invalid contact payload" };
+  }
+
+  const {
+    listingId,
+    clientIdempotencyKey,
+    unitIdentityEpochObserved,
+  } = parsedInput.data;
 
   try {
     // Rate limiting
@@ -57,20 +108,59 @@ export async function startConversation(listingId: string) {
 
     const userId = session.user.id;
 
-    const listing = await prisma.listing.findUnique({
+    const listingRow = await prisma.listing.findUnique({
       where: { id: listingId },
-      select: { ownerId: true },
+      select: {
+        ownerId: true,
+        status: true,
+        statusReason: true,
+        availableSlots: true,
+        totalSlots: true,
+        openSlots: true,
+        moveInDate: true,
+        availableUntil: true,
+        minStayMonths: true,
+        lastConfirmedAt: true,
+        physicalUnitId: true,
+      },
     });
 
-    if (!listing) return { error: "Listing not found" };
+    const contactable = evaluateListingContactable(listingRow);
+    if (!contactable.ok) {
+      return { error: contactable.message, code: contactable.code };
+    }
+    const listing = contactable.listing;
     if (listing.ownerId === userId)
       return { error: "Cannot chat with yourself" };
+
+    let resolvedUnitIdentityEpoch: number | null = null;
+    if (unitIdentityEpochObserved && listing.physicalUnitId) {
+      const unit = await prisma.physicalUnit.findUnique({
+        where: { id: listing.physicalUnitId },
+        select: {
+          unitIdentityEpoch: true,
+          supersededByUnitId: true,
+        },
+      });
+
+      if (!unit || unit.unitIdentityEpoch !== unitIdentityEpochObserved) {
+        return {
+          error: "Please refresh this listing before contacting the host.",
+          code: "UNIT_EPOCH_STALE",
+        };
+      }
+
+      resolvedUnitIdentityEpoch = unit.unitIdentityEpoch;
+    }
 
     // Check if either user has blocked the other
     const { checkBlockBeforeAction } = await import("./block");
     const blockCheck = await checkBlockBeforeAction(listing.ownerId);
     if (!blockCheck.allowed) {
-      return { error: blockCheck.message };
+      return {
+        error: HOST_NOT_ACCEPTING_CONTACT_MESSAGE,
+        code: "HOST_NOT_ACCEPTING_CONTACT",
+      };
     }
 
     const isSerializationFailure = (error: unknown): boolean => {
@@ -87,7 +177,14 @@ export async function startConversation(listingId: string) {
     // to prevent duplicate conversations from concurrent requests (TOCTOU race).
     // One retry is enough: the winner commits, the retry acquires the same lock
     // and finds the conversation created by the winning transaction.
-    let result: { conversationId: string } | null = null;
+    let result:
+      | { conversationId: string; path: ConversationStartPath }
+      | {
+          error: string;
+          code: "PAYWALL_REQUIRED" | "PAYWALL_UNAVAILABLE";
+          unitId: string | null;
+        }
+      | null = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         result = await prisma.$transaction(
@@ -111,11 +208,57 @@ export async function startConversation(listingId: string) {
             });
 
             if (existing) {
-              // Resurrect: clear per-user deletion record if it exists
-              await tx.conversationDeletion.deleteMany({
-                where: { conversationId: existing.id, userId },
+              // Resurrect: clear per-user deletion record if it exists.
+              // `count` distinguishes the "existing" vs "resurrected" path
+              // for the cfm.messaging.conv.start_path telemetry.
+              const { count: clearedDeletions } =
+                await tx.conversationDeletion.deleteMany({
+                  where: { conversationId: existing.id, userId },
+                });
+              await recordContactAttempt(tx, {
+                userId,
+                listingId,
+                unitId: listing.physicalUnitId,
+                unitIdentityEpochObserved,
+                unitIdentityEpochResolved: resolvedUnitIdentityEpoch,
+                outcome:
+                  clearedDeletions > 0
+                    ? "RESURRECTED_CONVERSATION"
+                    : "EXISTING_CONVERSATION",
+                clientIdempotencyKey,
+                conversationId: existing.id,
               });
-              return { conversationId: existing.id };
+              return {
+                conversationId: existing.id,
+                path: (clearedDeletions > 0
+                  ? "resurrected"
+                  : "existing") as ConversationStartPath,
+              };
+            }
+
+            const consumption = await consumeMessageStartEntitlement(tx, {
+              userId,
+              listingId,
+              physicalUnitId: listing.physicalUnitId,
+              clientIdempotencyKey,
+            });
+
+            if (!consumption.ok) {
+              await recordContactAttempt(tx, {
+                userId,
+                listingId,
+                unitId: consumption.unitId,
+                unitIdentityEpochObserved,
+                unitIdentityEpochResolved: consumption.unitIdentityEpoch,
+                outcome: consumption.code,
+                clientIdempotencyKey,
+                reasonCode: consumption.code,
+              });
+              return {
+                error: consumption.message,
+                code: consumption.code,
+                unitId: consumption.unitId,
+              };
             }
 
             const conversation = await tx.conversation.create({
@@ -127,7 +270,26 @@ export async function startConversation(listingId: string) {
               },
             });
 
-            return { conversationId: conversation.id };
+            await attachConsumptionToConversation(tx, {
+              consumptionId: consumption.consumptionId,
+              conversationId: conversation.id,
+            });
+
+            await recordContactAttempt(tx, {
+              userId,
+              listingId,
+              unitId: consumption.unitId,
+              unitIdentityEpochObserved,
+              unitIdentityEpochResolved: consumption.unitIdentityEpoch,
+              outcome: "SUCCEEDED",
+              clientIdempotencyKey,
+              conversationId: conversation.id,
+            });
+
+            return {
+              conversationId: conversation.id,
+              path: "created" as ConversationStartPath,
+            };
           },
           { isolationLevel: "Serializable" }
         );
@@ -136,8 +298,8 @@ export async function startConversation(listingId: string) {
         if (attempt === 1 && isSerializationFailure(error)) {
           logger.sync.debug("startConversation serialization conflict, retrying", {
             action: "startConversation",
-            listingId,
-            userId,
+            listingIdHash: hashIdForLog(listingId),
+            userIdHash: hashIdForLog(userId),
           });
           continue;
         }
@@ -145,7 +307,40 @@ export async function startConversation(listingId: string) {
       }
     }
 
-    return result ?? { error: "Failed to start conversation" };
+    if (result) {
+      if ("error" in result) {
+        if (result.code === "PAYWALL_UNAVAILABLE") {
+          recordStartConversationPaywallUnavailable({
+            userId,
+            listingId,
+          });
+        } else {
+          recordStartConversationBlockedPaywall({
+            userId,
+            listingId,
+            unitId: result.unitId,
+          });
+        }
+        return { error: result.error, code: result.code };
+      }
+
+      // CFM-003: structured log + metric so the messaging precondition
+      // DoD (docs/migration/cfm-messaging-precondition.md) is observable
+      // in production. No raw PII — ids are HMAC-hashed.
+      logger.sync.info("startConversation:resolved", {
+        path: result.path,
+        listingIdHash: hashIdForLog(listingId),
+        userIdHash: hashIdForLog(userId),
+      });
+      recordConversationStartPath({
+        path: result.path,
+        listingId,
+        userId,
+      });
+      return { conversationId: result.conversationId };
+    }
+
+    return { error: "Failed to start conversation" };
   } catch (error: unknown) {
     logger.sync.error("Failed to start conversation", {
       action: "startConversation",
@@ -202,11 +397,29 @@ export async function sendMessage(conversationId: string, content: string) {
         participants: {
           select: { id: true, name: true },
         },
+        listing: {
+          select: {
+            status: true,
+            statusReason: true,
+            availableSlots: true,
+            totalSlots: true,
+            openSlots: true,
+            moveInDate: true,
+            availableUntil: true,
+            minStayMonths: true,
+            lastConfirmedAt: true,
+          },
+        },
       },
     });
 
     if (!conversation || conversation.deletedAt) {
       return { error: "Conversation not found" };
+    }
+
+    const contactable = evaluateListingContactable(conversation.listing);
+    if (!contactable.ok) {
+      return { error: contactable.message, code: contactable.code };
     }
 
     // P1-17 FIX: Verify user is a participant in the conversation (IDOR protection)
@@ -228,6 +441,13 @@ export async function sendMessage(conversationId: string, content: string) {
         return { error: blockCheck.message };
       }
     }
+
+    const outboundContentFlags = scanOutboundMessageContent(safeContent);
+    recordOutboundContentSoftFlag({
+      conversationId: safeConversationId,
+      userId: session.user.id,
+      flagKinds: outboundContentFlags,
+    });
 
     // Wrap dependent writes in a transaction to prevent partial failures
     const message = await prisma.$transaction(async (tx) => {

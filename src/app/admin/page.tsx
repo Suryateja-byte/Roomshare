@@ -8,7 +8,6 @@ import {
   Home,
   FileCheck,
   Flag,
-  Calendar,
   MessageSquare,
   TrendingUp,
   Shield,
@@ -27,7 +26,6 @@ async function getAdminStats() {
     activeListingsCount,
     pendingVerifications,
     pendingReports,
-    bookingsCount,
     messagesCount,
     verifiedUsersCount,
   ] = await Promise.all([
@@ -36,7 +34,6 @@ async function getAdminStats() {
     prisma.listing.count({ where: { status: "ACTIVE" } }),
     prisma.verificationRequest.count({ where: { status: "PENDING" } }),
     prisma.report.count(),
-    prisma.booking.count(),
     prisma.message.count(),
     prisma.user.count({ where: { isVerified: true } }),
   ]);
@@ -47,7 +44,6 @@ async function getAdminStats() {
     activeListingsCount,
     pendingVerifications,
     pendingReports,
-    bookingsCount,
     messagesCount,
     verifiedUsersCount,
   };
@@ -110,12 +106,6 @@ export default async function AdminDashboard() {
       icon: Flag,
       color: "bg-red-500",
       alert: stats.pendingReports > 0,
-    },
-    {
-      label: "Total Bookings",
-      value: stats.bookingsCount,
-      icon: Calendar,
-      color: "bg-primary",
     },
     {
       label: "Messages Sent",

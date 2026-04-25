@@ -771,11 +771,11 @@ export default function NavbarClient({
             {user && (
               <>
                 <Link
-                  href="/bookings"
+                  href="/messages"
                   className="font-display text-3xl font-medium text-on-surface hover:text-primary tracking-tight transition-colors duration-300"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  Bookings
+                  Messages
                 </Link>
                 <Link
                   href="/settings"

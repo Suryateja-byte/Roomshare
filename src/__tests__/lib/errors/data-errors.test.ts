@@ -1,6 +1,7 @@
 import {
   DataError,
   QueryError,
+  SchemaMismatchError,
   ConnectionError,
   DataTransformError,
   isDataError,
@@ -118,6 +119,24 @@ describe("DataError classes", () => {
     });
   });
 
+  describe("SchemaMismatchError", () => {
+    it("creates non-retryable schema mismatch error", () => {
+      const error = new SchemaMismatchError("getListings");
+
+      expect(error.code).toBe("SCHEMA_MISMATCH");
+      expect(error.retryable).toBe(false);
+      expect(error.name).toBe("SchemaMismatchError");
+      expect(error.message).toBe("Database schema mismatch: getListings");
+    });
+
+    it("preserves cause error", () => {
+      const cause = new Error('column "openSlots" does not exist');
+      const error = new SchemaMismatchError("getListings", cause);
+
+      expect(error.cause).toBe(cause);
+    });
+  });
+
   describe("DataTransformError", () => {
     it("creates non-retryable transform error", () => {
       const error = new DataTransformError("parseResponse");
@@ -142,6 +161,10 @@ describe("DataError classes", () => {
       expect(isDataError(new ConnectionError())).toBe(true);
     });
 
+    it("returns true for SchemaMismatchError instances", () => {
+      expect(isDataError(new SchemaMismatchError("test"))).toBe(true);
+    });
+
     it("returns true for DataTransformError instances", () => {
       expect(isDataError(new DataTransformError("test"))).toBe(true);
     });
@@ -164,6 +187,41 @@ describe("DataError classes", () => {
   });
 
   describe("wrapDatabaseError", () => {
+    it("returns SchemaMismatchError for missing-column messages", () => {
+      const error = new Error('column "openSlots" does not exist');
+      const wrapped = wrapDatabaseError(error, "getListingsPaginated");
+
+      expect(wrapped).toBeInstanceOf(SchemaMismatchError);
+      expect(wrapped.cause).toBe(error);
+      expect(wrapped.message).toContain("getListingsPaginated");
+    });
+
+    it("returns SchemaMismatchError for missing-table and undefined-object variants", () => {
+      const relationError = new Error('relation "listing_search_docs" does not exist');
+      const rawQueryError = Object.assign(
+        new Error("Raw query failed"),
+        {
+          code: "P2010",
+          meta: {
+            code: "42704",
+            message: 'type "ListingAvailabilitySource" does not exist',
+          },
+        }
+      );
+
+      const wrappedRelation = wrapDatabaseError(
+        relationError,
+        "getSearchDocs"
+      );
+      const wrappedRawQuery = wrapDatabaseError(
+        rawQueryError,
+        "getListingsPaginated"
+      );
+
+      expect(wrappedRelation).toBeInstanceOf(SchemaMismatchError);
+      expect(wrappedRawQuery).toBeInstanceOf(SchemaMismatchError);
+    });
+
     it("returns ConnectionError for connection-related messages", () => {
       const connectionErrors = [
         "Connection refused",

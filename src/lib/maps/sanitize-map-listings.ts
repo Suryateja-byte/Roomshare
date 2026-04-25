@@ -1,12 +1,20 @@
-import type { MapListingData } from "@/lib/search-types";
+import type {
+  GroupContextPresentation,
+  GroupSummary,
+  MapListingData,
+} from "@/lib/search-types";
+import { buildPublicAvailability } from "@/lib/search/public-availability";
+import type { PublicAvailabilitySource } from "@/lib/search/public-availability";
 
 type MapListingInput = {
   id: string;
   title?: string | null;
   price?: unknown;
   availableSlots?: unknown;
+  totalSlots?: unknown;
   images?: unknown;
   roomType?: unknown;
+  moveInDate?: unknown;
   location?: {
     city?: unknown;
     state?: unknown;
@@ -18,6 +26,17 @@ type MapListingInput = {
   reviewCount?: unknown;
   recommendedScore?: unknown;
   createdAt?: unknown;
+  availabilitySource?: PublicAvailabilitySource;
+  openSlots?: unknown;
+  availableUntil?: unknown;
+  minStayMonths?: unknown;
+  lastConfirmedAt?: unknown;
+  status?: unknown;
+  statusReason?: unknown;
+  publicAvailability?: MapListingData["publicAvailability"];
+  groupKey?: unknown;
+  groupSummary?: GroupSummary | null;
+  groupContext?: GroupContextPresentation | null;
 };
 
 function toFiniteNumber(value: unknown, fallback = 0): number {
@@ -33,8 +52,8 @@ function toFiniteNumber(value: unknown, fallback = 0): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function toSafeSlotCount(value: unknown): number {
-  return Math.max(0, Math.trunc(toFiniteNumber(value, 0)));
+function toSafeSlotCount(value: unknown, fallback = 0): number {
+  return Math.max(0, Math.trunc(toFiniteNumber(value, fallback)));
 }
 
 function toSafeDate(value: unknown): Date | null {
@@ -74,23 +93,56 @@ export function sanitizeMapListing(
     return null;
   }
 
+  const publicAvailability =
+    listing.publicAvailability ??
+    buildPublicAvailability({
+      availabilitySource: listing.availabilitySource,
+      openSlots:
+        listing.openSlots == null ? null : toSafeSlotCount(listing.openSlots),
+      availableSlots: toSafeSlotCount(listing.availableSlots),
+      totalSlots: toSafeSlotCount(
+        listing.totalSlots,
+        toSafeSlotCount(listing.availableSlots)
+      ),
+      moveInDate: toSafeDate(listing.moveInDate),
+      availableUntil: toSafeDate(listing.availableUntil),
+      minStayMonths:
+        listing.minStayMonths == null
+          ? undefined
+          : Math.max(1, toSafeSlotCount(listing.minStayMonths, 1)),
+      lastConfirmedAt: toSafeDate(listing.lastConfirmedAt),
+    });
+
   return {
     id: listing.id,
     title: listing.title?.trim() || "",
     price: Math.max(0, toFiniteNumber(listing.price, 0)),
-    availableSlots: toSafeSlotCount(listing.availableSlots),
+    availableSlots: toSafeSlotCount(publicAvailability.openSlots),
+    totalSlots: toSafeSlotCount(publicAvailability.totalSlots),
     images: Array.isArray(listing.images)
       ? listing.images.filter(
           (image): image is string => typeof image === "string"
         )
       : [],
     roomType: toOptionalTrimmedString(listing.roomType),
+    moveInDate: toSafeDate(listing.moveInDate) ?? undefined,
+    availabilitySource: publicAvailability.availabilitySource,
+    openSlots: toSafeSlotCount(publicAvailability.openSlots),
+    availableUntil: toSafeDate(publicAvailability.availableUntil),
+    minStayMonths: Math.max(1, toSafeSlotCount(publicAvailability.minStayMonths, 1)),
+    lastConfirmedAt: toSafeDate(publicAvailability.lastConfirmedAt),
+    status: toOptionalTrimmedString(listing.status),
+    statusReason: toOptionalTrimmedString(listing.statusReason) ?? null,
+    groupKey: toOptionalTrimmedString(listing.groupKey) ?? null,
+    groupSummary: listing.groupSummary ?? null,
+    groupContext: listing.groupContext ?? null,
     location: {
       city: toOptionalTrimmedString(listing.location?.city),
       state: toOptionalTrimmedString(listing.location?.state),
       lat,
       lng,
     },
+    publicAvailability,
     tier: listing.tier,
     avgRating: toFiniteNumber(listing.avgRating, 0),
     reviewCount: Math.max(

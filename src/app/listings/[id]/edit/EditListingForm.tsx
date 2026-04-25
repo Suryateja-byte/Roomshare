@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,7 +48,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import ImageUploader from "@/components/listings/ImageUploader";
+import ListingFreshnessCheck from "@/components/ListingFreshnessCheck";
 import { ImageIcon } from "lucide-react";
+import {
+  getModerationWriteLockReason,
+  LISTING_LOCKED_ERROR_MESSAGE,
+} from "@/lib/listings/moderation-write-lock";
 
 interface ImageObject {
   file?: File;
@@ -76,9 +81,16 @@ interface Listing {
   householdGender: string | null;
   leaseDuration: string | null;
   roomType: string | null;
-  bookingMode: string;
+  bookingMode?: string;
+  version?: number;
+  status?: "ACTIVE" | "PAUSED" | "RENTED";
+  statusReason?: string | null;
+  openSlots?: number | null;
   totalSlots: number;
-  moveInDate: Date | null;
+  moveInDate: Date | string | null;
+  availableUntil?: Date | string | null;
+  minStayMonths?: number | null;
+  lastConfirmedAt?: Date | string | null;
   updatedAt?: string;
   location: {
     address: string;
@@ -91,7 +103,9 @@ interface Listing {
 
 interface EditListingFormProps {
   listing: Listing;
+  migrationReview?: { isReviewRequired: boolean } | null;
   enableWholeUnitMode?: boolean;
+  moderationWriteLocksEnabled?: boolean;
 }
 
 interface EditListingFormData {
@@ -106,6 +120,8 @@ interface EditListingFormData {
   amenities: string;
   houseRules: string;
   moveInDate: string;
+  availableUntil?: string;
+  minStayMonths?: string;
   leaseDuration: string;
   roomType: string;
   genderPreference: string;
@@ -116,18 +132,553 @@ interface EditListingFormData {
 }
 
 // Format date for input (YYYY-MM-DD)
-const formatDateForInput = (date: Date | null) => {
+const formatDateForInput = (date: Date | string | null | undefined) => {
   if (!date) return "";
+  if (typeof date === "string") {
+    const match = date.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (match) {
+      return match[1];
+    }
+  }
   const d = new Date(date);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 };
 
-export default function EditListingForm({
+function resolveInitialWriteLock(options: {
+  moderationWriteLocksEnabled?: boolean;
+  statusReason?: string | null;
+}) {
+  return (
+    options.moderationWriteLocksEnabled === true &&
+    getModerationWriteLockReason(options.statusReason) !== null
+  );
+}
+
+function HostManagedEditListingForm({
   listing,
+  migrationReview: _migrationReview = null,
+  moderationWriteLocksEnabled = false,
+}: EditListingFormProps) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [version, setVersion] = useState(listing.version ?? 0);
+  const [formModified, setFormModified] = useState(false);
+  const [moveInDate, setMoveInDate] = useState(
+    formatDateForInput(listing.moveInDate)
+  );
+  const [availableUntil, setAvailableUntil] = useState(
+    formatDateForInput(listing.availableUntil)
+  );
+  const [status, setStatus] = useState(listing.status ?? "ACTIVE");
+  const [openSlots, setOpenSlots] = useState(String(listing.openSlots ?? 0));
+  const [totalSlots, setTotalSlots] = useState(String(listing.totalSlots));
+  const [minStayMonths, setMinStayMonths] = useState(
+    String(listing.minStayMonths ?? 1)
+  );
+  const [reloadSuggested, setReloadSuggested] = useState(false);
+  const [pendingReload, setPendingReload] = useState(false);
+  const [isWriteLocked, setIsWriteLocked] = useState(() =>
+    resolveInitialWriteLock({
+      moderationWriteLocksEnabled,
+      statusReason: listing.statusReason,
+    })
+  );
+  const formRef = useRef<HTMLFormElement>(null);
+  const submitAbortRef = useRef<AbortController | null>(null);
+  const previousSnapshotKeyRef = useRef<string | null>(null);
+  const pendingReloadSnapshotKeyRef = useRef<string | null>(null);
+  const navGuard = useNavigationGuard(
+    formModified && !loading && !pendingReload,
+    "You have unsaved changes. Leave without saving?"
+  );
+  const isFormDisabled = loading || pendingReload || isWriteLocked;
+  const isNavigationDisabled = loading || pendingReload;
+
+  const latestSnapshot = useMemo(
+    () => ({
+      version: listing.version ?? 0,
+      moveInDate: formatDateForInput(listing.moveInDate),
+      availableUntil: formatDateForInput(listing.availableUntil),
+      status: listing.status ?? "ACTIVE",
+      openSlots: String(listing.openSlots ?? 0),
+      totalSlots: String(listing.totalSlots),
+      minStayMonths: String(listing.minStayMonths ?? 1),
+    }),
+    [
+      listing.availableUntil,
+      listing.minStayMonths,
+      listing.moveInDate,
+      listing.openSlots,
+      listing.status,
+      listing.totalSlots,
+      listing.version,
+    ]
+  );
+
+  const latestSnapshotKey = useMemo(
+    () =>
+      [
+        latestSnapshot.version,
+        latestSnapshot.moveInDate,
+        latestSnapshot.availableUntil,
+        latestSnapshot.status,
+        latestSnapshot.openSlots,
+        latestSnapshot.totalSlots,
+        latestSnapshot.minStayMonths,
+      ].join("|"),
+    [latestSnapshot]
+  );
+
+  const hydrateFromListing = useCallback(() => {
+    setVersion(latestSnapshot.version);
+    setMoveInDate(latestSnapshot.moveInDate);
+    setAvailableUntil(latestSnapshot.availableUntil);
+    setStatus(latestSnapshot.status);
+    setOpenSlots(latestSnapshot.openSlots);
+    setTotalSlots(latestSnapshot.totalSlots);
+    setMinStayMonths(latestSnapshot.minStayMonths);
+    setError("");
+    setFieldErrors({});
+    setReloadSuggested(false);
+    setFormModified(false);
+    setPendingReload(false);
+    pendingReloadSnapshotKeyRef.current = null;
+  }, [latestSnapshot]);
+
+  useEffect(() => {
+    return () => {
+      submitAbortRef.current?.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    setIsWriteLocked(
+      resolveInitialWriteLock({
+        moderationWriteLocksEnabled,
+        statusReason: listing.statusReason,
+      })
+    );
+  }, [listing.statusReason, moderationWriteLocksEnabled]);
+
+  useEffect(() => {
+    const previousSnapshotKey = previousSnapshotKeyRef.current;
+    previousSnapshotKeyRef.current = latestSnapshotKey;
+
+    if (pendingReload) {
+      if (pendingReloadSnapshotKeyRef.current === latestSnapshotKey) {
+        return;
+      }
+      hydrateFromListing();
+      return;
+    }
+
+    if (
+      previousSnapshotKey === null ||
+      previousSnapshotKey === latestSnapshotKey
+    ) {
+      return;
+    }
+
+    if (!formModified) {
+      hydrateFromListing();
+      return;
+    }
+
+    setReloadSuggested(true);
+  }, [formModified, hydrateFromListing, latestSnapshotKey, pendingReload]);
+
+  const FieldError = ({ field }: { field: string }) => {
+    if (!fieldErrors[field]) return null;
+    return (
+      <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+        <AlertCircle className="w-3 h-3" />
+        {fieldErrors[field]}
+      </p>
+    );
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (pendingReload || isWriteLocked) {
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setFieldErrors({});
+    setReloadSuggested(false);
+
+    const controller = new AbortController();
+    submitAbortRef.current = controller;
+
+    try {
+      const res = await fetch(`/api/listings/${listing.id}`, {
+        method: "PATCH",
+        signal: controller.signal,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          expectedVersion: version,
+          openSlots: Number(openSlots),
+          totalSlots: Number(totalSlots),
+          moveInDate: moveInDate || null,
+          availableUntil: availableUntil || null,
+          minStayMonths: Number(minStayMonths),
+          status,
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        if (json.code === "LISTING_LOCKED") {
+          setIsWriteLocked(true);
+          setError("");
+          setFieldErrors({});
+          setReloadSuggested(false);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
+
+        if (json.fields) {
+          setFieldErrors(json.fields);
+        }
+
+        if (json.code === "VERSION_CONFLICT") {
+          setReloadSuggested(true);
+          throw new Error(
+            "This listing was updated elsewhere. Reload to continue editing or reapply your changes."
+          );
+        }
+
+        throw new Error(json.error || "Failed to update listing");
+      }
+
+      if (typeof json.version === "number") {
+        setVersion(json.version);
+      }
+
+      navGuard.disable();
+      router.push(`/listings/${listing.id}`);
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") return;
+      Sentry.captureException(err, {
+        tags: { component: "HostManagedEditListingForm", action: "submit" },
+      });
+      setError(
+        err instanceof Error ? err.message : "An unexpected error occurred"
+      );
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } finally {
+      submitAbortRef.current = null;
+      setLoading(false);
+    }
+  };
+
+  const handleReloadLatest = () => {
+    pendingReloadSnapshotKeyRef.current = latestSnapshotKey;
+    setPendingReload(true);
+    router.refresh();
+  };
+
+  return (
+    <>
+      <Link
+        data-testid="listing-cancel-button"
+        href={`/listings/${listing.id}`}
+        className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6"
+      >
+        <ArrowLeft className="w-4 h-4 mr-1" />
+        Back to listing
+      </Link>
+
+      <div className="mb-8">
+        <ListingFreshnessCheck listingId={listing.id} canManage={true} />
+      </div>
+
+      {isWriteLocked && (
+        <div className="bg-amber-50 border border-amber-100 px-4 py-4 rounded-xl mb-8">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-amber-900">
+                  Listing locked
+                </p>
+                <p className="text-sm text-amber-700 mt-1">
+                  {LISTING_LOCKED_ERROR_MESSAGE}
+                </p>
+                <p className="text-xs text-amber-700 mt-2">
+                  Your unsaved edits are still on the page. Reload when you want
+                  to check for an updated listing state.
+                </p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => router.refresh()}
+              disabled={loading}
+              className="flex-shrink-0 text-amber-700 border-outline-variant/20 hover:bg-amber-100"
+            >
+              <RefreshCcw className="w-4 h-4 mr-1" />
+              Reload page
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {!isWriteLocked && error && (
+        <div className="bg-red-50 border border-red-100 px-4 py-4 rounded-xl mb-8">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-red-900">
+                  Failed to save changes
+                </p>
+                <p className="text-sm text-red-600 mt-1">{error}</p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                reloadSuggested
+                  ? handleReloadLatest()
+                  : formRef.current?.requestSubmit()
+              }
+              disabled={isFormDisabled}
+              className="flex-shrink-0 text-red-700 border-outline-variant/20 hover:bg-red-100"
+            >
+              <RefreshCcw className="w-4 h-4 mr-1" />
+              {pendingReload
+                ? "Reloading..."
+                : reloadSuggested
+                  ? "Reload latest"
+                  : "Retry"}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {!isWriteLocked && !error && reloadSuggested && (
+        <div className="bg-amber-50 border border-amber-100 px-4 py-4 rounded-xl mb-8">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-amber-900">
+                  A newer version is available
+                </p>
+                <p className="text-sm text-amber-700 mt-1">
+                  Reload the latest listing snapshot to discard unsaved changes
+                  and continue editing with the current version.
+                </p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleReloadLatest}
+              disabled={isFormDisabled}
+              className="flex-shrink-0 text-amber-700 border-outline-variant/20 hover:bg-amber-100"
+            >
+              <RefreshCcw className="w-4 h-4 mr-1" />
+              {pendingReload ? "Reloading..." : "Reload latest"}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <form
+        ref={formRef}
+        data-testid="edit-listing-form"
+        onSubmit={handleSubmit}
+        onChange={() => setFormModified(true)}
+        className="space-y-8"
+      >
+        <div className="space-y-6">
+          <h3 className="text-lg font-semibold font-display text-on-surface flex items-center gap-2">
+            <Home className="w-4 h-4" /> Host-managed availability
+          </h3>
+          <p className="text-sm text-on-surface-variant">
+            Update the live availability fields for this host-managed listing.
+            This save uses the dedicated versioned availability contract.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <Label htmlFor="openSlots">Open Slots</Label>
+              <Input
+                id="openSlots"
+                name="openSlots"
+                type="number"
+                min="0"
+                step="1"
+                value={openSlots}
+                onChange={(e) => setOpenSlots(e.target.value)}
+                disabled={isFormDisabled}
+              />
+              <FieldError field="openSlots" />
+            </div>
+            <div>
+              <Label htmlFor="totalSlots">Total Slots</Label>
+              <Input
+                id="totalSlots"
+                name="totalSlots"
+                type="number"
+                min="1"
+                step="1"
+                value={totalSlots}
+                onChange={(e) => setTotalSlots(e.target.value)}
+                disabled={isFormDisabled}
+              />
+              <FieldError field="totalSlots" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <Label htmlFor="moveInDate">Move-in Date</Label>
+              <DatePicker
+                id="moveInDate"
+                value={moveInDate}
+                onChange={setMoveInDate}
+                placeholder="Select move-in date"
+                disabled={isFormDisabled}
+              />
+              <FieldError field="moveInDate" />
+            </div>
+            <div>
+              <Label htmlFor="availableUntil">Available Until</Label>
+              <DatePicker
+                id="availableUntil"
+                value={availableUntil}
+                onChange={setAvailableUntil}
+                placeholder="Select end date"
+                disabled={isFormDisabled}
+              />
+              <FieldError field="availableUntil" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <Label htmlFor="minStayMonths">Minimum Stay (Months)</Label>
+              <Input
+                id="minStayMonths"
+                name="minStayMonths"
+                type="number"
+                min="1"
+                step="1"
+                value={minStayMonths}
+                onChange={(e) => setMinStayMonths(e.target.value)}
+                disabled={isFormDisabled}
+              />
+              <FieldError field="minStayMonths" />
+            </div>
+            <div>
+              <Label htmlFor="status">Status</Label>
+              <select
+                id="status"
+                name="status"
+                value={status}
+                onChange={(e) =>
+                  setStatus(e.target.value as "ACTIVE" | "PAUSED" | "RENTED")
+                }
+                disabled={isFormDisabled}
+                className="mt-1 flex h-10 w-full rounded-md border border-outline-variant/20 bg-surface-canvas px-3 py-2 text-sm text-on-surface"
+              >
+                <option value="ACTIVE">Active</option>
+                <option value="PAUSED">Paused</option>
+                <option value="RENTED">Rented</option>
+              </select>
+              <FieldError field="status" />
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="expectedVersion">Expected Version</Label>
+            <Input
+              id="expectedVersion"
+              name="expectedVersion"
+              value={String(version)}
+              readOnly
+              disabled
+            />
+          </div>
+        </div>
+
+        <div className="pt-6 flex gap-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.push(`/listings/${listing.id}`)}
+            disabled={isNavigationDisabled}
+            size="lg"
+            className="flex-1 h-14 rounded-xl"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            disabled={isFormDisabled}
+            size="lg"
+            className="flex-1 h-14 rounded-xl shadow-ambient-lg shadow-on-surface/10 text-lg"
+            data-testid="listing-save-button"
+          >
+            {loading || pendingReload ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                {pendingReload ? "Reloading..." : "Updating..."}
+              </>
+            ) : (
+              "Save Changes"
+            )}
+          </Button>
+        </div>
+      </form>
+
+      {navGuard.showDialog && (
+        <AlertDialog open={navGuard.showDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+              <AlertDialogDescription>
+                {navGuard.message}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={navGuard.onStay}>
+                Stay
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={navGuard.onLeave}>
+                Leave
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+    </>
+  );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function LegacyEditListingForm({
+  listing,
+  migrationReview = null,
   enableWholeUnitMode = false,
+  moderationWriteLocksEnabled = false,
 }: EditListingFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -140,6 +691,12 @@ export default function EditListingForm({
   const formRef = useRef<HTMLFormElement>(null);
   const [showDraftBanner, setShowDraftBanner] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
+  const [isWriteLocked, setIsWriteLocked] = useState(() =>
+    resolveInitialWriteLock({
+      moderationWriteLocksEnabled,
+      statusReason: listing.statusReason,
+    })
+  );
 
   const submitAbortRef = useRef<AbortController | null>(null);
 
@@ -155,6 +712,12 @@ export default function EditListingForm({
   const [moveInDate, setMoveInDate] = useState(
     formatDateForInput(listing.moveInDate)
   );
+  const [availableUntil, setAvailableUntil] = useState(
+    formatDateForInput(listing.availableUntil)
+  );
+  const [minStayMonths, setMinStayMonths] = useState(
+    String(listing.minStayMonths ?? 1)
+  );
   const [leaseDuration, setLeaseDuration] = useState(
     listing.leaseDuration || ""
   );
@@ -168,6 +731,7 @@ export default function EditListingForm({
   const [bookingMode, setBookingMode] = useState(
     listing.bookingMode || "SHARED"
   );
+  const isMigrationReviewMode = Boolean(migrationReview?.isReviewRequired);
 
   // Ref to track user-initiated roomType changes (prevents auto-set on mount/restore)
   const userChangedRoomType = useRef(false);
@@ -207,6 +771,17 @@ export default function EditListingForm({
     formModified && !loading,
     "You have unsaved changes. Leave without saving?"
   );
+  const isFieldDisabled = loading || isWriteLocked;
+  const isNavigationDisabled = loading;
+
+  useEffect(() => {
+    setIsWriteLocked(
+      resolveInitialWriteLock({
+        moderationWriteLocksEnabled,
+        statusReason: listing.statusReason,
+      })
+    );
+  }, [listing.statusReason, moderationWriteLocksEnabled]);
 
   // Show draft banner when we have a draft and haven't restored yet
   useEffect(() => {
@@ -246,6 +821,8 @@ export default function EditListingForm({
         amenities: listing.amenities.join(", "),
         houseRules: listing.houseRules.join(", "),
         moveInDate,
+        availableUntil,
+        minStayMonths,
         leaseDuration,
         roomType,
         genderPreference,
@@ -277,6 +854,8 @@ export default function EditListingForm({
         (form.elements.namedItem("houseRules") as HTMLTextAreaElement)?.value ||
         "",
       moveInDate,
+      availableUntil,
+      minStayMonths,
       leaseDuration,
       roomType,
       genderPreference,
@@ -326,6 +905,12 @@ export default function EditListingForm({
 
     setMoveInDate(
       persistedData.moveInDate || formatDateForInput(listing.moveInDate)
+    );
+    setAvailableUntil(
+      persistedData.availableUntil || formatDateForInput(listing.availableUntil)
+    );
+    setMinStayMonths(
+      persistedData.minStayMonths || String(listing.minStayMonths ?? 1)
     );
     setLeaseDuration(
       persistedData.leaseDuration || listing.leaseDuration || ""
@@ -389,6 +974,8 @@ export default function EditListingForm({
   }, [
     description,
     moveInDate,
+    availableUntil,
+    minStayMonths,
     leaseDuration,
     roomType,
     genderPreference,
@@ -450,6 +1037,9 @@ export default function EditListingForm({
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (isWriteLocked) {
+      return;
+    }
     setLoading(true);
     setError("");
     setFieldErrors({});
@@ -471,6 +1061,13 @@ export default function EditListingForm({
           ...data,
           householdLanguages: selectedLanguages,
           moveInDate: moveInDate || undefined,
+          availableUntil: isMigrationReviewMode
+            ? availableUntil || null
+            : undefined,
+          minStayMonths:
+            isMigrationReviewMode && minStayMonths.trim().length > 0
+              ? Number(minStayMonths)
+              : undefined,
           leaseDuration: leaseDuration || undefined,
           roomType: roomType || undefined,
           genderPreference: genderPreference || undefined,
@@ -484,6 +1081,14 @@ export default function EditListingForm({
 
       if (!res.ok) {
         const json = await res.json();
+        if (json.code === "LISTING_LOCKED") {
+          setIsWriteLocked(true);
+          setError("");
+          setFieldErrors({});
+          saveData(collectFormData());
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
         // Handle field-level errors if provided
         if (json.fields) {
           setFieldErrors(json.fields);
@@ -495,7 +1100,12 @@ export default function EditListingForm({
       cancelSave();
       clearPersistedData();
       navGuard.disable();
-      router.push(`/listings/${listing.id}`);
+      setFormModified(false);
+      if (isMigrationReviewMode) {
+        router.refresh();
+      } else {
+        router.push(`/listings/${listing.id}`);
+      }
     } catch (err: unknown) {
       if (err instanceof Error && err.name === "AbortError") return; // Component unmounted
       Sentry.captureException(err, {
@@ -524,7 +1134,40 @@ export default function EditListingForm({
         Back to listing
       </Link>
 
-      {error && (
+      {isWriteLocked && (
+        <div className="bg-amber-50 border border-amber-100 px-4 py-4 rounded-xl mb-8">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-amber-900">
+                  Listing locked
+                </p>
+                <p className="text-sm text-amber-700 mt-1">
+                  {LISTING_LOCKED_ERROR_MESSAGE}
+                </p>
+                <p className="text-xs text-amber-700 mt-2">
+                  Your unsaved edits remain available locally. Reload when you
+                  want to check for an updated listing state.
+                </p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => router.refresh()}
+              disabled={loading}
+              className="flex-shrink-0 text-amber-700 border-outline-variant/20 hover:bg-amber-100"
+            >
+              <RefreshCcw className="w-4 h-4 mr-1" />
+              Reload page
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {!isWriteLocked && error && (
         <div className="bg-red-50 border border-red-100 px-4 py-4 rounded-xl mb-8">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
@@ -632,7 +1275,7 @@ export default function EditListingForm({
               maxLength={100}
               defaultValue={listing.title}
               placeholder="e.g. Sun-drenched Loft in Arts District"
-              disabled={loading}
+              disabled={isFieldDisabled}
               data-testid="listing-title-input"
             />
             <FieldError field="title" />
@@ -648,7 +1291,7 @@ export default function EditListingForm({
               maxLength={1000}
               className="w-full bg-surface-canvas hover:bg-surface-container-high focus:bg-surface-container-lowest border border-outline-variant/20 rounded-xl px-4 py-3.5 text-on-surface placeholder:text-on-surface-variant outline-none focus:ring-2 focus:ring-on-surface/5 focus:border-on-surface transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 resize-none leading-relaxed"
               placeholder="What makes your place special? Describe the vibe, the light, and the lifestyle..."
-              disabled={loading}
+              disabled={isFieldDisabled}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               data-testid="listing-description-input"
@@ -668,7 +1311,7 @@ export default function EditListingForm({
                 required
                 defaultValue={listing.price}
                 placeholder="2400"
-                disabled={loading}
+                disabled={isFieldDisabled}
                 data-testid="listing-price-input"
               />
               <FieldError field="price" />
@@ -685,7 +1328,7 @@ export default function EditListingForm({
                 min="1"
                 max="20"
                 step="1"
-                disabled={loading}
+                disabled={isFieldDisabled}
               />
               <FieldError field="totalSlots" />
             </div>
@@ -744,7 +1387,7 @@ export default function EditListingForm({
               maxLength={200}
               defaultValue={listing.location?.address || ""}
               placeholder="123 Boulevard St"
-              disabled={loading}
+              disabled={isFieldDisabled}
             />
             <FieldError field="address" />
           </div>
@@ -758,7 +1401,7 @@ export default function EditListingForm({
                 maxLength={100}
                 defaultValue={listing.location?.city || ""}
                 placeholder="San Francisco"
-                disabled={loading}
+                disabled={isFieldDisabled}
               />
             </div>
             <div>
@@ -770,7 +1413,7 @@ export default function EditListingForm({
                 maxLength={100}
                 defaultValue={listing.location?.state || ""}
                 placeholder="CA"
-                disabled={loading}
+                disabled={isFieldDisabled}
               />
             </div>
             <div>
@@ -782,7 +1425,7 @@ export default function EditListingForm({
                 maxLength={20}
                 defaultValue={listing.location?.zip || ""}
                 placeholder="94103"
-                disabled={loading}
+                disabled={isFieldDisabled}
               />
             </div>
           </div>
@@ -803,7 +1446,7 @@ export default function EditListingForm({
               name="amenities"
               defaultValue={listing.amenities.join(", ")}
               placeholder="Wifi, Gym, Washer/Dryer, Roof Deck..."
-              disabled={loading}
+              disabled={isFieldDisabled}
             />
             <p className="text-xs text-on-surface-variant mt-2 pl-1">
               Separate amenities with commas
@@ -817,11 +1460,50 @@ export default function EditListingForm({
               value={moveInDate}
               onChange={setMoveInDate}
               placeholder="Select move-in date"
+              disabled={isFieldDisabled}
             />
             <p className="text-xs text-on-surface-variant mt-2 pl-1">
               When can tenants move in? (Optional)
             </p>
           </div>
+
+          {isMigrationReviewMode && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="availableUntil">Available Until</Label>
+                <DatePicker
+                  id="availableUntil"
+                  value={availableUntil}
+                  onChange={setAvailableUntil}
+                  placeholder="Select availability end date"
+                  disabled={isFieldDisabled}
+                />
+                <p className="text-xs text-on-surface-variant mt-2 pl-1">
+                  Keep this blank for open-ended availability, or choose a
+                  future date before review.
+                </p>
+                <FieldError field="availableUntil" />
+              </div>
+              <div>
+                <Label htmlFor="minStayMonths">Minimum Stay (Months)</Label>
+                <Input
+                  id="minStayMonths"
+                  name="minStayMonths"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={minStayMonths}
+                  onChange={(e) => setMinStayMonths(e.target.value)}
+                  disabled={isFieldDisabled}
+                />
+                <p className="text-xs text-on-surface-variant mt-2 pl-1">
+                  Host-managed listings require a minimum stay of at least 1
+                  month.
+                </p>
+                <FieldError field="minStayMonths" />
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -829,7 +1511,7 @@ export default function EditListingForm({
               <Select
                 value={leaseDuration}
                 onValueChange={setLeaseDuration}
-                disabled={loading}
+                disabled={isFieldDisabled}
               >
                 <SelectTrigger id="leaseDuration" className="w-full mt-1">
                   <SelectValue placeholder="Select duration..." />
@@ -851,7 +1533,7 @@ export default function EditListingForm({
                   userChangedRoomType.current = true;
                   setRoomType(val);
                 }}
-                disabled={loading}
+                disabled={isFieldDisabled}
               >
                 <SelectTrigger id="roomType" className="w-full mt-1">
                   <SelectValue placeholder="Select type..." />
@@ -867,7 +1549,7 @@ export default function EditListingForm({
 
           {/* Booking Mode Selector (behind feature flag) */}
           {enableWholeUnitMode && (
-            <fieldset className="space-y-3" disabled={loading}>
+            <fieldset className="space-y-3" disabled={isFieldDisabled}>
               <legend className="text-sm font-medium text-on-surface">
                 Booking Mode
               </legend>
@@ -885,6 +1567,7 @@ export default function EditListingForm({
                     value="SHARED"
                     checked={bookingMode === "SHARED"}
                     onChange={(e) => setBookingMode(e.target.value)}
+                    disabled={isFieldDisabled}
                     className="mt-0.5"
                   />
                   <div>
@@ -909,6 +1592,7 @@ export default function EditListingForm({
                     value="WHOLE_UNIT"
                     checked={bookingMode === "WHOLE_UNIT"}
                     onChange={(e) => setBookingMode(e.target.value)}
+                    disabled={isFieldDisabled}
                     className="mt-0.5"
                   />
                   <div>
@@ -939,7 +1623,7 @@ export default function EditListingForm({
                     key={code}
                     type="button"
                     onClick={() => toggleLanguage(code)}
-                    disabled={loading}
+                    disabled={isFieldDisabled}
                     className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-on-surface text-white disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {getLanguageName(code)}
@@ -956,7 +1640,7 @@ export default function EditListingForm({
               value={languageSearch}
               onChange={(e) => setLanguageSearch(e.target.value)}
               className="mb-3"
-              disabled={loading}
+              disabled={isFieldDisabled}
             />
 
             {/* Language chips */}
@@ -968,7 +1652,7 @@ export default function EditListingForm({
                     key={code}
                     type="button"
                     onClick={() => toggleLanguage(code)}
-                    disabled={loading}
+                    disabled={isFieldDisabled}
                     className="px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 bg-surface-container-high text-on-surface-variant hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {getLanguageName(code)}
@@ -996,7 +1680,7 @@ export default function EditListingForm({
               <Select
                 value={genderPreference}
                 onValueChange={setGenderPreference}
-                disabled={loading}
+                disabled={isFieldDisabled}
               >
                 <SelectTrigger id="genderPreference" className="w-full">
                   <SelectValue placeholder="Select preference..." />
@@ -1022,7 +1706,7 @@ export default function EditListingForm({
               <Select
                 value={householdGender}
                 onValueChange={setHouseholdGender}
-                disabled={loading}
+                disabled={isFieldDisabled}
               >
                 <SelectTrigger id="householdGender" className="w-full">
                   <SelectValue placeholder="Select composition..." />
@@ -1044,7 +1728,7 @@ export default function EditListingForm({
               rows={3}
               className="w-full bg-surface-canvas hover:bg-surface-container-high focus:bg-surface-container-lowest border border-outline-variant/20 rounded-xl px-4 py-3.5 text-on-surface placeholder:text-on-surface-variant outline-none focus:ring-2 focus:ring-on-surface/5 focus:border-on-surface transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 resize-none"
               placeholder="No smoking, quiet hours after 10pm, no pets..."
-              disabled={loading}
+              disabled={isFieldDisabled}
               defaultValue={listing.houseRules.join(", ")}
             />
           </div>
@@ -1056,7 +1740,7 @@ export default function EditListingForm({
             type="button"
             variant="outline"
             onClick={() => router.push(`/listings/${listing.id}`)}
-            disabled={loading}
+            disabled={isNavigationDisabled}
             size="lg"
             className="flex-1 h-14 rounded-xl"
           >
@@ -1064,7 +1748,9 @@ export default function EditListingForm({
           </Button>
           <Button
             type="submit"
-            disabled={loading || isAnyImageUploading || images.length === 0}
+            disabled={
+              isFieldDisabled || isAnyImageUploading || images.length === 0
+            }
             size="lg"
             className="flex-1 h-14 rounded-xl shadow-ambient-lg shadow-on-surface/10 text-lg"
             data-testid="listing-save-button"
@@ -1103,4 +1789,8 @@ export default function EditListingForm({
       )}
     </>
   );
+}
+
+export default function EditListingForm(props: EditListingFormProps) {
+  return <HostManagedEditListingForm {...props} />;
 }

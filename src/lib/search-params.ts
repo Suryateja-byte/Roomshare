@@ -1,3 +1,7 @@
+// Canonical search contract: see docs/search-contract.md for the prose
+// reference covering input shape, response shape, query-hash versioning,
+// deprecation map, and backward-compat rules. This file is the source of
+// truth for the URL -> NormalizedSearchFilters normalization step.
 import { normalizeLanguages } from "./languages";
 import {
   MAX_SAFE_PRICE,
@@ -11,7 +15,6 @@ import {
   deriveSearchBoundsFromPoint,
 } from "./search/location-bounds";
 import {
-  VALID_BOOKING_MODES,
   VALID_AMENITIES,
   VALID_HOUSE_RULES,
   VALID_LEASE_DURATIONS,
@@ -43,6 +46,45 @@ export { MAX_SAFE_PRICE, MAX_SAFE_PAGE, MAX_ARRAY_ITEMS };
 // Re-exported here for consumers that import from search-params.
 export type { SortOption, FilterParams, FilterCriteria };
 
+export const LEGACY_URL_ALIASES = [
+  "startDate",
+  "minBudget",
+  "maxBudget",
+  "minAvailableSlots",
+  "pageNumber",
+  "cursorStack",
+  "where",
+] as const;
+
+export type LegacyUrlAlias = (typeof LEGACY_URL_ALIASES)[number];
+
+/**
+ * Registry of legacy URL aliases the parser still accepts.
+ *
+ * Update ritual when adding or removing an alias:
+ * 1. Update the parser logic (`parseSearchParams`, `normalizeSearchFilters`,
+ *    or `normalizeSearchQuery`) to add or remove the fallback.
+ * 2. Update `PARSER_LEGACY_ALIAS_MAP`.
+ * 3. Update `LEGACY_URL_ALIASES`.
+ * 4. Update `src/__tests__/lib/search/cfm-604-legacy-url-parity.test.ts`.
+ *
+ * This must remain a distinct declaration from `LEGACY_URL_ALIASES` so the
+ * guard test can fail if the parser registry and telemetry allowlist drift.
+ */
+export const PARSER_LEGACY_ALIAS_MAP = {
+  startDate: "moveInDate",
+  minBudget: "minPrice",
+  maxBudget: "maxPrice",
+  minAvailableSlots: "minSlots",
+  pageNumber: "page",
+  cursorStack: "cursor",
+  where: "locationLabel",
+} as const satisfies Record<LegacyUrlAlias, string>;
+
+export const LEGACY_URL_SURFACES = ["ssr", "spa", "saved-search"] as const;
+
+export type LegacyUrlSurface = (typeof LEGACY_URL_SURFACES)[number];
+
 /**
  * Returns true if any narrowing filter is active (excludes query, bounds, sort, nearMatches).
  * Used to distinguish "unbounded browse" (no filters) from "filtered browse" (filters but no query/bounds).
@@ -53,6 +95,7 @@ export function hasActiveFilters(params: FilterParams): boolean {
     params.maxPrice != null ||
     (params.amenities && params.amenities.length > 0) ||
     params.moveInDate ||
+    params.endDate ||
     params.leaseDuration ||
     (params.houseRules && params.houseRules.length > 0) ||
     params.roomType ||
@@ -66,6 +109,7 @@ export function hasActiveFilters(params: FilterParams): boolean {
 
 export interface RawSearchParams {
   q?: string | string[];
+  locationLabel?: string | string[];
   where?: string | string[];
   what?: string | string[];
   minPrice?: string | string[];
@@ -74,7 +118,9 @@ export interface RawSearchParams {
   minBudget?: string | string[];
   maxBudget?: string | string[];
   amenities?: string | string[];
+  startDate?: string | string[];
   moveInDate?: string | string[];
+  endDate?: string | string[];
   leaseDuration?: string | string[];
   houseRules?: string | string[];
   languages?: string | string[];
@@ -82,6 +128,7 @@ export interface RawSearchParams {
   genderPreference?: string | string[];
   householdGender?: string | string[];
   bookingMode?: string | string[];
+  minAvailableSlots?: string | string[];
   minSlots?: string | string[];
   minLat?: string | string[];
   maxLat?: string | string[];
@@ -103,7 +150,7 @@ export interface ParsedSearchParams {
   what?: string;
   requestedPage: number;
   sortOption: SortOption;
-  filterParams: FilterCriteria;
+  filterParams: NormalizedSearchFilters;
   /**
    * True when a text query exists but no geographic bounds were provided.
    * This indicates an unbounded search that would cause full-table scans.
@@ -118,6 +165,41 @@ export interface ParsedSearchParams {
   browseMode: boolean;
 }
 
+export interface NormalizedSearchFilters extends FilterCriteria {
+  availabilityIntent?: "availability";
+}
+
+interface NormalizeSearchFiltersOptions {
+  invalidRange?: "drop" | "throw";
+  overlongText?: "truncate" | "drop";
+}
+
+type SearchFilterNormalizationInput = {
+  query?: unknown;
+  locationLabel?: unknown;
+  where?: unknown;
+  vibeQuery?: unknown;
+  minPrice?: unknown;
+  maxPrice?: unknown;
+  amenities?: unknown;
+  moveInDate?: unknown;
+  startDate?: unknown;
+  endDate?: unknown;
+  leaseDuration?: unknown;
+  houseRules?: unknown;
+  languages?: unknown;
+  roomType?: unknown;
+  genderPreference?: unknown;
+  householdGender?: unknown;
+  bookingMode?: unknown;
+  bounds?: unknown;
+  minAvailableSlots?: unknown;
+  minSlots?: unknown;
+  nearMatches?: unknown;
+  sort?: unknown;
+  availabilityIntent?: unknown;
+};
+
 /**
  * Canonical filter params that affect the result set.
  * Excludes pagination/sort and map viewport keys.
@@ -129,6 +211,7 @@ export const FILTER_QUERY_KEYS = [
   "maxPrice",
   "amenities",
   "moveInDate",
+  "endDate",
   "leaseDuration",
   "houseRules",
   "languages",
@@ -169,6 +252,30 @@ export function buildRawParamsFromSearchParams(
   return rawParams;
 }
 
+export function detectLegacyUrlAliases(
+  raw:
+    | URLSearchParams
+    | Record<string, string | string[] | number | boolean | undefined>,
+  options: { includeWhere?: boolean } = {}
+): LegacyUrlAlias[] {
+  const { includeWhere = true } = options;
+  const has = (key: string): boolean => {
+    if (raw instanceof URLSearchParams) {
+      return raw.has(key);
+    }
+
+    return raw[key] !== undefined;
+  };
+
+  return LEGACY_URL_ALIASES.filter((alias) => {
+    if (alias === "where" && !includeWhere) {
+      return false;
+    }
+
+    return has(alias);
+  });
+}
+
 /**
  * Build canonical filter query params from URLSearchParams.
  * This ensures every consumer (list/map/count/cache keys) uses the same parsed filter set.
@@ -176,70 +283,9 @@ export function buildRawParamsFromSearchParams(
 export function buildCanonicalFilterParamsFromSearchParams(
   searchParams: URLSearchParams
 ): URLSearchParams {
-  const canonical = new URLSearchParams();
-
-  try {
-    const raw = buildRawParamsFromSearchParams(searchParams);
-    const parsed = parseSearchParams(raw);
-    const { filterParams } = parsed;
-
-    if (filterParams.query) {
-      canonical.set("q", filterParams.query);
-    }
-    if (filterParams.vibeQuery) {
-      canonical.set("what", filterParams.vibeQuery);
-    }
-    if (filterParams.minPrice !== undefined) {
-      canonical.set("minPrice", String(filterParams.minPrice));
-    }
-    if (filterParams.maxPrice !== undefined) {
-      canonical.set("maxPrice", String(filterParams.maxPrice));
-    }
-
-    filterParams.amenities?.forEach((value) =>
-      canonical.append("amenities", value)
-    );
-    filterParams.houseRules?.forEach((value) =>
-      canonical.append("houseRules", value)
-    );
-    filterParams.languages?.forEach((value) =>
-      canonical.append("languages", value)
-    );
-
-    if (filterParams.moveInDate) {
-      canonical.set("moveInDate", filterParams.moveInDate);
-    }
-    if (filterParams.leaseDuration) {
-      canonical.set("leaseDuration", filterParams.leaseDuration);
-    }
-    if (filterParams.roomType) {
-      canonical.set("roomType", filterParams.roomType);
-    }
-    if (filterParams.genderPreference) {
-      canonical.set("genderPreference", filterParams.genderPreference);
-    }
-    if (filterParams.householdGender) {
-      canonical.set("householdGender", filterParams.householdGender);
-    }
-    if (filterParams.bookingMode) {
-      canonical.set("bookingMode", filterParams.bookingMode);
-    }
-    if (filterParams.minAvailableSlots !== undefined) {
-      canonical.set("minSlots", String(filterParams.minAvailableSlots));
-    }
-    if (typeof filterParams.nearMatches === "boolean") {
-      canonical.set("nearMatches", filterParams.nearMatches ? "true" : "false");
-    }
-  } catch {
-    // Best-effort fallback when parsing fails (for malformed URLs).
-    for (const key of FILTER_QUERY_KEYS) {
-      const values = searchParams.getAll(key);
-      values.forEach((value) => canonical.append(key, value));
-    }
-  }
-
-  canonical.sort();
-  return canonical;
+  const raw = buildRawParamsFromSearchParams(searchParams);
+  const parsed = parseSearchParams(raw as RawSearchParams);
+  return buildCanonicalFilterSearchParams(parsed.filterParams);
 }
 
 const validSortOptions: SortOption[] = [...VALID_SORT_OPTIONS];
@@ -359,58 +405,401 @@ const safeParseDate = (value: string | undefined): string | undefined => {
   return trimmed;
 };
 
+const getFirstInputValue = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+  return value;
+};
+
+const toStringArrayInput = (
+  value: unknown
+): string | string[] | undefined => {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const strings = value.filter((item): item is string => typeof item === "string");
+  return strings.length > 0 ? strings : undefined;
+};
+
+const normalizeTextField = (
+  value: unknown,
+  overflow: "truncate" | "drop" = "truncate"
+): string | undefined => {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.length <= MAX_QUERY_LENGTH) {
+    return trimmed;
+  }
+  return overflow === "truncate"
+    ? trimmed.slice(0, MAX_QUERY_LENGTH)
+    : undefined;
+};
+
+const normalizeFiniteNumber = (
+  value: unknown,
+  min?: number,
+  max?: number
+): number | undefined => {
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return undefined;
+    let normalized = value;
+    if (min !== undefined && normalized < min) normalized = min;
+    if (max !== undefined && normalized > max) normalized = max;
+    return normalized;
+  }
+
+  if (typeof value === "string") {
+    return safeParseFloat(value, min, max);
+  }
+
+  return undefined;
+};
+
+const normalizePriceValue = (value: unknown): number | undefined => {
+  return normalizeFiniteNumber(value, 0, MAX_SAFE_PRICE);
+};
+
+const normalizeBookingMode = (value: unknown): string | undefined => {
+  if (typeof value !== "string") return undefined;
+
+  switch (value.trim().toLowerCase()) {
+    case "shared":
+      return "SHARED";
+    case "whole_unit":
+    case "whole-unit":
+    case "whole unit":
+    case "wholeunit":
+      return "WHOLE_UNIT";
+    case "per_slot":
+    case "per-slot":
+    case "per slot":
+    case "perslot":
+      return "SHARED";
+    default:
+      return undefined;
+  }
+};
+
+const normalizeMinAvailableSlots = (value: unknown): number | undefined => {
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return undefined;
+    const normalized = Math.trunc(value);
+    return normalized >= 1 && normalized <= 20 ? normalized : undefined;
+  }
+
+  if (typeof value === "string") {
+    const parsed = parseInt(value.trim(), 10);
+    return Number.isFinite(parsed) && parsed >= 1 && parsed <= 20
+      ? parsed
+      : undefined;
+  }
+
+  return undefined;
+};
+
+const normalizeNearMatches = (value: unknown): boolean | undefined => {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "number") {
+    if (value === 1) return true;
+    if (value === 0) return false;
+    return undefined;
+  }
+
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  switch (value.trim().toLowerCase()) {
+    case "true":
+    case "1":
+      return true;
+    case "false":
+    case "0":
+      return false;
+    default:
+      return undefined;
+  }
+};
+
+const normalizeSortOption = (value: unknown): SortOption | undefined => {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return validSortOptions.includes(trimmed as SortOption)
+    ? (trimmed as SortOption)
+    : undefined;
+};
+
+const normalizeBoundsInput = (
+  value: unknown,
+  invalidRange: "drop" | "throw"
+): FilterParams["bounds"] => {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+
+  const bounds = value as Record<string, unknown>;
+  const minLat = normalizeFiniteNumber(bounds.minLat, -90, 90);
+  const maxLat = normalizeFiniteNumber(bounds.maxLat, -90, 90);
+  const minLng = normalizeFiniteNumber(bounds.minLng, -180, 180);
+  const maxLng = normalizeFiniteNumber(bounds.maxLng, -180, 180);
+
+  if (
+    minLat === undefined ||
+    maxLat === undefined ||
+    minLng === undefined ||
+    maxLng === undefined
+  ) {
+    return undefined;
+  }
+
+  const clampedBounds = {
+    minLat: Math.max(-90, Math.min(90, minLat)),
+    maxLat: Math.max(-90, Math.min(90, maxLat)),
+    minLng: Math.max(-180, Math.min(180, minLng)),
+    maxLng: Math.max(-180, Math.min(180, maxLng)),
+  };
+
+  if (clampedBounds.minLat > clampedBounds.maxLat) {
+    if (invalidRange === "throw") {
+      throw new Error("minLat cannot exceed maxLat");
+    }
+    return undefined;
+  }
+
+  return clampedBounds;
+};
+
+export function normalizeSearchFilters(
+  input: SearchFilterNormalizationInput,
+  options: NormalizeSearchFiltersOptions = {}
+): NormalizedSearchFilters {
+  const {
+    invalidRange = "drop",
+    overlongText = "truncate",
+  } = options;
+
+  const query = normalizeTextField(getFirstInputValue(input.query), overlongText);
+  const locationLabel = normalizeTextField(
+    getFirstInputValue(input.locationLabel ?? input.where),
+    overlongText
+  );
+  const vibeQuery = normalizeTextField(
+    getFirstInputValue(input.vibeQuery),
+    overlongText
+  );
+
+  let minPrice = normalizePriceValue(getFirstInputValue(input.minPrice));
+  let maxPrice = normalizePriceValue(getFirstInputValue(input.maxPrice));
+  if (
+    minPrice !== undefined &&
+    maxPrice !== undefined &&
+    minPrice > maxPrice
+  ) {
+    if (invalidRange === "throw") {
+      throw new Error("minPrice cannot exceed maxPrice");
+    }
+    minPrice = undefined;
+    maxPrice = undefined;
+  }
+
+  const amenities = safeParseArray(
+    toStringArrayInput(input.amenities),
+    VALID_AMENITIES
+  );
+  const houseRules = safeParseArray(
+    toStringArrayInput(input.houseRules),
+    VALID_HOUSE_RULES
+  );
+
+  const languages = (() => {
+    const list = toStringArrayInput(input.languages);
+    if (!list) return undefined;
+
+    const flattened = (typeof list === "string" ? [list] : list)
+      .flatMap((value) => value.split(","))
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0 && value.length <= 32);
+    const normalized = normalizeLanguages(flattened);
+    const unique = Array.from(new Set(normalized)).slice(0, MAX_ARRAY_ITEMS);
+    return unique.length > 0 ? unique : undefined;
+  })();
+
+  const moveInSource =
+    getFirstInputValue(input.moveInDate) ?? getFirstInputValue(input.startDate);
+  const moveInDate = safeParseDate(
+    typeof moveInSource === "string" ? moveInSource : undefined
+  );
+  const parsedEndDate = safeParseDate(
+    typeof getFirstInputValue(input.endDate) === "string"
+      ? (getFirstInputValue(input.endDate) as string)
+      : undefined
+  );
+  const endDate =
+    moveInDate && parsedEndDate && parsedEndDate > moveInDate
+      ? parsedEndDate
+      : undefined;
+
+  const roomType = safeParseEnum(
+    typeof getFirstInputValue(input.roomType) === "string"
+      ? (getFirstInputValue(input.roomType) as string)
+      : undefined,
+    VALID_ROOM_TYPES as readonly string[],
+    undefined,
+    ROOM_TYPE_ALIASES
+  );
+  const leaseDuration = safeParseEnum(
+    typeof getFirstInputValue(input.leaseDuration) === "string"
+      ? (getFirstInputValue(input.leaseDuration) as string)
+      : undefined,
+    VALID_LEASE_DURATIONS as readonly string[],
+    undefined,
+    LEASE_DURATION_ALIASES
+  );
+  const genderPreference = safeParseEnum(
+    typeof getFirstInputValue(input.genderPreference) === "string"
+      ? (getFirstInputValue(input.genderPreference) as string)
+      : undefined,
+    VALID_GENDER_PREFERENCES as readonly string[]
+  );
+  const householdGender = safeParseEnum(
+    typeof getFirstInputValue(input.householdGender) === "string"
+      ? (getFirstInputValue(input.householdGender) as string)
+      : undefined,
+    VALID_HOUSEHOLD_GENDERS as readonly string[]
+  );
+  const bookingMode = normalizeBookingMode(getFirstInputValue(input.bookingMode));
+  const minAvailableSlots = normalizeMinAvailableSlots(
+    getFirstInputValue(input.minAvailableSlots) ??
+      getFirstInputValue(input.minSlots)
+  );
+  const nearMatches = normalizeNearMatches(getFirstInputValue(input.nearMatches));
+  const bounds = normalizeBoundsInput(input.bounds, invalidRange);
+  const sort = normalizeSortOption(getFirstInputValue(input.sort));
+  const availabilityIntent =
+    getFirstInputValue(input.availabilityIntent) === "availability"
+      ? "availability"
+      : undefined;
+
+  const normalized: NormalizedSearchFilters = {};
+
+  if (query !== undefined) normalized.query = query;
+  if (locationLabel !== undefined) normalized.locationLabel = locationLabel;
+  if (vibeQuery !== undefined) normalized.vibeQuery = vibeQuery;
+  if (minPrice !== undefined) normalized.minPrice = minPrice;
+  if (maxPrice !== undefined) normalized.maxPrice = maxPrice;
+  if (amenities !== undefined) normalized.amenities = amenities;
+  if (moveInDate !== undefined) normalized.moveInDate = moveInDate;
+  if (endDate !== undefined) normalized.endDate = endDate;
+  if (leaseDuration !== undefined) normalized.leaseDuration = leaseDuration;
+  if (houseRules !== undefined) normalized.houseRules = houseRules;
+  if (languages !== undefined) normalized.languages = languages;
+  if (roomType !== undefined) normalized.roomType = roomType;
+  if (genderPreference !== undefined) {
+    normalized.genderPreference = genderPreference;
+  }
+  if (householdGender !== undefined) {
+    normalized.householdGender = householdGender;
+  }
+  if (bookingMode !== undefined) normalized.bookingMode = bookingMode;
+  if (bounds !== undefined) normalized.bounds = bounds;
+  if (minAvailableSlots !== undefined) {
+    normalized.minAvailableSlots = minAvailableSlots;
+  }
+  if (nearMatches !== undefined) normalized.nearMatches = nearMatches;
+  if (sort !== undefined) normalized.sort = sort;
+  if (availabilityIntent !== undefined) {
+    normalized.availabilityIntent = availabilityIntent;
+  }
+
+  return normalized;
+}
+
+function buildCanonicalFilterSearchParams(
+  filters: SearchFilterNormalizationInput
+): URLSearchParams {
+  const normalized = normalizeSearchFilters(filters, {
+    invalidRange: "drop",
+  });
+  const canonical = new URLSearchParams();
+
+  if (normalized.query) {
+    canonical.set("q", normalized.query);
+  }
+  if (normalized.vibeQuery) {
+    canonical.set("what", normalized.vibeQuery);
+  }
+  if (normalized.minPrice !== undefined) {
+    canonical.set("minPrice", String(normalized.minPrice));
+  }
+  if (normalized.maxPrice !== undefined) {
+    canonical.set("maxPrice", String(normalized.maxPrice));
+  }
+
+  [...(normalized.amenities ?? [])]
+    .sort((left, right) => left.localeCompare(right))
+    .forEach((value) => canonical.append("amenities", value));
+  [...(normalized.houseRules ?? [])]
+    .sort((left, right) => left.localeCompare(right))
+    .forEach((value) => canonical.append("houseRules", value));
+  [...(normalized.languages ?? [])]
+    .sort((left, right) => left.localeCompare(right))
+    .forEach((value) => canonical.append("languages", value));
+
+  if (normalized.moveInDate) {
+    canonical.set("moveInDate", normalized.moveInDate);
+  }
+  if (normalized.endDate) {
+    canonical.set("endDate", normalized.endDate);
+  }
+  if (normalized.leaseDuration) {
+    canonical.set("leaseDuration", normalized.leaseDuration);
+  }
+  if (normalized.roomType) {
+    canonical.set("roomType", normalized.roomType);
+  }
+  if (normalized.genderPreference) {
+    canonical.set("genderPreference", normalized.genderPreference);
+  }
+  if (normalized.householdGender) {
+    canonical.set("householdGender", normalized.householdGender);
+  }
+  if (normalized.bookingMode) {
+    canonical.set("bookingMode", normalized.bookingMode);
+  }
+  if (normalized.minAvailableSlots !== undefined) {
+    canonical.set("minSlots", String(normalized.minAvailableSlots));
+  }
+  if (typeof normalized.nearMatches === "boolean") {
+    canonical.set("nearMatches", normalized.nearMatches ? "true" : "false");
+  }
+
+  canonical.sort();
+  return canonical;
+}
+
 export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
-  const rawQuery = getFirstValue(raw.q);
-  const trimmed = rawQuery ? rawQuery.trim() : "";
-  const queryText =
-    trimmed.length > MAX_QUERY_LENGTH
-      ? trimmed.slice(0, MAX_QUERY_LENGTH)
-      : trimmed;
-  const q = queryText || undefined;
-  const rawWhere = getFirstValue(raw.where);
-  const trimmedWhere = rawWhere ? rawWhere.trim() : "";
-  const whereText =
-    trimmedWhere.length > MAX_QUERY_LENGTH
-      ? trimmedWhere.slice(0, MAX_QUERY_LENGTH)
-      : trimmedWhere;
-  const explicitLocationLabel = whereText || undefined;
-  const rawWhat = getFirstValue(raw.what);
-  const trimmedWhat = rawWhat ? rawWhat.trim() : "";
-  const vibeQueryText =
-    trimmedWhat.length > MAX_QUERY_LENGTH
-      ? trimmedWhat.slice(0, MAX_QUERY_LENGTH)
-      : trimmedWhat;
-  const what = vibeQueryText || undefined;
+  const q = normalizeTextField(getFirstValue(raw.q));
+  const explicitLocationLabel = normalizeTextField(
+    getFirstValue(raw.locationLabel) ?? getFirstValue(raw.where)
+  );
+  const what = normalizeTextField(getFirstValue(raw.what));
 
   const requestedPage = safeParseInt(
-    getFirstValue(raw.page),
+    getFirstValue(raw.page) ?? getFirstValue(raw.pageNumber),
     1,
     MAX_SAFE_PAGE,
     1
   );
-
-  // Support budget aliases (minBudget/maxBudget) with canonical precedence
-  const validMinPrice = safeParseFloat(
-    getFirstValue(raw.minPrice) ?? getFirstValue(raw.minBudget),
-    0,
-    MAX_SAFE_PRICE
-  );
-  const validMaxPrice = safeParseFloat(
-    getFirstValue(raw.maxPrice) ?? getFirstValue(raw.maxBudget),
-    0,
-    MAX_SAFE_PRICE
-  );
-
-  let effectiveMinPrice = validMinPrice;
-  let effectiveMaxPrice = validMaxPrice;
-  if (
-    validMinPrice !== undefined &&
-    validMaxPrice !== undefined &&
-    validMinPrice > validMaxPrice
-  ) {
-    effectiveMinPrice = undefined;
-    effectiveMaxPrice = undefined;
-  }
 
   const validLat = safeParseFloat(getFirstValue(raw.lat), -90, 90);
   const validLng = safeParseFloat(getFirstValue(raw.lng), -180, 180);
@@ -438,23 +827,6 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
     effectiveMaxLat = undefined;
   }
 
-  const amenitiesList = safeParseArray(raw.amenities, VALID_AMENITIES);
-  const houseRulesList = safeParseArray(raw.houseRules, VALID_HOUSE_RULES);
-
-  const languagesList = (() => {
-    const list = raw.languages
-      ? Array.isArray(raw.languages)
-        ? raw.languages
-        : [raw.languages]
-      : [];
-    const flattened = list
-      .flatMap((value) => String(value).split(","))
-      .map((value) => value.trim())
-      .filter((value) => value.length > 0 && value.length <= 32);
-    const normalized = normalizeLanguages(flattened);
-    return Array.from(new Set(normalized)).slice(0, MAX_ARRAY_ITEMS);
-  })();
-
   let bounds: FilterParams["bounds"];
   if (
     effectiveMinLat !== undefined &&
@@ -474,79 +846,44 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
     );
   }
 
-  const sortOption: SortOption = validSortOptions.includes(
-    getFirstValue(raw.sort) as SortOption
-  )
-    ? (getFirstValue(raw.sort) as SortOption)
-    : "recommended";
-
-  const validMoveInDate = safeParseDate(getFirstValue(raw.moveInDate));
-  const validRoomType = safeParseEnum(
-    getFirstValue(raw.roomType),
-    VALID_ROOM_TYPES as readonly string[],
-    undefined,
-    ROOM_TYPE_ALIASES
-  );
-  const validLeaseDuration = safeParseEnum(
-    getFirstValue(raw.leaseDuration),
-    VALID_LEASE_DURATIONS as readonly string[],
-    undefined,
-    LEASE_DURATION_ALIASES
-  );
-  const validGenderPreference = safeParseEnum(
-    getFirstValue(raw.genderPreference),
-    VALID_GENDER_PREFERENCES as readonly string[]
-  );
-  const validHouseholdGender = safeParseEnum(
-    getFirstValue(raw.householdGender),
-    VALID_HOUSEHOLD_GENDERS as readonly string[]
-  );
-  const validBookingMode = safeParseEnum(
-    getFirstValue(raw.bookingMode),
-    VALID_BOOKING_MODES as readonly string[]
+  const normalizedFilters = normalizeSearchFilters(
+    {
+      query: effectiveQuery,
+      locationLabel,
+      vibeQuery: what,
+      minPrice: getFirstValue(raw.minPrice) ?? getFirstValue(raw.minBudget),
+      maxPrice: getFirstValue(raw.maxPrice) ?? getFirstValue(raw.maxBudget),
+      amenities: raw.amenities,
+      moveInDate: getFirstValue(raw.moveInDate),
+      startDate: getFirstValue(raw.startDate),
+      endDate: getFirstValue(raw.endDate),
+      leaseDuration: getFirstValue(raw.leaseDuration),
+      houseRules: raw.houseRules,
+      languages: raw.languages,
+      roomType: getFirstValue(raw.roomType),
+      genderPreference: getFirstValue(raw.genderPreference),
+      householdGender: getFirstValue(raw.householdGender),
+      bookingMode: getFirstValue(raw.bookingMode),
+      bounds,
+      minAvailableSlots: getFirstValue(raw.minAvailableSlots),
+      minSlots: getFirstValue(raw.minSlots),
+      nearMatches: getFirstValue(raw.nearMatches),
+      sort: getFirstValue(raw.sort),
+    },
+    {
+      invalidRange: "drop",
+      overlongText: "truncate",
+    }
   );
 
-  // Parse minSlots (minimum available slots filter)
-  const rawMinSlots = getFirstValue(raw.minSlots);
-  const parsedMinSlots = rawMinSlots
-    ? (() => {
-        const parsed = parseInt(rawMinSlots.trim(), 10);
-        return Number.isFinite(parsed) && parsed >= 1 && parsed <= 20
-          ? parsed
-          : undefined;
-      })()
-    : undefined;
-
-  // Parse nearMatches boolean flag.
-  // Accept both boolean strings and numeric toggles for backward compatibility:
-  // true/false and 1/0.
-  const nearMatchesRaw = getFirstValue(raw.nearMatches);
-  const nearMatches =
-    nearMatchesRaw === "true" || nearMatchesRaw === "1"
-      ? true
-      : nearMatchesRaw === "false" || nearMatchesRaw === "0"
-        ? false
-        : undefined;
-
-  const filterParams: FilterParams = {
+  const sortOption = normalizedFilters.sort ?? "recommended";
+  const filterParams: NormalizedSearchFilters = {
+    ...normalizedFilters,
     query: effectiveQuery,
     locationLabel,
     vibeQuery: what,
-    minPrice: effectiveMinPrice,
-    maxPrice: effectiveMaxPrice,
-    amenities: amenitiesList,
-    moveInDate: validMoveInDate,
-    leaseDuration: validLeaseDuration,
-    houseRules: houseRulesList,
-    languages: languagesList.length > 0 ? languagesList : undefined,
-    roomType: validRoomType,
-    genderPreference: validGenderPreference,
-    householdGender: validHouseholdGender,
-    bookingMode: validBookingMode,
     bounds,
-    minAvailableSlots: parsedMinSlots,
     sort: sortOption,
-    nearMatches,
   };
 
   const boundsRequired = isBoundsRequired({
@@ -606,164 +943,73 @@ export function getPriceParam(
  * Used by server actions before storing filters in the database.
  */
 export function validateSearchFilters(filters: unknown): FilterParams {
-  if (!filters || typeof filters !== "object") {
+  if (!filters || typeof filters !== "object" || Array.isArray(filters)) {
     return {};
   }
 
   const input = filters as Record<string, unknown>;
-  const validated: FilterParams = {};
+  const boundsInput =
+    input.bounds && typeof input.bounds === "object"
+      ? (() => {
+          const bounds = input.bounds as Record<string, unknown>;
+          if (
+            typeof bounds.minLat === "number" &&
+            typeof bounds.maxLat === "number" &&
+            typeof bounds.minLng === "number" &&
+            typeof bounds.maxLng === "number"
+          ) {
+            return {
+              minLat: bounds.minLat,
+              maxLat: bounds.maxLat,
+              minLng: bounds.minLng,
+              maxLng: bounds.maxLng,
+            };
+          }
+          return undefined;
+        })()
+      : undefined;
 
-  // Query validation
-  if (typeof input.query === "string") {
-    const trimmed = input.query.trim();
-    if (trimmed.length > 0 && trimmed.length <= 200) {
-      validated.query = trimmed;
+  return normalizeSearchFilters(
+    {
+      query: typeof input.query === "string" ? input.query : undefined,
+      locationLabel:
+        typeof input.locationLabel === "string" ? input.locationLabel : undefined,
+      vibeQuery: typeof input.vibeQuery === "string" ? input.vibeQuery : undefined,
+      minPrice: typeof input.minPrice === "number" ? input.minPrice : undefined,
+      maxPrice: typeof input.maxPrice === "number" ? input.maxPrice : undefined,
+      amenities: Array.isArray(input.amenities) ? input.amenities : undefined,
+      moveInDate:
+        typeof input.moveInDate === "string" ? input.moveInDate : undefined,
+      endDate: typeof input.endDate === "string" ? input.endDate : undefined,
+      leaseDuration:
+        typeof input.leaseDuration === "string" ? input.leaseDuration : undefined,
+      houseRules: Array.isArray(input.houseRules) ? input.houseRules : undefined,
+      languages: Array.isArray(input.languages) ? input.languages : undefined,
+      roomType: typeof input.roomType === "string" ? input.roomType : undefined,
+      genderPreference:
+        typeof input.genderPreference === "string"
+          ? input.genderPreference
+          : undefined,
+      householdGender:
+        typeof input.householdGender === "string"
+          ? input.householdGender
+          : undefined,
+      bookingMode:
+        typeof input.bookingMode === "string" ? input.bookingMode : undefined,
+      bounds: boundsInput,
+      minAvailableSlots:
+        typeof input.minAvailableSlots === "number"
+          ? input.minAvailableSlots
+          : undefined,
+      nearMatches:
+        typeof input.nearMatches === "boolean" ? input.nearMatches : undefined,
+      sort: typeof input.sort === "string" ? input.sort : undefined,
+    },
+    {
+    invalidRange: "throw",
+    overlongText: "drop",
     }
-  }
-  if (typeof input.locationLabel === "string") {
-    const trimmed = input.locationLabel.trim();
-    if (trimmed.length > 0 && trimmed.length <= 200) {
-      validated.locationLabel = trimmed;
-    }
-  }
-  if (typeof input.vibeQuery === "string") {
-    const trimmed = input.vibeQuery.trim();
-    if (trimmed.length > 0 && trimmed.length <= 200) {
-      validated.vibeQuery = trimmed;
-    }
-  }
-
-  // Price validation with MAX_SAFE_PRICE clamping
-  if (typeof input.minPrice === "number" && Number.isFinite(input.minPrice)) {
-    validated.minPrice = Math.max(0, Math.min(input.minPrice, MAX_SAFE_PRICE));
-  }
-  if (typeof input.maxPrice === "number" && Number.isFinite(input.maxPrice)) {
-    validated.maxPrice = Math.max(0, Math.min(input.maxPrice, MAX_SAFE_PRICE));
-  }
-
-  // P1-13: Reject inverted price ranges instead of silently swapping
-  // This matches the behavior in filter-schema.ts normalizeFilters() and parseSearchParams()
-  if (
-    validated.minPrice !== undefined &&
-    validated.maxPrice !== undefined &&
-    validated.minPrice > validated.maxPrice
-  ) {
-    throw new Error("minPrice cannot exceed maxPrice");
-  }
-
-  // Array field validation helper
-  const validateArrayField = (
-    field: unknown,
-    allowlist: readonly string[]
-  ): string[] | undefined => {
-    if (!Array.isArray(field)) return undefined;
-    const allowMap = new Map(
-      allowlist.map((item) => [item.toLowerCase(), item])
-    );
-    const validated = field
-      .filter((v): v is string => typeof v === "string")
-      .map((v) => v.trim())
-      .map((v) => allowMap.get(v.toLowerCase()))
-      .filter((v): v is string => Boolean(v));
-    const unique = [...new Set(validated)].slice(0, MAX_ARRAY_ITEMS);
-    return unique.length > 0 ? unique : undefined;
-  };
-
-  // Amenities validation
-  validated.amenities = validateArrayField(input.amenities, VALID_AMENITIES);
-
-  // House rules validation
-  validated.houseRules = validateArrayField(
-    input.houseRules,
-    VALID_HOUSE_RULES
   );
-
-  // Languages validation (uses normalizeLanguages for normalization)
-  if (Array.isArray(input.languages)) {
-    const langList = input.languages
-      .filter((v): v is string => typeof v === "string")
-      .map((v) => v.trim())
-      .filter((v) => v.length > 0 && v.length <= 32);
-    const normalized = normalizeLanguages(langList);
-    const unique = [...new Set(normalized)].slice(0, MAX_ARRAY_ITEMS);
-    if (unique.length > 0) {
-      validated.languages = unique;
-    }
-  }
-
-  // Enum field validation helper
-  const validateEnumField = (
-    field: unknown,
-    allowlist: readonly string[]
-  ): string | undefined => {
-    if (typeof field !== "string") return undefined;
-    const trimmed = field.trim();
-    if (!allowlist.includes(trimmed)) return undefined;
-    return trimmed === "any" ? undefined : trimmed;
-  };
-
-  // Room type validation
-  validated.roomType = validateEnumField(input.roomType, VALID_ROOM_TYPES);
-
-  // Lease duration validation
-  validated.leaseDuration = validateEnumField(
-    input.leaseDuration,
-    VALID_LEASE_DURATIONS
-  );
-
-  // Gender preference validation
-  validated.genderPreference = validateEnumField(
-    input.genderPreference,
-    VALID_GENDER_PREFERENCES
-  );
-
-  // Household gender validation
-  validated.householdGender = validateEnumField(
-    input.householdGender,
-    VALID_HOUSEHOLD_GENDERS
-  );
-
-  // Move-in date validation (reuse safeParseDate logic)
-  if (typeof input.moveInDate === "string") {
-    validated.moveInDate = safeParseDate(input.moveInDate);
-  }
-
-  // Sort validation
-  if (typeof input.sort === "string") {
-    const trimmed = input.sort.trim();
-    if (validSortOptions.includes(trimmed as SortOption)) {
-      validated.sort = trimmed as SortOption;
-    }
-  }
-
-  // Bounds validation
-  if (input.bounds && typeof input.bounds === "object") {
-    const b = input.bounds as Record<string, unknown>;
-    if (
-      typeof b.minLat === "number" &&
-      Number.isFinite(b.minLat) &&
-      typeof b.maxLat === "number" &&
-      Number.isFinite(b.maxLat) &&
-      typeof b.minLng === "number" &&
-      Number.isFinite(b.minLng) &&
-      typeof b.maxLng === "number" &&
-      Number.isFinite(b.maxLng)
-    ) {
-      const clampedBounds = {
-        minLat: Math.max(-90, Math.min(90, b.minLat)),
-        maxLat: Math.max(-90, Math.min(90, b.maxLat)),
-        minLng: Math.max(-180, Math.min(180, b.minLng)),
-        maxLng: Math.max(-180, Math.min(180, b.maxLng)),
-      };
-      // P1-3: Throw for inverted lat (consistent with price)
-      if (clampedBounds.minLat > clampedBounds.maxLat) {
-        throw new Error("minLat cannot exceed maxLat");
-      }
-      validated.bounds = clampedBounds;
-    }
-  }
-
-  return validated;
 }
 
 /**

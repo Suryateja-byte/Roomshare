@@ -21,6 +21,7 @@ import {
   waitFor,
   cleanup,
   act,
+  within,
 } from "@testing-library/react";
 import "@testing-library/jest-dom";
 
@@ -561,7 +562,9 @@ function setDesktopAvoidRects(
     document.querySelectorAll<HTMLElement>("[data-map-avoid]")
   );
 
-  rects.slice(0, avoidElements.length).forEach((rect, index) => {
+  expect(rects).toHaveLength(avoidElements.length);
+
+  rects.forEach((rect, index) => {
     const element = avoidElements[index];
     if (!element) return;
     element.getBoundingClientRect = jest
@@ -1336,6 +1339,41 @@ describe("Map Component", () => {
       expect(screen.getByTestId("map-popup")).toBeInTheDocument();
     });
 
+    it("preserves the canonical detail range in the desktop popup link", async () => {
+      mockSearchParams = new URLSearchParams(
+        "moveInDate=2026-05-01&endDate=2026-06-01"
+      );
+
+      render(<MapComponent listings={mockListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      const handlers = (
+        window as unknown as Record<string, { onIdle?: () => void }>
+      ).__mapHandlers;
+      await act(async () => {
+        handlers?.onIdle?.();
+      });
+
+      setDesktopMapPaneRect();
+
+      const markers = screen.getAllByTestId("map-marker");
+      await act(async () => {
+        fireEvent.click(markers[0]);
+      });
+
+      expect(
+        within(screen.getByTestId("map-popup")).getByRole("link", {
+          name: /view details/i,
+        })
+      ).toHaveAttribute(
+        "href",
+        "/listings/listing-1?startDate=2026-05-01&endDate=2026-06-01"
+      );
+    });
+
     it("keeps a centered marker above the point without camera correction", async () => {
       render(<MapComponent listings={mockListings} />);
 
@@ -1462,8 +1500,6 @@ describe("Map Component", () => {
 
       setDesktopMapPaneRect();
       setDesktopAvoidRects([
-        { left: 0, top: 0, width: 0, height: 0 },
-        { left: 560, top: 20, width: 200, height: 240 },
         { left: 560, top: 20, width: 200, height: 240 },
       ]);
       mockMapInstance.project.mockReturnValue({ x: 500, y: 340 });
@@ -1600,6 +1636,40 @@ describe("Map Component", () => {
       expect(screen.getByTestId("map-preview-card")).toBeInTheDocument();
       expect(mockSetActive).toHaveBeenCalledWith(mockListings[0].id);
       expect(mockRequestScrollTo).toHaveBeenCalledWith(mockListings[0].id);
+    });
+
+    it("preserves the canonical detail range in the phone preview card link", async () => {
+      phoneViewportMatches = true;
+      mockSearchParams = new URLSearchParams(
+        "moveInDate=2026-05-01&endDate=2026-06-01"
+      );
+
+      render(
+        <MapComponent listings={mockListings} selectionPresentation="preview" />
+      );
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      const handlers = (
+        window as unknown as Record<string, { onIdle?: () => void }>
+      ).__mapHandlers;
+      await act(async () => {
+        handlers?.onIdle?.();
+      });
+
+      const markers = screen.getAllByTestId("map-marker");
+      await act(async () => {
+        fireEvent.click(markers[0]);
+      });
+
+      expect(
+        within(screen.getByTestId("map-preview-card")).getByRole("link")
+      ).toHaveAttribute(
+        "href",
+        "/listings/listing-1?startDate=2026-05-01&endDate=2026-06-01"
+      );
     });
 
     it("keeps the phone preview during programmatic recenter and dismisses it on user move", async () => {
@@ -2168,7 +2238,7 @@ describe("Map Component", () => {
   });
 
   describe("desktop map controls", () => {
-    it("renders the hide map button on desktop", async () => {
+    it("renders the desktop map tools trigger on desktop", async () => {
       render(<MapComponent listings={mockListings} />);
 
       await act(async () => {
@@ -2176,7 +2246,7 @@ describe("Map Component", () => {
       });
 
       expect(
-        screen.getByRole("button", { name: /hide map/i })
+        screen.getByRole("button", { name: /map tools/i })
       ).toBeInTheDocument();
     });
 

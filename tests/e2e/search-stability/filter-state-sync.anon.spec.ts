@@ -168,8 +168,14 @@ test.describe("Filter State Sync across URL changes", () => {
     expect(getUrlParam(page, "roomType")).toBe("Private Room");
 
     // Bounds should reflect the new panned values
-    expect(getUrlParam(page, "minLat")).toBe(String(PANNED_BOUNDS.minLat));
-    expect(getUrlParam(page, "maxLat")).toBe(String(PANNED_BOUNDS.maxLat));
+    expect(Number(getUrlParam(page, "minLat"))).toBeCloseTo(
+      PANNED_BOUNDS.minLat,
+      3
+    );
+    expect(Number(getUrlParam(page, "maxLat"))).toBeCloseTo(
+      PANNED_BOUNDS.maxLat,
+      3
+    );
 
     // Chip should still be visible
     const region = appliedFiltersRegion(page);

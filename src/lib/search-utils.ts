@@ -16,6 +16,7 @@ export interface SearchFilters {
   maxPrice?: number;
   amenities?: string[];
   moveInDate?: string;
+  endDate?: string;
   leaseDuration?: string;
   houseRules?: string[];
   roomType?: string;
@@ -74,6 +75,7 @@ export function searchFiltersToNormalizedQuery(
       maxPrice: filters.maxPrice,
       amenities: filters.amenities,
       moveInDate: filters.moveInDate,
+      endDate: filters.endDate,
       leaseDuration: filters.leaseDuration,
       houseRules: filters.houseRules,
       languages: filters.languages,
@@ -102,6 +104,7 @@ export function normalizedSearchQueryToSearchFilters(
     maxPrice: query.maxPrice,
     amenities: query.amenities,
     moveInDate: query.moveInDate,
+    endDate: query.endDate,
     leaseDuration: query.leaseDuration,
     houseRules: query.houseRules,
     roomType: query.roomType,
@@ -141,6 +144,7 @@ export function searchParamsToSearchFilters(
 
 // Build search URL from filters
 export function buildSearchUrl(filters: SearchFilters): string {
+  // CFM-604: canonical-on-write guarantee — saved-search URLs funnel through buildCanonicalSearchUrl.
   return buildCanonicalSearchUrl(searchFiltersToNormalizedQuery(filters), {
     includePagination: false,
   });

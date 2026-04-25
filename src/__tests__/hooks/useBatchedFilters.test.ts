@@ -66,6 +66,7 @@ describe("readFiltersFromURL", () => {
       roomType: "Private Room",
       leaseDuration: "6 months",
       moveInDate: "2026-03-01",
+      endDate: "2026-04-01",
       genderPreference: "FEMALE_ONLY",
       householdGender: "MIXED",
     });
@@ -75,8 +76,21 @@ describe("readFiltersFromURL", () => {
     expect(result.roomType).toBe("Private Room");
     expect(result.leaseDuration).toBe("6 months");
     expect(result.moveInDate).toBe("2026-03-01");
+    expect(result.endDate).toBe("2026-04-01");
     expect(result.genderPreference).toBe("FEMALE_ONLY");
     expect(result.householdGender).toBe("MIXED");
+  });
+
+  it("accepts startDate as an inbound alias and drops invalid endDate ranges", () => {
+    const params = new URLSearchParams({
+      startDate: "2026-03-01",
+      endDate: "2026-02-01",
+    });
+
+    const result = readFiltersFromURL(params);
+
+    expect(result.moveInDate).toBe("2026-03-01");
+    expect(result.endDate).toBe("");
   });
 
   it("parses comma-separated array params", () => {
@@ -209,6 +223,7 @@ describe("commit URL building", () => {
       roomType: "Private Room",
       leaseDuration: "",
       moveInDate: "",
+      endDate: "",
       amenities: ["Wifi", "Parking"],
       houseRules: [],
       languages: ["en"],
@@ -678,11 +693,13 @@ describe("useBatchedFilters hook", () => {
         result.current.commit({
           roomType: "Private Room",
           moveInDate: "2026-05-01",
+          endDate: "2026-06-01",
         });
       });
 
       expect(result.current.pending.roomType).toBe("Private Room");
       expect(result.current.pending.moveInDate).toBe("2026-05-01");
+      expect(result.current.pending.endDate).toBe("2026-06-01");
 
       const calledUrl = mockRouter.push.mock.calls[0][0] as string;
       const searchUrl = new URL(calledUrl, "http://localhost");
@@ -690,6 +707,33 @@ describe("useBatchedFilters hook", () => {
       expect(searchUrl.searchParams.get("sort")).toBeNull();
       expect(searchUrl.searchParams.get("roomType")).toBe("Private Room");
       expect(searchUrl.searchParams.get("moveInDate")).toBe("2026-05-01");
+      expect(searchUrl.searchParams.get("endDate")).toBe("2026-06-01");
+    });
+
+    it("drops endDate when commit overrides produce an invalid range", () => {
+      (useSearchParams as jest.Mock).mockReturnValue(
+        createMockSearchParams({
+          moveInDate: "2026-05-01",
+          endDate: "2026-06-01",
+        })
+      );
+
+      const { result } = renderHook(() => useBatchedFilters());
+
+      act(() => {
+        result.current.commit({
+          moveInDate: "2026-07-01",
+        });
+      });
+
+      expect(result.current.pending.moveInDate).toBe("2026-07-01");
+      expect(result.current.pending.endDate).toBe("");
+
+      const calledUrl = mockRouter.push.mock.calls[0][0] as string;
+      const searchUrl = new URL(calledUrl, "http://localhost");
+
+      expect(searchUrl.searchParams.get("moveInDate")).toBe("2026-07-01");
+      expect(searchUrl.searchParams.get("endDate")).toBeNull();
     });
   });
 

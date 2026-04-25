@@ -33,6 +33,7 @@ describe("useDebouncedFilterCount", () => {
     roomType: "",
     leaseDuration: "",
     moveInDate: "",
+    endDate: "",
     amenities: [] as string[],
     houseRules: [] as string[],
     languages: [] as string[],
@@ -57,6 +58,36 @@ describe("useDebouncedFilterCount", () => {
   });
 
   describe("normal count behavior", () => {
+    it("includes moveInDate and endDate in the count request when a valid range is selected", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ count: 42 }),
+      });
+
+      renderHook(() =>
+        useDebouncedFilterCount({
+          pending: {
+            ...defaultPending,
+            moveInDate: "2026-05-01",
+            endDate: "2026-06-01",
+          },
+          isDirty: true,
+          isDrawerOpen: true,
+        })
+      );
+
+      act(() => {
+        jest.advanceTimersByTime(350);
+      });
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledTimes(1);
+      });
+
+      expect(mockFetch.mock.calls[0]?.[0]).toContain("moveInDate=2026-05-01");
+      expect(mockFetch.mock.calls[0]?.[0]).toContain("endDate=2026-06-01");
+    });
+
     it("returns count from API when available", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,

@@ -92,6 +92,9 @@ jest.mock("@/lib/logger", () => ({
 
 jest.mock("@/lib/search/search-doc-dirty", () => ({
   markListingDirty: jest.fn().mockResolvedValue(undefined),
+  markListingsDirty: jest.fn().mockResolvedValue(undefined),
+  markListingDirtyInTx: jest.fn().mockResolvedValue(undefined),
+  markListingsDirtyInTx: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock("@/app/actions/suspension", () => ({
@@ -207,7 +210,7 @@ describe("Access Control Security Tests", () => {
       });
 
       it("updateListingStatus (admin) rejects non-admin", async () => {
-        const result = await updateListingStatus("listing-1", "PAUSED");
+        const result = await updateListingStatus("listing-1", "PAUSED", 1);
         expect(result.error).toBe("Unauthorized");
       });
 
@@ -394,14 +397,34 @@ describe("Access Control Security Tests", () => {
 
       // Fix 9: updateListingStatus now uses $transaction with FOR UPDATE
       const mockTx = {
-        $queryRaw: jest.fn().mockResolvedValue([{ ownerId: "user-other" }]),
+        $queryRaw: jest.fn().mockResolvedValue([
+          {
+            id: "listing-1",
+            ownerId: "user-other",
+            version: 1,
+            availabilitySource: "LEGACY_BOOKING",
+            status: "ACTIVE",
+            statusReason: null,
+            needsMigrationReview: false,
+            openSlots: null,
+            availableSlots: 1,
+            totalSlots: 1,
+            moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+            availableUntil: null,
+            minStayMonths: 1,
+            lastConfirmedAt: null,
+            freshnessReminderSentAt: null,
+            freshnessWarningSentAt: null,
+            autoPausedAt: null,
+          },
+        ]),
         booking: { count: jest.fn() },
         listing: { update: jest.fn() },
       };
       mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(mockTx));
 
       // Listing owned by a different user (ownerId returned by FOR UPDATE query above)
-      const result = await userUpdateListingStatus("listing-1", "PAUSED");
+      const result = await userUpdateListingStatus("listing-1", "PAUSED", 1);
       expect(result.error).toBe("You can only update your own listings");
     });
 
@@ -410,7 +433,27 @@ describe("Access Control Security Tests", () => {
 
       // Fix 9: updateListingStatus now uses $transaction with FOR UPDATE
       const mockTx = {
-        $queryRaw: jest.fn().mockResolvedValue([{ ownerId: "user-regular" }]),
+        $queryRaw: jest.fn().mockResolvedValue([
+          {
+            id: "listing-1",
+            ownerId: "user-regular",
+            version: 1,
+            availabilitySource: "LEGACY_BOOKING",
+            status: "ACTIVE",
+            statusReason: null,
+            needsMigrationReview: false,
+            openSlots: null,
+            availableSlots: 1,
+            totalSlots: 1,
+            moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+            availableUntil: null,
+            minStayMonths: 1,
+            lastConfirmedAt: null,
+            freshnessReminderSentAt: null,
+            freshnessWarningSentAt: null,
+            autoPausedAt: null,
+          },
+        ]),
         booking: { count: jest.fn().mockResolvedValue(0) },
         listing: {
           update: jest
@@ -420,7 +463,7 @@ describe("Access Control Security Tests", () => {
       };
       mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(mockTx));
 
-      const result = await userUpdateListingStatus("listing-1", "PAUSED");
+      const result = await userUpdateListingStatus("listing-1", "PAUSED", 1);
       expect(result.error).toBeUndefined();
     });
   });

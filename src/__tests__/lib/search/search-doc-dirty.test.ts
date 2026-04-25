@@ -30,6 +30,9 @@ jest.mock("@/lib/logger", () => ({
 import {
   markListingDirty,
   markListingsDirty,
+  markListingDirtyInTx,
+  markListingsDirtyInTx,
+  type DirtyMarkTxClient,
 } from "@/lib/search/search-doc-dirty";
 import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
@@ -145,6 +148,130 @@ describe("search-doc-dirty", () => {
       await markListingsDirty(listings, "listing_updated");
 
       expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("markListingDirtyInTx", () => {
+    function makeTx(): DirtyMarkTxClient & {
+      $executeRaw: jest.Mock;
+    } {
+      return {
+        $executeRaw: jest.fn().mockResolvedValue(1),
+      } as unknown as DirtyMarkTxClient & { $executeRaw: jest.Mock };
+    }
+
+    it("calls the supplied transaction client's $executeRaw, not the module-level prisma", async () => {
+      const tx = makeTx();
+
+      await markListingDirtyInTx(tx, "listing-123", "listing_updated");
+
+      expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+    });
+
+    it("rethrows errors so the enclosing transaction can roll back", async () => {
+      const tx = makeTx();
+      const dbError = new Error("constraint violation");
+      tx.$executeRaw.mockRejectedValue(dbError);
+
+      await expect(
+        markListingDirtyInTx(tx, "listing-123", "status_changed")
+      ).rejects.toThrow("constraint violation");
+    });
+
+    it("rolls back the dirty mark when the enclosing $transaction rolls back", async () => {
+      const executeRawCalls: unknown[][] = [];
+      const tx = {
+        $executeRaw: jest.fn((...args: unknown[]) => {
+          executeRawCalls.push(args);
+          return Promise.resolve(1);
+        }),
+      } as unknown as DirtyMarkTxClient;
+
+      // Simulate prisma.$transaction: callback runs, then a rollback.
+      // The test caller (below) throws AFTER markListingDirtyInTx returns to
+      // force the rollback path — `committed` stays false because the happy
+      // `return result` is never reached.
+      let committed = false;
+      const simulateTx = async <T>(
+        cb: (tx: DirtyMarkTxClient) => Promise<T>
+      ): Promise<T> => {
+        const result = await cb(tx);
+        committed = true;
+        return result;
+      };
+
+      await expect(
+        simulateTx(async (txClient) => {
+          await markListingDirtyInTx(txClient, "listing-1", "listing_updated");
+          throw new Error("simulated source-write failure");
+        })
+      ).rejects.toThrow("simulated source-write failure");
+
+      // The helper issued its INSERT inside the tx callback, but since the tx
+      // threw, a real DB would roll the INSERT back. Here we verify the call
+      // went through the tx client (never to the module-level prisma).
+      expect(executeRawCalls.length).toBe(1);
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+      expect(committed).toBe(false);
+    });
+
+    it("no-ops when searchDoc feature flag is off", async () => {
+      const originalEnabled = process.env.ENABLE_SEARCH_DOC;
+      delete process.env.ENABLE_SEARCH_DOC;
+      // Re-import to pick up the flag change
+      jest.resetModules();
+      const { markListingDirtyInTx: reloaded } = await import(
+        "@/lib/search/search-doc-dirty"
+      );
+      const tx = makeTx();
+
+      await reloaded(tx, "listing-1", "listing_updated");
+
+      expect(tx.$executeRaw).not.toHaveBeenCalled();
+
+      process.env.ENABLE_SEARCH_DOC = originalEnabled;
+    });
+  });
+
+  describe("markListingsDirtyInTx", () => {
+    function makeTx(): DirtyMarkTxClient & {
+      $executeRaw: jest.Mock;
+    } {
+      return {
+        $executeRaw: jest.fn().mockResolvedValue(2),
+      } as unknown as DirtyMarkTxClient & { $executeRaw: jest.Mock };
+    }
+
+    it("calls the supplied transaction client's $executeRaw for a batch", async () => {
+      const tx = makeTx();
+
+      await markListingsDirtyInTx(
+        tx,
+        ["listing-1", "listing-2"],
+        "status_changed"
+      );
+
+      expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+    });
+
+    it("no-ops on empty array", async () => {
+      const tx = makeTx();
+
+      await markListingsDirtyInTx(tx, [], "listing_updated");
+
+      expect(tx.$executeRaw).not.toHaveBeenCalled();
+    });
+
+    it("rethrows errors so the enclosing transaction can roll back", async () => {
+      const tx = makeTx();
+      const dbError = new Error("batch insert failed");
+      tx.$executeRaw.mockRejectedValue(dbError);
+
+      await expect(
+        markListingsDirtyInTx(tx, ["listing-1"], "review_changed")
+      ).rejects.toThrow("batch insert failed");
     });
   });
 });

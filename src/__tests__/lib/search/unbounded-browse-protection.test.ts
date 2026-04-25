@@ -60,6 +60,14 @@ function createMockSearchDocRow(id: string, overrides = {}) {
     images: ["/image.jpg"],
     availableSlots: 2,
     totalSlots: 3,
+    availabilitySource: "HOST_MANAGED",
+    openSlots: 2,
+    availableUntil: null,
+    minStayMonths: 1,
+    lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
+    status: "ACTIVE",
+    statusReason: null,
+    needsMigrationReview: false,
     amenities: ["WiFi"],
     houseRules: ["No Smoking"],
     householdLanguages: ["en"],
@@ -213,10 +221,28 @@ describe("Unbounded Browse Protection", () => {
           title: "Test Listing",
           price: BigInt(1000),
           availableSlots: 2,
+          totalSlots: 3,
+          availabilitySource: "HOST_MANAGED",
+          openSlots: 2,
+          availableUntil: null,
+          minStayMonths: 1,
+          lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
           ownerId: "owner-1",
+          normalizedAddress: "123 main st san francisco ca 94102",
           primaryImage: "/image.jpg",
+          roomType: "Private Room",
+          moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+          city: "San Francisco",
+          state: "CA",
           lat: 37.7749,
           lng: -122.4194,
+          avgRating: 4.5,
+          reviewCount: 10,
+          recommendedScore: 85,
+          createdAt: "2026-04-01T00:00:00.000Z",
           totalCount: BigInt(1),
         },
       ];
@@ -247,9 +273,28 @@ describe("Unbounded Browse Protection", () => {
           title: "Test Listing",
           price: BigInt(1000),
           availableSlots: 2,
+          totalSlots: 3,
+          availabilitySource: "HOST_MANAGED",
+          openSlots: 2,
+          availableUntil: null,
+          minStayMonths: 1,
+          lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          ownerId: "owner-1",
+          normalizedAddress: "123 main st san francisco ca 94102",
           primaryImage: "/image.jpg",
+          roomType: "Private Room",
+          moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+          city: "San Francisco",
+          state: "CA",
           lat: 37.7749,
           lng: -122.4194,
+          avgRating: 4.5,
+          reviewCount: 10,
+          recommendedScore: 85,
+          createdAt: "2026-04-01T00:00:00.000Z",
         },
       ]);
 
@@ -282,9 +327,7 @@ describe("Unbounded Browse Protection", () => {
         { length: MAX_UNBOUNDED_RESULTS + 2 },
         (_, i) => createMockSearchDocRow(`listing-${i}`)
       );
-      (prisma.$queryRawUnsafe as jest.Mock)
-        .mockResolvedValueOnce([{ count: null }]) // Count query returns null for unbounded
-        .mockResolvedValueOnce(manyResults); // List query
+      (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce(manyResults);
 
       // Act: Request 100 items without bounds (unbounded browse)
       const result = await getSearchDocListingsPaginated({
@@ -301,9 +344,7 @@ describe("Unbounded Browse Protection", () => {
       const fewResults = Array.from({ length: 7 }, (_, i) =>
         createMockSearchDocRow(`listing-${i}`)
       );
-      (prisma.$queryRawUnsafe as jest.Mock)
-        .mockResolvedValueOnce([{ count: null }]) // Count query
-        .mockResolvedValueOnce(fewResults); // List query
+      (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce(fewResults);
 
       // Act: Request 6 items (under cap)
       const result = await getSearchDocListingsPaginated({
@@ -359,9 +400,7 @@ describe("Unbounded Browse Protection", () => {
       const featuredResults = Array.from({ length: 7 }, (_, i) =>
         createMockSearchDocRow(`listing-${i}`)
       );
-      (prisma.$queryRawUnsafe as jest.Mock)
-        .mockResolvedValueOnce([{ count: null }]) // Count query (null for unbounded)
-        .mockResolvedValueOnce(featuredResults); // List query
+      (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValueOnce(featuredResults);
 
       // Act: Featured listings typically use limit: 6
       const result = await getSearchDocListingsPaginated({

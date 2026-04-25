@@ -78,6 +78,9 @@ describe("search-scenarios", () => {
     expect(state.meta.backendSource).toBe("v1-fallback");
     if (state.kind === "degraded") {
       expect(state.data.items.length).toBeGreaterThan(0);
+      expect(state.data.items[0]?.publicAvailability).toMatchObject({
+        availabilitySource: "HOST_MANAGED",
+      });
     }
   });
 
@@ -97,5 +100,35 @@ describe("search-scenarios", () => {
     expect(mapState.kind).toBe("rate-limited");
     expect(loadMore.rateLimited).toBe(true);
     expect(loadMore.meta.backendSource).toBe("v2");
+  });
+
+  it("adds publicAvailability to scenario list and map payloads", async () => {
+    const query = normalizeSearchQuery(
+      new URLSearchParams("where=Austin&lat=30.2672&lng=-97.7431")
+    );
+
+    const listState = await buildScenarioSearchListState("default-results", {
+      query,
+    });
+    const mapState = await buildScenarioSearchMapState("default-results", {
+      query,
+    });
+
+    expect(listState.kind).toBe("ok");
+    if (listState.kind === "ok") {
+      expect(listState.data.items[0]?.publicAvailability).toMatchObject({
+        availabilitySource: "HOST_MANAGED",
+        openSlots: listState.data.items[0]?.availableSlots,
+        totalSlots: listState.data.items[0]?.totalSlots,
+      });
+    }
+
+    expect(mapState.kind).toBe("ok");
+    if (mapState.kind === "ok") {
+      expect(mapState.data.listings[0]?.publicAvailability).toMatchObject({
+        availabilitySource: "HOST_MANAGED",
+        openSlots: mapState.data.listings[0]?.availableSlots,
+      });
+    }
   });
 });

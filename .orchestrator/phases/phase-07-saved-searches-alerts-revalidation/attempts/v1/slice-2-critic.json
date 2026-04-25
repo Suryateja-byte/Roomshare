@@ -1,0 +1,10 @@
+{
+  "slice": "canonical-saved-search-contract",
+  "verdict": "approved",
+  "findings": [],
+  "rationale": "The action contract stays backward-compatible, owner-scoped mutations are preserved, new saved searches write canonical metadata and an EMAIL subscription atomically, and legacy rows get subscription repair through toggle upsert.",
+  "checks_reviewed": [
+    "pnpm test -- --runTestsByPath src/__tests__/actions/saved-search.test.ts --runInBand"
+  ],
+  "next_action": "Proceed to durable alert match and delivery worker slice."
+}

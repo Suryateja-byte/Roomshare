@@ -85,7 +85,7 @@ const SUGGESTION_TYPE_TO_PENDING_KEYS: Record<
   Array<keyof BatchedFilterValues>
 > = {
   price: ["minPrice", "maxPrice"],
-  date: ["moveInDate"],
+  date: ["moveInDate", "endDate"],
   roomType: ["roomType"],
   amenities: ["amenities"],
   leaseDuration: ["leaseDuration"],
@@ -129,6 +129,30 @@ const validateMoveInDate = (value: string | null): string => {
 
   return trimmed;
 };
+
+const validateEndDate = (value: string | null, moveInDate: string): string => {
+  const validatedEndDate = validateMoveInDate(value);
+  if (!validatedEndDate || !moveInDate) return "";
+  return validatedEndDate > moveInDate ? validatedEndDate : "";
+};
+
+function getValidatedSearchDateRange(
+  moveInDateValue: string | null,
+  endDateValue: string | null
+) {
+  const moveInDate = validateMoveInDate(moveInDateValue);
+  if (!moveInDate) {
+    return {
+      moveInDate: "",
+      endDate: "",
+    };
+  }
+
+  return {
+    moveInDate,
+    endDate: validateEndDate(endDateValue, moveInDate),
+  };
+}
 
 // Custom event for map fly-to
 export const MAP_FLY_TO_EVENT = "mapFlyToLocation";
@@ -192,6 +216,7 @@ export default function SearchForm({
     minPrice,
     maxPrice,
     moveInDate,
+    endDate,
     leaseDuration,
     roomType,
     amenities,
@@ -291,17 +316,40 @@ export default function SearchForm({
   // changes would fight the URL sync effect in useBatchedFilters.
   useEffect(() => {
     setHasMounted(true);
-    // Validate moveInDate on mount to clear invalid past dates
-    const rawMoveInDate = searchParams.get("moveInDate");
-    const validated = validateMoveInDate(rawMoveInDate);
-    if (validated !== moveInDate) {
-      setPending({ moveInDate: validated });
+    // Validate search dates on mount to clear invalid or orphaned ranges.
+    const rawMoveInDate =
+      searchParams.get("moveInDate") ?? searchParams.get("startDate");
+    const rawEndDate = searchParams.get("endDate");
+    const validatedRange = getValidatedSearchDateRange(
+      rawMoveInDate,
+      rawEndDate
+    );
+    if (
+      validatedRange.moveInDate !== moveInDate ||
+      validatedRange.endDate !== endDate
+    ) {
+      setPending(validatedRange);
     }
-    // Strip invalid moveInDate from URL so the sync effect in
-    // useBatchedFilters doesn't re-override the cleanup from committed state
-    if (rawMoveInDate && !validated) {
+
+    // Strip invalid dates and canonicalize startDate -> moveInDate in the URL so
+    // the sync effect in useBatchedFilters doesn't re-override the cleanup.
+    if (
+      rawMoveInDate !== validatedRange.moveInDate ||
+      (rawEndDate ?? "") !== validatedRange.endDate ||
+      searchParams.has("startDate")
+    ) {
       const params = new URLSearchParams(searchParams.toString());
-      params.delete("moveInDate");
+      params.delete("startDate");
+      if (validatedRange.moveInDate) {
+        params.set("moveInDate", validatedRange.moveInDate);
+      } else {
+        params.delete("moveInDate");
+      }
+      if (validatedRange.endDate) {
+        params.set("endDate", validatedRange.endDate);
+      } else {
+        params.delete("endDate");
+      }
       const qs = params.toString();
       router.replace(`${window.location.pathname}${qs ? `?${qs}` : ""}`, {
         scroll: false,
@@ -455,6 +503,7 @@ export default function SearchForm({
 
         setIsSearching(true);
         setShowFilters(false);
+        // CFM-604: canonical-on-write guarantee — must go through buildCanonicalSearchUrl.
         const searchUrl = buildCanonicalSearchUrl(
           normalizeSearchQuery(current)
         );
@@ -527,6 +576,10 @@ export default function SearchForm({
       ) {
         [finalMinPrice, finalMaxPrice] = [finalMaxPrice, finalMinPrice];
       }
+      const validatedDateRange = getValidatedSearchDateRange(
+        committed.moveInDate,
+        committed.endDate
+      );
       const currentQuery = normalizeSearchQuery(
         new URLSearchParams(searchParams.toString())
       );
@@ -544,11 +597,13 @@ export default function SearchForm({
       ) {
         intentQuery.bounds = currentQuery.bounds;
       }
+      // CFM-604: canonical-on-write guarantee — must go through buildCanonicalSearchUrl.
       const searchUrl = buildCanonicalSearchUrl(
         applySearchQueryChange(intentQuery, "filter", {
           minPrice: finalMinPrice ?? undefined,
           maxPrice: finalMaxPrice ?? undefined,
-          moveInDate: validateMoveInDate(committed.moveInDate) || undefined,
+          moveInDate: validatedDateRange.moveInDate || undefined,
+          endDate: validatedDateRange.endDate || undefined,
           leaseDuration: committed.leaseDuration || undefined,
           roomType: committed.roomType || undefined,
           amenities:
@@ -699,6 +754,7 @@ export default function SearchForm({
         minPrice: "",
         maxPrice: "",
         moveInDate: "",
+        endDate: "",
         leaseDuration: "",
         roomType: "",
         amenities: [],
@@ -713,6 +769,7 @@ export default function SearchForm({
     const preserved = clearAllFilters(
       new URLSearchParams(searchParams.toString())
     );
+    // CFM-604: canonical-on-write guarantee — clearAllFilters() serializes canonically.
     const searchUrl = `/search${preserved ? `?${preserved}` : ""}`;
     if (transitionContext) {
       transitionContext.navigateWithTransition(searchUrl, {
@@ -854,6 +911,7 @@ export default function SearchForm({
   const isHome = variant === "home";
   // 'en-CA' locale returns YYYY-MM-DD format in local timezone, safe across DST transitions
   const minMoveInDate = new Date().toLocaleDateString("en-CA");
+  const minEndDate = moveInDate || minMoveInDate;
 
   // Compute inline flex styles for focus-triggered expansion.
   // Uses inline styles instead of Tailwind classes because Tailwind v4
@@ -1420,6 +1478,7 @@ export default function SearchForm({
         hasActiveFilters={hasActiveFilters}
         activeFilterCount={activeFilterCount}
         moveInDate={moveInDate}
+        endDate={endDate}
         leaseDuration={leaseDuration}
         roomType={roomType}
         amenities={amenities}
@@ -1431,7 +1490,19 @@ export default function SearchForm({
         onMinSlotsChange={(v) =>
           setPending({ minSlots: v !== undefined ? String(v) : "" })
         }
-        onMoveInDateChange={(v: string) => setPending({ moveInDate: v })}
+        onMoveInDateChange={(v: string) => {
+          const normalizedMoveInDate = validateMoveInDate(v);
+          setPending((prev) => ({
+            moveInDate: normalizedMoveInDate,
+            endDate:
+              prev.endDate &&
+              normalizedMoveInDate &&
+              prev.endDate > normalizedMoveInDate
+                ? prev.endDate
+                : "",
+          }));
+        }}
+        onEndDateChange={(v: string) => setPending({ endDate: v })}
         onLeaseDurationChange={(v: string) =>
           setPending({ leaseDuration: v === "any" ? "" : v })
         }
@@ -1451,6 +1522,7 @@ export default function SearchForm({
         onLanguageSearchChange={setLanguageSearch}
         filteredLanguages={filteredLanguages}
         minMoveInDate={minMoveInDate}
+        minEndDate={minEndDate}
         amenityOptions={AMENITY_OPTIONS}
         houseRuleOptions={HOUSE_RULE_OPTIONS}
         // Price range filter

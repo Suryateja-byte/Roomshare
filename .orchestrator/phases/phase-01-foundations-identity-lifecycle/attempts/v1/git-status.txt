@@ -1,0 +1,58 @@
+ M .gitignore
+ M AGENTS.md
+ M docs/TROUBLESHOOTING.md
+ M jest.setup.js
+ M prisma/schema.prisma
+ M src/__tests__/app/search/actions.test.ts
+ M src/__tests__/components/search/SearchResultsClient.test.tsx
+ M src/__tests__/lib/search/cursor.test.ts
+ M src/__tests__/lib/search/search-v2-service.test.ts
+ M src/app/api/test-helpers/route.ts
+ M src/app/search/actions.ts
+ M src/components/search/SearchResultsClient.tsx
+ M src/lib/env.ts
+ M src/lib/idempotency.ts
+ M src/lib/search/cursor.ts
+ M src/lib/search/search-doc-queries.ts
+ M src/lib/search/search-v2-service.ts
+ M tests/e2e/page-objects/create-listing.page.ts
+?? .agents/
+?? .claude/artifacts/
+?? .claude/task-tracker.json
+?? .claude/task-tracker.json.followups
+?? .omc/
+?? .orchestrator/
+?? docs/plans/oloc-occupancy-refactor-plan.md
+?? docs/plans/open-questions.md
+?? prisma/migrations/20260501000000_phase01_canonical_identity_tables/
+?? prisma/migrations/20260501010000_phase01_moderation_precedence_trigger/
+?? prisma/migrations/20260501020000_phase01_add_listing_physical_unit_id/
+?? "roomshare_final_production_plan_v10 - Copy.docx"
+?? roomshare_final_production_plan_v10.docx
+?? roomshare_final_production_plan_v10.docx:Zone.Identifier
+?? src/__tests__/api/cron/daily-maintenance.test.ts
+?? src/__tests__/api/cron/vercel-cron-budget.test.ts
+?? src/__tests__/db/phase01-moderation-precedence.test.ts
+?? src/__tests__/db/phase01-schema.test.ts
+?? src/__tests__/integration/phase01-read-path-isolation.test.ts
+?? src/__tests__/integration/phase01-schema-doc-presence.test.ts
+?? src/__tests__/lib/audit/
+?? src/__tests__/lib/db/
+?? src/__tests__/lib/flags/
+?? src/__tests__/lib/idempotency-phase01.test.ts
+?? src/__tests__/lib/identity/
+?? src/__tests__/lib/outbox/
+?? src/__tests__/lib/validation/
+?? src/lib/audit/
+?? src/lib/db/
+?? src/lib/flags/
+?? src/lib/identity/
+?? src/lib/outbox/
+?? src/lib/validation/category/
+?? tests/e2e/dedupe/create-collision-cross-owner-no-modal.dedupe.spec.ts
+?? tests/e2e/dedupe/create-collision-fourth-gated.dedupe.spec.ts
+?? tests/e2e/dedupe/create-collision-helpers.ts
+?? tests/e2e/dedupe/create-collision-modal-add-date.dedupe.spec.ts
+?? tests/e2e/dedupe/create-collision-modal-create-separate.dedupe.spec.ts
+?? tests/e2e/dedupe/create-collision-modal-update.dedupe.spec.ts
+?? tmp_production_plan_extract.txt

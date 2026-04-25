@@ -1,0 +1,79 @@
+{
+  "phase": "10",
+  "slug": "launch-hardening-drills",
+  "attempt": "v1",
+  "verdict": "approved",
+  "reviewer": "Codex GPT-5 in-thread Critic",
+  "generator": "Codex GPT-5 in-thread Generating agent",
+  "findings": [],
+  "rationale": "Phase 10 is approved. The implementation satisfies the launch-hardening artifact, runbook, SLO stub, deterministic drill, PII scanner, CI gate, and focused regression requirements. The previously blocked local Postgres seed prerequisite now passes after Docker was started and migrations were applied to the localhost:5433 database.",
+  "checks": [
+    {
+      "command": "pnpm test -- --runTestsByPath src/__tests__/launch/phase10-launch-hardening.test.ts --runInBand",
+      "status": "passed",
+      "result": "1 suite, 8 tests"
+    },
+    {
+      "command": "pnpm run scan:public-payload-pii -- scripts/fixtures/public-payload-clean.json",
+      "status": "passed"
+    },
+    {
+      "command": "pnpm exec prisma validate",
+      "status": "passed"
+    },
+    {
+      "command": "pnpm typecheck",
+      "status": "passed"
+    },
+    {
+      "command": "pnpm lint",
+      "status": "passed",
+      "result": "0 errors; existing warnings"
+    },
+    {
+      "command": "Phase 09 targeted Jest",
+      "status": "passed",
+      "result": "2 suites, 7 tests"
+    },
+    {
+      "command": "Phase 08 focused Jest",
+      "status": "passed",
+      "result": "10 suites, 28 tests"
+    },
+    {
+      "command": "Phase 07 focused Jest",
+      "status": "passed",
+      "result": "9 suites, 100 tests"
+    },
+    {
+      "command": "Phase 06 focused Jest",
+      "status": "passed",
+      "result": "11 suites, 65 tests"
+    },
+    {
+      "command": "FEATURE_PHASE04_PROJECTION_READS=false Phase 04 focused Jest",
+      "status": "passed",
+      "result": "7 suites, 78 tests"
+    },
+    {
+      "command": "FEATURE_PHASE03_SEMANTIC_PROJECTION_WRITES=false Phase 02 projection/outbox focused Jest",
+      "status": "passed",
+      "result": "17 suites, 136 tests"
+    },
+    {
+      "command": "pnpm run seed:e2e",
+      "status": "passed",
+      "result": "E2E seed complete against local Docker Postgres at localhost:5433."
+    },
+    {
+      "command": "pnpm exec prisma migrate deploy",
+      "status": "passed",
+      "result": "All migrations applied against local Docker Postgres at localhost:5433."
+    }
+  ],
+  "approval": {
+    "status": "APPROVED",
+    "final_state": "launch_ready"
+  },
+  "exact_required_next_action": "Commit the approved Phase 10 launch-hardening changes when ready."
+}

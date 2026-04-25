@@ -11,6 +11,7 @@ import {
 } from "@/lib/supabase";
 import { sendMessage } from "@/app/actions/chat";
 import { blockUser, unblockUser } from "@/app/actions/block";
+import PrivateFeedbackDialog from "@/components/PrivateFeedbackDialog";
 import { useRouter } from "next/navigation";
 import {
   Send,
@@ -18,6 +19,7 @@ import {
   Check,
   CheckCheck,
   ArrowLeft,
+  MessageSquare,
   MoreVertical,
   Ban,
   ShieldOff,
@@ -67,10 +69,14 @@ type Message = {
 const MESSAGE_MAX_LENGTH = 500;
 
 interface ChatWindowProps {
+  canLeavePrivateFeedback: boolean;
   initialMessages: Message[];
   conversationId: string;
   currentUserId: string;
   currentUserName?: string;
+  listingId: string;
+  listingOwnerId: string;
+  listingTitle?: string;
   otherUserId: string;
   otherUserName?: string;
   otherUserImage?: string | null;
@@ -84,10 +90,14 @@ function isAbortError(error: unknown): boolean {
 }
 
 export default function ChatWindow({
+  canLeavePrivateFeedback,
   initialMessages,
   conversationId,
   currentUserId,
   currentUserName,
+  listingId,
+  listingOwnerId,
+  listingTitle,
   otherUserId,
   otherUserName,
   otherUserImage,
@@ -104,6 +114,8 @@ export default function ChatWindow({
   );
   const transportModeRef = useRef<"realtime" | "polling">("polling");
   const [showBlockDialog, setShowBlockDialog] = useState(false);
+  const [showPrivateFeedbackDialog, setShowPrivateFeedbackDialog] =
+    useState(false);
   const [isBlocking, setIsBlocking] = useState(false);
   const [isUnblocking, setIsUnblocking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -785,6 +797,15 @@ export default function ChatWindow({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            {canLeavePrivateFeedback && listingId && listingOwnerId && (
+              <DropdownMenuItem
+                onClick={() => setShowPrivateFeedbackDialog(true)}
+                className="text-on-surface"
+              >
+                <MessageSquare className="w-4 h-4 mr-2" />
+                Share private feedback about this listing
+              </DropdownMenuItem>
+            )}
             {blockStatus === "blocker" ? (
               <DropdownMenuItem
                 onClick={handleUnblock}
@@ -808,6 +829,16 @@ export default function ChatWindow({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {listingId && listingOwnerId && (
+        <PrivateFeedbackDialog
+          listingId={listingId}
+          listingTitle={listingTitle}
+          open={showPrivateFeedbackDialog}
+          onOpenChange={setShowPrivateFeedbackDialog}
+          targetUserId={listingOwnerId}
+        />
+      )}
 
       {/* Block Confirmation Dialog */}
       <AlertDialog open={showBlockDialog} onOpenChange={setShowBlockDialog}>

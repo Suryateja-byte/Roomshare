@@ -1,16 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Eye, EyeOff, Home, ChevronDown } from "lucide-react";
 import {
   updateListingStatus,
   ListingStatus,
 } from "@/app/actions/listing-status";
+import {
+  getModerationWriteLockReason,
+  LISTING_LOCKED_ERROR_MESSAGE,
+} from "@/lib/listings/moderation-write-lock";
 
 interface ListingStatusToggleProps {
   listingId: string;
   currentStatus: ListingStatus;
+  currentVersion: number;
+  currentStatusReason?: string | null;
+  moderationWriteLocksEnabled?: boolean;
 }
 
 const statusConfig = {
@@ -40,26 +48,63 @@ const statusConfig = {
 export default function ListingStatusToggle({
   listingId,
   currentStatus,
+  currentVersion,
+  currentStatusReason = null,
+  moderationWriteLocksEnabled = false,
 }: ListingStatusToggleProps) {
+  const router = useRouter();
   const [status, setStatus] = useState<ListingStatus>(currentStatus);
+  const [version, setVersion] = useState(currentVersion);
   const [isOpen, setIsOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [awaitingRefresh, setAwaitingRefresh] = useState(false);
+  const awaitingRefreshRef = useRef(false);
+  const isLockedFromProps =
+    moderationWriteLocksEnabled &&
+    getModerationWriteLockReason(currentStatusReason) !== null;
+
+  useEffect(() => {
+    setStatus(currentStatus);
+    setVersion(currentVersion);
+    if (awaitingRefreshRef.current) {
+      awaitingRefreshRef.current = false;
+      setAwaitingRefresh(false);
+    }
+  }, [currentStatus, currentVersion, currentStatusReason]);
 
   const config = statusConfig[status];
+  const isInteractionDisabled =
+    isUpdating || awaitingRefresh || isLockedFromProps;
 
   const handleStatusChange = async (newStatus: ListingStatus) => {
-    if (newStatus === status) {
+    if (newStatus === status || isInteractionDisabled) {
       setIsOpen(false);
       return;
     }
 
     setIsUpdating(true);
-    const result = await updateListingStatus(listingId, newStatus);
+    const result = await updateListingStatus(listingId, newStatus, version);
 
     if (result.error) {
-      toast.error(result.error);
+      if (result.code === "VERSION_CONFLICT") {
+        awaitingRefreshRef.current = true;
+        setAwaitingRefresh(true);
+        toast.error("Listing changed elsewhere. Refreshing the latest version...");
+        router.refresh();
+      } else if (result.code === "LISTING_LOCKED") {
+        awaitingRefreshRef.current = true;
+        setAwaitingRefresh(true);
+        toast.error(LISTING_LOCKED_ERROR_MESSAGE);
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
     } else {
-      setStatus(newStatus);
+      setStatus(result.status ?? newStatus);
+      if (typeof result.version === "number") {
+        setVersion(result.version);
+      }
+      router.refresh();
     }
 
     setIsUpdating(false);
@@ -70,7 +115,7 @@ export default function ListingStatusToggle({
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        disabled={isUpdating}
+        disabled={isInteractionDisabled}
         className={`flex items-center gap-2 px-4 py-2 rounded-xl border ${config.color} transition-all hover:shadow-ambient disabled:opacity-60`}
       >
         <span className={`w-2 h-2 rounded-full ${config.dotColor}`} />

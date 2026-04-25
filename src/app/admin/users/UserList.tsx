@@ -12,7 +12,6 @@ import {
   Search,
   Loader2,
   Home,
-  Calendar,
   Star,
   Mail,
   MoreVertical,
@@ -29,7 +28,6 @@ interface User {
   emailVerified: Date | null;
   _count: {
     listings: number;
-    bookings: number;
     reviewsWritten: number;
   };
 }
@@ -197,10 +195,6 @@ export default function UserList({
                       <span className="flex items-center gap-1">
                         <Home className="w-3 h-3" />
                         {user._count.listings} listings
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3" />
-                        {user._count.bookings} bookings
                       </span>
                       <span className="flex items-center gap-1">
                         <Star className="w-3 h-3" />

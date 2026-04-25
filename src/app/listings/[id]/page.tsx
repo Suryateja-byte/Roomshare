@@ -8,6 +8,9 @@ import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { sanitizeUnicode } from "@/lib/schemas";
 import { features } from "@/lib/env";
 import { generateViewToken } from "@/app/api/metrics/hmac";
+import { resolveListingDetailDateParams } from "@/lib/search/listing-detail-link";
+import { resolvePublicAvailability } from "@/lib/search/public-availability";
+import { getPublicListingDetail } from "@/lib/listings/public-detail";
 import ListingPageClient from "./ListingPageClient";
 
 const getListingWithLocation = cache(async (id: string) => {
@@ -69,6 +72,53 @@ const getSimilarListings = cache(async function getSimilarListings(
 
 interface PageProps {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{
+    startDate?: string | string[];
+    moveInDate?: string | string[];
+    endDate?: string | string[];
+  }>;
+}
+
+function parseDateParam(value: string | null): Date | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null;
+  }
+
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function resolveInitialAvailabilityRange(searchParams?: {
+  startDate?: string | string[];
+  moveInDate?: string | string[];
+  endDate?: string | string[];
+}) {
+  const resolvedRange = resolveListingDetailDateParams({
+    startDate: searchParams?.startDate,
+    moveInDate: searchParams?.moveInDate,
+    endDate: searchParams?.endDate,
+  });
+  const initialStartDate = resolvedRange.startDate ?? null;
+  const initialEndDate = resolvedRange.endDate ?? null;
+
+  const startDate = parseDateParam(initialStartDate);
+  const endDate = parseDateParam(initialEndDate);
+
+  if (startDate && endDate && endDate > startDate) {
+    return {
+      startDate,
+      endDate,
+      initialStartDate: initialStartDate ?? undefined,
+      initialEndDate: initialEndDate ?? undefined,
+    };
+  }
+
+  return {
+    startDate: undefined,
+    endDate: undefined,
+    initialStartDate: undefined,
+    initialEndDate: undefined,
+  };
 }
 
 export async function generateMetadata({
@@ -78,7 +128,8 @@ export async function generateMetadata({
 
   let listing;
   try {
-    listing = await getListingWithLocation(id);
+    const publicDetail = await getPublicListingDetail(id);
+    listing = publicDetail?.listing ?? null;
   } catch {
     return { title: "Listing | RoomShare" };
   }
@@ -117,33 +168,45 @@ export async function generateMetadata({
   };
 }
 
-export default async function ListingPage({ params }: PageProps) {
+export default async function ListingPage({ params, searchParams }: PageProps) {
   const { id } = await params;
-  const listing = await getListingWithLocation(id);
+  const rawSearchParams = searchParams ? await searchParams : undefined;
+  const initialAvailabilityRange =
+    resolveInitialAvailabilityRange(rawSearchParams);
+  const session = await auth();
+  let isOwner = false;
+  const isAdmin = session?.user?.isAdmin === true;
+  let canViewExactLocation = false;
+  let publicDetail:
+    | Awaited<ReturnType<typeof getPublicListingDetail>>
+    | null = null;
+  let listing = null;
+
+  publicDetail = await getPublicListingDetail(id, {
+    userId: session?.user?.id ?? null,
+    isAdmin,
+  });
+
+  if (!publicDetail) {
+    notFound();
+  }
+
+  isOwner = publicDetail.isOwner;
+  canViewExactLocation = publicDetail.isOwner || publicDetail.isAdmin;
+  listing = canViewExactLocation
+    ? await getListingWithLocation(id)
+    : publicDetail.listing;
 
   if (!listing) {
     notFound();
   }
 
-  let session = null;
-  let isOwner = false;
-  let isAdmin = false;
-
-  if (listing.status !== "ACTIVE") {
-    session = await auth();
-    isOwner = session?.user?.id === listing.ownerId;
-    isAdmin = session?.user?.isAdmin === true;
-    if (!isOwner && !isAdmin) {
-      notFound();
-    }
-  }
-
   // Start similar listings fetch early (runs in parallel with remaining queries)
   const similarListingsPromise = getSimilarListings(id);
 
-  const [coordinates, acceptedBookings, reviews] = await Promise.all([
+  const [coordinates, reviews] = await Promise.all([
     (async () => {
-      if (!listing.location) {
+      if (!canViewExactLocation || !listing.location) {
         return null;
       }
 
@@ -177,32 +240,24 @@ export default async function ListingPage({ params }: PageProps) {
 
       return null;
     })(),
-    prisma.booking.findMany({
-      where: {
-        listingId: id,
-        status: { in: ["ACCEPTED", "HELD"] },
-        endDate: {
-          gte: new Date(),
-        },
-      },
-      select: {
-        startDate: true,
-        endDate: true,
-      },
-      orderBy: {
-        startDate: "asc",
-      },
-    }),
     getReviews(listing.id),
   ]);
 
-  const similarListingsRaw = await similarListingsPromise;
+  const resolvedAvailability = resolvePublicAvailability(listing);
+  const availability = {
+    listingId: listing.id,
+    totalSlots: resolvedAvailability.totalSlots,
+    effectiveAvailableSlots: resolvedAvailability.effectiveAvailableSlots,
+    heldSlots: 0,
+    acceptedSlots: 0,
+    rangeVersion: listing.version,
+    asOf: new Date().toISOString(),
+    availabilitySource: resolvedAvailability.availabilitySource,
+    isValid: resolvedAvailability.isValid,
+    isPubliclyAvailable: resolvedAvailability.isPubliclyAvailable,
+  };
 
-  // Format booked dates for client - using YYYY-MM-DD to avoid timezone issues
-  const bookedDates = acceptedBookings.map((b) => ({
-    startDate: b.startDate.toISOString().split("T")[0],
-    endDate: b.endDate.toISOString().split("T")[0],
-  }));
+  const similarListingsRaw = await similarListingsPromise;
 
   const similarListings = similarListingsRaw.map((row) => ({
     id: row.id,
@@ -250,7 +305,8 @@ export default async function ListingPage({ params }: PageProps) {
             price: Number(listing.price),
             priceCurrency: "USD",
             availability:
-              listing.availableSlots > 0
+              resolvedAvailability.isPubliclyAvailable &&
+              availability.effectiveAvailableSlots > 0
                 ? "https://schema.org/InStock"
                 : "https://schema.org/SoldOut",
           },
@@ -290,9 +346,12 @@ export default async function ListingPage({ params }: PageProps) {
           amenities: listing.amenities,
           householdLanguages: listing.householdLanguages,
           totalSlots: listing.totalSlots,
-          availableSlots: listing.availableSlots,
-          bookingMode: listing.bookingMode ?? "SHARED",
+          availableSlots: resolvedAvailability.effectiveAvailableSlots,
+          version: listing.version,
+          availabilitySource: resolvedAvailability.availabilitySource,
+          bookingMode: "SHARED",
           status: listing.status,
+          statusReason: listing.statusReason,
           viewCount: listing.viewCount,
           genderPreference: listing.genderPreference,
           householdGender: listing.householdGender,
@@ -310,7 +369,6 @@ export default async function ListingPage({ params }: PageProps) {
             isVerified: listing.owner.isVerified,
             createdAt: listing.owner.createdAt,
           },
-          holdTtlMinutes: listing.holdTtlMinutes ?? 15,
           ownerId: listing.ownerId,
         }}
         reviews={reviews}
@@ -318,11 +376,17 @@ export default async function ListingPage({ params }: PageProps) {
         isLoggedIn={!!session?.user}
         userHasBooking={false}
         userExistingReview={null}
-        bookedDates={bookedDates}
         holdEnabled={features.softHoldsEnabled}
         coordinates={coordinates}
+        canViewExactLocation={canViewExactLocation}
         similarListings={similarListings}
         viewToken={generateViewToken(listing.id)}
+        initialStartDate={initialAvailabilityRange.initialStartDate}
+        initialEndDate={initialAvailabilityRange.initialEndDate}
+        initialAvailability={availability}
+        contactFirstEnabled={features.contactFirstListings}
+        moderationWriteLocksEnabled={features.moderationWriteLocks}
+        publicCacheMetadata={publicDetail.publicCacheMetadata}
       />
     </>
   );

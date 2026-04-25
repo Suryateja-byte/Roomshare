@@ -310,6 +310,17 @@ describe("Messages API", () => {
       (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
         id: "conv-123",
         participants: [{ id: "user-123" }, { id: "user-456" }],
+        listing: {
+          status: "ACTIVE",
+          statusReason: null,
+          availableSlots: 1,
+          totalSlots: 1,
+          openSlots: 1,
+          moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+          availableUntil: null,
+          minStayMonths: 1,
+          lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
+        },
       });
       (checkBlockBeforeAction as jest.Mock).mockResolvedValueOnce({
         allowed: false,
@@ -331,6 +342,17 @@ describe("Messages API", () => {
       (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
         id: "conv-123",
         participants: [{ id: "user-123" }, { id: "user-456" }],
+        listing: {
+          status: "ACTIVE",
+          statusReason: null,
+          availableSlots: 1,
+          totalSlots: 1,
+          openSlots: 1,
+          moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+          availableUntil: null,
+          minStayMonths: 1,
+          lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
+        },
       });
       (checkBlockBeforeAction as jest.Mock).mockResolvedValueOnce({
         allowed: false,
@@ -354,6 +376,17 @@ describe("Messages API", () => {
       const mockConversation = {
         id: "conv-123",
         participants: [{ id: "user-123" }, { id: "user-456" }],
+        listing: {
+          status: "ACTIVE",
+          statusReason: null,
+          availableSlots: 1,
+          totalSlots: 1,
+          openSlots: 1,
+          moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+          availableUntil: null,
+          minStayMonths: 1,
+          lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
+        },
       };
       const mockMessage = {
         id: "msg-new",
@@ -376,6 +409,71 @@ describe("Messages API", () => {
       expect(response.status).toBe(201);
       expect(prisma.message.create).toHaveBeenCalled();
       expect(prisma.conversation.update).toHaveBeenCalled();
+    });
+
+    it.each(["PAUSED", "RENTED"] as const)(
+      "returns 403 LISTING_UNAVAILABLE when conversation listing is %s",
+      async (status) => {
+        (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
+          id: "conv-123",
+          participants: [{ id: "user-123" }, { id: "user-456" }],
+          listing: { status },
+        });
+
+        const request = new Request("http://localhost/api/messages", {
+          method: "POST",
+          body: JSON.stringify({
+            conversationId: "conv-123",
+            content: "Hello",
+          }),
+        });
+        const response = await POST(request);
+
+        expect(response.status).toBe(403);
+        const data = await response.json();
+        expect(data).toEqual({
+          error: "This listing is not available for new messages right now.",
+          code: "LISTING_UNAVAILABLE",
+        });
+        expect(prisma.message.create).not.toHaveBeenCalled();
+      },
+    );
+
+    it("returns 403 MIGRATION_REVIEW when the listing is gated by migration review", async () => {
+      (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
+        id: "conv-123",
+        participants: [{ id: "user-123" }, { id: "user-456" }],
+        listing: {
+          status: "ACTIVE",
+          statusReason: "MIGRATION_REVIEW",
+          needsMigrationReview: true,
+          availabilitySource: "HOST_MANAGED",
+          availableSlots: 1,
+          totalSlots: 1,
+          openSlots: 1,
+          moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+          availableUntil: new Date("2026-12-01T00:00:00.000Z"),
+          minStayMonths: 1,
+          lastConfirmedAt: new Date("2026-04-10T12:00:00.000Z"),
+        },
+      });
+
+      const request = new Request("http://localhost/api/messages", {
+        method: "POST",
+        body: JSON.stringify({
+          conversationId: "conv-123",
+          content: "Hello",
+        }),
+      });
+      const response = await POST(request);
+
+      expect(response.status).toBe(403);
+      const data = await response.json();
+      expect(data).toEqual({
+        error: "This listing is temporarily unavailable.",
+        code: "MIGRATION_REVIEW",
+      });
+      expect(prisma.message.create).not.toHaveBeenCalled();
     });
 
     it("handles database errors", async () => {

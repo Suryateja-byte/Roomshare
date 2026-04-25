@@ -1,0 +1,42 @@
+{
+  "verdict": "APPROVE",
+  "phase": "02",
+  "slug": "outbox-filter-projections",
+  "attempt": "v1",
+  "reviewed_at": "2026-04-23",
+  "findings": [],
+  "evidence": {
+    "identity_contract": "INVENTORY_UPSERTED now uses aggregateId as inventoryId and payload.unitId as the preferred unitId; fallback resolves listing_inventories.unit_id by inventory id for legacy or malformed events.",
+    "geocode_contract": "handleGeocodeNeeded emits aggregateType=LISTING_INVENTORY, aggregateId=inventory id, and payload.unitId. The handler now accepts that emitted contract.",
+    "dark_launch": "Projection tables remain populated and tested, with public search/read cutover intentionally left out of Phase 02."
+  },
+  "validation": [
+    {
+      "command": "pnpm test -- --runTestsByPath src/__tests__/lib/outbox/handlers.test.ts src/__tests__/integration/phase02-outbox-to-projection.test.ts src/__tests__/integration/phase02-source-version-ordering.test.ts src/__tests__/integration/phase02-geocode-pending.test.ts src/__tests__/lib/projections/geocode-worker.test.ts --runInBand",
+      "result": "PASS",
+      "summary": "5 suites, 41 tests"
+    },
+    {
+      "command": "pnpm test -- --runTestsByPath <Phase 02 focused set> --runInBand",
+      "result": "PASS",
+      "summary": "20 suites, 165 tests"
+    },
+    {
+      "command": "pnpm typecheck",
+      "result": "PASS"
+    },
+    {
+      "command": "pnpm lint",
+      "result": "PASS",
+      "summary": "0 errors, 45 existing warnings"
+    },
+    {
+      "command": "pnpm test --runInBand",
+      "result": "DEFERRED",
+      "summary": "Optional broad suite aborted from Node heap exhaustion during unrelated UI/component suites; no Phase 02 assertion failure was observed before OOM."
+    }
+  ],
+  "deferred": [
+    "Optional broad Jest suite needs a separate memory/test-sharding pass; this is outside Phase 02 approval because the full Phase 02 focused set, typecheck, and lint passed."
+  ]
+}

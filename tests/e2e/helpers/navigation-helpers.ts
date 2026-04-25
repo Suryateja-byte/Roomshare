@@ -177,12 +177,13 @@ export function navigationHelpers(page: Page) {
     },
 
     /**
-     * Navigate to bookings
+     * Navigate to the retired bookings bookmark route.
+     * Phase 09 redirects authenticated users to messages.
      */
     async goToBookings() {
       await page.goto("/bookings");
       await waitForPageReady(page, {
-        selector: 'h1, [data-testid="bookings"]',
+        selector: 'main, h1, [data-testid="messages"], [data-testid="messages-page"]',
       });
     },
 

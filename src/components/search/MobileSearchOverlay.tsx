@@ -154,6 +154,7 @@ export default function MobileSearchOverlay({
         vibe: currentIntent.vibeInput,
         selectedLocation,
       });
+      // CFM-604: canonical-on-write guarantee — must go through buildCanonicalSearchUrl.
       const nextUrl = buildCanonicalSearchUrl(
         applySearchQueryChange(normalizeSearchQuery(params), "filter", {
           minPrice: minPrice ? Number.parseFloat(minPrice) : undefined,
@@ -208,6 +209,7 @@ export default function MobileSearchOverlay({
       vibe: currentIntent.vibeInput,
       selectedLocation: locationCoords,
     });
+    // CFM-604: canonical-on-write guarantee — must go through buildCanonicalSearchUrl.
     const nextUrl = buildCanonicalSearchUrl(
       applySearchQueryChange(normalizeSearchQuery(params), "filter", {
         minPrice: minPrice ? Number.parseFloat(minPrice) : undefined,
@@ -257,6 +259,7 @@ export default function MobileSearchOverlay({
             }
           : null,
       });
+      // CFM-604: canonical-on-write guarantee — must go through buildCanonicalSearchUrl.
       router.push(
         buildCanonicalSearchUrl(normalizeSearchQuery(params))
       );

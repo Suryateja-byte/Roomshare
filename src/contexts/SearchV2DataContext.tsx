@@ -61,6 +61,10 @@ export interface V2MapData {
   pins?: SearchV2Pin[];
   /** Mode determines rendering strategy: 'geojson' for clustering, 'pins' for individual markers */
   mode: SearchV2Mode;
+  /** Query contract hash for stale-response rejection */
+  queryHash?: string;
+  /** Durable snapshot id when the unified V2 snapshot contract is active */
+  querySnapshotId?: string;
 }
 
 interface SearchV2DataContextValue {
@@ -72,6 +76,10 @@ interface SearchV2DataContextValue {
   isV2Enabled: boolean;
   /** Set v2 enabled state */
   setIsV2Enabled: (enabled: boolean) => void;
+  /** Query hash currently waiting on a unified V2 response, null when idle */
+  pendingQueryHash: string | null;
+  /** Set or clear the in-flight unified V2 query hash */
+  setPendingQueryHash: (queryHash: string | null) => void;
   /** Current data version - use this when calling setV2MapData to guard against stale data */
   dataVersion: number;
 }
@@ -81,6 +89,8 @@ const SearchV2DataContext = createContext<SearchV2DataContextValue>({
   setV2MapData: () => {},
   isV2Enabled: false,
   setIsV2Enabled: () => {},
+  pendingQueryHash: null,
+  setPendingQueryHash: () => {},
   dataVersion: 0,
 });
 
@@ -91,23 +101,27 @@ const SearchV2DataContext = createContext<SearchV2DataContextValue>({
 interface SearchV2DataStateValue {
   v2MapData: V2MapData | null;
   isV2Enabled: boolean;
+  pendingQueryHash: string | null;
   dataVersion: number;
 }
 
 interface SearchV2DataSetterValue {
   setV2MapData: (data: V2MapData | null, version?: number) => void;
   setIsV2Enabled: (enabled: boolean) => void;
+  setPendingQueryHash: (queryHash: string | null) => void;
 }
 
 const SearchV2DataStateContext = createContext<SearchV2DataStateValue>({
   v2MapData: null,
   isV2Enabled: false,
+  pendingQueryHash: null,
   dataVersion: 0,
 });
 
 const SearchV2DataSetterContext = createContext<SearchV2DataSetterValue>({
   setV2MapData: () => {},
   setIsV2Enabled: () => {},
+  setPendingQueryHash: () => {},
 });
 
 /**
@@ -118,6 +132,7 @@ const SearchV2DataSetterContext = createContext<SearchV2DataSetterValue>({
 export function SearchV2DataProvider({ children }: { children: ReactNode }) {
   const [v2MapData, setV2MapDataInternal] = useState<V2MapData | null>(null);
   const [isV2Enabled, setIsV2Enabled] = useState(false);
+  const [pendingQueryHash, setPendingQueryHash] = useState<string | null>(null);
   const [dataVersion, setDataVersion] = useState(0);
   const searchParams = useSearchParams();
   const prevFilterParamsRef = useRef<string | null>(null);
@@ -135,8 +150,8 @@ export function SearchV2DataProvider({ children }: { children: ReactNode }) {
       prevBoundsRef.current !== null && prevBoundsRef.current !== currentBounds;
 
     // Don't clear v2MapData here — only increment version.
-    // NOTE: V2MapDataSetter is currently INACTIVE (not rendered in production).
-    // When it is wired, clearing data here would race with V2MapDataSetter's injection.
+    // Clearing during a URL transition would race with the unified V2 list/map
+    // response injection and briefly blank the persistent map.
     // Version increment ensures strictly sequential data updates.
     if (filterChanged || boundsChanged) {
       const newVersion = dataVersionRef.current + 1;
@@ -164,14 +179,14 @@ export function SearchV2DataProvider({ children }: { children: ReactNode }) {
 
   // Memoize STATE value — changes when data changes
   const stateValue = useMemo<SearchV2DataStateValue>(
-    () => ({ v2MapData, isV2Enabled, dataVersion }),
-    [v2MapData, isV2Enabled, dataVersion]
+    () => ({ v2MapData, isV2Enabled, pendingQueryHash, dataVersion }),
+    [v2MapData, isV2Enabled, pendingQueryHash, dataVersion]
   );
 
   // Memoize SETTER value — stable callbacks, rarely changes
   const setterValue = useMemo<SearchV2DataSetterValue>(
-    () => ({ setV2MapData, setIsV2Enabled }),
-    [setV2MapData, setIsV2Enabled]
+    () => ({ setV2MapData, setIsV2Enabled, setPendingQueryHash }),
+    [setPendingQueryHash, setV2MapData, setIsV2Enabled]
   );
 
   // P1-FIX (#113): Memoize context value to prevent cascade re-renders of all consumers
@@ -198,7 +213,7 @@ export function SearchV2DataProvider({ children }: { children: ReactNode }) {
  * PREFER using selector hooks below for better performance.
  *
  * Used by:
- * - V2MapDataSetter: to inject map data from page.tsx (INACTIVE — not rendered in production)
+ * - V2MapDataSetter / SearchResultsClient: to inject unified V2 map data
  * - PersistentMapWrapper: to read map data and skip v1 fetch
  */
 export function useSearchV2Data() {
@@ -252,6 +267,16 @@ export function useIsV2Enabled(): {
     () => ({ isV2Enabled, setIsV2Enabled }),
     [isV2Enabled, setIsV2Enabled]
   );
+}
+
+/**
+ * TRUE selector: Only re-renders when the current in-flight V2 query hash changes.
+ * Used by PersistentMapWrapper to wait for the current unified response instead of
+ * racing a fallback map fetch.
+ */
+export function usePendingV2QueryHash(): string | null {
+  const { pendingQueryHash } = useContext(SearchV2DataStateContext);
+  return pendingQueryHash;
 }
 
 /**

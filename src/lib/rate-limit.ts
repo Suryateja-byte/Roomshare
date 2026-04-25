@@ -266,6 +266,8 @@ export const RATE_LIMITS = {
   getReviews: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute
   // Listing status check (freshness polling)
   listingStatus: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute
+  publicCacheState: { limit: 120, windowMs: 60 * 1000 }, // 120 per minute
+  publicAutocomplete: { limit: 120, windowMs: 60 * 1000 }, // 120 per minute
   // Sensitive account actions
   changePassword: { limit: 5, windowMs: 60 * 60 * 1000 }, // 5 per hour
   verifyPassword: { limit: 10, windowMs: 60 * 60 * 1000 }, // 10 per hour
@@ -275,6 +277,9 @@ export const RATE_LIMITS = {
   filterSuggestions: { limit: 30, windowMs: 60 * 1000 }, // 30 per minute
   chatSendMessage: { limit: 100, windowMs: 60 * 60 * 1000 }, // 100 per hour
   chatStartConversation: { limit: 20, windowMs: 60 * 60 * 1000 }, // 20 per hour
+  phoneReveal: { limit: 10, windowMs: 60 * 60 * 1000 }, // 10 per hour
+  paymentsCheckout: { limit: 10, windowMs: 60 * 60 * 1000 }, // 10 per hour
+  paymentsCheckoutStatus: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute
   savedListings: { limit: 60, windowMs: 60 * 60 * 1000 }, // 60 per hour
   notifications: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute
   savedSearchMutations: { limit: 30, windowMs: 60 * 60 * 1000 }, // 30 per hour
@@ -287,6 +292,7 @@ export const RATE_LIMITS = {
   // Phase 2: Rate limit booking creation (C4 fix — was unprotected)
   createBooking: { limit: 10, windowMs: 60 * 60 * 1000 }, // 10 per hour (per user)
   createBookingByIp: { limit: 30, windowMs: 60 * 60 * 1000 }, // 30 per hour (per IP — higher for shared NAT)
+  createPreAuthByIp: { limit: 60, windowMs: 60_000 }, // 60 per minute per IP (pre-freeze-gate abuse cap)
   // Phase 4: Rate limit hold creation
   createHold: { limit: 10, windowMs: 60 * 60 * 1000 }, // 10 holds/hour per user
   createHoldByIp: { limit: 30, windowMs: 60 * 60 * 1000 }, // 30 holds/hour per IP

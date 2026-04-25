@@ -3,6 +3,11 @@ import { auth } from "@/auth";
 import ChatWindow from "./ChatWindow";
 import { prisma } from "@/lib/prisma";
 import { listConversationMessages } from "@/lib/messages";
+import { features } from "@/lib/env";
+import {
+  ACTIVE_REPORT_STATUSES,
+  canLeavePrivateFeedback as canLeavePrivateFeedbackForViewer,
+} from "@/lib/reports/private-feedback";
 import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
@@ -30,6 +35,13 @@ export default async function ChatPage({
     prisma.conversation.findUnique({
       where: { id },
       include: {
+        listing: {
+          select: {
+            id: true,
+            ownerId: true,
+            title: true,
+          },
+        },
         participants: {
           select: { id: true, name: true, image: true },
         },
@@ -61,13 +73,52 @@ export default async function ChatPage({
   const currentParticipant = conversation.participants.find(
     (p) => p.id === userId
   );
+  let canLeavePrivateFeedback = false;
+
+  if (
+    features.privateFeedback &&
+    conversation.listing.ownerId !== userId &&
+    session.user.emailVerified
+  ) {
+    const [existingPrivateFeedback, reporterHasMessaged] = await Promise.all([
+      prisma.report.findFirst({
+        where: {
+          listingId: conversation.listing.id,
+          reporterId: userId,
+          kind: "PRIVATE_FEEDBACK",
+          status: { in: [...ACTIVE_REPORT_STATUSES] },
+        },
+        select: { id: true },
+      }),
+      prisma.message.findFirst({
+        where: {
+          conversationId: conversation.id,
+          senderId: session.user.id,
+        },
+        select: { id: true },
+      }),
+    ]);
+
+    canLeavePrivateFeedback = canLeavePrivateFeedbackForViewer({
+      isLoggedIn: true,
+      isOwner: false,
+      isEmailVerified: true,
+      hasPriorConversation: Boolean(reporterHasMessaged),
+      hasAcceptedBooking: false,
+      hasExistingPrivateFeedback: !!existingPrivateFeedback,
+    });
+  }
 
   return (
     <ChatWindow
+      canLeavePrivateFeedback={canLeavePrivateFeedback}
       initialMessages={messages}
       conversationId={id}
       currentUserId={userId}
       currentUserName={currentParticipant?.name || session.user.name || "User"}
+      listingId={conversation.listing.id}
+      listingOwnerId={conversation.listing.ownerId}
+      listingTitle={conversation.listing.title}
       otherUserId={otherParticipant?.id || ""}
       otherUserName={otherParticipant?.name || "User"}
       otherUserImage={otherParticipant?.image}

@@ -1,0 +1,48 @@
+{
+  "verdict": "APPROVE",
+  "phase": "03",
+  "slug": "semantic-projection",
+  "attempt": "v1",
+  "reviewed_at": "2026-04-23",
+  "findings": [],
+  "evidence": {
+    "dark_launch": "Live search services do not reference semantic_inventory_projection; Phase 03 exposes only dark helpers and tests.",
+    "version_isolation": "Candidate reads filter by selected embedding_version and publish_status='PUBLISHED'.",
+    "publish_flow": "Phase 03-enabled filter projection keeps inventory_search_projection visible while listing_inventories waits in PENDING_EMBEDDING until semantic projection publish succeeds.",
+    "tombstone": "Semantic rows are removed for active and shadow versions when Phase 03 projection writes are enabled."
+  },
+  "validation": [
+    {
+      "command": "pnpm test -- --runTestsByPath src/__tests__/db/phase03-schema.test.ts src/__tests__/lib/projections/semantic.test.ts src/__tests__/integration/phase03-read-isolation.test.ts --runInBand",
+      "result": "PASS",
+      "summary": "3 suites, 14 tests"
+    },
+    {
+      "command": "pnpm test -- --runTestsByPath <Phase 02 focused set> --runInBand",
+      "result": "PASS",
+      "summary": "20 suites, 165 tests"
+    },
+    {
+      "command": "pnpm test -- --runTestsByPath <embedding set> --runInBand",
+      "result": "PASS",
+      "summary": "8 suites, 118 tests"
+    },
+    {
+      "command": "pnpm typecheck",
+      "result": "PASS"
+    },
+    {
+      "command": "pnpm lint",
+      "result": "PASS",
+      "summary": "0 errors, 45 existing warnings"
+    },
+    {
+      "command": "pnpm exec prisma validate",
+      "result": "PASS"
+    }
+  ],
+  "deferred": [
+    "Optional broad Jest run remains deferred because the previous broad run exhausted Node heap in unrelated UI/component suites.",
+    "Live search route cutover to semantic_inventory_projection remains Phase 04 work."
+  ]
+}

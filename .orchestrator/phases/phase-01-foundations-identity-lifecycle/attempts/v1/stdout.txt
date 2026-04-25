@@ -1,0 +1,20 @@
+**Diff**
+Phase 01-only unified diff, excluding unrelated dirty-worktree files: [phase01_generator.diff](/tmp/phase01_generator.diff)
+
+**Validation**
+- `pnpm prisma generate` → exit `0`
+- `pnpm lint` → exit `0`
+  38 existing warnings, 0 errors
+- `pnpm typecheck` → exit `0`
+- `pnpm test` → exit `1`
+  27 failed, 398 passed, 2 skipped suites
+  127 failed, 7605 passed, 8 skipped tests
+  Main failing areas are outside Phase 01 scope: `search/facets`, booking/whole-unit flows, `map-listings-route`, `chat-dedup`, `SlotBadge`, `migration/backfill`, `legacy-url-alias-registry`
+- Phase 01 slice verification:
+  `pnpm test -- src/__tests__/lib/identity/canonicalizer-version.test.ts src/__tests__/lib/identity/canonical-address.test.ts src/__tests__/lib/identity/advisory-locks.test.ts src/__tests__/lib/identity/resolve-or-create-unit.test.ts src/__tests__/lib/identity/mutate-unit.test.ts src/__tests__/lib/validation/category/schema.test.ts src/__tests__/lib/db/with-actor.test.ts src/__tests__/lib/db/optimistic-lock.test.ts src/__tests__/lib/outbox/append.test.ts src/__tests__/lib/audit/events.test.ts src/__tests__/lib/flags/phase01.test.ts src/__tests__/lib/idempotency-phase01.test.ts src/__tests__/db/phase01-schema.test.ts src/__tests__/db/phase01-moderation-precedence.test.ts src/__tests__/integration/phase01-read-path-isolation.test.ts src/__tests__/integration/phase01-schema-doc-presence.test.ts` → exit `0`
+  16 passed suites, 39 passed tests
+
+**Deviation Notes**
+- Live DB migration execution was not possible here: `psql` is unavailable and Prisma could not reach local Postgres on `localhost:5432` or `localhost:5433`. I implemented DB-boundary coverage as migration/schema contract tests plus tx-scoped module tests instead of real migration/apply tests.
+- `reasonCode` allowlisting in `src/lib/identity/mutate-unit.ts` is a conservative Phase 01 set derived from the approved spec examples because the referenced §6.15 list is not enumerated in `spec.md`.
+- I did not edit unrelated failing areas to force the full repo `pnpm test` green, because that would have gone beyond the approved Phase 01 slice and your “do not touch unrelated WIP” constraint.

@@ -51,6 +51,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import CharacterCounter from "@/components/CharacterCounter";
+import CreateCollisionModal from "@/components/listings/CreateCollisionModal";
+import type { CollisionSibling } from "@/lib/listings/collision-detector";
+import { emitListingCreateCollisionActionSelected } from "@/lib/search/search-telemetry-client";
 
 interface ImageObject {
   id: string;
@@ -129,6 +132,13 @@ export default function CreateListingForm({
   const [showDraftBanner, setShowDraftBanner] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
   const [showPartialUploadDialog, setShowPartialUploadDialog] = useState(false);
+  const [collisionSiblings, setCollisionSiblings] = useState<
+    CollisionSibling[] | null
+  >(null);
+  const [collisionBody, setCollisionBody] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const errorBannerRef = useRef<HTMLDivElement>(null);
   const isSubmittingRef = useRef(false);
@@ -338,6 +348,111 @@ export default function CreateListingForm({
     }
   }, [roomType, enableWholeUnitMode]);
 
+  // Re-POST /api/listings with x-collision-ack: 1 after the user chose a
+  // non-update option in the collision modal. Keeps the existing
+  // idempotency-key, fires the success toast + redirect on 201, and falls
+  // back to an error toast on unexpected failures.
+  const performCollisionAckResubmit = async (
+    bodyObj: Record<string, unknown>
+  ) => {
+    setCollisionSiblings(null);
+    setLoading(true);
+    isSubmittingRef.current = true;
+
+    if (submitAbortRef.current) submitAbortRef.current.abort();
+    const abortController = new AbortController();
+    submitAbortRef.current = abortController;
+
+    try {
+      const res = await fetch("/api/listings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Idempotency-Key": idempotencyKeyRef.current,
+          "x-collision-ack": "1",
+        },
+        body: JSON.stringify(bodyObj),
+        signal: abortController.signal,
+      });
+
+      if (abortController.signal.aborted) return;
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        if (
+          res.status === 409 &&
+          json &&
+          typeof json === "object" &&
+          json.error === "COLLISION_CANDIDATES" &&
+          Array.isArray(json.siblings)
+        ) {
+          setCollisionSiblings(json.siblings as CollisionSibling[]);
+          setCollisionBody(bodyObj);
+          idempotencyKeyRef.current = crypto.randomUUID();
+          toast.error(
+            "We couldn't confirm that choice. Please try again or edit the existing listing."
+          );
+          return;
+        }
+
+        const msg =
+          json && typeof json === "object" && typeof json.error === "string"
+            ? json.error
+            : "Failed to create listing";
+        showError(msg);
+        if (
+          res.status >= 400 &&
+          res.status < 500 &&
+          !msg.includes("Idempotency key reused")
+        ) {
+          idempotencyKeyRef.current = crypto.randomUUID();
+        }
+        return;
+      }
+
+      const result = await res.json();
+      const needsMigrationReview =
+        typeof result?.id === "string"
+          ? await fetchNeedsMigrationReview(result.id, abortController.signal)
+          : false;
+
+      if (abortController.signal.aborted) return;
+
+      cancelSave();
+      clearPersistedData();
+      submitSucceededRef.current = true;
+      navGuard.disable();
+      idempotencyKeyRef.current = crypto.randomUUID();
+      setCollisionBody(null);
+      if (needsMigrationReview) {
+        toast("We'll review this listing before it's published.", {
+          description:
+            "You've added several listings at this address recently. Our team will take a quick look, usually within a day. You'll get an email when it's live.",
+          duration: 8000,
+        });
+      } else {
+        toast.success("Listing published successfully!", {
+          description:
+            "Your listing is now live and visible to potential roommates.",
+          duration: 5000,
+        });
+      }
+      redirectTimeoutRef.current = setTimeout(() => {
+        if (!abortController.signal.aborted) {
+          router.push(`/listings/${result.id}`);
+        }
+      }, 1000);
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") return;
+      const msg =
+        err instanceof Error ? err.message : "An unexpected error occurred";
+      showError(msg);
+    } finally {
+      setLoading(false);
+      isSubmittingRef.current = false;
+    }
+  };
+
   // Cleanup: abort in-flight submission and clear redirect timeout on unmount
   useEffect(() => {
     return () => {
@@ -350,6 +465,27 @@ export default function CreateListingForm({
     setSelectedLanguages((prev) =>
       prev.includes(lang) ? prev.filter((l) => l !== lang) : [...prev, lang]
     );
+  };
+
+  const fetchNeedsMigrationReview = async (
+    listingId: string,
+    signal?: AbortSignal
+  ): Promise<boolean> => {
+    try {
+      const response = await fetch(`/api/listings/${listingId}/viewer-state`, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        signal,
+      });
+      if (!response.ok) return false;
+
+      const payload = (await response.json()) as {
+        needsMigrationReview?: boolean;
+      };
+      return payload.needsMigrationReview === true;
+    } catch {
+      return false;
+    }
   };
 
   // Show a non-field error in the banner and focus it for screen readers
@@ -476,6 +612,22 @@ export default function CreateListingForm({
 
       if (!res.ok) {
         const json = await res.json();
+
+        // Collision warning path: server returned 409 COLLISION_CANDIDATES
+        // with a siblings payload. Open the modal and pause submission;
+        // the user will resolve via onUpdate / onAddDate / onCreateSeparate.
+        if (
+          res.status === 409 &&
+          json?.error === "COLLISION_CANDIDATES" &&
+          Array.isArray(json?.siblings) &&
+          json.siblings.length > 0
+        ) {
+          setCollisionSiblings(json.siblings as CollisionSibling[]);
+          setCollisionBody(bodyObj);
+          setLoading(false);
+          isSubmittingRef.current = false;
+          return;
+        }
 
         // Regenerate key when the server definitively rejected (no listing created).
         // Keep key on hash-mismatch or ambiguous errors for dedup safety.
@@ -1340,6 +1492,43 @@ export default function CreateListingForm({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <CreateCollisionModal
+        open={collisionSiblings !== null && collisionSiblings.length > 0}
+        siblings={collisionSiblings ?? []}
+        onUpdate={(sibling) => {
+          emitListingCreateCollisionActionSelected({ action: "update" });
+          setCollisionSiblings(null);
+          setCollisionBody(null);
+          navGuard.disable();
+          router.push(`/listings/${sibling.id}/edit`);
+        }}
+        onAddDate={async () => {
+          if (!collisionBody) {
+            setCollisionSiblings(null);
+            return;
+          }
+          emitListingCreateCollisionActionSelected({ action: "add_date" });
+          await performCollisionAckResubmit(collisionBody);
+        }}
+        onCreateSeparate={async (reason) => {
+          if (!collisionBody) {
+            setCollisionSiblings(null);
+            return;
+          }
+          emitListingCreateCollisionActionSelected({
+            action: "create_separate",
+          });
+          await performCollisionAckResubmit({
+            ...collisionBody,
+            createSeparateReason: reason,
+          });
+        }}
+        onCancel={() => {
+          emitListingCreateCollisionActionSelected({ action: "cancel" });
+          setCollisionSiblings(null);
+          setCollisionBody(null);
+        }}
+      />
     </>
   );
 }

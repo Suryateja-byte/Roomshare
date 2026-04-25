@@ -12,6 +12,7 @@ import {
   useSearchV2Data,
 } from "@/contexts/SearchV2DataContext";
 import type { V2MapData } from "@/contexts/SearchV2DataContext";
+import { buildPublicAvailability } from "@/lib/search/public-availability";
 
 // ── Issue A: MAP_RELEVANT_KEYS includes nearMatches ──
 
@@ -102,6 +103,10 @@ describe("SearchV2DataContext version guard", () => {
               price: 100,
               image: null,
               availableSlots: 1,
+              publicAvailability: buildPublicAvailability({
+                availableSlots: 1,
+                totalSlots: 1,
+              }),
               ownerId: "u1",
             },
           },
@@ -126,6 +131,62 @@ describe("SearchV2DataContext version guard", () => {
     });
 
     expect(result.current.v2MapData).toEqual(testData);
+  });
+
+  it("preserves host-managed publicAvailability blocks unchanged in stored map data", () => {
+    const { result } = renderHook(() => useSearchV2Data(), { wrapper });
+    const hostManagedAvailability = buildPublicAvailability({
+      availabilitySource: "HOST_MANAGED",
+      openSlots: 2,
+      totalSlots: 4,
+      availableFrom: "2026-06-01",
+      availableUntil: "2026-12-01",
+      minStayMonths: 3,
+      lastConfirmedAt: "2026-04-15T12:30:00.000Z",
+    });
+    const hostManagedMapData: V2MapData = {
+      geojson: {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            geometry: {
+              type: "Point",
+              coordinates: [-122.4194, 37.7749],
+            },
+            properties: {
+              id: "host-1",
+              title: "Host Managed",
+              price: 1400,
+              image: null,
+              availableSlots: 2,
+              publicAvailability: hostManagedAvailability,
+            },
+          },
+        ],
+      },
+      pins: [
+        {
+          id: "host-1",
+          lat: 37.7749,
+          lng: -122.4194,
+          price: 1400,
+          publicAvailability: hostManagedAvailability,
+        },
+      ],
+      mode: "pins",
+    };
+
+    act(() => {
+      result.current.setV2MapData(hostManagedMapData);
+    });
+
+    expect(
+      result.current.v2MapData?.geojson.features[0].properties.publicAvailability
+    ).toEqual(hostManagedAvailability);
+    expect(result.current.v2MapData?.pins?.[0].publicAvailability).toEqual(
+      hostManagedAvailability
+    );
   });
 });
 

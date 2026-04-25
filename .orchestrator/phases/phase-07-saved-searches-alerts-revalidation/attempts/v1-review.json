@@ -1,0 +1,44 @@
+{
+  "phase": "07",
+  "slug": "saved-searches-alerts-revalidation",
+  "attempt": "v1",
+  "verdict": "approved",
+  "reviewer": "Codex GPT-5 in-thread Critic",
+  "generator": "Codex GPT-5 in-thread Generating agent",
+  "findings": [],
+  "rationale": "Phase 07 satisfies the approved plan: schema changes are additive, saved-search writes are canonical/query-hash aligned, alert subscriptions and deliveries are durable and idempotent, ALERT_MATCH/ALERT_DELIVER are wired into outbox handling, and final delivery revalidates current preferences, pass state, subscription state, and target visibility before email or notification creation. The disable-alerts kill switch pauses work without deleting pending rows.",
+  "checks": [
+    {
+      "command": "pnpm test -- --runTestsByPath src/__tests__/db/phase07-schema.test.ts src/__tests__/actions/saved-search.test.ts src/__tests__/actions/saved-search-reopen.test.ts src/__tests__/app/saved-searches/SavedSearchList.test.tsx src/__tests__/components/SaveSearchButton.test.tsx src/__tests__/api/cron/search-alerts.test.ts src/__tests__/lib/search-alerts.test.ts src/__tests__/lib/search-alerts-telemetry.test.ts src/__tests__/lib/payments/search-alert-paywall.test.ts src/__tests__/lib/outbox/handlers.test.ts src/__tests__/lib/outbox/drain.test.ts --runInBand",
+      "status": "passed",
+      "result": "11 suites, 140 tests"
+    },
+    {
+      "command": "pnpm test -- --runTestsByPath <Phase 06 targeted set> --runInBand",
+      "status": "passed",
+      "result": "15 suites, 119 tests"
+    },
+    {
+      "command": "pnpm test -- --runTestsByPath <Phase 04 focused set> --runInBand",
+      "status": "passed",
+      "result": "8 suites, 100 tests"
+    },
+    {
+      "command": "pnpm exec prisma validate",
+      "status": "passed"
+    },
+    {
+      "command": "pnpm typecheck",
+      "status": "passed"
+    },
+    {
+      "command": "pnpm lint",
+      "status": "passed",
+      "result": "0 errors; existing warnings only"
+    }
+  ],
+  "approval": {
+    "status": "APPROVED",
+    "next_phase": "phase_08_pending"
+  }
+}

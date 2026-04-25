@@ -468,6 +468,17 @@ describe("Messages Pagination (P1-03)", () => {
       (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
         id: "conversation-abc",
         participants: [{ id: "user-123" }, { id: "other-user" }],
+        listing: {
+          status: "ACTIVE",
+          statusReason: null,
+          availableSlots: 1,
+          totalSlots: 1,
+          openSlots: 1,
+          moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+          availableUntil: null,
+          minStayMonths: 1,
+          lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
+        },
       });
     });
 

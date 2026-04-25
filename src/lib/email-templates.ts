@@ -22,566 +22,235 @@ function buildAppHref(path: string): string {
   return escapeHtml(`${APP_URL}${normalizedPath}`);
 }
 
-// Base email template
 export const baseTemplate = (content: string) => `
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RoomShare</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RoomShare</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f5;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f5; padding: 40px 20px;">
-        <tr>
-            <td align="center">
-                <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);">
-                    <!-- Header -->
-                    <tr>
-                        <td style="background-color: #18181b; padding: 32px; text-align: center;">
-                            <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">RoomShare</h1>
-                        </td>
-                    </tr>
-                    <!-- Content -->
-                    <tr>
-                        <td style="padding: 40px 32px;">
-                            ${content}
-                        </td>
-                    </tr>
-                    <!-- Footer -->
-                    <tr>
-                        <td style="background-color: #fafafa; padding: 24px 32px; text-align: center; border-top: 1px solid #e4e4e7;">
-                            <p style="margin: 0; color: #71717a; font-size: 12px;">
-                                This email was sent by RoomShare. If you have questions, contact us at support@roomshare.com
-                            </p>
-                            <p style="margin: 8px 0 0; color: #a1a1aa; font-size: 11px;">
-                                &copy; ${new Date().getFullYear()} RoomShare. All rights reserved.
-                            </p>
-                        </td>
-                    </tr>
-                </table>
+<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:#f4f4f5;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 6px rgba(0,0,0,.05);">
+          <tr>
+            <td style="background:#18181b;padding:32px;text-align:center;">
+              <h1 style="margin:0;color:#fff;font-size:24px;font-weight:600;">RoomShare</h1>
             </td>
-        </tr>
-    </table>
+          </tr>
+          <tr>
+            <td style="padding:40px 32px;">${content}</td>
+          </tr>
+          <tr>
+            <td style="background:#fafafa;padding:24px 32px;text-align:center;border-top:1px solid #e4e4e7;">
+              <p style="margin:0;color:#71717a;font-size:12px;">This email was sent by RoomShare. If you have questions, contact us at support@roomshare.com</p>
+              <p style="margin:8px 0 0;color:#a1a1aa;font-size:11px;">&copy; ${new Date().getFullYear()} RoomShare. All rights reserved.</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>
 `;
 
-// Notification email templates
-export const emailTemplates = {
-  bookingRequest: (data: {
-    hostName: string;
-    tenantName: string;
-    listingTitle: string;
-    startDate: string;
-    endDate: string;
-    listingId: string;
-  }) => {
-    const safeHostName = escapeHtml(data.hostName);
-    const safeTenantName = escapeHtml(data.tenantName);
-    const safeListingTitle = escapeHtml(data.listingTitle);
-    const safeStartDate = escapeHtml(data.startDate);
-    const safeEndDate = escapeHtml(data.endDate);
+function button(label: string, href: string): string {
+  return `<a href="${buildAppHref(href)}" style="display:inline-block;background:#18181b;color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:14px;">${escapeHtml(label)}</a>`;
+}
 
-    return {
-      subject: sanitizeSubject(`New booking request for ${data.listingTitle}`),
-      html: baseTemplate(`
-            <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">New Booking Request</h2>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                Hi ${safeHostName},
-            </p>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                <strong>${safeTenantName}</strong> has requested to book your listing <strong>"${safeListingTitle}"</strong>.
-            </p>
-            <div style="background-color: #f4f4f5; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-                <p style="margin: 0 0 8px; color: #71717a; font-size: 14px;">Requested dates:</p>
-                <p style="margin: 0; color: #18181b; font-size: 16px; font-weight: 600;">
-                    ${safeStartDate} - ${safeEndDate}
-                </p>
-            </div>
-            <a href="${buildAppHref("/bookings")}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
-                View Booking Request
-            </a>
-        `),
-    };
-  },
-
-  bookingAccepted: (data: {
-    tenantName: string;
-    listingTitle: string;
-    hostName: string;
-    startDate: string;
-    listingId: string;
-  }) => {
-    const safeTenantName = escapeHtml(data.tenantName);
-    const safeListingTitle = escapeHtml(data.listingTitle);
-    const safeHostName = escapeHtml(data.hostName);
-    const safeStartDate = escapeHtml(data.startDate);
-
-    return {
-      subject: sanitizeSubject(
-        `Your booking for ${data.listingTitle} has been accepted!`
-      ),
-      html: baseTemplate(`
-            <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">Booking Confirmed!</h2>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                Hi ${safeTenantName},
-            </p>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                Great news! <strong>${safeHostName}</strong> has accepted your booking request for <strong>"${safeListingTitle}"</strong>.
-            </p>
-            <div style="background-color: #dcfce7; border-radius: 12px; padding: 20px; margin-bottom: 24px; border: 1px solid #bbf7d0;">
-                <p style="margin: 0; color: #166534; font-size: 16px; font-weight: 600;">
-                    Your move-in date: ${safeStartDate}
-                </p>
-            </div>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                We recommend reaching out to your host to coordinate move-in details.
-            </p>
-            <a href="${buildAppHref("/bookings")}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
-                View Booking Details
-            </a>
-        `),
-    };
-  },
-
-  bookingRejected: (data: {
-    tenantName: string;
-    listingTitle: string;
-    hostName: string;
-    rejectionReason?: string;
-  }) => {
-    const safeTenantName = escapeHtml(data.tenantName);
-    const safeListingTitle = escapeHtml(data.listingTitle);
-    const safeHostName = escapeHtml(data.hostName);
-    const safeRejectionReason = data.rejectionReason
-      ? escapeHtml(data.rejectionReason)
+function simpleTemplate(input: {
+  title: string;
+  greeting?: string;
+  body: string;
+  ctaLabel?: string;
+  ctaHref?: string;
+}) {
+  const greeting = input.greeting
+    ? `<p style="margin:0 0 24px;color:#52525b;font-size:16px;line-height:1.6;">Hi ${escapeHtml(input.greeting)},</p>`
+    : "";
+  const cta =
+    input.ctaLabel && input.ctaHref
+      ? `<p style="margin:24px 0 0;">${button(input.ctaLabel, input.ctaHref)}</p>`
       : "";
 
-    return {
-      subject: sanitizeSubject(
-        `Update on your booking request for ${data.listingTitle}`
-      ),
-      html: baseTemplate(`
-            <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">Booking Update</h2>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                Hi ${safeTenantName},
-            </p>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                Unfortunately, <strong>${safeHostName}</strong> was unable to accept your booking request for <strong>"${safeListingTitle}"</strong>.
-            </p>
-            ${
-              data.rejectionReason
-                ? `
-            <div style="margin: 0 0 24px; padding: 16px; background-color: #f4f4f5; border-radius: 8px; border-left: 4px solid #71717a;">
-                <p style="margin: 0 0 8px; color: #52525b; font-size: 14px; font-weight: 600;">
-                    Reason from host:
-                </p>
-                <p style="margin: 0; color: #3f3f46; font-size: 15px; line-height: 1.5;">
-                    "${safeRejectionReason}"
-                </p>
-            </div>
-            `
-                : ""
-            }
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                Don't worry! There are plenty of other great listings available. Keep searching to find your perfect room.
-            </p>
-            <a href="${buildAppHref("/search")}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
-                Browse More Listings
-            </a>
-        `),
-    };
-  },
+  return baseTemplate(`
+    <h2 style="margin:0 0 16px;color:#18181b;font-size:20px;">${escapeHtml(input.title)}</h2>
+    ${greeting}
+    <p style="margin:0;color:#52525b;font-size:16px;line-height:1.6;">${input.body}</p>
+    ${cta}
+  `);
+}
 
+export const emailTemplates = {
   newMessage: (data: {
     recipientName: string;
     senderName: string;
+    listingTitle: string;
+    messagePreview: string;
     conversationId: string;
-  }) => {
-    const safeRecipientName = escapeHtml(data.recipientName);
-    const safeSenderName = escapeHtml(data.senderName);
-    const conversationHref = buildAppHref(
-      `/messages/${encodeURIComponent(data.conversationId)}`
-    );
-
-    return {
-      subject: sanitizeSubject(`New message from ${data.senderName}`),
-      html: baseTemplate(`
-            <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">New Message</h2>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                Hi ${safeRecipientName},
-            </p>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                You have a new message from <strong>${safeSenderName}</strong>. Open the app to read it.
-            </p>
-            <a href="${conversationHref}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
-                Reply to Message
-            </a>
-        `),
-    };
-  },
+  }) => ({
+    subject: sanitizeSubject(`New message from ${data.senderName}`),
+    html: simpleTemplate({
+      title: "New Message",
+      greeting: data.recipientName,
+      body: `<strong>${escapeHtml(data.senderName)}</strong> sent you a message about <strong>"${escapeHtml(data.listingTitle)}"</strong>:<br><br>${escapeHtml(data.messagePreview)}`,
+      ctaLabel: "View Message",
+      ctaHref: `/messages/${encodeURIComponent(data.conversationId)}`,
+    }),
+  }),
 
   newReview: (data: {
-    hostName: string;
+    recipientName: string;
     reviewerName: string;
-    listingTitle: string;
     rating: number;
-    listingId: string;
-  }) => {
-    const safeHostName = escapeHtml(data.hostName);
-    const safeReviewerName = escapeHtml(data.reviewerName);
-    const safeListingTitle = escapeHtml(data.listingTitle);
-    const safeRating = Number.isFinite(data.rating)
-      ? Math.max(0, Math.min(5, Math.floor(data.rating)))
-      : 0;
-
-    return {
-      subject: sanitizeSubject(
-        `New ${data.rating}-star review on ${data.listingTitle}`
-      ),
-      html: baseTemplate(`
-            <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">New Review Received</h2>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                Hi ${safeHostName},
-            </p>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                <strong>${safeReviewerName}</strong> just left a review on your listing <strong>"${safeListingTitle}"</strong>.
-            </p>
-            <div style="background-color: #fef3c7; border-radius: 12px; padding: 20px; margin-bottom: 24px; text-align: center;">
-                <p style="margin: 0 0 8px; color: #92400e; font-size: 14px;">Rating</p>
-                <p style="margin: 0; color: #18181b; font-size: 32px;">
-                    ${"★".repeat(safeRating)}${"☆".repeat(5 - safeRating)}
-                </p>
-            </div>
-            <a href="${buildAppHref(`/listings/${encodeURIComponent(data.listingId)}`)}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
-                View Review
-            </a>
-        `),
-    };
-  },
+    comment: string;
+  }) => ({
+    subject: sanitizeSubject(`New ${data.rating}-star review from ${data.reviewerName}`),
+    html: simpleTemplate({
+      title: "New Review",
+      greeting: data.recipientName,
+      body: `<strong>${escapeHtml(data.reviewerName)}</strong> left you a ${data.rating}-star review:<br><br>${escapeHtml(data.comment)}`,
+      ctaLabel: "View Profile",
+      ctaHref: "/profile",
+    }),
+  }),
 
   listingSaved: (data: {
     hostName: string;
     saverName: string;
     listingTitle: string;
     listingId: string;
-  }) => {
-    const safeHostName = escapeHtml(data.hostName);
-    const safeSaverName = escapeHtml(data.saverName);
-    const safeListingTitle = escapeHtml(data.listingTitle);
-
-    return {
-      subject: sanitizeSubject(
-        `Someone saved your listing "${data.listingTitle}"`
-      ),
-      html: baseTemplate(`
-            <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">Your Listing is Getting Attention!</h2>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                Hi ${safeHostName},
-            </p>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                <strong>${safeSaverName}</strong> just saved your listing <strong>"${safeListingTitle}"</strong> to their favorites.
-            </p>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                This is a great sign of interest! Make sure your listing is up to date to attract potential tenants.
-            </p>
-            <a href="${buildAppHref(`/listings/${encodeURIComponent(data.listingId)}`)}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
-                View Your Listing
-            </a>
-        `),
-    };
-  },
+  }) => ({
+    subject: sanitizeSubject(`${data.saverName} saved your listing`),
+    html: simpleTemplate({
+      title: "Listing Saved",
+      greeting: data.hostName,
+      body: `<strong>${escapeHtml(data.saverName)}</strong> saved <strong>"${escapeHtml(data.listingTitle)}"</strong>.`,
+      ctaLabel: "View Listing",
+      ctaHref: `/listings/${encodeURIComponent(data.listingId)}`,
+    }),
+  }),
 
   searchAlert: (data: {
     userName: string;
-    searchQuery: string;
-    newListingsCount: number;
-    searchId: string;
-  }) => {
-    const safeUserName = escapeHtml(data.userName);
-    const safeSearchQuery = escapeHtml(data.searchQuery);
-    const searchHref = buildAppHref(
-      `/search?q=${encodeURIComponent(data.searchQuery)}`
-    );
+    searchName: string;
+    listingTitle: string;
+    listingId: string;
+  }) => ({
+    subject: sanitizeSubject(`New match for ${data.searchName}`),
+    html: simpleTemplate({
+      title: "New Saved Search Match",
+      greeting: data.userName,
+      body: `We found a new match for <strong>${escapeHtml(data.searchName)}</strong>: <strong>"${escapeHtml(data.listingTitle)}"</strong>.`,
+      ctaLabel: "View Listing",
+      ctaHref: `/listings/${encodeURIComponent(data.listingId)}`,
+    }),
+  }),
 
-    return {
-      subject: sanitizeSubject(
-        `${data.newListingsCount} new listings match your search`
-      ),
-      html: baseTemplate(`
-            <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">New Listings Alert</h2>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                Hi ${safeUserName},
-            </p>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                We found <strong>${data.newListingsCount} new listing${data.newListingsCount > 1 ? "s" : ""}</strong> matching your saved search: <strong>"${safeSearchQuery}"</strong>
-            </p>
-            <a href="${searchHref}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
-                View New Listings
-            </a>
-            <p style="margin: 24px 0 0; color: #71717a; font-size: 14px;">
-                <a href="${buildAppHref("/saved-searches")}" style="color: #71717a;">Manage your saved searches</a>
-            </p>
-        `),
-    };
-  },
+  listingFreshnessReminder: (data: {
+    hostName: string;
+    listingTitle: string;
+    listingId: string;
+  }) => ({
+    subject: sanitizeSubject(`Confirm availability for ${data.listingTitle}`),
+    html: simpleTemplate({
+      title: "Confirm Listing Availability",
+      greeting: data.hostName,
+      body: `Please confirm that <strong>"${escapeHtml(data.listingTitle)}"</strong> is still available.`,
+      ctaLabel: "Update Listing",
+      ctaHref: `/listings/${encodeURIComponent(data.listingId)}/edit`,
+    }),
+  }),
 
-  welcomeEmail: (data: { userName: string; verificationUrl?: string }) => {
-    const safeUserName = escapeHtml(data.userName);
-    const safeVerificationUrl = data.verificationUrl
-      ? escapeHtml(data.verificationUrl)
-      : "";
+  listingStaleWarning: (data: {
+    hostName: string;
+    listingTitle: string;
+    listingId: string;
+  }) => ({
+    subject: sanitizeSubject(`Final availability check for ${data.listingTitle}`),
+    html: simpleTemplate({
+      title: "Listing Availability Warning",
+      greeting: data.hostName,
+      body: `<strong>"${escapeHtml(data.listingTitle)}"</strong> may be paused soon unless you confirm it is still available.`,
+      ctaLabel: "Confirm Availability",
+      ctaHref: `/listings/${encodeURIComponent(data.listingId)}/edit`,
+    }),
+  }),
 
-    return {
-      subject: sanitizeSubject(`Welcome to RoomShare, ${data.userName}!`),
-      html: baseTemplate(`
-            <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">Welcome to RoomShare!</h2>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                Hi ${safeUserName},
-            </p>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                We're thrilled to have you join our community of roommates and hosts. RoomShare makes it easy to find the perfect shared living space.
-            </p>
-            ${
-              data.verificationUrl
-                ? `
-            <div style="background-color: #fef3c7; border-radius: 12px; padding: 20px; margin-bottom: 24px; border: 1px solid #fcd34d;">
-                <p style="margin: 0 0 12px; color: #92400e; font-size: 14px; font-weight: 600;">Please verify your email address</p>
-                <p style="margin: 0 0 16px; color: #78350f; font-size: 14px;">
-                    Click the button below to verify your email and unlock all features.
-                </p>
-                <a href="${safeVerificationUrl}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px;">
-                    Verify Email Address
-                </a>
-            </div>
-            `
-                : ""
-            }
-            <div style="background-color: #f4f4f5; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
-                <h3 style="margin: 0 0 16px; color: #18181b; font-size: 16px;">Get Started:</h3>
-                <ul style="margin: 0; padding: 0 0 0 20px; color: #52525b; font-size: 14px; line-height: 1.8;">
-                    <li>Complete your profile to build trust</li>
-                    <li>Browse listings in your area</li>
-                    <li>Save your favorite places</li>
-                    <li>Message hosts to learn more</li>
-                </ul>
-            </div>
-            <a href="${buildAppHref("/profile/edit")}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
-                Complete Your Profile
-            </a>
-        `),
-    };
-  },
+  listingAutoPaused: (data: {
+    hostName: string;
+    listingTitle: string;
+    listingId: string;
+  }) => ({
+    subject: sanitizeSubject(`${data.listingTitle} was paused`),
+    html: simpleTemplate({
+      title: "Listing Paused",
+      greeting: data.hostName,
+      body: `<strong>"${escapeHtml(data.listingTitle)}"</strong> was paused because its availability was not confirmed.`,
+      ctaLabel: "Review Listing",
+      ctaHref: `/listings/${encodeURIComponent(data.listingId)}/edit`,
+    }),
+  }),
 
-  emailVerification: (data: { userName: string; verificationUrl: string }) => {
-    const safeUserName = escapeHtml(data.userName);
-    const safeVerificationUrl = escapeHtml(data.verificationUrl);
+  welcomeEmail: (data: { userName: string; verificationUrl?: string }) => ({
+    subject: "Welcome to RoomShare!",
+    html: simpleTemplate({
+      title: "Welcome to RoomShare",
+      greeting: data.userName,
+      body: "Your account is ready. Verify your email to unlock the full RoomShare experience.",
+      ctaLabel: data.verificationUrl ? "Verify Email" : undefined,
+      ctaHref: data.verificationUrl ?? undefined,
+    }),
+  }),
 
-    return {
-      subject: "Verify your RoomShare email address",
-      html: baseTemplate(`
-            <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">Verify Your Email Address</h2>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                Hi ${safeUserName},
-            </p>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                Please verify your email address to unlock all RoomShare features, including creating listings and sending messages.
-            </p>
-            <a href="${safeVerificationUrl}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
-                Verify Email Address
-            </a>
-            <p style="margin: 24px 0 0; color: #71717a; font-size: 14px;">
-                This link will expire in 24 hours. If it expires, simply log in to your account and request a new verification email.
-            </p>
-            <p style="margin: 16px 0 0; color: #a1a1aa; font-size: 12px;">
-                If the button above doesn't work, copy and paste this link into your browser:
-            </p>
-            <p style="margin: 8px 0 0; color: #71717a; font-size: 11px; word-break: break-all;">
-                ${safeVerificationUrl}
-            </p>
-            <p style="margin: 12px 0 0; color: #a1a1aa; font-size: 12px;">
-                If you didn't create a RoomShare account, you can safely ignore this email.
-            </p>
-        `),
-    };
-  },
+  emailVerification: (data: { userName: string; verificationUrl: string }) => ({
+    subject: "Verify your RoomShare email",
+    html: simpleTemplate({
+      title: "Verify Your Email",
+      greeting: data.userName,
+      body: "Confirm your email address to finish setting up your account.",
+      ctaLabel: "Verify Email",
+      ctaHref: data.verificationUrl,
+    }),
+  }),
 
-  passwordReset: (data: { userName: string; resetLink: string }) => {
-    const safeUserName = escapeHtml(data.userName);
-    const safeResetLink = escapeHtml(data.resetLink);
-
-    return {
-      subject: "Reset your RoomShare password",
-      html: baseTemplate(`
-            <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">Password Reset Request</h2>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                Hi ${safeUserName},
-            </p>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                We received a request to reset your password. Click the button below to create a new password:
-            </p>
-            <a href="${safeResetLink}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
-                Reset Password
-            </a>
-            <p style="margin: 24px 0 0; color: #71717a; font-size: 14px;">
-                This link will expire in 1 hour. If you didn't request this, you can safely ignore this email.
-            </p>
-        `),
-    };
-  },
+  passwordReset: (data: { userName: string; resetLink: string }) => ({
+    subject: "Reset your RoomShare password",
+    html: simpleTemplate({
+      title: "Reset Your Password",
+      greeting: data.userName,
+      body: "Use the secure link below to reset your password.",
+      ctaLabel: "Reset Password",
+      ctaHref: data.resetLink,
+    }),
+  }),
 
   reviewResponse: (data: {
     reviewerName: string;
-    hostName: string;
-    listingTitle: string;
-    responsePreview: string;
-    listingId: string;
-  }) => {
-    const safeReviewerName = escapeHtml(data.reviewerName);
-    const safeHostName = escapeHtml(data.hostName);
-    const safeListingTitle = escapeHtml(data.listingTitle);
-    const responsePreview =
-      data.responsePreview.length > 200
-        ? `${data.responsePreview.substring(0, 200)}...`
-        : data.responsePreview;
-    const safeResponsePreview = escapeHtml(responsePreview);
+    responderName: string;
+    response: string;
+  }) => ({
+    subject: sanitizeSubject(`${data.responderName} responded to your review`),
+    html: simpleTemplate({
+      title: "Review Response",
+      greeting: data.reviewerName,
+      body: `<strong>${escapeHtml(data.responderName)}</strong> responded:<br><br>${escapeHtml(data.response)}`,
+      ctaLabel: "View Reviews",
+      ctaHref: "/profile",
+    }),
+  }),
 
-    return {
-      subject: sanitizeSubject(`${data.hostName} responded to your review`),
-      html: baseTemplate(`
-            <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">Response to Your Review</h2>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                Hi ${safeReviewerName},
-            </p>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                <strong>${safeHostName}</strong> has responded to your review on <strong>"${safeListingTitle}"</strong>:
-            </p>
-            <div style="background-color: #f4f4f5; border-radius: 12px; padding: 20px; margin-bottom: 24px; border-left: 4px solid #18181b;">
-                <p style="margin: 0; color: #18181b; font-size: 16px; font-style: italic;">
-                    "${safeResponsePreview}"
-                </p>
-            </div>
-            <a href="${buildAppHref(`/listings/${encodeURIComponent(data.listingId)}`)}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
-                View Response
-            </a>
-        `),
-    };
-  },
-
-  verificationRejected: (data: { userName: string; reason: string }) => {
-    const safeUserName = escapeHtml(data.userName);
-    const safeReason = escapeHtml(data.reason);
-
-    return {
-      subject: "Your Verification Request Update",
-      html: baseTemplate(`
-            <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">Verification Request Update</h2>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                Hi ${safeUserName},
-            </p>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                Your identity verification request was not approved.
-            </p>
-            <div style="background-color: #fef2f2; border-radius: 12px; padding: 20px; margin-bottom: 24px; border: 1px solid #fecaca;">
-                <p style="margin: 0 0 8px; color: #991b1b; font-size: 14px; font-weight: 600;">Reason:</p>
-                <p style="margin: 0; color: #7f1d1d; font-size: 14px;">
-                    ${safeReason}
-                </p>
-            </div>
-            <div style="background-color: #f4f4f5; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-                <p style="margin: 0 0 12px; color: #18181b; font-size: 14px; font-weight: 600;">Tips for a successful verification:</p>
-                <ul style="margin: 0; padding: 0 0 0 20px; color: #52525b; font-size: 14px; line-height: 1.8;">
-                    <li>Ensure your document is clearly visible with all corners showing</li>
-                    <li>Take photos in good lighting without glare or shadows</li>
-                    <li>Make sure the text on your ID is readable</li>
-                    <li>Use the original document, not a photocopy</li>
-                </ul>
-            </div>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                You can submit a new verification request after 24 hours.
-            </p>
-            <a href="${buildAppHref("/verify")}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
-                View Verification Status
-            </a>
-        `),
-    };
-  },
-
-  bookingHoldRequest: (data: {
-    hostName: string;
-    tenantName: string;
-    listingTitle: string;
-    holdExpiresAt: string;
-  }) => {
-    const safeHost = escapeHtml(data.hostName);
-    const safeTenant = escapeHtml(data.tenantName);
-    const safeTitle = escapeHtml(data.listingTitle);
-    const safeExpires = escapeHtml(data.holdExpiresAt);
-
-    return {
-      subject: sanitizeSubject(`New hold request on ${data.listingTitle}`),
-      html: baseTemplate(`
-            <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">Hold Request</h2>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                Hi ${safeHost},
-            </p>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                <strong>${safeTenant}</strong> has placed a hold on <strong>"${safeTitle}"</strong>.
-            </p>
-            <div style="background-color: #f4f4f5; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-                <p style="margin: 0; color: #18181b; font-size: 16px;">
-                    This hold expires on <strong>${safeExpires}</strong>.
-                </p>
-            </div>
-            <a href="${buildAppHref("/bookings")}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
-                View Bookings
-            </a>
-        `),
-    };
-  },
-
-  bookingExpired: (data: { tenantName: string; listingTitle: string }) => {
-    const safeName = escapeHtml(data.tenantName);
-    const safeTitle = escapeHtml(data.listingTitle);
-
-    return {
-      subject: sanitizeSubject(
-        `Booking request expired for ${data.listingTitle}`
-      ),
-      html: baseTemplate(`
-            <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">Booking Expired</h2>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                Hi ${safeName},
-            </p>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                Your booking request for <strong>"${safeTitle}"</strong> has expired.
-            </p>
-            <a href="${buildAppHref("/search")}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
-                Browse Listings
-            </a>
-        `),
-    };
-  },
-
-  bookingHoldExpired: (data: { tenantName: string; listingTitle: string }) => {
-    const safeName = escapeHtml(data.tenantName);
-    const safeTitle = escapeHtml(data.listingTitle);
-
-    return {
-      subject: sanitizeSubject(`Hold expired for ${data.listingTitle}`),
-      html: baseTemplate(`
-            <h2 style="margin: 0 0 16px; color: #d97706; font-size: 20px;">Hold Expired</h2>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                Hi ${safeName},
-            </p>
-            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                Your hold on <strong>"${safeTitle}"</strong> has expired.
-            </p>
-            <a href="${buildAppHref("/search")}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
-                Browse Listings
-            </a>
-        `),
-    };
-  },
+  verificationRejected: (data: { userName: string; reason: string }) => ({
+    subject: "Verification request update",
+    html: simpleTemplate({
+      title: "Verification Update",
+      greeting: data.userName,
+      body: `Your verification could not be approved. Reason: ${escapeHtml(data.reason)}`,
+      ctaLabel: "View Verification Status",
+      ctaHref: "/verify",
+    }),
+  }),
 };

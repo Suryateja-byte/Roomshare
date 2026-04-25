@@ -1,0 +1,8 @@
+{
+  "slice": "05-host-ghost-and-abuse-controls",
+  "critic": "Codex GPT-5 in-thread Critic",
+  "verdict": "approved",
+  "findings": [],
+  "rationale": "The outbound guard is non-blocking and logs only hashed identifiers plus flag kinds. Host-ghost tests now prove both qualifying and non-qualifying read/reply behavior. Focused tests pass.",
+  "required_next_action": "Proceed to Slice 06: validation, final artifacts, approval marker, and state advancement."
+}

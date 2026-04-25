@@ -120,6 +120,16 @@ async function hasVisibleEditForm(
     .catch(() => false);
 }
 
+async function hasLegacyEditFields(
+  page: import("@playwright/test").Page
+): Promise<boolean> {
+  return page
+    .locator('[data-testid="listing-title-input"]')
+    .first()
+    .isVisible()
+    .catch(() => false);
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Auth & Access Guards (LE-01, LE-02, LE-03)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -221,20 +231,24 @@ test.describe("Listing Edit — Auth & Access Guards", () => {
       return;
     }
 
-    // Verify form is visible
     const form = page.locator('[data-testid="edit-listing-form"]').first();
     await expect(form).toBeVisible({ timeout: 15000 });
-
-    // Verify heading
     await expect(
-      page.getByRole("heading", { name: /edit listing/i })
+      page
+        .getByRole("heading", { name: /edit listing/i })
+        .or(page.getByRole("heading", { name: /host-managed availability/i }))
+        .first()
     ).toBeVisible({ timeout: 10000 });
 
-    // Verify title is pre-filled (not empty)
-    const titleInput = page.locator('[data-testid="listing-title-input"]').first();
-    await expect(titleInput).toBeVisible({ timeout: 10000 });
-    const titleValue = await titleInput.inputValue();
-    expect(titleValue.length).toBeGreaterThan(0);
+    if (await hasLegacyEditFields(page)) {
+      const titleInput = page
+        .locator('[data-testid="listing-title-input"]')
+        .first();
+      const titleValue = await titleInput.inputValue();
+      expect(titleValue.length).toBeGreaterThan(0);
+    } else {
+      await expect(page.locator("#openSlots")).toBeVisible({ timeout: 10000 });
+    }
   });
 });
 
@@ -255,10 +269,11 @@ test.describe("Listing Edit — Field Editing", () => {
     await page.waitForLoadState("domcontentloaded");
 
     const formVisible = await hasVisibleEditForm(page);
-    if (!page.url().includes("/edit") || !formVisible) {
+    const legacyFieldsVisible = await hasLegacyEditFields(page);
+    if (!page.url().includes("/edit") || !formVisible || !legacyFieldsVisible) {
       test.skip(
         true,
-        "Redirected away from /edit or edit form unavailable"
+        "Legacy full edit fields are retired for contact-first host-managed listings"
       );
       return;
     }
@@ -399,8 +414,8 @@ test.describe("Listing Edit — Image Management", () => {
     await page.goto(`/listings/${listingId}/edit`);
     await page.waitForLoadState("domcontentloaded");
     test.skip(
-      !(await hasVisibleEditForm(page)),
-      "Redirected away from /edit or edit form unavailable"
+      !(await hasVisibleEditForm(page)) || !(await hasLegacyEditFields(page)),
+      "Legacy full edit fields are retired for contact-first host-managed listings"
     );
   });
 
@@ -465,8 +480,8 @@ test.describe.serial("Listing Edit — Draft Persistence", () => {
     await page.goto(`/listings/${listingId}/edit`);
     await page.waitForLoadState("domcontentloaded");
     test.skip(
-      !(await hasVisibleEditForm(page)),
-      "Redirected away from /edit or edit form unavailable"
+      !(await hasVisibleEditForm(page)) || !(await hasLegacyEditFields(page)),
+      "Legacy full edit fields are retired for contact-first host-managed listings"
     );
 
     // Dismiss any existing draft banner first
@@ -509,8 +524,8 @@ test.describe.serial("Listing Edit — Draft Persistence", () => {
     await page.goto(`/listings/${listingId}/edit`);
     await page.waitForLoadState("domcontentloaded");
     test.skip(
-      !(await hasVisibleEditForm(page)),
-      "Redirected away from /edit or edit form unavailable"
+      !(await hasVisibleEditForm(page)) || !(await hasLegacyEditFields(page)),
+      "Legacy full edit fields are retired for contact-first host-managed listings"
     );
 
     // Draft banner should appear: "You have unsaved edits"
@@ -538,8 +553,8 @@ test.describe.serial("Listing Edit — Draft Persistence", () => {
     await page.goto(`/listings/${listingId}/edit`);
     await page.waitForLoadState("domcontentloaded");
     test.skip(
-      !(await hasVisibleEditForm(page)),
-      "Redirected away from /edit or edit form unavailable"
+      !(await hasVisibleEditForm(page)) || !(await hasLegacyEditFields(page)),
+      "Legacy full edit fields are retired for contact-first host-managed listings"
     );
 
     // Wait for draft banner
@@ -590,8 +605,8 @@ test.describe("Listing Edit — Form Actions", () => {
     await page.reload();
     await page.waitForLoadState("domcontentloaded");
     test.skip(
-      !(await hasVisibleEditForm(page)),
-      "Redirected away from /edit or edit form unavailable"
+      !(await hasVisibleEditForm(page)) || !(await hasLegacyEditFields(page)),
+      "Legacy full edit fields are retired for contact-first host-managed listings"
     );
   });
 
@@ -601,8 +616,8 @@ test.describe("Listing Edit — Form Actions", () => {
     await page.goto(`/listings/${listingId}/edit`);
     await page.waitForLoadState("domcontentloaded");
     test.skip(
-      !(await hasVisibleEditForm(page)),
-      "Redirected away from /edit or edit form unavailable"
+      !(await hasVisibleEditForm(page)) || !(await hasLegacyEditFields(page)),
+      "Legacy full edit fields are retired for contact-first host-managed listings"
     );
 
     // The cancel button is a Link with data-testid="listing-cancel-button"
@@ -626,8 +641,8 @@ test.describe("Listing Edit — Form Actions", () => {
     await page.goto(`/listings/${listingId}/edit`);
     await page.waitForLoadState("domcontentloaded");
     test.skip(
-      !(await hasVisibleEditForm(page)),
-      "Redirected away from /edit or edit form unavailable"
+      !(await hasVisibleEditForm(page)) || !(await hasLegacyEditFields(page)),
+      "Legacy full edit fields are retired for contact-first host-managed listings"
     );
 
     // Dismiss any draft banner
@@ -706,8 +721,8 @@ test.describe("Listing Edit — Form Actions", () => {
     await page.goto(`/listings/${listingId}/edit`);
     await page.waitForLoadState("domcontentloaded");
     test.skip(
-      !(await hasVisibleEditForm(page)),
-      "Redirected away from /edit or edit form unavailable"
+      !(await hasVisibleEditForm(page)) || !(await hasLegacyEditFields(page)),
+      "Legacy full edit fields are retired for contact-first host-managed listings"
     );
 
     // Dismiss any draft banner

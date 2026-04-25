@@ -35,7 +35,11 @@ export function readSearchIntentState(
   searchParams: URLSearchParams
 ): SearchIntentState {
   const vibeInput = searchParams.get("what") || "";
-  const locationInput = searchParams.get("where") || searchParams.get("q") || "";
+  const locationInput =
+    searchParams.get("locationLabel") ||
+    searchParams.get("where") ||
+    searchParams.get("q") ||
+    "";
   const lat = parseFiniteNumber(searchParams.get("lat"));
   const lng = parseFiniteNumber(searchParams.get("lng"));
   const minLng = parseFiniteNumber(searchParams.get("minLng"));
@@ -89,6 +93,7 @@ export function buildSearchIntentParams(
           values.selectedLocation.lng
         )
     );
+    // CFM-604: canonical-on-write guarantee — intent URLs serialize via the canonical query builder.
     return serializeSearchQuery(
       applySearchQueryChange(currentQuery, "location", {
         query: undefined,
@@ -120,5 +125,6 @@ export function buildSearchIntentParams(
   nextQuery.lat = undefined;
   nextQuery.lng = undefined;
 
+  // CFM-604: canonical-on-write guarantee — intent URLs serialize via the canonical query builder.
   return serializeSearchQuery(nextQuery);
 }

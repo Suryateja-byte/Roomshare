@@ -32,6 +32,19 @@ const EMPTY_FACETS: FacetsResponse = {
   priceHistogram: null,
 };
 
+function getValidatedPendingDateRange(
+  pending: BatchedFilterValues
+): { moveInDate: string; endDate: string } {
+  const moveInDate = pending.moveInDate.trim();
+  const endDate = pending.endDate.trim();
+
+  if (!moveInDate || !endDate || endDate <= moveInDate) {
+    return { moveInDate, endDate: "" };
+  }
+
+  return { moveInDate, endDate };
+}
+
 export interface UseFacetsOptions {
   pending: BatchedFilterValues;
   isDrawerOpen: boolean;
@@ -53,13 +66,16 @@ function generateFacetsCacheKey(
   pending: BatchedFilterValues,
   searchParams: URLSearchParams
 ): string {
+  const { moveInDate, endDate } = getValidatedPendingDateRange(pending);
+
   const parts = [
     // Include price so non-price facet counts update after price changes (#19)
     `minPrice=${pending.minPrice}`,
     `maxPrice=${pending.maxPrice}`,
     `roomType=${pending.roomType}`,
     `leaseDuration=${pending.leaseDuration}`,
-    `moveInDate=${pending.moveInDate}`,
+    `moveInDate=${moveInDate}`,
+    `endDate=${endDate}`,
     `amenities=${[...pending.amenities].sort().join(",")}`,
     `houseRules=${[...pending.houseRules].sort().join(",")}`,
     `languages=${[...pending.languages].sort().join(",")}`,
@@ -83,6 +99,7 @@ function buildFacetsUrl(
   searchParams: URLSearchParams
 ): string {
   const params = new URLSearchParams();
+  const { moveInDate, endDate } = getValidatedPendingDateRange(pending);
 
   // Include ALL filters (including price) in the API request
   // so non-price facet counts reflect price selection
@@ -90,7 +107,8 @@ function buildFacetsUrl(
   if (pending.maxPrice) params.set("maxPrice", pending.maxPrice);
   if (pending.roomType) params.set("roomType", pending.roomType);
   if (pending.leaseDuration) params.set("leaseDuration", pending.leaseDuration);
-  if (pending.moveInDate) params.set("moveInDate", pending.moveInDate);
+  if (moveInDate) params.set("moveInDate", moveInDate);
+  if (endDate) params.set("endDate", endDate);
   if (pending.amenities.length > 0) {
     params.set("amenities", pending.amenities.join(","));
   }

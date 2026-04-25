@@ -72,10 +72,10 @@ test.describe("NX: Notifications Extended Read-only", () => {
       return;
     }
 
-    // Find a notification with a link (Booking Confirmed or New Message have links)
+    // Find a contact-first notification with a link.
     const linkedItem = page
       .getByTestId("notification-item")
-      .filter({ hasText: /Booking Confirmed|New Message/i })
+      .filter({ hasText: /New Message|New Review/i })
       .first();
 
     try {

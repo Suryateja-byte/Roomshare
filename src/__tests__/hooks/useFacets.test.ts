@@ -82,6 +82,7 @@ const defaultPending = {
   roomType: "",
   leaseDuration: "",
   moveInDate: "",
+  endDate: "",
   amenities: [] as string[],
   houseRules: [] as string[],
   languages: [] as string[],
@@ -192,6 +193,35 @@ describe("useFacets", () => {
     expect(result.current.isLoading).toBe(false);
     expect(result.current.error).toBeNull();
     expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("3b. includes moveInDate and endDate in the facets request when a valid range is selected", async () => {
+    (useSearchParams as jest.Mock).mockReturnValue(
+      makeSearchParams({ lat: "37.15", lng: "-122.15" })
+    );
+    mockFetch.mockResolvedValueOnce(mockOkResponse(SAMPLE_FACETS));
+
+    renderHook(() =>
+      useFacets({
+        pending: {
+          ...defaultPending,
+          moveInDate: "2026-05-01",
+          endDate: "2026-06-01",
+        },
+        isDrawerOpen: true,
+      })
+    );
+
+    act(() => {
+      jest.advanceTimersByTime(350);
+    });
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    expect(mockFetch.mock.calls[0]?.[0]).toContain("moveInDate=2026-05-01");
+    expect(mockFetch.mock.calls[0]?.[0]).toContain("endDate=2026-06-01");
   });
 
   // ── 4. Cache hit — no refetch ───────────────────────────────────────────

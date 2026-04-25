@@ -12,6 +12,27 @@ dns.setDefaultResultOrder("ipv4first");
 dotenv.config({ path: path.resolve(__dirname, ".env.local") });
 dotenv.config({ path: path.resolve(__dirname, ".env") });
 
+const runningDedupeSuite = process.argv.some(
+  (arg) => arg.includes("tests/e2e/dedupe") || arg.includes("/dedupe/")
+);
+const retiredBookingLifecycleSpecs = [
+  /concurrent\/admin-host-race\.spec\.ts/,
+  /concurrent\/held-slot-restoration\.spec\.ts/,
+  /concurrent\/listing-deletion-cascade\.spec\.ts/,
+];
+const webServerEnv = Object.fromEntries(
+  Object.entries(process.env).filter(
+    (entry): entry is [string, string] => entry[1] != null
+  )
+);
+
+if (runningDedupeSuite) {
+  webServerEnv.FEATURE_SEARCH_LISTING_DEDUP = "true";
+  webServerEnv.FEATURE_LISTING_CREATE_COLLISION_WARN = "true";
+}
+webServerEnv.NEXT_PUBLIC_SUPABASE_URL =
+  webServerEnv.NEXT_PUBLIC_SUPABASE_URL || "https://fake.supabase.co";
+
 /**
  * Playwright configuration for RoomShare E2E tests
  * @see https://playwright.dev/docs/test-configuration
@@ -32,7 +53,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
 
   /* Limit workers to prevent overwhelming dev server */
-  workers: process.env.CI ? 1 : 3,
+  workers: process.env.CI || runningDedupeSuite ? 1 : 3,
 
   /* Reporter to use */
   reporter: [
@@ -80,7 +101,7 @@ export default defineConfig({
 
     {
       name: "chromium",
-      testIgnore: /\.(anon|admin)\.spec\.ts/,
+      testIgnore: [/(\.anon|\.admin)\.spec\.ts/, ...retiredBookingLifecycleSpecs],
       use: {
         ...devices["Desktop Chrome"],
         storageState: "playwright/.auth/user.json",
@@ -90,7 +111,7 @@ export default defineConfig({
 
     {
       name: "firefox",
-      testIgnore: /\.(anon|admin)\.spec\.ts/,
+      testIgnore: [/(\.anon|\.admin)\.spec\.ts/, ...retiredBookingLifecycleSpecs],
       use: {
         ...devices["Desktop Firefox"],
         storageState: "playwright/.auth/user.json",
@@ -100,7 +121,7 @@ export default defineConfig({
 
     {
       name: "webkit",
-      testIgnore: /\.(anon|admin)\.spec\.ts/,
+      testIgnore: [/(\.anon|\.admin)\.spec\.ts/, ...retiredBookingLifecycleSpecs],
       use: {
         ...devices["Desktop Safari"],
         storageState: "playwright/.auth/user.json",
@@ -111,7 +132,7 @@ export default defineConfig({
     /* Mobile viewports */
     {
       name: "Mobile Chrome",
-      testIgnore: /\.(anon|admin)\.spec\.ts/,
+      testIgnore: [/(\.anon|\.admin)\.spec\.ts/, ...retiredBookingLifecycleSpecs],
       use: {
         ...devices["Pixel 7"],
         storageState: "playwright/.auth/user.json",
@@ -121,7 +142,7 @@ export default defineConfig({
 
     {
       name: "Mobile Safari",
-      testIgnore: /\.(anon|admin)\.spec\.ts/,
+      testIgnore: [/(\.anon|\.admin)\.spec\.ts/, ...retiredBookingLifecycleSpecs],
       use: {
         ...devices["iPhone 14"],
         storageState: "playwright/.auth/user.json",
@@ -181,15 +202,11 @@ export default defineConfig({
     : {
         command: "pnpm run dev",
         url: "http://localhost:3000/api/health/ready",
-        reuseExistingServer: true,
+        reuseExistingServer: !runningDedupeSuite,
         timeout: 180000,
         stdout: "pipe",
         stderr: "pipe",
-        env: Object.fromEntries(
-          Object.entries(process.env).filter(
-            (entry): entry is [string, string] => entry[1] != null
-          )
-        ),
+        env: webServerEnv,
       },
 
   /* Output folder for test artifacts */

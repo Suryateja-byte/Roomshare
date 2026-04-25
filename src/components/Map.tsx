@@ -84,6 +84,12 @@ import {
   buildCanonicalSearchUrl,
   normalizeSearchQuery,
 } from "@/lib/search/search-query";
+import {
+  getAvailabilityPresentation,
+  type AvailabilityPublicAvailability,
+} from "@/lib/search/availability-presentation";
+import { buildListingDetailHref } from "@/lib/search/listing-detail-link";
+import type { GroupContextPresentation } from "@/lib/search-types";
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import {
@@ -132,10 +138,13 @@ interface Listing {
   title: string;
   price: number;
   availableSlots: number;
+  totalSlots?: number;
   images?: string[];
   avgRating?: number;
   reviewCount?: number;
   roomType?: string;
+  publicAvailability?: AvailabilityPublicAvailability;
+  groupContext?: GroupContextPresentation | null;
   location: {
     city?: string;
     state?: string;
@@ -170,6 +179,8 @@ interface ClusterFeatureProperties {
   title: string;
   price: number;
   availableSlots: number;
+  publicAvailabilityJson?: string;
+  groupContextJson?: string;
   images?: string;
   lat: number;
   lng: number;
@@ -187,6 +198,40 @@ function parseFeatureImages(rawImages: unknown): string[] {
     return parsed.filter((item): item is string => typeof item === "string");
   } catch {
     return [];
+  }
+}
+
+function parseFeatureAvailability(
+  rawAvailability: unknown
+): AvailabilityPublicAvailability | undefined {
+  if (typeof rawAvailability !== "string" || rawAvailability.length === 0) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(rawAvailability);
+    return parsed && typeof parsed === "object"
+      ? (parsed as AvailabilityPublicAvailability)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function parseFeatureGroupContext(
+  rawGroupContext: unknown
+): GroupContextPresentation | null {
+  if (typeof rawGroupContext !== "string" || rawGroupContext.length === 0) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(rawGroupContext);
+    return parsed && typeof parsed === "object"
+      ? (parsed as GroupContextPresentation)
+      : null;
+  } catch {
+    return null;
   }
 }
 
@@ -816,7 +861,7 @@ interface MapMarkerItemProps {
   lat: number;
   price: number;
   title: string;
-  availableSlots: number;
+  availabilityAriaLabel: string;
   tier: "primary" | "mini" | undefined;
   currentZoom: number;
   isHovered: boolean;
@@ -838,7 +883,7 @@ const MapMarkerItem = React.memo(function MapMarkerItem({
   lat,
   price,
   title,
-  availableSlots,
+  availabilityAriaLabel,
   tier,
   currentZoom,
   isHovered,
@@ -903,7 +948,7 @@ const MapMarkerItem = React.memo(function MapMarkerItem({
     [listingId, onClickById, onKeyboardNav]
   );
 
-  const ariaLabel = `${formatPrice(price)} per month${title ? `, ${title}` : ""}${availableSlots > 0 ? `, ${availableSlots} spots available` : ", currently filled"}. Use arrow keys to navigate between markers.`;
+  const ariaLabel = `${formatPrice(price)} per month${title ? `, ${title}` : ""}, ${availabilityAriaLabel}. Use arrow keys to navigate between markers.`;
 
   return (
     <Marker
@@ -1160,6 +1205,9 @@ export default function MapComponent({
   // --- Controlled vs Uncontrolled View State ---
   // When viewState prop is provided, map runs in controlled mode
   const isControlledViewState = controlledViewState !== undefined;
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const searchParamsString = searchParams.toString();
 
   // --- Controlled vs Uncontrolled Selection ---
   // When selectedListingId prop is provided, selection is controlled by parent
@@ -1167,23 +1215,44 @@ export default function MapComponent({
   const usesPopupSelection = selectionPresentation === "popup";
   const usesPreviewSelection = selectionPresentation === "preview";
   const usesOverlaySelection = usesPopupSelection || usesPreviewSelection;
-  const [internalSelectedListing, setInternalSelectedListing] =
-    useState<Listing | null>(null);
+  const [internalSelectedListingId, setInternalSelectedListingId] =
+    useState<string | null>(null);
+  const selectedListingId = isControlledSelection
+    ? controlledSelectedId ?? null
+    : internalSelectedListingId;
 
   // Computed selected listing - use controlled ID or internal state
   const selectedListing = useMemo(() => {
-    if (isControlledSelection) {
-      return controlledSelectedId
-        ? (listings.find((l) => l.id === controlledSelectedId) ?? null)
-        : null;
-    }
-    return internalSelectedListing;
-  }, [
-    isControlledSelection,
-    controlledSelectedId,
-    listings,
-    internalSelectedListing,
-  ]);
+    return selectedListingId
+      ? (listings.find((l) => l.id === selectedListingId) ?? null)
+      : null;
+  }, [listings, selectedListingId]);
+  const listingDetailDateParams = useMemo(() => {
+    const params = new URLSearchParams(searchParamsString);
+
+    return {
+      startDate: params.get("startDate"),
+      moveInDate: params.get("moveInDate"),
+      endDate: params.get("endDate"),
+    };
+  }, [searchParamsString]);
+  const selectedListingHref = useMemo(() => {
+    if (!selectedListing) return null;
+
+    return buildListingDetailHref(selectedListing.id, listingDetailDateParams);
+  }, [listingDetailDateParams, selectedListing]);
+  const selectedAvailabilityPresentation = useMemo(
+    () =>
+      selectedListing
+        ? getAvailabilityPresentation({
+            availableSlots: selectedListing.availableSlots,
+            totalSlots: selectedListing.totalSlots,
+            publicAvailability: selectedListing.publicAvailability,
+            groupContext: selectedListing.groupContext,
+          })
+        : null,
+    [selectedListing]
+  );
 
   // Unified setter for selected listing that respects controlled/uncontrolled mode
   const setSelectedListing = useCallback(
@@ -1191,7 +1260,7 @@ export default function MapComponent({
       if (isControlledSelection) {
         onSelectedListingChange?.(listing?.id ?? null);
       } else {
-        setInternalSelectedListing(listing);
+        setInternalSelectedListingId(listing?.id ?? null);
       }
     },
     [isControlledSelection, onSelectedListingChange]
@@ -1228,8 +1297,6 @@ export default function MapComponent({
   const markerRefs = useRef<globalThis.Map<string, HTMLDivElement>>(
     new globalThis.Map()
   );
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const {
     mobileResultsView,
     setMobileMapOverlayActive,
@@ -1242,7 +1309,6 @@ export default function MapComponent({
     toggleCategory: togglePOICategory,
   } = usePOILayerState();
   const appliedPOICategories = activePOICategories;
-
   const {
     hasUserMoved,
     setHasUserMoved,
@@ -1543,6 +1609,12 @@ export default function MapComponent({
           title: listing.title,
           price: normalizeMapNumber(listing.price),
           availableSlots: normalizeMapNumber(listing.availableSlots),
+          publicAvailabilityJson: listing.publicAvailability
+            ? JSON.stringify(listing.publicAvailability)
+            : undefined,
+          groupContextJson: listing.groupContext
+            ? JSON.stringify(listing.groupContext)
+            : undefined,
           images: JSON.stringify(listing.images || []),
           lat: normalizeMapNumber(listing.location.lat),
           lng: normalizeMapNumber(listing.location.lng),
@@ -1647,6 +1719,12 @@ export default function MapComponent({
           title: properties.title ?? "",
           price: Number(properties.price) || 0,
           availableSlots: Number(properties.availableSlots) || 0,
+          publicAvailability: parseFeatureAvailability(
+            properties.publicAvailabilityJson
+          ),
+          groupContext: parseFeatureGroupContext(properties.groupContextJson),
+          totalSlots: parseFeatureAvailability(properties.publicAvailabilityJson)
+            ?.totalSlots,
           images,
           location: {
             lat: Number(properties.lat) || 0,
@@ -1739,17 +1817,24 @@ export default function MapComponent({
   // rendered marker payload changes, not when parent arrays are recreated.
   const markersSourceSignature = useMemo(() => {
     return markersSource
-      .map((listing) =>
-        [
+      .map((listing) => {
+        const availabilityPresentation = getAvailabilityPresentation({
+          availableSlots: listing.availableSlots,
+          totalSlots: listing.totalSlots,
+          publicAvailability: listing.publicAvailability,
+          groupContext: listing.groupContext,
+        });
+
+        return [
           listing.id,
           listing.title.trim(),
           listing.price,
-          listing.availableSlots,
+          availabilityPresentation.presentationKey,
           listing.location.lat,
           listing.location.lng,
           listing.tier ?? "",
-        ].join(":")
-      )
+        ].join(":");
+      })
       .sort()
       .join(",");
   }, [markersSource]);
@@ -2704,7 +2789,7 @@ export default function MapComponent({
 
     // P1-FIX (#106): Clear selectedListing popup if the listing no longer exists.
     // Prevents showing stale popup data after search results update.
-    if (selectedListing && !listings.find((l) => l.id === selectedListing.id)) {
+    if (selectedListingId && !listings.find((l) => l.id === selectedListingId)) {
       lastMapActiveRef.current = null;
       popupFocusOriginRef.current = null;
       setSelectedListing(null);
@@ -2717,7 +2802,7 @@ export default function MapComponent({
       (window as unknown as Record<string, unknown>).__roomshare = roomshare;
       roomshare.markerCount = listings.length;
     }
-  }, [listings, activeId, setActive, selectedListing, setSelectedListing]);
+  }, [listings, activeId, selectedListingId, setActive, setSelectedListing]);
 
   useEffect(() => {
     if (searchStatusTimerRef.current) {
@@ -2909,6 +2994,7 @@ export default function MapComponent({
         return; // Bounds haven't meaningfully changed, skip search
       }
       lastSearchBoundsRef.current = { ...bounds };
+      // CFM-604: canonical-on-write guarantee — must go through buildCanonicalSearchUrl.
       const url = buildCanonicalSearchUrl(
         applySearchQueryChange(
           normalizeSearchQuery(new URLSearchParams(searchParams.toString())),
@@ -3690,7 +3776,7 @@ export default function MapComponent({
         aria-atomic="true"
       >
         {selectedListing
-          ? `Selected listing: ${selectedListing.title}, ${formatPrice(selectedListing.price)} per month, ${selectedListing.availableSlots > 0 ? `${selectedListing.availableSlots} spots available` : "currently filled"}`
+          ? `Selected listing: ${selectedListing.title}, ${formatPrice(selectedListing.price)} per month, ${selectedAvailabilityPresentation?.ariaLabel ?? "Filled"}`
           : ""}
       </div>
 
@@ -4068,7 +4154,11 @@ export default function MapComponent({
       >
         {/* Boundary polygon for named search areas */}
         <BoundaryLayer
-          query={searchParams.get("where") || searchParams.get("q")}
+          query={
+            searchParams.get("locationLabel") ||
+            searchParams.get("where") ||
+            searchParams.get("q")
+          }
           isDarkMode={isDarkMode}
         />
 
@@ -4105,6 +4195,15 @@ export default function MapComponent({
             can bail out when non-marker state changes (isSearching, areTilesLoading, etc.).
             MarkerPinContent inside each item only re-renders when its 4 primitive props change. */}
         {markerPositions.map((position) => (
+          (() => {
+            const availabilityPresentation = getAvailabilityPresentation({
+              availableSlots: position.listing.availableSlots,
+              totalSlots: position.listing.totalSlots,
+              publicAvailability: position.listing.publicAvailability,
+              groupContext: position.listing.groupContext,
+            });
+
+            return (
           <MapMarkerItem
             key={position.listing.id}
             listingId={position.listing.id}
@@ -4112,7 +4211,7 @@ export default function MapComponent({
             lat={position.lat}
             price={position.listing.price}
             title={position.listing.title}
-            availableSlots={position.listing.availableSlots}
+            availabilityAriaLabel={availabilityPresentation.ariaLabel}
             tier={position.listing.tier}
             currentZoom={currentZoom}
             isHovered={
@@ -4133,6 +4232,8 @@ export default function MapComponent({
             onFocusChange={setKeyboardFocusedId}
             markerRefsMap={markerRefs}
           />
+            );
+          })()
         ))}
 
         {/* Cluster highlight: when a card is hovered/active but its marker is inside
@@ -4160,6 +4261,7 @@ export default function MapComponent({
             <DesktopListingPreviewCard
               key={selectedListing.id}
               listing={selectedListing}
+              href={selectedListingHref ?? `/listings/${selectedListing.id}`}
               isDarkMode={isDarkMode}
               onClose={() => handleSelectedListingClose(true)}
               cardRef={selectedPopupCardRef}
@@ -4220,7 +4322,7 @@ export default function MapComponent({
                 </button>
 
                 <Link
-                  href={`/listings/${selectedListing.id}`}
+                  href={selectedListingHref ?? `/listings/${selectedListing.id}`}
                   className="flex items-stretch gap-3 p-3 pr-12"
                 >
                   <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-surface-container-high">
@@ -4252,11 +4354,17 @@ export default function MapComponent({
                       {selectedListing.title}
                     </h3>
 
-                    <div className="mt-2 inline-flex items-center rounded-full bg-surface-container-high px-2.5 py-1 text-[11px] font-medium text-on-surface-variant">
-                      {selectedListing.availableSlots > 0
-                        ? `${selectedListing.availableSlots} available`
-                        : "Filled"}
+                    <div
+                      data-testid="map-popup-availability"
+                      className="mt-2 inline-flex items-center rounded-full bg-surface-container-high px-2.5 py-1 text-[11px] font-medium text-on-surface-variant"
+                    >
+                      {selectedAvailabilityPresentation?.primaryLabel ?? "Filled"}
                     </div>
+                    {selectedAvailabilityPresentation?.secondaryGroupLabel ? (
+                      <p className="mt-2 text-xs font-medium text-on-surface-variant">
+                        {selectedAvailabilityPresentation.secondaryGroupLabel}
+                      </p>
+                    ) : null}
 
                     <p className="mt-2 flex items-baseline gap-1">
                       <span className="text-lg font-bold text-on-surface">

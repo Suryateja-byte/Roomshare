@@ -99,6 +99,7 @@ jest.mock("@/lib/search-params", () => ({
       householdGender: undefined,
     },
   }),
+  normalizeSearchFilters: jest.fn((value: unknown) => value),
 }));
 
 jest.mock("@/lib/constants", () => ({
@@ -123,6 +124,10 @@ jest.mock("@sentry/nextjs", () => ({
 
 jest.mock("@/lib/search-rate-limit-identifier", () => ({
   getSearchRateLimitIdentifier: jest.fn().mockResolvedValue("127.0.0.1"),
+}));
+
+jest.mock("@/lib/search/search-telemetry", () => ({
+  recordSearchRequestLatency: jest.fn(),
 }));
 
 // --- Imports (after mocks) ---

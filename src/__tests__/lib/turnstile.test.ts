@@ -2,6 +2,8 @@
  * Unit tests for Turnstile server-side verification
  */
 
+export {};
+
 // Mock logger before importing module under test
 jest.mock("@/lib/logger", () => ({
   logger: {

@@ -12,6 +12,7 @@ import {
   type CursorRowData,
 } from "@/lib/search/cursor";
 import { encodeCursor } from "@/lib/search/hash";
+import { buildPublicAvailability } from "@/lib/search/public-availability";
 
 // Mock env to enable features
 jest.mock("@/lib/env", () => {
@@ -60,7 +61,7 @@ function createMockListingData(
   id: string,
   overrides: Partial<ListingData & { _cursorCreatedAt?: string }> = {}
 ): ListingData {
-  return {
+  const listing = {
     id,
     title: `Listing ${id}`,
     description: "Test listing",
@@ -81,6 +82,17 @@ function createMockListingData(
     },
     isNearMatch: false,
     ...overrides,
+  };
+
+  return {
+    ...listing,
+    publicAvailability:
+      overrides.publicAvailability ??
+      buildPublicAvailability({
+        availableSlots: listing.availableSlots,
+        totalSlots: listing.totalSlots,
+        moveInDate: listing.moveInDate,
+      }),
   };
 }
 
@@ -166,7 +178,11 @@ describe("Keyset Pagination Integration", () => {
 
       expect(getSearchDocListingsWithKeyset).toHaveBeenCalledWith(
         expect.any(Object),
-        cursor
+        cursor,
+        expect.objectContaining({
+          engine: "searchdoc-keyset",
+          embeddingVersion: null,
+        })
       );
       expect(result.response?.list.nextCursor).toBe(mockNextCursor);
     });

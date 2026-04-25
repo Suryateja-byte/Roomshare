@@ -4,7 +4,7 @@
  * axe-core WCAG 2.1 AA compliance scans for pages that require authentication.
  * Uses shared A11Y_CONFIG from test-utils for consistent standards.
  *
- * Pages covered: /bookings, /messages, /profile, /settings, /notifications,
+ * Pages covered: retired /bookings redirect, /messages, /profile, /settings, /notifications,
  *                /saved, /saved-searches, /recently-viewed, /listings/create
  */
 
@@ -23,14 +23,15 @@ test.describe("axe-core Page Audit — Authenticated Pages", () => {
   });
 
   test.describe("P0 — Trust & safety critical", () => {
-    test("Bookings page (/bookings) passes WCAG 2.1 AA", async ({ page }) => {
+    test("Retired bookings route redirects to messages and passes WCAG 2.1 AA", async ({ page }) => {
       await page.goto("/bookings");
       await page.waitForLoadState("domcontentloaded");
+      await expect(page).toHaveURL(/\/messages/, { timeout: 30_000 });
 
       const results = await runAxeScan(page, { includeCIDefaults: false });
       const violations = filterViolations(results.violations, []);
 
-      logViolations("Bookings", violations);
+      logViolations("Bookings redirect", violations);
       expect(violations).toHaveLength(0);
     });
 

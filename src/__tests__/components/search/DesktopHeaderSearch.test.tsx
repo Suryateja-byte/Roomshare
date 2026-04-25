@@ -161,7 +161,7 @@ describe("DesktopHeaderSearch", () => {
 
     expect(url.searchParams.get("sort")).toBeNull();
     expect(url.searchParams.get("amenities")).toBe("Wifi");
-    expect(url.searchParams.get("where")).toBe("San Francisco");
+    expect(url.searchParams.get("locationLabel")).toBe("San Francisco");
     expect(url.searchParams.get("what")).toBe("quiet roommates");
     expect(url.searchParams.get("lat")).toBe("37.7749");
     expect(url.searchParams.get("lng")).toBe("-122.4194");
@@ -187,7 +187,7 @@ describe("DesktopHeaderSearch", () => {
     const pushedUrl = mockPush.mock.calls[0][0] as string;
     const url = new URL(pushedUrl, "http://localhost");
 
-    expect(url.searchParams.get("where")).toBe("Irving, TX");
+    expect(url.searchParams.get("locationLabel")).toBe("Irving, TX");
     expect(url.searchParams.get("lat")).toBe("32.814");
     expect(url.searchParams.get("lng")).toBe("-96.9489");
     expect(url.searchParams.get("minLng")).toBeTruthy();

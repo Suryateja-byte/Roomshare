@@ -1,0 +1,15 @@
+{
+  "querySnapshotId": "qs_phase10_leak",
+  "results": [
+    {
+      "unitKey": "unit_private_1@3",
+      "exactAddress": "123 Main Street",
+      "unitNumber": "4B",
+      "phone": "312-555-1212",
+      "exactPoint": {
+        "latitude": 41.878113,
+        "longitude": -87.629799
+      }
+    }
+  ]
+}

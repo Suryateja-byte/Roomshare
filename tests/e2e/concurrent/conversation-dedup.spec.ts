@@ -26,13 +26,12 @@ async function getVisibleContactHostButton(page: Page): Promise<Locator> {
     .getByTestId("contact-host-sidebar")
     .getByRole("button", { name: /contact host/i });
 
-  await expect(
-    page.locator(
-      '[data-testid="contact-host-host-section"]:visible, [data-testid="contact-host-sidebar"]:visible'
-    )
-  ).toHaveCount(1, { timeout: 15_000 });
+  const visibleContactButton = hostSectionButton.or(sidebarButton).first();
+  await expect(visibleContactButton).toBeVisible({ timeout: 15_000 });
 
-  if (await hostSectionButton.isVisible()) return hostSectionButton;
+  if (await hostSectionButton.isVisible().catch(() => false)) {
+    return hostSectionButton;
+  }
   return sidebarButton;
 }
 

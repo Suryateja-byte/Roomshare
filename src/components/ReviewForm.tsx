@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import Link from "next/link";
 import CharacterCounter from "@/components/CharacterCounter";
+import { PUBLIC_REVIEW_CONFIRMED_STAY_MESSAGE } from "@/lib/reviews/public-review-copy";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,6 +38,19 @@ interface ExistingReview {
   createdAt: string;
 }
 
+type ReviewEligibilityReason =
+  | "LOGIN_REQUIRED"
+  | "ELIGIBLE"
+  | "ALREADY_REVIEWED"
+  | "ACCEPTED_BOOKING_REQUIRED";
+
+interface ReviewEligibility {
+  canPublicReview: boolean;
+  hasLegacyAcceptedBooking: boolean;
+  canLeavePrivateFeedback: boolean;
+  reason: ReviewEligibilityReason;
+}
+
 interface ReviewFormProps {
   listingId?: string;
   targetUserId?: string;
@@ -44,7 +58,23 @@ interface ReviewFormProps {
   onSuccess?: () => void;
   hasExistingReview?: boolean;
   existingReview?: ExistingReview;
-  hasBookingHistory?: boolean; // Whether user has booking history for this listing
+  reviewEligibility?: ReviewEligibility;
+}
+
+function buildFallbackReviewEligibility(options: {
+  isLoggedIn: boolean;
+  hasExistingReview: boolean;
+}): ReviewEligibility {
+  return {
+    canPublicReview: false,
+    hasLegacyAcceptedBooking: false,
+    canLeavePrivateFeedback: false,
+    reason: options.isLoggedIn
+      ? options.hasExistingReview
+        ? "ALREADY_REVIEWED"
+        : "ACCEPTED_BOOKING_REQUIRED"
+      : "LOGIN_REQUIRED",
+  };
 }
 
 export default function ReviewForm({
@@ -54,7 +84,7 @@ export default function ReviewForm({
   onSuccess,
   hasExistingReview = false,
   existingReview,
-  hasBookingHistory,
+  reviewEligibility,
 }: ReviewFormProps) {
   const [rating, setRating] = useState(existingReview?.rating || 0);
   const [comment, setComment] = useState(existingReview?.comment || "");
@@ -67,6 +97,24 @@ export default function ReviewForm({
   const [wasDeleted, setWasDeleted] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const router = useRouter();
+  const isListingReview = Boolean(listingId);
+  const effectiveReviewEligibility = isListingReview
+    ? reviewEligibility ??
+      buildFallbackReviewEligibility({
+        isLoggedIn,
+        hasExistingReview,
+      })
+    : null;
+  const reviewGateReason = effectiveReviewEligibility?.reason;
+  const shouldShowLoginPrompt =
+    !isLoggedIn &&
+    (!isListingReview || reviewGateReason === "LOGIN_REQUIRED");
+  const shouldShowAcceptedBookingGate =
+    isListingReview &&
+    isLoggedIn &&
+    reviewGateReason === "ACCEPTED_BOOKING_REQUIRED";
+  const shouldShowExistingReviewState =
+    hasExistingReview || reviewGateReason === "ALREADY_REVIEWED";
 
   // Handle editing an existing review
   const handleUpdate = async () => {
@@ -207,7 +255,7 @@ export default function ReviewForm({
   };
 
   // Show login prompt for logged-out users
-  if (!isLoggedIn) {
+  if (shouldShowLoginPrompt) {
     return (
       <div className="bg-surface-canvas p-6 rounded-xl border border-outline-variant/20">
         <div className="text-center py-4">
@@ -231,8 +279,7 @@ export default function ReviewForm({
     );
   }
 
-  // Show "booking required" message for logged-in users without booking history
-  if (listingId && hasBookingHistory === false) {
+  if (shouldShowAcceptedBookingGate) {
     return (
       <div className="bg-surface-canvas p-6 rounded-xl border border-outline-variant/20">
         <div className="text-center py-4">
@@ -240,11 +287,10 @@ export default function ReviewForm({
             <Calendar className="w-6 h-6 text-amber-600" />
           </div>
           <h3 className="font-semibold text-lg text-on-surface mb-2">
-            Booking required
+            Past stay required
           </h3>
           <p className="text-sm text-on-surface-variant">
-            You can leave a review after making a booking request for this
-            listing
+            {PUBLIC_REVIEW_CONFIRMED_STAY_MESSAGE}
           </p>
         </div>
       </div>
@@ -252,7 +298,7 @@ export default function ReviewForm({
   }
 
   // Show existing review state with edit/delete options
-  if (hasExistingReview && existingReview && !wasDeleted) {
+  if (shouldShowExistingReviewState && existingReview && !wasDeleted) {
     // Edit mode
     if (isEditing) {
       return (
@@ -459,7 +505,7 @@ export default function ReviewForm({
   }
 
   // Show "already reviewed" without details (fallback)
-  if (hasExistingReview) {
+  if (shouldShowExistingReviewState && !wasDeleted) {
     return (
       <div className="bg-surface-canvas p-6 rounded-xl border border-outline-variant/20">
         <div className="text-center py-4">

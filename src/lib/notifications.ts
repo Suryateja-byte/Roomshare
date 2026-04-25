@@ -1,20 +1,11 @@
 import "server-only";
 
+import type { NotificationType as PrismaNotificationType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
+import { hashIdForLog } from "@/lib/messaging/cfm-messaging-telemetry";
 
-export type NotificationType =
-  | "BOOKING_REQUEST"
-  | "BOOKING_ACCEPTED"
-  | "BOOKING_REJECTED"
-  | "BOOKING_CANCELLED"
-  | "BOOKING_HOLD_REQUEST"
-  | "BOOKING_EXPIRED"
-  | "BOOKING_HOLD_EXPIRED"
-  | "NEW_MESSAGE"
-  | "NEW_REVIEW"
-  | "LISTING_SAVED"
-  | "SEARCH_ALERT";
+export type NotificationType = PrismaNotificationType;
 
 export interface CreateNotificationInput {
   userId: string;
@@ -45,7 +36,7 @@ export async function createInternalNotification(
   } catch (error) {
     logger.sync.error("Failed to create notification", {
       action: "createInternalNotification",
-      userId: input.userId,
+      userIdHash: hashIdForLog(input.userId),
       type: input.type,
       error: error instanceof Error ? error.message : "Unknown error",
     });

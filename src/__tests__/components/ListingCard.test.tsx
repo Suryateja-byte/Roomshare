@@ -5,6 +5,19 @@ import {
   useIsListingFocused,
 } from "@/contexts/ListingFocusContext";
 
+const mockPush = jest.fn();
+const mockUseMediaQuery = jest.fn<boolean | undefined, [string]>();
+
+jest.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: mockPush,
+  }),
+}));
+
+jest.mock("@/hooks/useMediaQuery", () => ({
+  useMediaQuery: (query: string) => mockUseMediaQuery(query),
+}));
+
 jest.mock("@/contexts/ListingFocusContext", () => ({
   useListingFocusActions: jest.fn(),
   useIsListingFocused: jest.fn(),
@@ -90,6 +103,8 @@ const mockListing = {
 };
 
 beforeEach(() => {
+  mockPush.mockReset();
+  mockUseMediaQuery.mockReturnValue(false);
   mockUseListingFocusActions.mockReturnValue({
     setHovered: jest.fn(),
     setActive: jest.fn(),
@@ -157,6 +172,86 @@ describe("ListingCard", () => {
       expect(screen.getByText("2 of 3 open")).toBeInTheDocument();
     });
 
+    it("renders grouped-card slot totals across all dates", () => {
+      const listing = {
+        ...mockListing,
+        availableSlots: 2,
+        totalSlots: 3,
+        groupContext: {
+          siblingCount: 3,
+          dateCount: 4,
+          completeness: "complete" as const,
+          secondaryLabel: "Also available on 3 similar dates",
+          contextKey: "siblings:3|dates:4|completeness:complete",
+        },
+        groupSummary: {
+          groupKey: "group-key-1",
+          siblingIds: ["listing-234", "listing-345", "listing-456"],
+          availableFromDates: [
+            "2026-03-20",
+            "2026-04-18",
+            "2026-05-15",
+            "2026-06-01",
+          ],
+          combinedOpenSlots: 8,
+          combinedTotalSlots: 8,
+          groupOverflow: false,
+          members: [
+            {
+              listingId: "listing-123",
+              availableFrom: "2026-03-20",
+              availableUntil: null,
+              startDate: "2026-03-20",
+              endDate: undefined,
+              openSlots: 2,
+              totalSlots: 3,
+              isCanonical: true,
+              roomType: "Private Room",
+            },
+            {
+              listingId: "listing-234",
+              availableFrom: "2026-04-18",
+              availableUntil: null,
+              startDate: "2026-04-18",
+              endDate: undefined,
+              openSlots: 2,
+              totalSlots: 2,
+              isCanonical: false,
+              roomType: "Private Room",
+            },
+            {
+              listingId: "listing-345",
+              availableFrom: "2026-05-15",
+              availableUntil: null,
+              startDate: "2026-05-15",
+              endDate: undefined,
+              openSlots: 2,
+              totalSlots: 2,
+              isCanonical: false,
+              roomType: "Private Room",
+            },
+            {
+              listingId: "listing-456",
+              availableFrom: "2026-06-01",
+              availableUntil: null,
+              startDate: "2026-06-01",
+              endDate: undefined,
+              openSlots: 2,
+              totalSlots: 1,
+              isCanonical: false,
+              roomType: "Private Room",
+            },
+          ],
+        },
+      };
+
+      render(<ListingCard listing={listing} />);
+      expect(screen.getByText("2 of 3 open")).toBeInTheDocument();
+      expect(
+        screen.getByText("Also available on 3 similar dates")
+      ).toBeInTheDocument();
+    });
+
     it("renders availability badge as Filled when no slots", () => {
       const filledListing = { ...mockListing, availableSlots: 0 };
       render(<ListingCard listing={filledListing} />);
@@ -188,6 +283,20 @@ describe("ListingCard", () => {
       render(<ListingCard listing={mockListing} />);
       const link = screen.getByRole("link");
       expect(link).toHaveAttribute("href", "/listings/listing-123");
+    });
+
+    it("honors a custom listing detail href", () => {
+      render(
+        <ListingCard
+          listing={mockListing}
+          href="/listings/listing-123?startDate=2026-05-01&endDate=2026-06-01"
+        />
+      );
+
+      expect(screen.getByRole("link")).toHaveAttribute(
+        "href",
+        "/listings/listing-123?startDate=2026-05-01&endDate=2026-06-01"
+      );
     });
 
     it("keeps the card article rounded on mobile", () => {
@@ -422,6 +531,139 @@ describe("ListingCard", () => {
       expect(article).not.toHaveAttribute(
         "aria-label",
         expect.stringContaining("top rated")
+      );
+    });
+  });
+
+  describe("publicAvailability prop path (CFM-603)", () => {
+    it("prefers publicAvailability.openSlots over legacy availableSlots in slot badge", () => {
+      const listing = {
+        ...mockListing,
+        availableSlots: 99,
+        totalSlots: 99,
+        publicAvailability: {
+          availabilitySource: "HOST_MANAGED" as const,
+          openSlots: 1,
+          totalSlots: 3,
+          availableFrom: "2026-05-01",
+          availableUntil: null,
+          minStayMonths: 1,
+          lastConfirmedAt: "2026-04-01T00:00:00Z",
+          publicStatus: "AVAILABLE" as const,
+          freshnessBucket: "NORMAL" as const,
+        },
+      };
+      render(<ListingCard listing={listing} />);
+      expect(screen.getByTestId("slot-badge")).toHaveTextContent("1 of 3 open");
+    });
+
+    it("renders 'Needs reconfirmation' on stale host-managed listings", () => {
+      const listing = {
+        ...mockListing,
+        publicAvailability: {
+          availabilitySource: "HOST_MANAGED" as const,
+          openSlots: 2,
+          totalSlots: 3,
+          availableFrom: "2026-05-01",
+          availableUntil: null,
+          minStayMonths: 1,
+          lastConfirmedAt: "2025-12-01T00:00:00Z",
+          publicStatus: "NEEDS_RECONFIRMATION" as const,
+          freshnessBucket: "STALE" as const,
+        },
+      };
+      render(<ListingCard listing={listing} />);
+      expect(screen.getByTestId("slot-badge")).toHaveTextContent(
+        /needs reconfirmation/i
+      );
+    });
+
+    it("renders 'Full' when publicStatus=FULL", () => {
+      const listing = {
+        ...mockListing,
+        availableSlots: 0,
+        totalSlots: 3,
+        publicAvailability: {
+          availabilitySource: "HOST_MANAGED" as const,
+          openSlots: 0,
+          totalSlots: 3,
+          availableFrom: null,
+          availableUntil: null,
+          minStayMonths: 1,
+          lastConfirmedAt: "2026-04-01T00:00:00Z",
+          publicStatus: "FULL" as const,
+          freshnessBucket: "NORMAL" as const,
+        },
+      };
+      render(<ListingCard listing={listing} />);
+      expect(screen.getByTestId("slot-badge")).toHaveTextContent(/full/i);
+    });
+
+    it("renders 'Closed' when publicStatus=CLOSED (statusReason=AVAILABLE_UNTIL_PASSED)", () => {
+      const listing = {
+        ...mockListing,
+        publicAvailability: {
+          availabilitySource: "HOST_MANAGED" as const,
+          openSlots: 0,
+          totalSlots: 3,
+          availableFrom: null,
+          availableUntil: "2025-12-31",
+          minStayMonths: 1,
+          lastConfirmedAt: "2026-04-01T00:00:00Z",
+          publicStatus: "CLOSED" as const,
+          freshnessBucket: "NORMAL" as const,
+        },
+      };
+      render(<ListingCard listing={listing} />);
+      expect(screen.getByTestId("slot-badge")).toHaveTextContent(/closed/i);
+    });
+
+    it("prefers publicAvailability.availableFrom over legacy moveInDate", () => {
+      const listing = {
+        ...mockListing,
+        moveInDate: "2025-01-01",
+        publicAvailability: {
+          availabilitySource: "HOST_MANAGED" as const,
+          openSlots: 2,
+          totalSlots: 3,
+          availableFrom: "2026-06-15",
+          availableUntil: null,
+          minStayMonths: 1,
+          lastConfirmedAt: "2026-04-01T00:00:00Z",
+          publicStatus: "AVAILABLE" as const,
+          freshnessBucket: "NORMAL" as const,
+        },
+      };
+      render(<ListingCard listing={listing} />);
+      // "Available Jun 15" derives from publicAvailability.availableFrom,
+      // not from moveInDate=2025-01-01.
+      expect(
+        screen.getByText(/available jun 15/i)
+      ).toBeInTheDocument();
+    });
+
+    it("aria-label slot count derives from publicAvailability when present", () => {
+      const listing = {
+        ...mockListing,
+        availableSlots: 99,
+        totalSlots: 99,
+        publicAvailability: {
+          availabilitySource: "HOST_MANAGED" as const,
+          openSlots: 2,
+          totalSlots: 4,
+          availableFrom: "2026-05-01",
+          availableUntil: null,
+          minStayMonths: 1,
+          lastConfirmedAt: "2026-04-01T00:00:00Z",
+          publicStatus: "AVAILABLE" as const,
+          freshnessBucket: "NORMAL" as const,
+        },
+      };
+      render(<ListingCard listing={listing} />);
+      const article = screen.getByTestId("listing-card");
+      expect(article).toHaveAttribute(
+        "aria-label",
+        expect.stringContaining("2 of 4 open")
       );
     });
   });

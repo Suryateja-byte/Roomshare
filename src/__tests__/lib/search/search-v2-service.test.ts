@@ -47,6 +47,22 @@ jest.mock("@/lib/data", () => ({
   crossesAntimeridian: jest.fn(() => false),
 }));
 
+jest.mock("@/lib/prisma", () => ({
+  prisma: {
+    listing: {
+      findMany: jest.fn(),
+    },
+  },
+}));
+
+jest.mock("@/lib/availability", () => ({
+  getAvailabilityForListings: jest.fn(),
+}));
+
+jest.mock("@/lib/embeddings/version", () => ({
+  getCurrentEmbeddingVersion: jest.fn(() => "gemini-embedding-2-preview"),
+}));
+
 // Mock search-doc-queries
 jest.mock("@/lib/search/search-doc-queries", () => ({
   isSearchDocEnabled: jest.fn(),
@@ -159,6 +175,11 @@ import { features } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { withTimeout } from "@/lib/timeout-wrapper";
 import type { ListingData, MapListingData } from "@/lib/data";
+import { buildPublicAvailability } from "@/lib/search/public-availability";
+import { SEARCH_DOC_PROJECTION_VERSION } from "@/lib/search/search-doc-sync";
+import { prisma } from "@/lib/prisma";
+import { getAvailabilityForListings } from "@/lib/availability";
+import { getCurrentEmbeddingVersion } from "@/lib/embeddings/version";
 
 // ============================================================================
 // Cast mocks for type-safe access
@@ -241,6 +262,17 @@ const mockClampBoundsToMaxSpan = clampBoundsToMaxSpan as jest.MockedFunction<
   typeof clampBoundsToMaxSpan
 >;
 const mockWithTimeout = withTimeout as jest.MockedFunction<typeof withTimeout>;
+const mockPrismaListingFindMany = prisma.listing.findMany as jest.MockedFunction<
+  typeof prisma.listing.findMany
+>;
+const mockGetAvailabilityForListings =
+  getAvailabilityForListings as jest.MockedFunction<
+    typeof getAvailabilityForListings
+  >;
+const mockGetCurrentEmbeddingVersion =
+  getCurrentEmbeddingVersion as jest.MockedFunction<
+    typeof getCurrentEmbeddingVersion
+  >;
 
 // ============================================================================
 // Shared test fixtures
@@ -254,7 +286,7 @@ const BOUNDS = {
 };
 
 function makeListingData(overrides: Partial<ListingData> = {}): ListingData {
-  return {
+  const listing = {
     id: "listing-1",
     title: "Test Listing",
     description: "A test listing",
@@ -273,20 +305,42 @@ function makeListingData(overrides: Partial<ListingData> = {}): ListingData {
     },
     ...overrides,
   };
+
+  return {
+    ...listing,
+    publicAvailability:
+      overrides.publicAvailability ??
+      buildPublicAvailability({
+        availableSlots: listing.availableSlots,
+        totalSlots: listing.totalSlots,
+        moveInDate: listing.moveInDate,
+      }),
+  };
 }
 
 function makeMapListingData(
   overrides: Partial<MapListingData> = {}
 ): MapListingData {
-  return {
+  const listing = {
     id: "map-listing-1",
     title: "Map Listing",
     price: 1500,
     availableSlots: 1,
-
+    totalSlots: 2,
     images: ["img1.jpg"],
     location: { lat: 37.77, lng: -122.42 },
     ...overrides,
+  };
+
+  return {
+    ...listing,
+    publicAvailability:
+      overrides.publicAvailability ??
+      buildPublicAvailability({
+        availableSlots: listing.availableSlots,
+        totalSlots: listing.totalSlots ?? listing.availableSlots,
+        moveInDate: listing.moveInDate,
+      }),
   };
 }
 
@@ -367,6 +421,28 @@ function setupDefaultMocks({
   mockGenerateQueryHash.mockReturnValue("abcdef1234567890");
   mockSemanticSearchQuery.mockResolvedValue(null);
   mockMapSemanticRowsToListingData.mockImplementation((rows) => rows as never);
+  (mockPrismaListingFindMany as unknown as jest.Mock).mockImplementation(
+    async (args?: { where?: { id?: { in?: string[] } } }) => {
+      const ids = args?.where?.id?.in ?? [];
+      return ids.map((id) => ({
+        id,
+        status: "ACTIVE",
+        statusReason: null,
+        needsMigrationReview: false,
+        totalSlots: 2,
+        availableSlots: 1,
+        openSlots: 1,
+        moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+        availableUntil: null,
+        minStayMonths: 1,
+        lastConfirmedAt: new Date("2026-04-20T00:00:00.000Z"),
+      }));
+    }
+  );
+  mockGetAvailabilityForListings.mockResolvedValue(new Map());
+  mockGetCurrentEmbeddingVersion.mockReturnValue(
+    "gemini-embedding-2-preview"
+  );
   mockTransformToListItems.mockImplementation((items) =>
     items.map((l) => ({
       id: l.id,
@@ -375,6 +451,9 @@ function setupDefaultMocks({
       image: l.images[0] ?? null,
       lat: l.location.lat,
       lng: l.location.lng,
+      availableSlots: l.availableSlots,
+      totalSlots: l.totalSlots,
+      publicAvailability: l.publicAvailability,
     }))
   );
   mockTransformToMapResponse.mockReturnValue({
@@ -384,6 +463,7 @@ function setupDefaultMocks({
       lat: m.location.lat,
       lng: m.location.lng,
       price: m.price,
+      publicAvailability: m.publicAvailability,
     })),
   });
   mockEncodeCursor.mockReturnValue("cursor-page-2");
@@ -426,14 +506,183 @@ describe("search-v2-service", () => {
       // Response structure checks
       expect(result.response!.meta.queryHash).toBe("abcdef1234567890");
       expect(result.response!.meta.mode).toBe("pins");
+      expect(result.response!.meta.projectionVersion).toBeUndefined();
+      expect(result.response!.meta.embeddingVersion).toBeUndefined();
       expect(result.response!.list.items).toHaveLength(1);
       expect(result.response!.list.items[0].id).toBe("l-1");
+      expect(result.response!.list.items[0].publicAvailability).toEqual(
+        buildPublicAvailability({
+          availableSlots: 1,
+          totalSlots: 2,
+        })
+      );
       expect(result.response!.list.total).toBe(1);
       expect(result.response!.map).toBeDefined();
 
       // paginatedResult has the raw listing data
       expect(result.paginatedResult!.items).toHaveLength(1);
       expect(result.paginatedResult!.items[0].id).toBe("l-1");
+      expect(result.paginatedResult!.items[0].publicAvailability).toEqual(
+        buildPublicAvailability({
+          availableSlots: 1,
+          totalSlots: 2,
+        })
+      );
+    });
+
+    it("preserves host-managed publicAvailability across list and map response surfaces", async () => {
+      const hostManagedAvailability = buildPublicAvailability({
+        availabilitySource: "HOST_MANAGED",
+        openSlots: 2,
+        totalSlots: 4,
+        availableFrom: "2026-06-01",
+        availableUntil: "2026-12-01",
+        minStayMonths: 3,
+        lastConfirmedAt: "2026-04-15T12:30:00.000Z",
+      });
+      const listItems = [
+        makeListingData({
+          id: "host-listing",
+          availableSlots: 2,
+          totalSlots: 4,
+          availabilitySource: "HOST_MANAGED",
+          openSlots: 2,
+          availableUntil: new Date("2026-12-01T00:00:00.000Z"),
+          minStayMonths: 3,
+          lastConfirmedAt: new Date("2026-04-15T12:30:00.000Z"),
+          publicAvailability: hostManagedAvailability,
+        }),
+      ];
+      const mapItems = [
+        makeMapListingData({
+          id: "host-listing",
+          availableSlots: 2,
+          totalSlots: 4,
+          availabilitySource: "HOST_MANAGED",
+          openSlots: 2,
+          availableUntil: new Date("2026-12-01T00:00:00.000Z"),
+          minStayMonths: 3,
+          lastConfirmedAt: new Date("2026-04-15T12:30:00.000Z"),
+          publicAvailability: hostManagedAvailability,
+        }),
+      ];
+      setupDefaultMocks({ listItems, mapListings: mapItems });
+
+      const result = await executeSearchV2({
+        rawParams: {
+          minLat: "37.7",
+          maxLat: "37.85",
+          minLng: "-122.52",
+          maxLng: "-122.35",
+        },
+      });
+
+      expect(result.response?.list.items[0]?.publicAvailability).toEqual(
+        hostManagedAvailability
+      );
+      expect(result.paginatedResult?.items[0]?.publicAvailability).toEqual(
+        hostManagedAvailability
+      );
+      expect(result.response?.map.pins?.[0]?.publicAvailability).toEqual(
+        hostManagedAvailability
+      );
+    });
+
+    it("adds projectionVersion to meta when projection-backed search is active", async () => {
+      setupDefaultMocks({ useSearchDoc: true });
+      mockIsSearchDocEnabled.mockReturnValue(true);
+
+      const result = await executeSearchV2({
+        rawParams: {
+          minLat: "37.7",
+          maxLat: "37.85",
+          minLng: "-122.52",
+          maxLng: "-122.35",
+          searchDoc: "1",
+        },
+      });
+
+      expect(result.response?.meta.projectionVersion).toBe(
+        SEARCH_DOC_PROJECTION_VERSION
+      );
+      expect(result.response?.meta.embeddingVersion).toBeUndefined();
+    });
+
+    it("adds embeddingVersion to meta when semantic search powers the list response", async () => {
+      (features as Record<string, unknown>).semanticSearch = true;
+      setupDefaultMocks({ useSearchDoc: false });
+      mockParseSearchParams.mockReturnValue(
+        defaultParsedSearchParams({
+          filterParams: {
+            bounds: BOUNDS,
+            vibeQuery: "bright airy loft",
+          },
+        })
+      );
+
+      mockSemanticSearchQuery.mockResolvedValue([
+        {
+          id: "semantic-1",
+          title: "Semantic Listing",
+          description: "Sunny shared home",
+          price: 1800,
+          images: ["semantic.jpg"],
+          room_type: "private",
+          lease_duration: "6_months",
+          available_slots: 1,
+          total_slots: 2,
+          amenities: [],
+          house_rules: [],
+          household_languages: ["english"],
+          primary_home_language: "english",
+          gender_preference: "any",
+          household_gender: "mixed",
+          booking_mode: "shared",
+          move_in_date: null,
+          address: null,
+          city: "San Francisco",
+          state: "CA",
+          zip: null,
+          lat: 37.77,
+          lng: -122.42,
+          owner_id: "owner-1",
+          avg_rating: 4.5,
+          review_count: 10,
+          view_count: 42,
+          listing_created_at: new Date("2026-04-20T00:00:00.000Z"),
+          recommended_score: 0.9,
+          semantic_similarity: 0.88,
+          keyword_rank: 0.2,
+          combined_score: 0.61,
+        },
+      ] as never);
+      mockMapSemanticRowsToListingData.mockReturnValue([
+        makeListingData({
+          id: "semantic-1",
+          title: "Semantic Listing",
+          price: 1800,
+        }),
+      ]);
+
+      const result = await executeSearchV2({
+        rawParams: {
+          minLat: "37.7",
+          maxLat: "37.85",
+          minLng: "-122.52",
+          maxLng: "-122.35",
+          vibeQuery: "bright airy loft",
+        },
+      });
+
+      expect(result.response?.meta.projectionVersion).toBe(
+        SEARCH_DOC_PROJECTION_VERSION
+      );
+      expect(result.response?.meta.embeddingVersion).toBe(
+        "gemini-embedding-2-preview"
+      );
+      expect(result.response?.list.items[0]?.id).toBe("semantic-1");
+      expect(mockGetListingsPaginated).not.toHaveBeenCalled();
+      expect(mockGetCurrentEmbeddingVersion).toHaveBeenCalled();
     });
 
     it("uses vibeQuery for semantic ranking while preserving the location query", async () => {
@@ -479,6 +728,451 @@ describe("search-v2-service", () => {
         })
       );
       expect(result.paginatedResult?.items[0]?.id).toBe("semantic-1");
+    });
+
+    it("filters semantic candidates through the canonical public list-search predicate", async () => {
+      setupDefaultMocks();
+      (features as Record<string, unknown>).semanticSearch = true;
+      mockParseSearchParams.mockReturnValue(
+        defaultParsedSearchParams({
+          filterParams: {
+            query: "Irving",
+            vibeQuery: "quiet roommates",
+            bounds: BOUNDS,
+          },
+        })
+      );
+
+      const now = new Date();
+      const moveInDate = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+      const availableUntil = new Date(now.getTime() + 120 * 24 * 60 * 60 * 1000);
+      const staleConfirmedAt = new Date(
+        now.getTime() - 22 * 24 * 60 * 60 * 1000
+      );
+      const semanticItems = [
+        makeListingData({ id: "eligible-host", availableSlots: 4, totalSlots: 4 }),
+        makeListingData({ id: "invalid-host", availableSlots: 4, totalSlots: 4 }),
+        makeListingData({ id: "stale-host", availableSlots: 4, totalSlots: 4 }),
+        makeListingData({ id: "legacy-review", availableSlots: 2, totalSlots: 2 }),
+      ];
+
+      mockSemanticSearchQuery.mockResolvedValue(
+        [{ id: "row-1" }, { id: "row-2" }, { id: "row-3" }, { id: "row-4" }] as never
+      );
+      mockMapSemanticRowsToListingData.mockReturnValue(semanticItems);
+      mockPrismaListingFindMany.mockResolvedValue([
+        {
+          id: "eligible-host",
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          totalSlots: 4,
+          availableSlots: 4,
+          openSlots: 2,
+          moveInDate,
+          availableUntil,
+          minStayMonths: 2,
+          lastConfirmedAt: now,
+        },
+        {
+          id: "invalid-host",
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          totalSlots: 4,
+          availableSlots: 4,
+          openSlots: 0,
+          moveInDate,
+          availableUntil,
+          minStayMonths: 2,
+          lastConfirmedAt: now,
+        },
+        {
+          id: "stale-host",
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          totalSlots: 4,
+          availableSlots: 4,
+          openSlots: 2,
+          moveInDate,
+          availableUntil,
+          minStayMonths: 2,
+          lastConfirmedAt: staleConfirmedAt,
+        },
+        {
+          id: "legacy-review",
+          availabilitySource: "LEGACY_BOOKING",
+          status: "ACTIVE",
+          statusReason: "MIGRATION_REVIEW",
+          needsMigrationReview: true,
+          totalSlots: 2,
+          availableSlots: 2,
+          openSlots: null,
+          moveInDate,
+          availableUntil: null,
+          minStayMonths: 1,
+          lastConfirmedAt: null,
+        },
+      ] as never);
+      mockGetAvailabilityForListings.mockResolvedValue(
+        new Map([
+          [
+            "legacy-review",
+            {
+              listingId: "legacy-review",
+              effectiveAvailableSlots: 2,
+              totalSlots: 2,
+              heldSlots: 0,
+              acceptedSlots: 0,
+              rangeVersion: 1,
+              asOf: new Date().toISOString(),
+            },
+          ],
+        ])
+      );
+
+      const result = await executeSearchV2({
+        rawParams: {
+          q: "Irving",
+          what: "quiet roommates",
+          minLat: "32.8",
+          maxLat: "32.9",
+          minLng: "-96.99",
+          maxLng: "-96.9",
+        },
+      });
+
+      expect(result.paginatedResult?.items.map((item) => item.id)).toEqual([
+        "eligible-host",
+      ]);
+      expect(result.response?.list.items.map((item) => item.id)).toEqual([
+        "eligible-host",
+      ]);
+      expect(mockPrismaListingFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          select: expect.objectContaining({
+            statusReason: true,
+            totalSlots: true,
+            availableSlots: true,
+          }),
+        })
+      );
+    });
+
+    it("fills semantic page 1 from later eligible matches and computes next page from eligible rows", async () => {
+      setupDefaultMocks();
+      (features as Record<string, unknown>).semanticSearch = true;
+      mockParseSearchParams.mockReturnValue(
+        defaultParsedSearchParams({
+          filterParams: {
+            query: "Irving",
+            vibeQuery: "quiet roommates",
+            bounds: BOUNDS,
+          },
+        })
+      );
+
+      const now = new Date("2026-04-15T12:30:00.000Z");
+      const staleConfirmedAt = new Date("2026-03-20T12:30:00.000Z");
+      const moveInDate = new Date("2026-06-01T00:00:00.000Z");
+      const availableUntil = new Date("2026-12-01T00:00:00.000Z");
+      const semanticRows = [
+        { id: "filtered-invalid" },
+        { id: "filtered-stale" },
+        { id: "eligible-1" },
+        { id: "eligible-2" },
+        { id: "eligible-3" },
+        { id: "eligible-4" },
+      ];
+      const listingRowsById: Record<string, Record<string, unknown>> = {
+        "filtered-invalid": {
+          id: "filtered-invalid",
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          totalSlots: 4,
+          availableSlots: 4,
+          openSlots: 0,
+          moveInDate,
+          availableUntil,
+          minStayMonths: 2,
+          lastConfirmedAt: now,
+        },
+        "filtered-stale": {
+          id: "filtered-stale",
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          totalSlots: 4,
+          availableSlots: 4,
+          openSlots: 2,
+          moveInDate,
+          availableUntil,
+          minStayMonths: 2,
+          lastConfirmedAt: staleConfirmedAt,
+        },
+        "eligible-1": {
+          id: "eligible-1",
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          totalSlots: 4,
+          availableSlots: 4,
+          openSlots: 2,
+          moveInDate,
+          availableUntil,
+          minStayMonths: 2,
+          lastConfirmedAt: now,
+        },
+        "eligible-2": {
+          id: "eligible-2",
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          totalSlots: 4,
+          availableSlots: 4,
+          openSlots: 2,
+          moveInDate,
+          availableUntil,
+          minStayMonths: 2,
+          lastConfirmedAt: now,
+        },
+        "eligible-3": {
+          id: "eligible-3",
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          totalSlots: 4,
+          availableSlots: 4,
+          openSlots: 2,
+          moveInDate,
+          availableUntil,
+          minStayMonths: 2,
+          lastConfirmedAt: now,
+        },
+        "eligible-4": {
+          id: "eligible-4",
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          totalSlots: 4,
+          availableSlots: 4,
+          openSlots: 2,
+          moveInDate,
+          availableUntil,
+          minStayMonths: 2,
+          lastConfirmedAt: now,
+        },
+      };
+
+      mockSemanticSearchQuery.mockImplementation(
+        async (_filters, limit = 0, offset = 0) =>
+          semanticRows.slice(offset, offset + limit) as never
+      );
+      mockMapSemanticRowsToListingData.mockImplementation(
+        (rows) =>
+          (rows as Array<{ id: string }>).map(({ id }) =>
+            makeListingData({ id, availableSlots: 4, totalSlots: 4 })
+          ) as never
+      );
+      (mockPrismaListingFindMany as unknown as jest.Mock).mockImplementation(
+        async (args?: { where?: { id?: { in?: string[] } } }) =>
+          (args?.where?.id?.in ?? []).map((id) => listingRowsById[id]) as never
+      );
+
+      const result = await executeSearchV2({
+        rawParams: {
+          q: "Irving",
+          what: "quiet roommates",
+          minLat: "32.8",
+          maxLat: "32.9",
+          minLng: "-96.99",
+          maxLng: "-96.9",
+        },
+        limit: 2,
+      });
+
+      expect(result.paginatedResult?.items.map((item) => item.id)).toEqual([
+        "eligible-1",
+        "eligible-2",
+      ]);
+      expect(result.paginatedResult?.hasNextPage).toBe(true);
+      expect(result.paginatedResult?.nextCursor).toBe("cursor-page-2");
+      expect(result.response?.list.items.map((item) => item.id)).toEqual([
+        "eligible-1",
+        "eligible-2",
+      ]);
+      expect(result.response?.list.nextCursor).toBe("cursor-page-2");
+      expect(mockSemanticSearchQuery.mock.calls.map((call) => call[2])).toEqual([
+        0,
+        3,
+      ]);
+    });
+
+    it("keeps later semantic pages stable after filtering ineligible ranked matches", async () => {
+      setupDefaultMocks();
+      (features as Record<string, unknown>).semanticSearch = true;
+      mockParseSearchParams.mockReturnValue(
+        defaultParsedSearchParams({
+          requestedPage: 2,
+          filterParams: {
+            query: "Irving",
+            vibeQuery: "quiet roommates",
+            bounds: BOUNDS,
+          },
+        })
+      );
+
+      const now = new Date("2026-04-15T12:30:00.000Z");
+      const staleConfirmedAt = new Date("2026-03-20T12:30:00.000Z");
+      const moveInDate = new Date("2026-06-01T00:00:00.000Z");
+      const availableUntil = new Date("2026-12-01T00:00:00.000Z");
+      const semanticRows = [
+        { id: "filtered-invalid" },
+        { id: "filtered-stale" },
+        { id: "eligible-1" },
+        { id: "eligible-2" },
+        { id: "eligible-3" },
+        { id: "eligible-4" },
+      ];
+      const listingRowsById: Record<string, Record<string, unknown>> = {
+        "filtered-invalid": {
+          id: "filtered-invalid",
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          totalSlots: 4,
+          availableSlots: 4,
+          openSlots: 0,
+          moveInDate,
+          availableUntil,
+          minStayMonths: 2,
+          lastConfirmedAt: now,
+        },
+        "filtered-stale": {
+          id: "filtered-stale",
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          totalSlots: 4,
+          availableSlots: 4,
+          openSlots: 2,
+          moveInDate,
+          availableUntil,
+          minStayMonths: 2,
+          lastConfirmedAt: staleConfirmedAt,
+        },
+        "eligible-1": {
+          id: "eligible-1",
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          totalSlots: 4,
+          availableSlots: 4,
+          openSlots: 2,
+          moveInDate,
+          availableUntil,
+          minStayMonths: 2,
+          lastConfirmedAt: now,
+        },
+        "eligible-2": {
+          id: "eligible-2",
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          totalSlots: 4,
+          availableSlots: 4,
+          openSlots: 2,
+          moveInDate,
+          availableUntil,
+          minStayMonths: 2,
+          lastConfirmedAt: now,
+        },
+        "eligible-3": {
+          id: "eligible-3",
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          totalSlots: 4,
+          availableSlots: 4,
+          openSlots: 2,
+          moveInDate,
+          availableUntil,
+          minStayMonths: 2,
+          lastConfirmedAt: now,
+        },
+        "eligible-4": {
+          id: "eligible-4",
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          totalSlots: 4,
+          availableSlots: 4,
+          openSlots: 2,
+          moveInDate,
+          availableUntil,
+          minStayMonths: 2,
+          lastConfirmedAt: now,
+        },
+      };
+
+      mockSemanticSearchQuery.mockImplementation(
+        async (_filters, limit = 0, offset = 0) =>
+          semanticRows.slice(offset, offset + limit) as never
+      );
+      mockMapSemanticRowsToListingData.mockImplementation(
+        (rows) =>
+          (rows as Array<{ id: string }>).map(({ id }) =>
+            makeListingData({ id, availableSlots: 4, totalSlots: 4 })
+          ) as never
+      );
+      (mockPrismaListingFindMany as unknown as jest.Mock).mockImplementation(
+        async (args?: { where?: { id?: { in?: string[] } } }) =>
+          (args?.where?.id?.in ?? []).map((id) => listingRowsById[id]) as never
+      );
+
+      const result = await executeSearchV2({
+        rawParams: {
+          q: "Irving",
+          what: "quiet roommates",
+          minLat: "32.8",
+          maxLat: "32.9",
+          minLng: "-96.99",
+          maxLng: "-96.9",
+        },
+        limit: 2,
+      });
+
+      expect(result.paginatedResult?.items.map((item) => item.id)).toEqual([
+        "eligible-3",
+        "eligible-4",
+      ]);
+      expect(result.paginatedResult?.hasNextPage).toBe(false);
+      expect(result.paginatedResult?.nextCursor).toBeNull();
+      expect(result.paginatedResult?.total).toBe(4);
+      expect(result.paginatedResult?.totalPages).toBe(2);
+      expect(mockEncodeCursor).not.toHaveBeenCalled();
+      expect(mockSemanticSearchQuery.mock.calls.map((call) => call[2])).toEqual([
+        0,
+        3,
+        6,
+      ]);
     });
 
     it("falls back to broadened area results when semantic ranking returns no rows", async () => {
@@ -1220,8 +1914,54 @@ describe("search-v2-service", () => {
       );
       expect(mockGetSearchDocListingsWithKeyset).toHaveBeenCalledWith(
         expect.any(Object),
-        keysetCursor
+        keysetCursor,
+        expect.objectContaining({
+          engine: "searchdoc-keyset",
+          embeddingVersion: null,
+        })
       );
+    });
+
+    it("returns snapshotExpired when a version-pinned keyset cursor no longer matches the server snapshot", async () => {
+      (features as Record<string, unknown>).searchKeyset = true;
+      setupDefaultMocks({ useSearchDoc: true });
+      mockIsSearchDocEnabled.mockReturnValue(true);
+
+      mockDecodeCursorAny.mockReturnValue({
+        type: "keyset" as const,
+        cursor: {
+          v: 2 as const,
+          s: "recommended" as const,
+          k: ["85.50", "2024-01-15T10:00:00.000Z"],
+          id: "abc",
+          snapshot: {
+            engine: "searchdoc-keyset" as const,
+            responseVersion: "stale-contract",
+            projectionVersion: 0,
+            embeddingVersion: null,
+          },
+        },
+      });
+
+      const result = await executeSearchV2({
+        rawParams: {
+          minLat: "37.7",
+          maxLat: "37.85",
+          minLng: "-122.52",
+          maxLng: "-122.35",
+          cursor: "keyset-cursor-token",
+        },
+      });
+
+      expect(result).toEqual({
+        response: null,
+        paginatedResult: null,
+        snapshotExpired: {
+          queryHash: "abcdef1234567890",
+          reason: "search_contract_changed",
+        },
+      });
+      expect(mockGetSearchDocListingsWithKeyset).not.toHaveBeenCalled();
     });
   });
 });

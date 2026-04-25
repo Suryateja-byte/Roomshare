@@ -6,6 +6,7 @@ import SavedSearchList from "./SavedSearchList";
 import { Bookmark } from "lucide-react";
 import Link from "next/link";
 import type { SearchFilters } from "@/lib/search-utils";
+import { evaluateSavedSearchAlertPaywall } from "@/lib/payments/search-alert-paywall";
 
 export const metadata: Metadata = {
   title: "Saved Searches | RoomShare",
@@ -21,7 +22,10 @@ export default async function SavedSearchesPage() {
     redirect("/login?callbackUrl=/saved-searches");
   }
 
-  const savedSearches = await getMySavedSearches();
+  const [savedSearches, alertPaywallSummary] = await Promise.all([
+    getMySavedSearches(),
+    evaluateSavedSearchAlertPaywall({ userId: session.user.id }),
+  ]);
 
   return (
     <div className="min-h-screen bg-surface-canvas py-12">
@@ -69,6 +73,7 @@ export default async function SavedSearchesPage() {
               ...s,
               filters: s.filters as SearchFilters,
             }))}
+            initialAlertPaywallSummary={alertPaywallSummary}
           />
         )}
       </div>

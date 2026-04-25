@@ -35,6 +35,10 @@ export interface FetchMoreResult {
   nextCursor: string | null;
   hasNextPage: boolean;
   meta?: SearchResponseMeta;
+  snapshotExpired?: {
+    queryHash: string;
+    reason: "search_contract_changed" | "snapshot_missing" | "snapshot_expired";
+  };
   /** True when V2 is unavailable and V1 can't continue cursor pagination */
   degraded?: boolean;
   /** True when request was rate limited — client should show friendly message */
@@ -167,6 +171,9 @@ export async function fetchMoreListings(
             DEFAULT_TIMEOUTS.DATABASE,
             "fetchMoreListings-executeSearchV2"
           );
+          if (result.snapshotExpired) {
+            return result;
+          }
           // Throw on V2 failures so circuit breaker counts them
           if (!result.response || !result.paginatedResult) {
             throw new Error(result.error || "V2 search returned no response");
@@ -174,8 +181,44 @@ export async function fetchMoreListings(
           return result;
         });
 
-        if (v2Result.paginatedResult) {
+        if (v2Result.snapshotExpired) {
           const meta = createSearchResponseMeta(normalizedQuery, "v2");
+          const finalMeta =
+            queryHash && queryHash.trim().length > 0
+              ? { ...meta, queryHash }
+              : meta;
+          recordSearchLoadMoreError({
+            route: "search-load-more",
+            queryHash: finalMeta.queryHash,
+            reason: "snapshot-expired",
+          });
+          recordSearchRequestLatency({
+            route: "search-load-more",
+            durationMs: performance.now() - requestStartTime,
+            backendSource: finalMeta.backendSource,
+            stateKind: "degraded",
+            queryHash: finalMeta.queryHash,
+            resultCount: 0,
+          });
+          return {
+            items: [],
+            nextCursor: null,
+            hasNextPage: false,
+            snapshotExpired: v2Result.snapshotExpired,
+            meta: finalMeta,
+          };
+        }
+
+        if (v2Result.paginatedResult) {
+          const responseMeta = v2Result.response?.meta;
+          const meta = responseMeta
+            ? createSearchResponseMeta(normalizedQuery, "v2", {
+                querySnapshotId: responseMeta.querySnapshotId,
+                projectionVersion: responseMeta.projectionVersion,
+                embeddingVersion: responseMeta.embeddingVersion,
+                rankerProfileVersion: responseMeta.rankerProfileVersion,
+              })
+            : createSearchResponseMeta(normalizedQuery, "v2");
           const finalMeta =
             queryHash && queryHash.trim().length > 0
               ? { ...meta, queryHash }

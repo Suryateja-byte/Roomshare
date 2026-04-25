@@ -254,13 +254,25 @@ test.describe("J48: Protected Route Redirects", () => {
 
     for (const route of protectedRoutes) {
       // Use a fresh context approach: just verify the page loads or redirects
-      await page.goto(route);
-      await page.waitForLoadState("domcontentloaded");
+      await page
+        .goto(route, { waitUntil: "domcontentloaded" })
+        .catch((error: unknown) => {
+          if (
+            error instanceof Error &&
+            error.message.includes("net::ERR_ABORTED")
+          ) {
+            return null;
+          }
+          throw error;
+        });
+      await page.waitForLoadState("domcontentloaded").catch(() => {});
 
       const currentUrl = page.url();
 
       // Should either be on the route (if authenticated) or redirected to login
       const isOnRoute = currentUrl.includes(route);
+      const isRetiredBookingsRedirect =
+        route === "/bookings" && currentUrl.includes("/messages");
       const isOnLogin =
         currentUrl.includes("/login") ||
         currentUrl.includes("/auth") ||
@@ -268,7 +280,9 @@ test.describe("J48: Protected Route Redirects", () => {
       const isOnHome = currentUrl.endsWith("/");
 
       // One of these should be true
-      expect(isOnRoute || isOnLogin || isOnHome).toBeTruthy();
+      expect(
+        isOnRoute || isRetiredBookingsRedirect || isOnLogin || isOnHome
+      ).toBeTruthy();
 
       // Page should not crash
       await expect(page.locator("body")).toBeVisible();
@@ -330,7 +344,7 @@ test.describe("J49: Offline Page", () => {
 
 // ─── J50: Cross-Page Navigation Chain ─────────────────────────────────────────
 test.describe("J50: Cross-Page Navigation Chain", () => {
-  test("home → search → listing → bookings → messages → profile → verify each loads", async ({
+  test("home → search → listing → retired bookings bookmark → messages → profile → verify each loads", async ({
     page,
     nav,
   }) => {
@@ -357,9 +371,10 @@ test.describe("J50: Cross-Page Navigation Chain", () => {
       await expect(page.locator("body")).toBeVisible();
     }
 
-    // Step 4: Bookings page
+    // Step 4: Retired bookings bookmark redirects to messages
     await nav.goToBookings();
     await page.waitForLoadState("domcontentloaded");
+    await expect(page).toHaveURL(/\/messages/, { timeout: 30_000 });
     await expect(page.locator("body")).toBeVisible();
 
     // Step 5: Messages page

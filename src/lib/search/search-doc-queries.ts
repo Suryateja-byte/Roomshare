@@ -15,6 +15,7 @@
 
 import "server-only";
 
+import { createHash } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { wrapDatabaseError } from "@/lib/errors";
 import { unstable_cache } from "next/cache";
@@ -45,15 +46,40 @@ import {
 } from "@/lib/constants";
 import { features } from "@/lib/env";
 import { parseLocalDate } from "@/lib/utils";
-import type { KeysetCursor, SortOption, CursorRowData } from "./cursor";
+import type {
+  KeysetCursor,
+  SortOption,
+  CursorRowData,
+  SearchPaginationSnapshot,
+} from "./cursor";
 import { buildCursorFromRow, encodeKeysetCursor } from "./cursor";
+import {
+  buildPublicAvailability,
+  isListingEligibleForPublicSearch,
+  resolvePublicAvailability,
+} from "./public-availability";
 import pgvector from "pgvector";
 import { getCachedQueryEmbedding } from "@/lib/embeddings/query-cache";
+import { getCurrentEmbeddingVersion } from "@/lib/embeddings/version";
 import { logger } from "@/lib/logger";
 import { joinWhereClauseWithSecurityInvariant } from "@/lib/sql-safety";
+import { buildAvailabilitySqlFragments } from "@/lib/availability";
+import { applyServerDedup, type SearchRowForDedup } from "./dedup-pipeline";
+import { buildGroupMetadataById } from "./dedup";
+import { generateSearchQueryHash } from "./query-hash";
+import {
+  recordSearchDedupApplied,
+  recordSearchDedupOverflow,
+} from "./search-telemetry";
 
 // Statement timeout for search queries (5 seconds)
 const SEARCH_QUERY_TIMEOUT_MS = 5000;
+const SEARCH_DEDUP_LOOK_AHEAD = 16;
+const PUBLISHED_EMBEDDING_STATUSES = ["COMPLETED", "PARTIAL"] as const;
+
+function isPresent<T>(value: T | null | undefined): value is T {
+  return value != null;
+}
 
 // ============================================
 // Raw Query Result Interfaces (M6 fix)
@@ -62,11 +88,23 @@ const SEARCH_QUERY_TIMEOUT_MS = 5000;
 /** Raw row shape from map listings query */
 interface MapListingRaw {
   id: string;
+  ownerId?: string;
+  normalizedAddress?: string | null;
   title: string;
   price: number | string;
   availableSlots: number;
+  totalSlots: number;
+  availabilitySource: "LEGACY_BOOKING" | "HOST_MANAGED";
+  openSlots: number | null;
+  availableUntil: string | Date | null;
+  minStayMonths: number | string | null;
+  lastConfirmedAt: string | Date | null;
+  status: string;
+  statusReason: string | null;
+  needsMigrationReview?: boolean | null;
   primaryImage: string | null;
   roomType: string | null;
+  moveInDate: string | Date | null;
   city: string | null;
   state: string | null;
   lat: number | string;
@@ -86,6 +124,14 @@ interface ListingRaw {
   images: string[];
   availableSlots: number;
   totalSlots: number;
+  availabilitySource: "LEGACY_BOOKING" | "HOST_MANAGED";
+  openSlots: number | null;
+  availableUntil?: string | Date | null;
+  minStayMonths?: number | string | null;
+  lastConfirmedAt?: string | Date | null;
+  status?: string;
+  statusReason?: string | null;
+  needsMigrationReview?: boolean | null;
   amenities: string[];
   houseRules: string[];
   householdLanguages: string[];
@@ -95,8 +141,12 @@ interface ListingRaw {
   moveInDate?: string | Date;
   createdAt?: string | Date;
   viewCount: number | string;
+  ownerId?: string;
+  normalizedAddress?: string | null;
+  address?: string | null;
   city: string;
   state: string;
+  zip?: string | null;
   lat: number | string;
   lng: number | string;
   avgRating: number | string | null;
@@ -110,6 +160,62 @@ interface ListingWithCursorRaw extends ListingRaw {
   _cursorAvgRating: string | null;
   _cursorReviewCount: string | null;
   _cursorCreatedAt: string | null;
+}
+
+type RawAvailabilityCarrier = {
+  id: string;
+  availableSlots: number;
+  totalSlots: number;
+  availabilitySource: "LEGACY_BOOKING" | "HOST_MANAGED";
+  openSlots: number | null;
+  availableUntil?: string | Date | null;
+  minStayMonths?: number | string | null;
+  lastConfirmedAt?: string | Date | null;
+  moveInDate?: string | Date | null;
+  status?: string;
+  statusReason?: string | null;
+};
+
+function parseOptionalDate(
+  value: string | Date | null | undefined
+): Date | null {
+  return value && !isNaN(new Date(value).getTime()) ? new Date(value) : null;
+}
+
+function resolveRawPublicAvailability(raw: RawAvailabilityCarrier): {
+  moveInDate: Date | undefined;
+  availableUntil: Date | null;
+  lastConfirmedAt: Date | null;
+  resolvedAvailability: ReturnType<typeof resolvePublicAvailability>;
+} {
+  const moveInDate = parseOptionalDate(raw.moveInDate) ?? undefined;
+  const availableUntil = parseOptionalDate(raw.availableUntil);
+  const lastConfirmedAt = parseOptionalDate(raw.lastConfirmedAt);
+  const normalized = {
+    ...raw,
+    moveInDate,
+    availableUntil,
+    lastConfirmedAt,
+    minStayMonths:
+      raw.minStayMonths != null ? Number(raw.minStayMonths) : undefined,
+  };
+
+  const resolvedAvailability =
+    raw.availabilitySource === "LEGACY_BOOKING"
+      ? resolvePublicAvailability(normalized, {
+          legacySnapshot: {
+            totalSlots: raw.totalSlots,
+            effectiveAvailableSlots: raw.availableSlots,
+          },
+        })
+      : resolvePublicAvailability(normalized);
+
+  return {
+    moveInDate,
+    availableUntil,
+    lastConfirmedAt,
+    resolvedAvailability,
+  };
 }
 
 /**
@@ -137,6 +243,17 @@ const MAX_MAP_MARKERS = 200;
 
 // Threshold for full COUNT vs hybrid mode
 const HYBRID_COUNT_THRESHOLD = 100;
+const HOST_MANAGED_STALE_INTERVAL_SQL = "INTERVAL '21 days'";
+export const SEARCH_DOC_ALLOWED_SQL_LITERALS = new Set([
+  "ACTIVE",
+  "HOST_MANAGED",
+  "ACCEPTED",
+  "HELD",
+  "MIGRATION_REVIEW",
+  "english",
+  "1 day",
+  "21 days",
+]);
 
 // Maximum results for unbounded browse-all queries (no query, no bounds)
 // Prevents full-table scans while allowing homepage browsing.
@@ -156,7 +273,7 @@ function quantizeBound(value: number): number {
 }
 
 /** Shared base fields for search cache keys */
-function buildBaseCacheFields(params: FilterParams) {
+export function buildBaseCacheFields(params: FilterParams) {
   return {
     q: params.query?.toLowerCase().trim() || "",
     minPrice: params.minPrice ?? "",
@@ -167,17 +284,19 @@ function buildBaseCacheFields(params: FilterParams) {
     roomType: params.roomType?.toLowerCase() || "",
     leaseDuration: params.leaseDuration?.toLowerCase() || "",
     moveInDate: params.moveInDate || "",
+    endDate: params.endDate || "",
     genderPreference: params.genderPreference || "",
     householdGender: params.householdGender || "",
     bookingMode: params.bookingMode || "",
     minAvailableSlots: String(params.minAvailableSlots ?? 1),
+    dedup: features.searchListingDedup ? "v1" : "off",
     bounds: params.bounds
       ? `${quantizeBound(params.bounds.minLng)},${quantizeBound(params.bounds.minLat)},${quantizeBound(params.bounds.maxLng)},${quantizeBound(params.bounds.maxLat)}`
       : "",
   };
 }
 
-function createSearchDocListCacheKey(params: FilterParams): string {
+export function createSearchDocListCacheKey(params: FilterParams): string {
   return JSON.stringify({
     ...buildBaseCacheFields(params),
     page: params.page ?? 1,
@@ -197,6 +316,154 @@ function createSearchDocMapCacheKey(params: FilterParams): string {
 
 function createSearchDocCountCacheKey(params: FilterParams): string {
   return JSON.stringify(buildBaseCacheFields(params));
+}
+
+type ListingGroupMetadata = Pick<
+  ListingData,
+  "groupKey" | "groupSummary" | "groupContext"
+>;
+
+type DedupedListingRows<T extends ListingRaw> = {
+  rows: T[];
+  groupMetadataById: Map<string, ListingGroupMetadata>;
+  cursorBoundaryRow: T | null;
+};
+
+function buildSearchQueryHashPrefix8(params: FilterParams): string {
+  return generateSearchQueryHash({
+    query: params.query,
+    vibeQuery: params.vibeQuery,
+    minPrice: params.minPrice,
+    maxPrice: params.maxPrice,
+    amenities: params.amenities,
+    houseRules: params.houseRules,
+    languages: params.languages,
+    roomType: params.roomType,
+    leaseDuration: params.leaseDuration,
+    moveInDate: params.moveInDate,
+    endDate: params.endDate,
+    genderPreference: params.genderPreference,
+    householdGender: params.householdGender,
+    bookingMode: params.bookingMode,
+    minAvailableSlots: params.minAvailableSlots,
+    nearMatches: params.nearMatches,
+    bounds: params.bounds,
+  }).slice(0, 8);
+}
+
+function hashGroupKeyPrefix8(groupKey: string): string {
+  return createHash("sha256").update(groupKey).digest("hex").slice(0, 8);
+}
+
+function toSearchRowForDedup(row: ListingRaw): SearchRowForDedup {
+  return {
+    id: row.id,
+    ownerId: row.ownerId ?? "",
+    title: row.title,
+    price: Number(row.price),
+    roomType: row.roomType ?? null,
+    moveInDate: row.moveInDate ?? null,
+    availableUntil: row.availableUntil ?? null,
+    openSlots: row.openSlots ?? null,
+    totalSlots: row.totalSlots,
+    normalizedAddress: row.normalizedAddress ?? null,
+    location: {
+      address: row.address ?? null,
+      city: row.city,
+      state: row.state,
+      zip: row.zip ?? null,
+    },
+  };
+}
+
+function attachListingGroupMetadata(
+  listings: ListingData[],
+  groupMetadataById: Map<string, ListingGroupMetadata>
+): ListingData[] {
+  if (groupMetadataById.size === 0) {
+    return listings;
+  }
+
+  return listings.map((listing) => {
+    const groupMetadata = groupMetadataById.get(listing.id);
+    return groupMetadata ? { ...listing, ...groupMetadata } : listing;
+  });
+}
+
+function dedupeListingRows<T extends ListingRaw>(
+  rows: T[],
+  params: FilterParams,
+  limit: number
+): DedupedListingRows<T> {
+  const fallbackCursorBoundaryRow =
+    limit > 0 && rows.length > 0 ? rows[Math.min(limit - 1, rows.length - 1)] : null;
+
+  if (!features.searchListingDedup) {
+    return {
+      rows,
+      groupMetadataById: new Map<string, ListingGroupMetadata>(),
+      cursorBoundaryRow: fallbackCursorBoundaryRow,
+    };
+  }
+
+  const dedupResult = applyServerDedup(
+    rows.map((row) => toSearchRowForDedup(row)),
+    {
+      enabled: true,
+      limit,
+      lookAhead: SEARCH_DEDUP_LOOK_AHEAD,
+    }
+  );
+
+  recordSearchDedupApplied(dedupResult.metrics);
+
+  const groupMetadataById = new Map<string, ListingGroupMetadata>();
+  for (const canonical of dedupResult.canonicals) {
+    groupMetadataById.set(canonical.id, {
+      groupKey: canonical.groupKey,
+      groupSummary: canonical.groupSummary,
+      groupContext: canonical.groupContext,
+    });
+  }
+
+  const rawRowsById = new Map(rows.map((row) => [row.id, row]));
+  const canonicalRows = dedupResult.canonicals
+    .map((canonical) => rawRowsById.get(canonical.id))
+    .filter(isPresent);
+
+  const queryHashPrefix8 = buildSearchQueryHashPrefix8(params);
+  for (const canonicalId of dedupResult.overflowCanonicalIds) {
+    const groupMetadata = groupMetadataById.get(canonicalId);
+    if (!groupMetadata?.groupKey) {
+      continue;
+    }
+
+    recordSearchDedupOverflow({
+      groupKeyPrefix8: hashGroupKeyPrefix8(groupMetadata.groupKey),
+      queryHashPrefix8,
+    });
+  }
+
+  const emittedIds = new Set<string>();
+  for (const canonical of dedupResult.canonicals.slice(0, limit)) {
+    emittedIds.add(canonical.id);
+    for (const siblingId of canonical.groupSummary.siblingIds) {
+      emittedIds.add(siblingId);
+    }
+  }
+
+  let cursorBoundaryRow: T | null = null;
+  for (const row of rows) {
+    if (emittedIds.has(row.id)) {
+      cursorBoundaryRow = row;
+    }
+  }
+
+  return {
+    rows: canonicalRows,
+    groupMetadataById,
+    cursorBoundaryRow: cursorBoundaryRow ?? fallbackCursorBoundaryRow,
+  };
 }
 
 // ============================================
@@ -426,9 +693,110 @@ export interface WhereBuilder {
   paramIndex: number;
   /** Index of the FTS query param (if FTS is active), used for ts_rank_cd */
   ftsQueryParamIndex: number | null;
+  effectiveAvailableSql: string;
 }
 
-export function buildSearchDocWhereConditions(
+function buildSearchDocListAvailabilitySqlFragments(options: {
+  minAvailableSlots?: number;
+  moveInDate?: string;
+  endDate?: string;
+  startParamIndex: number;
+}): {
+  effectiveAvailableSql: string;
+  slotConditionSql: string;
+  params: unknown[];
+  nextParamIndex: number;
+} {
+  const {
+    effectiveAvailableSql: legacyEffectiveAvailableSql,
+    params: legacyParams,
+    nextParamIndex: legacyNextParamIndex,
+  } = buildAvailabilitySqlFragments({
+    listingIdRef: "d.id",
+    totalSlotsRef: "d.total_slots",
+    minAvailableSlots: options.minAvailableSlots,
+    startDate: options.moveInDate,
+    endDate: options.endDate,
+    startParamIndex: options.startParamIndex,
+  });
+
+  const params = [...legacyParams];
+  let paramIndex = legacyNextParamIndex;
+  const hostManagedMinSlotsParam = `$${paramIndex++}`;
+  params.push(Math.max(options.minAvailableSlots ?? 1, 1));
+
+  let requestedMoveInDateParam: string | null = null;
+  let hostManagedMoveInLowerBoundSql = "TRUE";
+  if (options.moveInDate) {
+    requestedMoveInDateParam = `$${paramIndex++}`;
+    params.push(parseLocalDate(options.moveInDate));
+    hostManagedMoveInLowerBoundSql = `
+      l."moveInDate"::date <= ${requestedMoveInDateParam}::date
+    `.trim();
+  }
+
+  let hostManagedWindowCoverageSql = "TRUE";
+  if (options.endDate) {
+    const requestedEndDateParam = `$${paramIndex++}`;
+    params.push(parseLocalDate(options.endDate));
+    hostManagedWindowCoverageSql = `(
+      l."availableUntil" IS NULL
+      OR l."availableUntil"::date >= ${requestedEndDateParam}::date
+    )`;
+  } else if (requestedMoveInDateParam) {
+    hostManagedWindowCoverageSql = `(
+      l."availableUntil" IS NULL
+      OR l."availableUntil"::date >= ${requestedMoveInDateParam}::date
+    )`;
+  }
+
+  const hostManagedSlotConditionSql = `(
+    l."openSlots" IS NOT NULL
+    AND l."openSlots" >= ${hostManagedMinSlotsParam}
+    AND l."totalSlots" >= 1
+    AND l."openSlots" <= l."totalSlots"
+    AND l."moveInDate" IS NOT NULL
+    AND ${hostManagedMoveInLowerBoundSql}
+    AND l."minStayMonths" >= 1
+    AND (
+      l."availableUntil" IS NULL
+      OR l."availableUntil"::date >= CURRENT_DATE
+    )
+    AND (
+      l."availableUntil" IS NULL
+      OR l."availableUntil"::date >= l."moveInDate"::date
+    )
+    AND ${hostManagedWindowCoverageSql}
+    AND (
+      l."lastConfirmedAt" IS NULL
+      OR l."lastConfirmedAt" > NOW() - ${HOST_MANAGED_STALE_INTERVAL_SQL}
+    )
+  )`;
+
+  return {
+    effectiveAvailableSql: `(
+      CASE
+        WHEN 'HOST_MANAGED' = 'HOST_MANAGED'
+          THEN GREATEST(COALESCE(l."openSlots", 0), 0)::int
+        ELSE ${legacyEffectiveAvailableSql}
+      END
+    )`,
+    slotConditionSql: `(
+      (
+        'HOST_MANAGED' = 'HOST_MANAGED'
+        AND ${hostManagedSlotConditionSql}
+      )
+      OR (
+        'HOST_MANAGED' <> 'HOST_MANAGED'
+        AND ${legacyEffectiveAvailableSql} >= ${hostManagedMinSlotsParam}
+      )
+    )`,
+    params,
+    nextParamIndex: paramIndex,
+  };
+}
+
+function buildSearchDocWhereConditionsInternal(
   filterParams: FilterParams
 ): WhereBuilder {
   // SECURITY INVARIANT:
@@ -450,25 +818,30 @@ export function buildSearchDocWhereConditions(
     bookingMode,
     bounds,
     minAvailableSlots,
+    endDate,
   } = filterParams;
 
-  // Base conditions for SearchDoc
-  const slotThreshold = Math.max(minAvailableSlots ?? 1, 1);
+  const {
+    effectiveAvailableSql,
+    slotConditionSql,
+    params,
+    nextParamIndex,
+  } = buildSearchDocListAvailabilitySqlFragments({
+    minAvailableSlots,
+    moveInDate,
+    endDate,
+    startParamIndex: 1,
+  });
+
   const conditions: string[] = [
-    features.softHoldsEnabled || features.softHoldsDraining
-      ? `(d.available_slots - COALESCE((
-          SELECT SUM("slotsRequested") FROM "Booking" b
-          WHERE b."listingId" = d.id
-            AND b.status = 'HELD'
-            AND b."heldUntil" > NOW()
-        ), 0)) >= $1`
-      : `d.available_slots >= $1`,
-    "d.status = 'ACTIVE'",
+    slotConditionSql,
+    `l.status = 'ACTIVE'`,
+    `COALESCE(FALSE, FALSE) = FALSE`,
+    `l."statusReason" IS DISTINCT FROM 'MIGRATION_REVIEW'`,
     "d.lat IS NOT NULL",
     "d.lng IS NOT NULL",
   ];
-  const params: unknown[] = [slotThreshold];
-  let paramIndex = 2;
+  let paramIndex = nextParamIndex;
   let ftsQueryParamIndex: number | null = null;
 
   // Geographic bounds filter using PostGIS geography
@@ -594,7 +967,25 @@ export function buildSearchDocWhereConditions(
     params.push(bookingMode);
   }
 
-  return { conditions, params, paramIndex, ftsQueryParamIndex };
+  return {
+    conditions,
+    params,
+    paramIndex,
+    ftsQueryParamIndex,
+    effectiveAvailableSql,
+  };
+}
+
+export function buildSearchDocWhereConditions(
+  filterParams: FilterParams
+): WhereBuilder {
+  return buildSearchDocWhereConditionsInternal(filterParams);
+}
+
+export function buildSearchDocListWhereConditions(
+  filterParams: FilterParams
+): WhereBuilder {
+  return buildSearchDocWhereConditionsInternal(filterParams);
 }
 
 // ============================================
@@ -671,8 +1062,11 @@ async function getSearchDocLimitedCountInternal(
   }
 
   const { conditions, params: queryParams } =
-    buildSearchDocWhereConditions(params);
-  const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
+    buildSearchDocListWhereConditions(params);
+  const whereClause = joinWhereClauseWithSecurityInvariant(
+    conditions,
+    SEARCH_DOC_ALLOWED_SQL_LITERALS
+  );
 
   // Use subquery with LIMIT 101 to efficiently check if count > threshold
   const limitedCountQuery = `
@@ -680,6 +1074,7 @@ async function getSearchDocLimitedCountInternal(
     FROM (
       SELECT d.id
       FROM listing_search_docs d
+      JOIN "Listing" l ON l.id = d.id
       WHERE ${whereClause}
       LIMIT ${HYBRID_COUNT_THRESHOLD + 1}
     ) subq
@@ -724,38 +1119,194 @@ export async function getSearchDocLimitedCount(
  * Map raw SQL query results to ListingData objects.
  * Shared by all paginated listing queries to avoid duplication.
  */
-function mapRawListingsToPublic(listings: ListingRaw[]): ListingData[] {
+export function mapRawListingsToPublic(listings: ListingRaw[]): ListingData[] {
   return listings
     .filter((l) => hasValidCoordinates(Number(l.lat), Number(l.lng)))
-    .map((l) => ({
-      id: l.id,
-      title: l.title,
-      description: l.description,
-      price: Number(l.price),
-      images: l.images || [],
-      availableSlots: l.availableSlots,
-      totalSlots: l.totalSlots,
-      amenities: l.amenities || [],
-      houseRules: l.houseRules || [],
-      householdLanguages: l.householdLanguages || [],
-      primaryHomeLanguage: l.primaryHomeLanguage,
-      leaseDuration: l.leaseDuration,
-      roomType: l.roomType,
-      moveInDate:
-        l.moveInDate && !isNaN(new Date(l.moveInDate).getTime())
-          ? new Date(l.moveInDate)
-          : undefined,
-      createdAt: l.createdAt ? new Date(l.createdAt) : new Date(),
-      viewCount: Number(l.viewCount) || 0,
-      avgRating: Number(l.avgRating) || 0,
-      reviewCount: Number(l.reviewCount) || 0,
-      location: {
-        city: l.city,
-        state: l.state,
-        lat: Number(l.lat),
-        lng: Number(l.lng),
-      },
-    }));
+    .map((l) => {
+      const { moveInDate, availableUntil, lastConfirmedAt, resolvedAvailability } =
+        resolveRawPublicAvailability(l);
+
+      if (
+        !isListingEligibleForPublicSearch({
+          needsMigrationReview: l.needsMigrationReview,
+          statusReason: l.statusReason,
+          resolvedAvailability,
+        })
+      ) {
+        return null;
+      }
+
+      return {
+        id: l.id,
+        title: l.title,
+        description: l.description,
+        price: Number(l.price),
+        images: l.images || [],
+        availableSlots: resolvedAvailability.effectiveAvailableSlots,
+        totalSlots: resolvedAvailability.totalSlots,
+        availabilitySource: resolvedAvailability.availabilitySource,
+        openSlots: resolvedAvailability.openSlots,
+        availableUntil,
+        minStayMonths: resolvedAvailability.minStayMonths,
+        lastConfirmedAt,
+        status: l.status,
+        statusReason: l.statusReason,
+        amenities: l.amenities || [],
+        houseRules: l.houseRules || [],
+        householdLanguages: l.householdLanguages || [],
+        primaryHomeLanguage: l.primaryHomeLanguage,
+        leaseDuration: l.leaseDuration,
+        roomType: l.roomType,
+        moveInDate,
+        publicAvailability: resolvedAvailability,
+        createdAt: l.createdAt ? new Date(l.createdAt) : new Date(),
+        viewCount: Number(l.viewCount) || 0,
+        avgRating: Number(l.avgRating) || 0,
+        reviewCount: Number(l.reviewCount) || 0,
+        location: {
+          city: l.city,
+          state: l.state,
+          lat: Number(l.lat),
+          lng: Number(l.lng),
+        },
+      };
+    })
+    .filter(isPresent);
+}
+
+export function mapRawMapListingsToPublic(
+  listings: MapListingRaw[]
+): MapListingData[] {
+  const sanitizedListings = sanitizeMapListings(
+    listings
+      .map((listing) => {
+        const {
+          moveInDate,
+          availableUntil,
+          lastConfirmedAt,
+          resolvedAvailability,
+        } = resolveRawPublicAvailability(listing);
+
+        if (
+          !isListingEligibleForPublicSearch({
+            needsMigrationReview: listing.needsMigrationReview,
+            statusReason: listing.statusReason,
+            resolvedAvailability,
+          })
+        ) {
+          return null;
+        }
+
+        return {
+          id: listing.id,
+          title: listing.title,
+          price: Number(listing.price),
+          availableSlots: resolvedAvailability.effectiveAvailableSlots,
+          totalSlots: resolvedAvailability.totalSlots,
+          images: listing.primaryImage ? [listing.primaryImage] : [],
+          roomType: listing.roomType ?? undefined,
+          moveInDate,
+          availabilitySource: resolvedAvailability.availabilitySource,
+          openSlots: resolvedAvailability.openSlots,
+          availableUntil,
+          minStayMonths: resolvedAvailability.minStayMonths,
+          lastConfirmedAt,
+          status: listing.status,
+          statusReason: listing.statusReason,
+          location: {
+            city: listing.city ?? undefined,
+            state: listing.state ?? undefined,
+            lat: Number(listing.lat),
+            lng: Number(listing.lng),
+          },
+          publicAvailability: resolvedAvailability,
+          avgRating: Number(listing.avgRating) || 0,
+          reviewCount: Number(listing.reviewCount) || 0,
+          recommendedScore:
+            listing.recommendedScore != null
+              ? Number(listing.recommendedScore)
+              : null,
+          createdAt: listing.createdAt ? new Date(listing.createdAt) : null,
+        };
+      })
+      .filter(isPresent)
+  );
+
+  const groupMetadataById = buildGroupMetadataById(
+    listings.map((listing) => ({
+      id: listing.id,
+      ownerId: listing.ownerId ?? "",
+      normalizedAddress: listing.normalizedAddress ?? "",
+      priceCents: Math.round(Number(listing.price) * 100),
+      title: listing.title,
+      roomType: listing.roomType ?? null,
+      moveInDate: listing.moveInDate ?? null,
+      availableUntil: listing.availableUntil ?? null,
+      openSlots: listing.openSlots ?? null,
+      totalSlots: Number(listing.totalSlots) || 0,
+    }))
+  );
+
+  return sanitizedListings.map((listing) => {
+    const groupMetadata = groupMetadataById.get(listing.id);
+    return groupMetadata ? { ...listing, ...groupMetadata } : listing;
+  });
+}
+
+export async function getSearchDocListingsByIds(
+  listingIds: string[]
+): Promise<ListingData[]> {
+  if (listingIds.length === 0) {
+    return [];
+  }
+
+  const sqlQuery = `
+    SELECT
+      d.id,
+      d.title,
+      d.description,
+      d.price,
+      d.images,
+      l."availableSlots" as "availableSlots",
+      l."totalSlots" as "totalSlots",
+      'HOST_MANAGED' as "availabilitySource",
+      l."openSlots" as "openSlots",
+      l."availableUntil" as "availableUntil",
+      l."minStayMonths" as "minStayMonths",
+      l."lastConfirmedAt" as "lastConfirmedAt",
+      l.status::text as status,
+      l."statusReason" as "statusReason",
+      FALSE as "needsMigrationReview",
+      l."ownerId" as "ownerId",
+      l."normalizedAddress" as "normalizedAddress",
+      d.amenities,
+      d.house_rules as "houseRules",
+      d.household_languages as "householdLanguages",
+      d.primary_home_language as "primaryHomeLanguage",
+      d.lease_duration as "leaseDuration",
+      d.room_type as "roomType",
+      l."moveInDate" as "moveInDate",
+      d.listing_created_at as "createdAt",
+      d.view_count as "viewCount",
+      d.city,
+      d.state,
+      d.lat,
+      d.lng,
+      d.avg_rating as "avgRating",
+      d.review_count as "reviewCount"
+    FROM listing_search_docs d
+    JOIN "Listing" l ON l.id = d.id
+    WHERE d.id = ANY($1::text[])
+  `;
+
+  const rows = await queryWithTimeout<ListingRaw>(sqlQuery, [listingIds]);
+  const mappedById = new Map(
+    mapRawListingsToPublic(rows).map((item) => [item.id, item])
+  );
+
+  return listingIds
+    .map((listingId) => mappedById.get(listingId))
+    .filter(isPresent);
 }
 
 // ============================================
@@ -795,8 +1346,12 @@ async function getSearchDocMapListingsInternal(
     params: queryParams,
     paramIndex,
     ftsQueryParamIndex,
+    effectiveAvailableSql,
   } = buildSearchDocWhereConditions(effectiveParams);
-  const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
+  const whereClause = joinWhereClauseWithSecurityInvariant(
+    conditions,
+    SEARCH_DOC_ALLOWED_SQL_LITERALS
+  );
   const sortOption = (effectiveParams.sort || "recommended") as SortOption;
   const orderByClause = buildOrderByClause(sortOption, ftsQueryParamIndex);
 
@@ -808,11 +1363,23 @@ async function getSearchDocMapListingsInternal(
   const sqlQuery = `
     SELECT
       d.id,
+      l."ownerId" as "ownerId",
+      l."normalizedAddress" as "normalizedAddress",
       d.title,
       d.price,
-      d.available_slots as "availableSlots",
+      ${effectiveAvailableSql} as "availableSlots",
+      l."totalSlots" as "totalSlots",
+      'HOST_MANAGED' as "availabilitySource",
+      l."openSlots" as "openSlots",
+      l."availableUntil" as "availableUntil",
+      l."minStayMonths" as "minStayMonths",
+      l."lastConfirmedAt" as "lastConfirmedAt",
+      l.status::text as status,
+      l."statusReason" as "statusReason",
+      FALSE as "needsMigrationReview",
       d.images[1] as "primaryImage",
       d.room_type as "roomType",
+      l."moveInDate" as "moveInDate",
       d.city,
       d.state,
       d.lat,
@@ -822,6 +1389,7 @@ async function getSearchDocMapListingsInternal(
       d.recommended_score as "recommendedScore",
       d.listing_created_at as "createdAt"
     FROM listing_search_docs d
+    JOIN "Listing" l ON l.id = d.id
     WHERE ${whereClause}
     ORDER BY ${orderByClause}
     LIMIT $${paramIndex}
@@ -839,31 +1407,7 @@ async function getSearchDocMapListingsInternal(
       ? listings.slice(0, MAX_MAP_MARKERS)
       : listings;
 
-    const mappedListings = sanitizeMapListings(
-      trimmedListings.map((l) => ({
-        id: l.id,
-        title: l.title,
-        price: Number(l.price),
-        availableSlots: l.availableSlots,
-        images: l.primaryImage ? [l.primaryImage] : [],
-        roomType: l.roomType ?? undefined,
-        location: {
-          city: l.city ?? undefined,
-          state: l.state ?? undefined,
-          // MED-4 FIX: Explicit Number() conversion — PostgreSQL raw queries may return
-          // numeric/float8 columns as strings depending on column type.
-          lat: Number(l.lat),
-          lng: Number(l.lng),
-        },
-        avgRating: Number(l.avgRating) || 0,
-        reviewCount: Number(l.reviewCount) || 0,
-        // L-9 FIX: Use explicit null check instead of falsy coalescing.
-        // `Number(0) || null` falsely converts a valid score of 0 to null.
-        recommendedScore:
-          l.recommendedScore != null ? Number(l.recommendedScore) : null,
-        createdAt: l.createdAt ? new Date(l.createdAt) : null,
-      }))
-    );
+    const mappedListings = mapRawMapListingsToPublic(trimmedListings);
 
     return {
       listings: mappedListings,
@@ -931,9 +1475,15 @@ async function expandWithNearMatches(
   });
 
   const exactIds = new Set(items.map((item) => item.id));
+  const exactGroupKeys = new Set(
+    items.map((item) => item.groupKey).filter((groupKey): groupKey is string => !!groupKey)
+  );
 
   const nearMatchItems = expandedResult.items
-    .filter((item) => !exactIds.has(item.id))
+    // Expanded rows can collapse into an already-emitted canonical group.
+    .filter(
+      (item) => !exactIds.has(item.id) && !(item.groupKey && exactGroupKeys.has(item.groupKey))
+    )
     .slice(0, LOW_RESULTS_THRESHOLD)
     .map((item) => {
       // EU-C: Guard against Invalid Date before calling toISOString()
@@ -986,8 +1536,12 @@ async function getSearchDocListingsPaginatedInternal(
       params: queryParams,
       paramIndex: startParamIndex,
       ftsQueryParamIndex,
-    } = buildSearchDocWhereConditions(params);
-    const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
+      effectiveAvailableSql,
+    } = buildSearchDocListWhereConditions(params);
+    const whereClause = joinWhereClauseWithSecurityInvariant(
+      conditions,
+      SEARCH_DOC_ALLOWED_SQL_LITERALS
+    );
 
     // Build ORDER BY clause with ts_rank_cd tie-breaker when FTS is active
     const orderByClause = buildOrderByClause(sort, ftsQueryParamIndex);
@@ -1018,8 +1572,10 @@ async function getSearchDocListingsPaginatedInternal(
 
     const offset = (safePage - 1) * effectiveLimit;
 
-    // Fetch limit+1 items to determine hasNextPage
-    const fetchLimit = effectiveLimit + 1;
+    // Fetch extra raw rows when dedupe is enabled so page sizing is based on canonicals.
+    const fetchLimit = features.searchListingDedup
+      ? effectiveLimit + SEARCH_DEDUP_LOOK_AHEAD + 1
+      : effectiveLimit + 1;
     let paramIndex = startParamIndex;
 
     // Main query - reads from denormalized SearchDoc
@@ -1030,24 +1586,37 @@ async function getSearchDocListingsPaginatedInternal(
         d.description,
         d.price,
         d.images,
-        d.available_slots as "availableSlots",
-        d.total_slots as "totalSlots",
+        ${effectiveAvailableSql} as "availableSlots",
+        l."totalSlots" as "totalSlots",
+        'HOST_MANAGED' as "availabilitySource",
+        l."openSlots" as "openSlots",
+        l."availableUntil" as "availableUntil",
+        l."minStayMonths" as "minStayMonths",
+        l."lastConfirmedAt" as "lastConfirmedAt",
+        l.status::text as status,
+        l."statusReason" as "statusReason",
+        FALSE as "needsMigrationReview",
+        l."ownerId" as "ownerId",
+        l."normalizedAddress" as "normalizedAddress",
         d.amenities,
         d.house_rules as "houseRules",
         d.household_languages as "householdLanguages",
         d.primary_home_language as "primaryHomeLanguage",
         d.lease_duration as "leaseDuration",
         d.room_type as "roomType",
-        d.move_in_date as "moveInDate",
+        l."moveInDate" as "moveInDate",
         d.listing_created_at as "createdAt",
         d.view_count as "viewCount",
+        d.address,
         d.city,
         d.state,
+        d.zip,
         d.lat,
         d.lng,
         d.avg_rating as "avgRating",
         d.review_count as "reviewCount"
       FROM listing_search_docs d
+      JOIN "Listing" l ON l.id = d.id
       WHERE ${whereClause}
       ORDER BY ${orderByClause}
       LIMIT $${paramIndex++} OFFSET $${paramIndex++}
@@ -1057,8 +1626,11 @@ async function getSearchDocListingsPaginatedInternal(
 
     const listings = await queryWithTimeout<ListingRaw>(dataQuery, dataParams);
 
-    // Map results to ListingData
-    const results = mapRawListingsToPublic(listings);
+    const deduped = dedupeListingRows(listings, params, effectiveLimit);
+    const results = attachListingGroupMetadata(
+      mapRawListingsToPublic(deduped.rows),
+      deduped.groupMetadataById
+    );
 
     // Determine hasNextPage using limit+1 pattern
     // Use effectiveLimit for unbounded browse cap
@@ -1158,7 +1730,8 @@ export interface KeysetPaginatedResult<T> extends PaginatedResultHybrid<T> {
  */
 export async function getSearchDocListingsWithKeyset(
   params: FilterParams = {},
-  cursor: KeysetCursor | null = null
+  cursor: KeysetCursor | null = null,
+  snapshot?: SearchPaginationSnapshot
 ): Promise<KeysetPaginatedResult<ListingData>> {
   // Defense in depth: block unbounded text searches
   if (params.query && !params.bounds) {
@@ -1189,7 +1762,8 @@ export async function getSearchDocListingsWithKeyset(
       params: queryParams,
       paramIndex: startParamIndex,
       ftsQueryParamIndex,
-    } = buildSearchDocWhereConditions(params);
+      effectiveAvailableSql,
+    } = buildSearchDocListWhereConditions(params);
 
     // Add keyset WHERE clause
     const keysetResult = buildKeysetWhereClause(
@@ -1201,7 +1775,10 @@ export async function getSearchDocListingsWithKeyset(
     const allParams = [...queryParams, ...keysetResult.params];
     let paramIndex = keysetResult.nextParamIndex;
 
-    const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
+    const whereClause = joinWhereClauseWithSecurityInvariant(
+      conditions,
+      SEARCH_DOC_ALLOWED_SQL_LITERALS
+    );
 
     // Build ORDER BY clause — skip ts_rank_cd for keyset (cursor doesn't capture rank)
     const orderByClause = buildOrderByClause(
@@ -1210,8 +1787,10 @@ export async function getSearchDocListingsWithKeyset(
       true
     );
 
-    // Fetch limit+1 items to determine hasNextPage
-    const fetchLimit = limit + 1;
+    // Fetch extra raw rows when dedupe is enabled so page sizing is based on canonicals.
+    const fetchLimit = features.searchListingDedup
+      ? limit + SEARCH_DEDUP_LOOK_AHEAD + 1
+      : limit + 1;
 
     // Main query with cursor row data columns for building next cursor
     // Note: Numeric values are cast to text to preserve precision for cursor encoding
@@ -1222,19 +1801,31 @@ export async function getSearchDocListingsWithKeyset(
         d.description,
         d.price,
         d.images,
-        d.available_slots as "availableSlots",
-        d.total_slots as "totalSlots",
+        ${effectiveAvailableSql} as "availableSlots",
+        l."totalSlots" as "totalSlots",
+        'HOST_MANAGED' as "availabilitySource",
+        l."openSlots" as "openSlots",
+        l."availableUntil" as "availableUntil",
+        l."minStayMonths" as "minStayMonths",
+        l."lastConfirmedAt" as "lastConfirmedAt",
+        l.status::text as status,
+        l."statusReason" as "statusReason",
+        FALSE as "needsMigrationReview",
+        l."ownerId" as "ownerId",
+        l."normalizedAddress" as "normalizedAddress",
         d.amenities,
         d.house_rules as "houseRules",
         d.household_languages as "householdLanguages",
         d.primary_home_language as "primaryHomeLanguage",
         d.lease_duration as "leaseDuration",
         d.room_type as "roomType",
-        d.move_in_date as "moveInDate",
+        l."moveInDate" as "moveInDate",
         d.listing_created_at as "createdAt",
         d.view_count as "viewCount",
+        d.address,
         d.city,
         d.state,
+        d.zip,
         d.lat,
         d.lng,
         d.avg_rating as "avgRating",
@@ -1246,6 +1837,7 @@ export async function getSearchDocListingsWithKeyset(
         d.review_count::text as "_cursorReviewCount",
         d.listing_created_at::text as "_cursorCreatedAt"
       FROM listing_search_docs d
+      JOIN "Listing" l ON l.id = d.id
       WHERE ${whereClause}
       ORDER BY ${orderByClause}
       LIMIT $${paramIndex++}
@@ -1258,8 +1850,11 @@ export async function getSearchDocListingsWithKeyset(
       dataParams
     );
 
-    // Map results to ListingData
-    const results = mapRawListingsToPublic(listings);
+    const deduped = dedupeListingRows(listings, params, limit);
+    const results = attachListingGroupMetadata(
+      mapRawListingsToPublic(deduped.rows),
+      deduped.groupMetadataById
+    );
 
     // Determine hasNextPage using limit+1 pattern
     const hasNextPage = results.length > limit;
@@ -1271,9 +1866,8 @@ export async function getSearchDocListingsWithKeyset(
 
     // Build nextCursor from the last item
     let nextCursor: string | null = null;
-    if (hasNextPage && listings.length > 0) {
-      // Use the last item within limit (not the extra one)
-      const lastRawItem = listings[limit - 1];
+    if (hasNextPage && deduped.cursorBoundaryRow) {
+      const lastRawItem = deduped.cursorBoundaryRow;
       const cursorRowData: CursorRowData = {
         id: lastRawItem.id,
         listing_created_at:
@@ -1283,7 +1877,11 @@ export async function getSearchDocListingsWithKeyset(
         avg_rating: lastRawItem._cursorAvgRating,
         review_count: lastRawItem._cursorReviewCount,
       };
-      const keysetCursor = buildCursorFromRow(cursorRowData, sortOption);
+      const keysetCursor = buildCursorFromRow(
+        cursorRowData,
+        sortOption,
+        snapshot
+      );
       nextCursor = encodeKeysetCursor(keysetCursor);
     }
 
@@ -1345,7 +1943,8 @@ export async function getSearchDocListingsWithKeyset(
  * @returns Paginated results with nextCursor for next page
  */
 export async function getSearchDocListingsFirstPage(
-  params: FilterParams = {}
+  params: FilterParams = {},
+  snapshot?: SearchPaginationSnapshot
 ): Promise<KeysetPaginatedResult<ListingData>> {
   // Defense in depth: block unbounded text searches
   if (params.query && !params.bounds) {
@@ -1376,8 +1975,12 @@ export async function getSearchDocListingsFirstPage(
       params: queryParams,
       paramIndex: startParamIndex,
       ftsQueryParamIndex,
-    } = buildSearchDocWhereConditions(params);
-    const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
+      effectiveAvailableSql,
+    } = buildSearchDocListWhereConditions(params);
+    const whereClause = joinWhereClauseWithSecurityInvariant(
+      conditions,
+      SEARCH_DOC_ALLOWED_SQL_LITERALS
+    );
 
     // Build ORDER BY clause — skip ts_rank_cd for keyset (cursor doesn't capture rank)
     const orderByClause = buildOrderByClause(
@@ -1392,8 +1995,10 @@ export async function getSearchDocListingsFirstPage(
     const totalPages =
       limitedCount !== null ? Math.ceil(limitedCount / limit) : null;
 
-    // Fetch limit+1 items to determine hasNextPage
-    const fetchLimit = limit + 1;
+    // Fetch extra raw rows when dedupe is enabled so page sizing is based on canonicals.
+    const fetchLimit = features.searchListingDedup
+      ? limit + SEARCH_DEDUP_LOOK_AHEAD + 1
+      : limit + 1;
     let paramIndex = startParamIndex;
 
     // Main query with cursor row data columns
@@ -1404,19 +2009,31 @@ export async function getSearchDocListingsFirstPage(
         d.description,
         d.price,
         d.images,
-        d.available_slots as "availableSlots",
-        d.total_slots as "totalSlots",
+        ${effectiveAvailableSql} as "availableSlots",
+        l."totalSlots" as "totalSlots",
+        'HOST_MANAGED' as "availabilitySource",
+        l."openSlots" as "openSlots",
+        l."availableUntil" as "availableUntil",
+        l."minStayMonths" as "minStayMonths",
+        l."lastConfirmedAt" as "lastConfirmedAt",
+        l.status::text as status,
+        l."statusReason" as "statusReason",
+        FALSE as "needsMigrationReview",
+        l."ownerId" as "ownerId",
+        l."normalizedAddress" as "normalizedAddress",
         d.amenities,
         d.house_rules as "houseRules",
         d.household_languages as "householdLanguages",
         d.primary_home_language as "primaryHomeLanguage",
         d.lease_duration as "leaseDuration",
         d.room_type as "roomType",
-        d.move_in_date as "moveInDate",
+        l."moveInDate" as "moveInDate",
         d.listing_created_at as "createdAt",
         d.view_count as "viewCount",
+        d.address,
         d.city,
         d.state,
+        d.zip,
         d.lat,
         d.lng,
         d.avg_rating as "avgRating",
@@ -1428,6 +2045,7 @@ export async function getSearchDocListingsFirstPage(
         d.review_count::text as "_cursorReviewCount",
         d.listing_created_at::text as "_cursorCreatedAt"
       FROM listing_search_docs d
+      JOIN "Listing" l ON l.id = d.id
       WHERE ${whereClause}
       ORDER BY ${orderByClause}
       LIMIT $${paramIndex++}
@@ -1440,8 +2058,11 @@ export async function getSearchDocListingsFirstPage(
       dataParams
     );
 
-    // Map results to ListingData
-    const results = mapRawListingsToPublic(listings);
+    const deduped = dedupeListingRows(listings, params, limit);
+    const results = attachListingGroupMetadata(
+      mapRawListingsToPublic(deduped.rows),
+      deduped.groupMetadataById
+    );
 
     // Determine hasNextPage using limit+1 pattern
     const hasNextPage = results.length > limit;
@@ -1470,9 +2091,8 @@ export async function getSearchDocListingsFirstPage(
 
     // Build nextCursor from the last item
     let nextCursor: string | null = null;
-    if (hasNextPage && listings.length > 0) {
-      // Use the last item within limit (not the extra one)
-      const lastRawItem = listings[Math.min(limit - 1, listings.length - 1)];
+    if (hasNextPage && deduped.cursorBoundaryRow) {
+      const lastRawItem = deduped.cursorBoundaryRow;
       const cursorRowData: CursorRowData = {
         id: lastRawItem.id,
         listing_created_at:
@@ -1482,7 +2102,11 @@ export async function getSearchDocListingsFirstPage(
         avg_rating: lastRawItem._cursorAvgRating,
         review_count: lastRawItem._cursorReviewCount,
       };
-      const keysetCursor = buildCursorFromRow(cursorRowData, sortOption);
+      const keysetCursor = buildCursorFromRow(
+        cursorRowData,
+        sortOption,
+        snapshot
+      );
       nextCursor = encodeKeysetCursor(keysetCursor);
     }
 
@@ -1579,6 +2203,29 @@ interface SemanticSearchRow {
   combined_score: number;
 }
 
+async function filterSemanticRowsToCurrentEmbeddingVersion(
+  rows: SemanticSearchRow[],
+  embeddingVersion: string
+): Promise<SemanticSearchRow[]> {
+  if (rows.length === 0) {
+    return rows;
+  }
+
+  const eligibleRows = await queryWithTimeout<{ id: string }>(
+    `
+      SELECT id
+      FROM listing_search_docs
+      WHERE id = ANY($1::text[])
+        AND embedding_model = $2
+        AND embedding_status = ANY($3::text[])
+    `,
+    [rows.map((row) => row.id), embeddingVersion, [...PUBLISHED_EMBEDDING_STATUSES]]
+  );
+
+  const eligibleIds = new Set(eligibleRows.map((row) => row.id));
+  return rows.filter((row) => eligibleIds.has(row.id));
+}
+
 /**
  * Semantic search — called when user provides a natural language query
  * and ENABLE_SEMANTIC_SEARCH is true.
@@ -1607,6 +2254,7 @@ export async function semanticSearchQuery(
 
   try {
     const embedding = await getCachedQueryEmbedding(cappedQuery);
+    const embeddingVersion = getCurrentEmbeddingVersion();
     const vecSql = pgvector.toSql(embedding);
 
     // Lowercase array filters to match _lower columns
@@ -1620,7 +2268,7 @@ export async function semanticSearchQuery(
       ? filterParams.languages.map((l) => l.toLowerCase())
       : null;
 
-    const results = await queryWithTimeout<SemanticSearchRow>(
+    const rawResults = await queryWithTimeout<SemanticSearchRow>(
       `SELECT * FROM search_listings_semantic(
         $1::text::vector,
         $2,
@@ -1666,7 +2314,14 @@ export async function semanticSearchQuery(
       ]
     );
 
-    return results.length > 0 ? results : null;
+    if (rawResults.length === 0) {
+      return null;
+    }
+
+    return filterSemanticRowsToCurrentEmbeddingVersion(
+      rawResults,
+      embeddingVersion
+    );
   } catch (err) {
     logger.sync.error("[semantic-search] Failed, falling back to FTS:", {
       error: err instanceof Error ? err.message : "Unknown",
@@ -1698,6 +2353,11 @@ export function mapSemanticRowsToListingData(
       genderPreference: row.gender_preference ?? undefined,
       householdGender: row.household_gender ?? undefined,
       moveInDate: row.move_in_date ?? undefined,
+      publicAvailability: buildPublicAvailability({
+        availableSlots: row.available_slots,
+        totalSlots: row.total_slots,
+        moveInDate: row.move_in_date ?? undefined,
+      }),
       // ownerId intentionally omitted — @deprecated, S3 security fix (types/listing.ts:28)
       // Match mapRawListingsToPublic: include rating/review/view/createdAt fields
       // for ListingCard rendering (star ratings, review counts, recency)

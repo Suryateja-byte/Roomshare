@@ -1,0 +1,4565 @@
+diff --git a/jest.config.js b/jest.config.js
+index 180bdb38..425a3c8d 100644
+--- a/jest.config.js
++++ b/jest.config.js
+@@ -47,6 +47,18 @@ const customJestConfig = {
+     "!src/app/layout.tsx",
+     "!src/app/global-error.tsx",
+   ],
++  coverageThreshold: {
++    "src/lib/identity/**/*.ts": {
++      statements: 90,
++      functions: 90,
++      lines: 90,
++    },
++    "src/lib/validation/category/**/*.ts": {
++      statements: 90,
++      functions: 90,
++      lines: 90,
++    },
++  },
+   forceExit: process.env.CI === "true",
+   workerIdleMemoryLimit: "512MB",
+   moduleDirectories: ["node_modules", "<rootDir>/"],
+diff --git a/src/__tests__/db/phase01-moderation-precedence.test.ts b/src/__tests__/db/phase01-moderation-precedence.test.ts
+new file mode 100644
+index 00000000..e989c472
+--- /dev/null
++++ b/src/__tests__/db/phase01-moderation-precedence.test.ts
+@@ -0,0 +1,198 @@
++import { withActor } from "@/lib/db/with-actor";
++import { ModerationLockedError } from "@/lib/identity/errors";
++import {
++  Phase01TestDb,
++  hostActor,
++  moderatorActor,
++} from "@/__tests__/utils/phase01-test-db";
++
++describe("Phase 01 moderation-precedence and append-only triggers", () => {
++  let db: Phase01TestDb;
++  let physicalUnitId: string;
++  let claimId: string;
++  let inventoryId: string;
++
++  beforeEach(() => {
++    db = new Phase01TestDb();
++    db.insertUser("host-1");
++    db.insertUser("moderator-1");
++
++    physicalUnitId = db.insertPhysicalUnit({
++      id: "unit-mod",
++      canonical_address_hash: "hash-mod",
++    });
++    claimId = db.insertHostUnitClaim({
++      id: "claim-mod",
++      unit_id: physicalUnitId,
++      host_user_id: "host-1",
++      canonical_address_hash: "hash-mod",
++    });
++    inventoryId = db.insertListingInventory({
++      id: "inventory-mod",
++      unit_id: physicalUnitId,
++      canonical_address_hash: "hash-mod",
++      room_category: "PRIVATE_ROOM",
++      capacity_guests: 1,
++    });
++  });
++
++  afterEach(() => {
++    db.dispose();
++  });
++
++  it.each([
++    ["publish_status", "PUBLISHED"],
++    ["lifecycle_status", "PAUSED"],
++    ["privacy_version", 2],
++  ])("host role cannot update %s on physical_units", async (column, value) => {
++    await expect(
++      withActor(
++        hostActor(),
++        async (tx) => {
++          await (tx as any).physicalUnit.update({
++            where: { id: physicalUnitId },
++            data: { [column]: value },
++          });
++        },
++        { client: db.client as never }
++      )
++    ).rejects.toBeInstanceOf(ModerationLockedError);
++
++    const row = db.get<{ publish_status: string; lifecycle_status: string; privacy_version: number }>(
++      `SELECT publish_status, lifecycle_status, privacy_version
++       FROM physical_units
++       WHERE id = ?`,
++      [physicalUnitId]
++    );
++
++    expect(row).toEqual({
++      publish_status: "DRAFT",
++      lifecycle_status: "ACTIVE",
++      privacy_version: 1,
++    });
++  });
++
++  it("moderator role can update publish_status on all three canonical tables", async () => {
++    await withActor(
++      moderatorActor(),
++      async (tx) => {
++        await (tx as any).physicalUnit.update({
++          where: { id: physicalUnitId },
++          data: { publish_status: "PUBLISHED" },
++        });
++        await (tx as any).hostUnitClaim.update({
++          where: { id: claimId },
++          data: { publish_status: "PUBLISHED" },
++        });
++        await (tx as any).listingInventory.update({
++          where: { id: inventoryId },
++          data: { publish_status: "PUBLISHED" },
++        });
++      },
++      { client: db.client as never }
++    );
++
++    expect(
++      db.get<{ publish_status: string }>(
++        `SELECT publish_status FROM physical_units WHERE id = ?`,
++        [physicalUnitId]
++      ).publish_status
++    ).toBe("PUBLISHED");
++    expect(
++      db.get<{ publish_status: string }>(
++        `SELECT publish_status FROM host_unit_claims WHERE id = ?`,
++        [claimId]
++      ).publish_status
++    ).toBe("PUBLISHED");
++    expect(
++      db.get<{ publish_status: string }>(
++        `SELECT publish_status FROM listing_inventories WHERE id = ?`,
++        [inventoryId]
++      ).publish_status
++    ).toBe("PUBLISHED");
++  });
++
++  it("missing actor_role defaults to system and passes", async () => {
++    await db.client.$transaction(async (tx) => {
++      await (tx as any).physicalUnit.update({
++        where: { id: physicalUnitId },
++        data: { publish_status: "PUBLISHED" },
++      });
++    });
++
++    expect(
++      db.get<{ publish_status: string }>(
++        `SELECT publish_status FROM physical_units WHERE id = ?`,
++        [physicalUnitId]
++      ).publish_status
++    ).toBe("PUBLISHED");
++  });
++
++  it("trigger applies to all three canonical tables for host-role updates", async () => {
++    await expect(
++      withActor(
++        hostActor(),
++        async (tx) => {
++          await (tx as any).hostUnitClaim.update({
++            where: { id: claimId },
++            data: { publish_status: "PUBLISHED" },
++          });
++        },
++        { client: db.client as never }
++      )
++    ).rejects.toBeInstanceOf(ModerationLockedError);
++
++    await expect(
++      withActor(
++        hostActor(),
++        async (tx) => {
++          await (tx as any).listingInventory.update({
++            where: { id: inventoryId },
++            data: { publish_status: "PUBLISHED" },
++          });
++        },
++        { client: db.client as never }
++      )
++    ).rejects.toBeInstanceOf(ModerationLockedError);
++  });
++
++  it("identity_mutations rejects UPDATE and DELETE", () => {
++    const mutationId = db.insertIdentityMutation({
++      id: "mutation-mod",
++      from_unit_ids: [physicalUnitId],
++      to_unit_ids: [physicalUnitId],
++    });
++
++    expect(() =>
++      db.run(
++        `UPDATE identity_mutations
++         SET reason_code = 'manual_moderation'
++         WHERE id = ?`,
++        [mutationId]
++      )
++    ).toThrow(/append-only/i);
++
++    expect(() =>
++      db.run(`DELETE FROM identity_mutations WHERE id = ?`, [mutationId])
++    ).toThrow(/append-only/i);
++  });
++
++  it("audit_events rejects UPDATE and DELETE", () => {
++    const auditId = db.insertAuditEvent({
++      id: "audit-mod",
++    });
++
++    expect(() =>
++      db.run(
++        `UPDATE audit_events
++         SET kind = 'CANONICAL_UNIT_CREATED'
++         WHERE id = ?`,
++        [auditId]
++      )
++    ).toThrow(/append-only/i);
++
++    expect(() => db.run(`DELETE FROM audit_events WHERE id = ?`, [auditId])).toThrow(
++      /append-only/i
++    );
++  });
++});
+diff --git a/src/__tests__/db/phase01-schema.test.ts b/src/__tests__/db/phase01-schema.test.ts
+new file mode 100644
+index 00000000..a64b4637
+--- /dev/null
++++ b/src/__tests__/db/phase01-schema.test.ts
+@@ -0,0 +1,274 @@
++import { withActor } from "@/lib/db/with-actor";
++import { resolveOrCreateUnit } from "@/lib/identity/resolve-or-create-unit";
++import { validateInventoryInput } from "@/lib/validation/category";
++import {
++  Phase01TestDb,
++  hostActor,
++} from "@/__tests__/utils/phase01-test-db";
++
++describe("Phase 01 schema and DB contracts", () => {
++  let db: Phase01TestDb;
++
++  beforeEach(() => {
++    db = new Phase01TestDb();
++    db.insertUser("host-1");
++    db.insertUser("moderator-1");
++  });
++
++  afterEach(() => {
++    db.dispose();
++  });
++
++  it("creates the seven canonical tables, required indexes, and Listing.physical_unit_id", () => {
++    expect(db.listTables()).toEqual(
++      expect.arrayContaining([
++        "physical_units",
++        "host_unit_claims",
++        "listing_inventories",
++        "identity_mutations",
++        "outbox_events",
++        "cache_invalidations",
++        "audit_events",
++      ])
++    );
++
++    expect(db.listIndexes()).toEqual(
++      expect.arrayContaining([
++        "physical_units_canonical_unique_idx",
++        "outbox_events_pending_idx",
++        "outbox_events_aggregate_idx",
++        "outbox_events_dlq_idx",
++        "cache_invalidations_pending_idx",
++        "cache_invalidations_unit_enqueued_idx",
++        "audit_events_aggregate_idx",
++        "audit_events_kind_idx",
++        "audit_events_actor_idx",
++      ])
++    );
++
++    const columns = db
++      .all<{ name: string }>(`PRAGMA table_info("Listing")`)
++      .map((column) => column.name);
++
++    expect(columns).toContain("physical_unit_id");
++  });
++
++  it.each([
++    [
++      "ENTIRE_PLACE rejects non-null total_beds",
++      {
++        room_category: "ENTIRE_PLACE",
++        total_beds: 2,
++      },
++    ],
++    [
++      "SHARED_ROOM rejects null open_beds",
++      {
++        room_category: "SHARED_ROOM",
++        capacity_guests: null,
++        total_beds: 2,
++        open_beds: null,
++      },
++    ],
++    [
++      "PRIVATE_ROOM rejects non-null total_beds",
++      {
++        room_category: "PRIVATE_ROOM",
++        total_beds: 1,
++      },
++    ],
++    [
++      "SHARED_ROOM rejects open_beds > total_beds",
++      {
++        room_category: "SHARED_ROOM",
++        capacity_guests: null,
++        total_beds: 2,
++        open_beds: 3,
++      },
++    ],
++    [
++      "ENTIRE_PLACE rejects non-null gender_preference",
++      {
++        room_category: "ENTIRE_PLACE",
++        gender_preference: "women",
++      },
++    ],
++  ])("%s", (_label, overrides) => {
++    const unitId = db.insertPhysicalUnit({
++      id: "unit-schema",
++      canonical_address_hash: "hash-schema",
++    });
++
++    expect(() =>
++      db.insertListingInventory({
++        id: `${String(overrides.room_category ?? "inv")}-row`,
++        unit_id: unitId,
++        canonical_address_hash: "hash-schema",
++        ...overrides,
++      })
++    ).toThrow(/constraint|check/i);
++  });
++
++  it("accepts a valid ENTIRE_PLACE row at the DB boundary", () => {
++    const unitId = db.insertPhysicalUnit({
++      id: "unit-valid",
++      canonical_address_hash: "hash-valid",
++    });
++
++    expect(() =>
++      db.insertListingInventory({
++        id: "inventory-valid",
++        unit_id: unitId,
++        canonical_address_hash: "hash-valid",
++        room_category: "ENTIRE_PLACE",
++        capacity_guests: 3,
++        total_beds: null,
++        open_beds: null,
++        gender_preference: null,
++        household_gender: null,
++      })
++    ).not.toThrow();
++  });
++
++  it("keeps availability_range present and constrained to a valid tstzrange literal", () => {
++    const unitId = db.insertPhysicalUnit({
++      id: "unit-range",
++      canonical_address_hash: "hash-range",
++    });
++
++    db.insertListingInventory({
++      id: "inventory-range-valid",
++      unit_id: unitId,
++      canonical_address_hash: "hash-range",
++      room_category: "PRIVATE_ROOM",
++      capacity_guests: 1,
++      availability_range: "[2026-05-01T00:00:00Z,2026-06-01T00:00:00Z)",
++    });
++
++    expect(() =>
++      db.insertListingInventory({
++        id: "inventory-range-invalid",
++        unit_id: unitId,
++        canonical_address_hash: "hash-range",
++        room_category: "PRIVATE_ROOM",
++        capacity_guests: 1,
++        availability_range: "not-a-range",
++      })
++    ).toThrow(/constraint|check/i);
++  });
++
++  it("rejects an UPDATE that would violate the category matrix", () => {
++    const unitId = db.insertPhysicalUnit({
++      id: "unit-update-check",
++      canonical_address_hash: "hash-update-check",
++    });
++    const inventoryId = db.insertListingInventory({
++      id: "inventory-update-check",
++      unit_id: unitId,
++      canonical_address_hash: "hash-update-check",
++      room_category: "PRIVATE_ROOM",
++      capacity_guests: 1,
++    });
++
++    expect(() =>
++      db.run(
++        `UPDATE "listing_inventories"
++         SET room_category = 'SHARED_ROOM'
++         WHERE id = ?`,
++        [inventoryId]
++      )
++    ).toThrow(/constraint|check/i);
++  });
++
++  it("resolveOrCreateUnit collapses the five canonical address variants into one row", async () => {
++    const actor = hostActor();
++    const variants = [
++      "123 Main St Apt 4B",
++      "  123  main  st  apt 4B ",
++      "123 MAIN ST APT 4B",
++      "123 Main St. Apt 4B",
++      "123 Main Street Apt 4B",
++    ];
++
++    const results: Array<{ created: boolean }> = [];
++    for (const address of variants) {
++      results.push(
++        await withActor(
++          actor,
++          async (tx) =>
++            resolveOrCreateUnit(tx as never, {
++              actor,
++              address: {
++                address,
++                city: "San Francisco",
++                state: "ca",
++                zip: "94107-1234",
++              },
++            }),
++          { client: db.client as never }
++        )
++      );
++    }
++
++    expect(db.getPhysicalUnits()).toHaveLength(1);
++    expect(results.filter((result) => result.created)).toHaveLength(1);
++  });
++
++  it("increments source_version and row_version on repeated upserts", async () => {
++    const actor = hostActor();
++    const address = {
++      address: "500 Market Street",
++      city: "San Francisco",
++      state: "CA",
++      zip: "94105",
++    };
++
++    await withActor(
++      actor,
++      async (tx) =>
++        resolveOrCreateUnit(tx as never, {
++          actor,
++          address,
++        }),
++      { client: db.client as never }
++    );
++
++    expect(db.getPhysicalUnits()[0]).toEqual(
++      expect.objectContaining({
++        sourceVersion: BigInt(1),
++        rowVersion: BigInt(1),
++      })
++    );
++
++    await withActor(
++      actor,
++      async (tx) =>
++        resolveOrCreateUnit(tx as never, {
++          actor,
++          address,
++        }),
++      { client: db.client as never }
++    );
++
++    expect(db.getPhysicalUnits()[0]).toEqual(
++      expect.objectContaining({
++        sourceVersion: BigInt(2),
++        rowVersion: BigInt(2),
++      })
++    );
++  });
++
++  it("rejects invalid SHARED_ROOM shapes at the zod layer before the DB write", () => {
++    const result = validateInventoryInput({
++      roomCategory: "SHARED_ROOM",
++      inventoryKey: "shared-1",
++      availableFrom: "2026-05-01",
++      availabilityRange: "[2026-05-01T00:00:00Z,2026-06-01T00:00:00Z)",
++      price: 900,
++      totalBeds: 2,
++      openBeds: 3,
++    });
++
++    expect(result.ok).toBe(false);
++  });
++});
+diff --git a/src/__tests__/integration/phase01-read-path-isolation.test.ts b/src/__tests__/integration/phase01-read-path-isolation.test.ts
+new file mode 100644
+index 00000000..100c9cc0
+--- /dev/null
++++ b/src/__tests__/integration/phase01-read-path-isolation.test.ts
+@@ -0,0 +1,110 @@
++import fs from "fs";
++import path from "path";
++
++const TEXT_EXTENSIONS = new Set([
++  ".ts",
++  ".tsx",
++  ".js",
++  ".jsx",
++  ".json",
++  ".md",
++  ".sql",
++  ".prisma",
++]);
++
++function walkFiles(root: string): string[] {
++  const entries = fs.readdirSync(root, { withFileTypes: true });
++  const files: string[] = [];
++
++  for (const entry of entries) {
++    if (
++      [".next", ".worktrees", "coverage", "node_modules", "test-output"].includes(
++        entry.name
++      )
++    ) {
++      continue;
++    }
++
++    const fullPath = path.join(root, entry.name);
++    if (entry.isDirectory()) {
++      files.push(...walkFiles(fullPath));
++      continue;
++    }
++
++    if (!TEXT_EXTENSIONS.has(path.extname(entry.name))) {
++      continue;
++    }
++
++    files.push(fullPath);
++  }
++
++  return files;
++}
++
++function findMatches(term: string): string[] {
++  const repoRoot = process.cwd();
++  const searchRoots = ["src", "prisma", ".orchestrator"].map((dir) =>
++    path.join(repoRoot, dir)
++  );
++  const matches: string[] = [];
++
++  for (const root of searchRoots) {
++    for (const file of walkFiles(root)) {
++      const relative = path.relative(repoRoot, file);
++      const content = fs.readFileSync(file, "utf8");
++      if (content.includes(term)) {
++        matches.push(relative);
++      }
++    }
++  }
++
++  return matches;
++}
++
++describe("Phase 01 read-path isolation", () => {
++  const terms = [
++    "listing_inventories",
++    "ListingInventory",
++    "physical_units",
++    "host_unit_claims",
++    "identity_mutations",
++    "outbox_events",
++    "cache_invalidations",
++    "audit_events",
++  ];
++
++  it("keeps new table references out of app and component read paths", () => {
++    for (const term of terms) {
++      const hits = findMatches(term);
++      const offending = hits.filter(
++        (file) => file.startsWith("src/app/") || file.startsWith("src/components/")
++      );
++      expect(offending).toEqual([]);
++    }
++  });
++
++  it("keeps Listing.physical_unit_id unread by app and component code", () => {
++    const hits = findMatches("physical_unit_id");
++    const offending = hits.filter(
++      (file) =>
++        (file.startsWith("src/app/") || file.startsWith("src/components/")) &&
++        file !== "src/__tests__/integration/phase01-read-path-isolation.test.ts"
++    );
++    expect(offending).toEqual([]);
++  });
++
++  it("keeps isPhase01CanonicalWritesEnabled uncoupled from production callers", () => {
++    const hits = findMatches("isPhase01CanonicalWritesEnabled");
++    const allowed = new Set([
++      "src/lib/flags/phase01.ts",
++      "src/__tests__/integration/phase01-read-path-isolation.test.ts",
++      "src/__tests__/lib/flags/phase01.test.ts",
++    ]);
++
++    const offending = hits.filter(
++      (file) => file.startsWith("src/") && !allowed.has(file)
++    );
++
++    expect(offending).toEqual([]);
++  });
++});
+diff --git a/src/__tests__/lib/audit/events.test.ts b/src/__tests__/lib/audit/events.test.ts
+new file mode 100644
+index 00000000..eb25c3a3
+--- /dev/null
++++ b/src/__tests__/lib/audit/events.test.ts
+@@ -0,0 +1,83 @@
++import { recordAuditEvent } from "@/lib/audit/events";
++
++describe("recordAuditEvent", () => {
++  it("writes audit events with default empty details", async () => {
++    const tx = {
++      auditEvent: {
++        create: jest.fn().mockResolvedValue({ id: "audit-1" }),
++      },
++    };
++
++    await recordAuditEvent(tx as never, {
++      kind: "CANONICAL_UNIT_CREATED",
++      actor: { role: "system", id: null },
++      aggregateType: "physical_units",
++      aggregateId: "unit-1",
++    });
++
++    expect(tx.auditEvent.create).toHaveBeenCalledWith(
++      expect.objectContaining({
++        data: expect.objectContaining({
++          details: {},
++        }),
++      })
++    );
++  });
++
++  it("rejects PII-like detail keys", async () => {
++    const tx = {
++      auditEvent: {
++        create: jest.fn(),
++      },
++    };
++
++    await expect(
++      recordAuditEvent(tx as never, {
++        kind: "IDENTITY_MUTATION",
++        actor: { role: "moderator", id: "admin-1" },
++        aggregateType: "identity_mutations",
++        aggregateId: "mutation-1",
++        details: {
++          email: "host@example.com",
++        },
++      })
++    ).rejects.toThrow(/PII-like detail keys/);
++  });
++
++  it("allows canonicalAddressHash-style detail keys", async () => {
++    const tx = {
++      auditEvent: {
++        create: jest.fn().mockResolvedValue({ id: "audit-2" }),
++      },
++    };
++
++    await expect(
++      recordAuditEvent(tx as never, {
++        kind: "IDENTITY_MUTATION",
++        actor: { role: "system", id: null },
++        aggregateType: "identity_mutations",
++        aggregateId: "mutation-2",
++        details: {
++          canonicalAddressHash: "abc123",
++        },
++      })
++    ).resolves.toEqual({ auditEventId: "audit-2" });
++  });
++
++  it("rejects unknown audit kinds at the zod layer", async () => {
++    const tx = {
++      auditEvent: {
++        create: jest.fn(),
++      },
++    };
++
++    await expect(
++      recordAuditEvent(tx as never, {
++        kind: "NOT_A_KIND" as never,
++        actor: { role: "system", id: null },
++        aggregateType: "identity_mutations",
++        aggregateId: "mutation-2",
++      })
++    ).rejects.toThrow();
++  });
++});
+diff --git a/src/__tests__/lib/db/optimistic-lock.test.ts b/src/__tests__/lib/db/optimistic-lock.test.ts
+new file mode 100644
+index 00000000..c1ba7fa6
+--- /dev/null
++++ b/src/__tests__/lib/db/optimistic-lock.test.ts
+@@ -0,0 +1,28 @@
++import { StaleVersionError } from "@/lib/identity/errors";
++import { requireRowVersion } from "@/lib/db/optimistic-lock";
++
++describe("requireRowVersion", () => {
++  it("is a no-op when the caller has no if-match version", () => {
++    expect(() => requireRowVersion(BigInt(5), null)).not.toThrow();
++  });
++
++  it("is a no-op when the version matches", () => {
++    expect(() => requireRowVersion(BigInt(5), BigInt(5))).not.toThrow();
++  });
++
++  it("throws a StaleVersionError on mismatch", () => {
++    expect(() => requireRowVersion(BigInt(5), BigInt(4))).toThrow(
++      StaleVersionError
++    );
++  });
++
++  it("surfaces the expected 409 metadata on stale versions", () => {
++    try {
++      requireRowVersion(BigInt(5), BigInt(4));
++      throw new Error("expected stale version failure");
++    } catch (error) {
++      expect(error).toBeInstanceOf(StaleVersionError);
++      expect((error as StaleVersionError).httpStatus).toBe(409);
++    }
++  });
++});
+diff --git a/src/__tests__/lib/db/with-actor.test.ts b/src/__tests__/lib/db/with-actor.test.ts
+new file mode 100644
+index 00000000..dc425290
+--- /dev/null
++++ b/src/__tests__/lib/db/with-actor.test.ts
+@@ -0,0 +1,68 @@
++import { Phase01TestDb, hostActor } from "@/__tests__/utils/phase01-test-db";
++import { ModerationLockedError } from "@/lib/identity/errors";
++import { withActor } from "@/lib/db/with-actor";
++
++describe("withActor", () => {
++  let db: Phase01TestDb;
++
++  beforeEach(() => {
++    db = new Phase01TestDb();
++  });
++
++  afterEach(() => {
++    db.dispose();
++  });
++
++  it("makes actor_role visible inside the transaction via current_setting", async () => {
++    const result = await withActor(
++      hostActor("user-1"),
++      async (tx) => db.currentSettingInTx(tx as never, "app.actor_role"),
++      { client: db.client as never }
++    );
++
++    expect(result).toBe("host");
++  });
++
++  it("auto-resets actor GUCs outside the transaction", async () => {
++    await withActor(hostActor("user-1"), async () => "ok", {
++      client: db.client as never,
++    });
++
++    expect(db.currentSettingOutsideTx("app.actor_role")).toBeNull();
++  });
++
++  it("leaves no actor GUC residue after a rolled-back transaction", async () => {
++    await expect(
++      withActor(
++        hostActor("user-1"),
++        async (tx) => {
++          expect(db.currentSettingInTx(tx as never, "app.actor_role")).toBe("host");
++          throw new Error("rollback me");
++        },
++        { client: db.client as never }
++      )
++    ).rejects.toThrow("rollback me");
++
++    expect(db.currentSettingOutsideTx("app.actor_role")).toBeNull();
++  });
++
++  it("translates moderation trigger failures", async () => {
++    const unitId = db.insertPhysicalUnit({
++      id: "unit-locked",
++      canonical_address_hash: "hash-locked",
++    });
++
++    await expect(
++      withActor(
++        hostActor("user-1"),
++        async (tx) => {
++          await (tx as any).physicalUnit.update({
++            where: { id: unitId },
++            data: { publish_status: "PUBLISHED" },
++          });
++        },
++        { client: db.client as never }
++      )
++    ).rejects.toBeInstanceOf(ModerationLockedError);
++  });
++});
+diff --git a/src/__tests__/lib/identity/mutate-unit.test.ts b/src/__tests__/lib/identity/mutate-unit.test.ts
+new file mode 100644
+index 00000000..63f5d0e3
+--- /dev/null
++++ b/src/__tests__/lib/identity/mutate-unit.test.ts
+@@ -0,0 +1,130 @@
++import { recordIdentityMutation } from "@/lib/identity/mutate-unit";
++
++function makePhysicalUnit(id: string, epoch: number, supersedesUnitIds: string[] = []) {
++  return { id, unitIdentityEpoch: epoch, supersedesUnitIds };
++}
++
++function makeTx(units = [makePhysicalUnit("unit-a", 2), makePhysicalUnit("unit-b", 4)]) {
++  return {
++    $executeRawUnsafe: jest.fn().mockResolvedValue(undefined),
++    $executeRaw: jest.fn().mockResolvedValue(0),
++    physicalUnit: {
++      findMany: jest.fn().mockResolvedValue(units),
++      update: jest.fn().mockResolvedValue({}),
++    },
++    identityMutation: {
++      create: jest.fn().mockResolvedValue({ id: "mutation-1" }),
++    },
++    outboxEvent: {
++      create: jest.fn().mockResolvedValue({ id: "outbox-1" }),
++    },
++    auditEvent: {
++      create: jest.fn().mockResolvedValue({ id: "audit-1" }),
++    },
++  };
++}
++
++describe("recordIdentityMutation", () => {
++  it("rejects MERGE inputs that target more than one destination unit", async () => {
++    const tx = makeTx([makePhysicalUnit("unit-a", 1)]);
++
++    await expect(
++      recordIdentityMutation(tx as never, {
++        kind: "MERGE",
++        fromUnitIds: ["unit-a"],
++        toUnitIds: ["unit-b", "unit-c"],
++        reasonCode: "operator_duplicate",
++        operatorId: "moderator-1",
++      })
++    ).rejects.toThrow("MERGE requires exactly one target unit id");
++
++    expect(tx.identityMutation.create).not.toHaveBeenCalled();
++  });
++
++  it("rejects SPLIT inputs that provide more than one source unit", async () => {
++    const tx = makeTx([makePhysicalUnit("unit-a", 1)]);
++
++    await expect(
++      recordIdentityMutation(tx as never, {
++        kind: "SPLIT",
++        fromUnitIds: ["unit-a", "unit-b"],
++        toUnitIds: ["unit-c"],
++        reasonCode: "operator_split",
++        operatorId: "moderator-1",
++      })
++    ).rejects.toThrow("SPLIT requires exactly one source unit id");
++
++    expect(tx.identityMutation.create).not.toHaveBeenCalled();
++  });
++
++  it("records a merge, bumps epochs, and emits a high-priority outbox event", async () => {
++    const tx = makeTx([
++      makePhysicalUnit("unit-a", 1),
++      makePhysicalUnit("unit-b", 3),
++      makePhysicalUnit("unit-target", 2, ["unit-a"]),
++    ]);
++
++    const result = await recordIdentityMutation(tx as never, {
++      kind: "MERGE",
++      fromUnitIds: ["unit-a", "unit-b"],
++      toUnitIds: ["unit-target"],
++      reasonCode: "operator_duplicate",
++      operatorId: "moderator-1",
++    });
++
++    expect(result.resultingEpoch).toBe(4);
++    expect(result.affectedUnitIds).toEqual(["unit-a", "unit-b", "unit-target"]);
++    expect(tx.identityMutation.create).toHaveBeenCalledTimes(1);
++    expect(tx.outboxEvent.create).toHaveBeenCalledWith(
++      expect.objectContaining({
++        data: expect.objectContaining({
++          priority: 0,
++        }),
++      })
++    );
++    expect(tx.physicalUnit.update).toHaveBeenCalledWith(
++      expect.objectContaining({
++        where: { id: "unit-target" },
++        data: expect.objectContaining({
++          supersedesUnitIds: ["unit-a", "unit-b"],
++        }),
++      })
++    );
++  });
++
++  it("requires all target units to already exist for splits", async () => {
++    const tx = makeTx([makePhysicalUnit("unit-a", 1), makePhysicalUnit("unit-b", 1)]);
++
++    await expect(
++      recordIdentityMutation(tx as never, {
++        kind: "SPLIT",
++        fromUnitIds: ["unit-a"],
++        toUnitIds: ["unit-b", "unit-c"],
++        reasonCode: "operator_split",
++        operatorId: "moderator-1",
++      })
++    ).rejects.toThrow("Unknown physical unit: unit-c");
++  });
++
++  it("allows canonicalizer upgrades without an operator id", async () => {
++    const tx = makeTx([makePhysicalUnit("unit-a", 5)]);
++
++    const result = await recordIdentityMutation(tx as never, {
++      kind: "CANONICALIZER_UPGRADE",
++      fromUnitIds: ["unit-a"],
++      toUnitIds: ["unit-a"],
++      reasonCode: "canonicalizer_upgrade",
++      operatorId: null,
++    });
++
++    expect(result.mutationId).toBe("mutation-1");
++    expect(tx.auditEvent.create).toHaveBeenCalledWith(
++      expect.objectContaining({
++        data: expect.objectContaining({
++          actorRole: "system",
++          actorId: null,
++        }),
++      })
++    );
++  });
++});
+diff --git a/src/__tests__/lib/validation/category/schema.test.ts b/src/__tests__/lib/validation/category/schema.test.ts
+new file mode 100644
+index 00000000..894109af
+--- /dev/null
++++ b/src/__tests__/lib/validation/category/schema.test.ts
+@@ -0,0 +1,97 @@
++import {
++  InventoryInputSchema,
++  PrivateRoomInputSchema,
++  SharedRoomInputSchema,
++} from "@/lib/validation/category/schema";
++import { validateInventoryInput } from "@/lib/validation/category";
++
++describe("InventoryInputSchema", () => {
++  const base = {
++    inventoryKey: "room-1",
++    availableFrom: "2026-05-01",
++    availabilityRange: "[2026-05-01T00:00:00Z,2026-06-01T00:00:00Z)",
++    price: 1200,
++  };
++
++  it("accepts a valid ENTIRE_PLACE shape and forces null-only fields", () => {
++    const result = validateInventoryInput({
++      ...base,
++      roomCategory: "ENTIRE_PLACE",
++      capacityGuests: 2,
++    });
++
++    expect(result.ok).toBe(true);
++    if (result.ok) {
++      expect(result.value.totalBeds).toBeNull();
++      expect(result.value.openBeds).toBeNull();
++    }
++  });
++
++  it("rejects ENTIRE_PLACE rows with non-null totalBeds", () => {
++    const result = validateInventoryInput({
++      ...base,
++      roomCategory: "ENTIRE_PLACE",
++      capacityGuests: 2,
++      totalBeds: 2,
++    });
++
++    expect(result.ok).toBe(false);
++  });
++
++  it("rejects SHARED_ROOM rows where openBeds exceeds totalBeds", () => {
++    const result = InventoryInputSchema.safeParse({
++      ...base,
++      roomCategory: "SHARED_ROOM",
++      totalBeds: 2,
++      openBeds: 3,
++    });
++
++    expect(result.success).toBe(false);
++  });
++
++  it("requires a valid tstzrange literal", () => {
++    const result = validateInventoryInput({
++      ...base,
++      roomCategory: "PRIVATE_ROOM",
++      capacityGuests: 1,
++      availabilityRange: "not-a-range",
++    });
++
++    expect(result.ok).toBe(false);
++  });
++
++  it("accepts a valid PRIVATE_ROOM shape and normalizes optional strings", () => {
++    const result = PrivateRoomInputSchema.parse({
++      ...base,
++      roomCategory: "PRIVATE_ROOM",
++      capacityGuests: "2",
++      spaceLabel: "  Front room  ",
++      leaseMinMonths: "3",
++      leaseMaxMonths: "6",
++      leaseNegotiable: true,
++    });
++
++    expect(result).toEqual(
++      expect.objectContaining({
++        capacityGuests: 2,
++        spaceLabel: "Front room",
++        leaseMinMonths: 3,
++        leaseMaxMonths: 6,
++        leaseNegotiable: true,
++      })
++    );
++  });
++
++  it("accepts a valid SHARED_ROOM shape and forces capacityGuests to null", () => {
++    const result = SharedRoomInputSchema.parse({
++      ...base,
++      roomCategory: "SHARED_ROOM",
++      totalBeds: 3,
++      openBeds: 1,
++    });
++
++    expect(result.capacityGuests).toBeNull();
++    expect(result.totalBeds).toBe(3);
++    expect(result.openBeds).toBe(1);
++  });
++});
+diff --git a/src/lib/audit/events.ts b/src/lib/audit/events.ts
+new file mode 100644
+index 00000000..2d364c60
+--- /dev/null
++++ b/src/lib/audit/events.ts
+@@ -0,0 +1,73 @@
++import { Prisma } from "@prisma/client";
++import { z } from "zod";
++import type { TransactionClient } from "@/lib/db/with-actor";
++
++const AuditEventKindSchema = z.enum([
++  "CANONICAL_UNIT_RESOLVED",
++  "CANONICAL_UNIT_CREATED",
++  "IDENTITY_MUTATION",
++  "MODERATION_LOCKED_REJECTED",
++  "HOST_CLAIM_UPSERTED",
++  "INVENTORY_UPSERTED",
++]);
++
++const AuditAggregateTypeSchema = z.enum([
++  "physical_units",
++  "host_unit_claims",
++  "listing_inventories",
++  "identity_mutations",
++]);
++
++const PII_BLOCKLIST =
++  /^(email|phone|password|address|token|secret|streetAddress|postalAddress)$/i;
++
++const AuditDetailsSchema = z
++  .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
++  .superRefine((details, ctx) => {
++    for (const key of Object.keys(details)) {
++      if (PII_BLOCKLIST.test(key)) {
++        ctx.addIssue({
++          code: z.ZodIssueCode.custom,
++          message: `PII-like detail keys are not allowed: ${key}`,
++        });
++      }
++    }
++  });
++
++const AuditEventInputSchema = z.object({
++  kind: AuditEventKindSchema,
++  actor: z.object({
++    role: z.enum(["host", "moderator", "system"]),
++    id: z.string().trim().min(1).nullable(),
++  }),
++  aggregateType: AuditAggregateTypeSchema,
++  aggregateId: z.string().trim().min(1),
++  details: AuditDetailsSchema.optional(),
++  requestId: z.string().trim().min(1).optional(),
++  unitIdentityEpoch: z.number().int().positive().optional(),
++});
++
++export type AuditEventKind = z.infer<typeof AuditEventKindSchema>;
++export type AuditEventInput = z.infer<typeof AuditEventInputSchema>;
++
++export async function recordAuditEvent(
++  tx: TransactionClient,
++  input: AuditEventInput
++): Promise<{ auditEventId: string }> {
++  const parsed = AuditEventInputSchema.parse(input);
++  const created = await tx.auditEvent.create({
++    data: {
++      kind: parsed.kind,
++      actorRole: parsed.actor.role,
++      actorId: parsed.actor.id,
++      aggregateType: parsed.aggregateType,
++      aggregateId: parsed.aggregateId,
++      details: (parsed.details ?? {}) as Prisma.InputJsonObject,
++      requestId: parsed.requestId ?? null,
++      unitIdentityEpoch: parsed.unitIdentityEpoch ?? null,
++    },
++    select: { id: true },
++  });
++
++  return { auditEventId: created.id };
++}
+diff --git a/src/lib/db/with-actor.ts b/src/lib/db/with-actor.ts
+new file mode 100644
+index 00000000..e11f36f5
+--- /dev/null
++++ b/src/lib/db/with-actor.ts
+@@ -0,0 +1,105 @@
++import "server-only";
++
++import { Prisma } from "@prisma/client";
++import { prisma } from "@/lib/prisma";
++import { ModerationLockedError } from "@/lib/identity/errors";
++
++export type TransactionClient = Parameters<
++  Parameters<typeof prisma.$transaction>[0]
++>[0];
++
++export type ActorRole = "host" | "moderator" | "system";
++
++export interface ActorContext {
++  role: ActorRole;
++  id: string | null;
++}
++
++export interface TransactionHost {
++  $transaction<T>(
++    fn: (tx: TransactionClient) => Promise<T>,
++    options?: Record<string, unknown>
++  ): Promise<T>;
++}
++
++function isModerationLockedError(error: unknown): boolean {
++  if (!error || typeof error !== "object") {
++    return false;
++  }
++
++  const candidate = error as {
++    message?: string;
++    meta?: { message?: string; hint?: string };
++  };
++  const message = candidate.message ?? candidate.meta?.message ?? "";
++  const hint = candidate.meta?.hint ?? "";
++
++  return message.includes("MODERATION_LOCKED") || hint === "moderation";
++}
++
++function moderationReasonFromError(
++  error: unknown
++): ModerationLockedError["reason"] {
++  if (!error || typeof error !== "object") {
++    return "REVIEW";
++  }
++
++  const message = (error as { message?: string }).message ?? "";
++  if (message.includes("SUPPRESSED")) {
++    return "SUPPRESSED";
++  }
++  if (message.includes("PAUSED")) {
++    return "PAUSED";
++  }
++  return "REVIEW";
++}
++
++export async function setActorContext(
++  tx: TransactionClient,
++  actor: ActorContext
++): Promise<void> {
++  await tx.$executeRaw`
++    SELECT set_config('app.actor_role', ${actor.role}, true)
++  `;
++  await tx.$executeRaw`
++    SELECT set_config('app.actor_id', ${actor.id ?? ""}, true)
++  `;
++}
++
++/**
++ * Run `fn` inside a SERIALIZABLE transaction with request-scoped actor GUCs.
++ */
++export async function withActor<T>(
++  actor: ActorContext,
++  fn: (tx: TransactionClient) => Promise<T>,
++  options?: {
++    isolationLevel?: Prisma.TransactionIsolationLevel;
++    timeoutMs?: number;
++    client?: TransactionHost;
++  }
++): Promise<T> {
++  const client = options?.client ?? prisma;
++  const transaction = client.$transaction as <R>(
++    fn: (tx: TransactionClient) => Promise<R>,
++    options?: Record<string, unknown>
++  ) => Promise<R>;
++
++  try {
++    return await transaction(
++      async (tx: TransactionClient) => {
++        await setActorContext(tx, actor);
++        return fn(tx);
++      },
++      {
++        isolationLevel:
++          options?.isolationLevel ?? Prisma.TransactionIsolationLevel.Serializable,
++        timeout: options?.timeoutMs ?? 30000,
++      }
++    );
++  } catch (error) {
++    if (isModerationLockedError(error)) {
++      throw new ModerationLockedError(moderationReasonFromError(error));
++    }
++    throw error;
++  }
++}
+diff --git a/src/lib/idempotency.ts b/src/lib/idempotency.ts
+index c390f4e4..9d0bb69d 100644
+--- a/src/lib/idempotency.ts
++++ b/src/lib/idempotency.ts
+@@ -27,6 +27,12 @@ import { logger } from "@/lib/logger";
+ type TransactionClient = Parameters<
+   Parameters<typeof prisma.$transaction>[0]
+ >[0];
++type TransactionHost = {
++  $transaction<T>(
++    fn: (tx: TransactionClient) => Promise<T>,
++    options?: Record<string, unknown>
++  ): Promise<T>;
++};
+ 
+ export interface IdempotencySuccess<T> {
+   success: true;
+@@ -115,16 +121,24 @@ export async function withIdempotency<T>(
+   userId: string,
+   endpoint: string,
+   requestBody: unknown,
+-  operation: (tx: TransactionClient) => Promise<T>
++  operation: (tx: TransactionClient) => Promise<T>,
++  options?: {
++    client?: TransactionHost;
++  }
+ ): Promise<IdempotencyResult<T>> {
+   const requestHash = computeRequestHash(requestBody);
++  const client = options?.client ?? prisma;
++  const transaction = client.$transaction as <R>(
++    fn: (tx: TransactionClient) => Promise<R>,
++    options?: Record<string, unknown>
++  ) => Promise<R>;
+ 
+   // Retry loop for SERIALIZABLE serialization conflicts
+   for (let attempt = 1; attempt <= MAX_SERIALIZATION_RETRIES; attempt++) {
+     try {
+       // ENTIRE flow runs in ONE transaction - lock held until commit
+-      return await prisma.$transaction(
+-        async (tx) => {
++      return await transaction(
++        async (tx: TransactionClient) => {
+           // ─────────────────────────────────────────────────────────────
+           // Step 1: Atomic claim via INSERT ON CONFLICT DO NOTHING
+           // ─────────────────────────────────────────────────────────────
+@@ -294,3 +308,9 @@ export function idempotencyResponse<T>(result: IdempotencyResult<T>): {
+     headers: result.cached ? { "X-Idempotency-Replayed": "true" } : undefined,
+   };
+ }
++
++export const IDEMPOTENCY_ENDPOINT_RESOLVE_UNIT =
++  "identity:resolveOrCreateUnit" as const;
++export const IDEMPOTENCY_ENDPOINT_MUTATE_UNIT =
++  "identity:mutateUnit" as const;
++export const IDEMPOTENCY_ENDPOINT_CONTACT = "identity:contact" as const;
+diff --git a/src/lib/identity/mutate-unit.ts b/src/lib/identity/mutate-unit.ts
+new file mode 100644
+index 00000000..520ecb0d
+--- /dev/null
++++ b/src/lib/identity/mutate-unit.ts
+@@ -0,0 +1,203 @@
++import { z } from "zod";
++import type { TransactionClient } from "@/lib/db/with-actor";
++import { recordAuditEvent } from "@/lib/audit/events";
++import { appendOutboxEvent } from "@/lib/outbox/append";
++import {
++  acquireXactLock,
++  identityMutationLockKey,
++} from "@/lib/identity/advisory-locks";
++
++export type IdentityMutationKind =
++  | "MERGE"
++  | "SPLIT"
++  | "CANONICALIZER_UPGRADE"
++  | "MANUAL_MODERATION";
++
++export interface IdentityMutationInput {
++  kind: IdentityMutationKind;
++  fromUnitIds: string[];
++  toUnitIds: string[];
++  reasonCode: string;
++  operatorId: string | null;
++}
++
++export interface IdentityMutationResult {
++  mutationId: string;
++  resultingEpoch: number;
++  affectedUnitIds: string[];
++}
++
++const ALLOWED_REASON_CODES = [
++  "operator_duplicate",
++  "operator_split",
++  "operator_reconcile",
++  "canonicalizer_upgrade",
++  "manual_moderation",
++  "moderation_review",
++  "system_reconcile",
++] as const;
++
++const IdentityMutationInputSchema = z.object({
++  kind: z.enum([
++    "MERGE",
++    "SPLIT",
++    "CANONICALIZER_UPGRADE",
++    "MANUAL_MODERATION",
++  ]),
++  fromUnitIds: z.array(z.string().trim().min(1)).min(1),
++  toUnitIds: z.array(z.string().trim().min(1)).min(1),
++  reasonCode: z.enum(ALLOWED_REASON_CODES),
++  operatorId: z.string().trim().min(1).nullable(),
++}).superRefine((value, ctx) => {
++  if (value.kind === "MERGE" && value.toUnitIds.length !== 1) {
++    ctx.addIssue({
++      code: z.ZodIssueCode.custom,
++      path: ["toUnitIds"],
++      message: "MERGE requires exactly one target unit id",
++    });
++  }
++
++  if (value.kind === "SPLIT" && value.fromUnitIds.length !== 1) {
++    ctx.addIssue({
++      code: z.ZodIssueCode.custom,
++      path: ["fromUnitIds"],
++      message: "SPLIT requires exactly one source unit id",
++    });
++  }
++});
++
++function uniq(values: string[]): string[] {
++  return Array.from(new Set(values));
++}
++
++function dedupeSupersedes(existing: string[], incoming: string[]): string[] {
++  return uniq([...existing, ...incoming]);
++}
++
++export async function recordIdentityMutation(
++  tx: TransactionClient,
++  input: IdentityMutationInput
++): Promise<IdentityMutationResult> {
++  const parsed = IdentityMutationInputSchema.parse({
++    ...input,
++    fromUnitIds: uniq(input.fromUnitIds),
++    toUnitIds: uniq(input.toUnitIds),
++  });
++
++  const affectedUnitIds = uniq([...parsed.fromUnitIds, ...parsed.toUnitIds]).sort();
++  for (const unitId of affectedUnitIds) {
++    await acquireXactLock(tx, identityMutationLockKey(unitId));
++  }
++
++  const units = await tx.physicalUnit.findMany({
++    where: { id: { in: affectedUnitIds } },
++    select: {
++      id: true,
++      unitIdentityEpoch: true,
++      supersedesUnitIds: true,
++    },
++  });
++
++  const foundIds = new Set(units.map((unit) => unit.id));
++  for (const unitId of affectedUnitIds) {
++    if (!foundIds.has(unitId)) {
++      throw new Error(`Unknown physical unit: ${unitId}`);
++    }
++  }
++
++  const resultingEpoch =
++    Math.max(...units.map((unit) => unit.unitIdentityEpoch), 0) + 1;
++
++  const mutation = await tx.identityMutation.create({
++    data: {
++      kind: parsed.kind,
++      fromUnitIds: parsed.fromUnitIds,
++      toUnitIds: parsed.toUnitIds,
++      reasonCode: parsed.reasonCode,
++      operatorId: parsed.operatorId,
++      resultingEpoch,
++    },
++    select: { id: true },
++  });
++
++  const unitById = new Map(units.map((unit) => [unit.id, unit]));
++
++  for (const unitId of affectedUnitIds) {
++    const current = unitById.get(unitId);
++    if (!current) {
++      continue;
++    }
++
++    const data: {
++      unitIdentityEpoch: number;
++      sourceVersion: { increment: bigint };
++      rowVersion: { increment: bigint };
++      supersededByUnitId?: string | null;
++      supersedesUnitIds?: string[];
++    } = {
++      unitIdentityEpoch: resultingEpoch,
++      sourceVersion: { increment: BigInt(1) },
++      rowVersion: { increment: BigInt(1) },
++    };
++
++    if (parsed.kind === "MERGE" && parsed.toUnitIds.length === 1) {
++      if (parsed.fromUnitIds.includes(unitId)) {
++        data.supersededByUnitId = parsed.toUnitIds[0];
++      }
++      if (parsed.toUnitIds.includes(unitId)) {
++        data.supersedesUnitIds = dedupeSupersedes(
++          current.supersedesUnitIds,
++          parsed.fromUnitIds
++        );
++      }
++    }
++
++    if (parsed.kind === "SPLIT" && parsed.toUnitIds.includes(unitId)) {
++      data.supersedesUnitIds = dedupeSupersedes(
++        current.supersedesUnitIds,
++        parsed.fromUnitIds
++      );
++    }
++
++    await tx.physicalUnit.update({
++      where: { id: unitId },
++      data,
++    });
++  }
++
++  await appendOutboxEvent(tx, {
++    aggregateType: "IDENTITY_MUTATION",
++    aggregateId: mutation.id,
++    kind: "IDENTITY_MUTATION",
++    payload: {
++      kind: parsed.kind,
++      fromUnitIds: parsed.fromUnitIds,
++      toUnitIds: parsed.toUnitIds,
++      reasonCode: parsed.reasonCode,
++    },
++    sourceVersion: BigInt(1),
++    unitIdentityEpoch: resultingEpoch,
++    priority: 0,
++  });
++
++  await recordAuditEvent(tx, {
++    kind: "IDENTITY_MUTATION",
++    actor: {
++      role: parsed.operatorId ? "moderator" : "system",
++      id: parsed.operatorId,
++    },
++    aggregateType: "identity_mutations",
++    aggregateId: mutation.id,
++    unitIdentityEpoch: resultingEpoch,
++    details: {
++      affectedUnitCount: affectedUnitIds.length,
++      reasonCode: parsed.reasonCode,
++    },
++  });
++
++  return {
++    mutationId: mutation.id,
++    resultingEpoch,
++    affectedUnitIds,
++  };
++}
+diff --git a/src/lib/identity/resolve-or-create-unit.ts b/src/lib/identity/resolve-or-create-unit.ts
+new file mode 100644
+index 00000000..8f2f84ab
+--- /dev/null
++++ b/src/lib/identity/resolve-or-create-unit.ts
+@@ -0,0 +1,106 @@
++import type { TransactionClient } from "@/lib/db/with-actor";
++import { setActorContext } from "@/lib/db/with-actor";
++import { appendOutboxEvent } from "@/lib/outbox/append";
++import { recordAuditEvent } from "@/lib/audit/events";
++import {
++  acquireXactLock,
++  canonicalUnitLockKey,
++} from "@/lib/identity/advisory-locks";
++import {
++  canonicalizeAddress,
++  type RawAddressInput,
++} from "@/lib/identity/canonical-address";
++
++export interface ResolveOrCreateUnitInput {
++  address: RawAddressInput;
++  actor: { role: "host" | "moderator" | "system"; id: string | null };
++  requestId?: string;
++}
++
++export interface ResolveOrCreateUnitResult {
++  unitId: string;
++  unitIdentityEpoch: number;
++  created: boolean;
++  canonicalAddressHash: string;
++}
++
++/**
++ * Resolve or create the canonical physical_units row for the given address.
++ */
++export async function resolveOrCreateUnit(
++  tx: TransactionClient,
++  input: ResolveOrCreateUnitInput
++): Promise<ResolveOrCreateUnitResult> {
++  // Defensive guard: callers are expected to use withActor(), but keeping the
++  // local set_config calls here preserves the actor context for direct tx users.
++  await setActorContext(tx, input.actor);
++
++  const canonical = canonicalizeAddress(input.address);
++  await acquireXactLock(
++    tx,
++    canonicalUnitLockKey(canonical.canonicalAddressHash)
++  );
++
++  const unit = await tx.physicalUnit.upsert({
++    where: {
++      canonicalAddressHash_canonicalUnit: {
++        canonicalAddressHash: canonical.canonicalAddressHash,
++        canonicalUnit: canonical.canonicalUnit,
++      },
++    },
++    create: {
++      canonicalAddressHash: canonical.canonicalAddressHash,
++      canonicalUnit: canonical.canonicalUnit,
++      canonicalizerVersion: canonical.canonicalizerVersion,
++    },
++    update: {
++      canonicalizerVersion: canonical.canonicalizerVersion,
++      sourceVersion: { increment: BigInt(1) },
++      rowVersion: { increment: BigInt(1) },
++    },
++    select: {
++      id: true,
++      unitIdentityEpoch: true,
++      sourceVersion: true,
++    },
++  });
++
++  // Prisma upsert does not expose Postgres xmax, so the created flag relies on
++  // the invariant that inserts start at sourceVersion=1 and every update path
++  // increments it before returning.
++  const created = unit.sourceVersion === BigInt(1);
++
++  await appendOutboxEvent(tx, {
++    aggregateType: "PHYSICAL_UNIT",
++    aggregateId: unit.id,
++    kind: "UNIT_UPSERTED",
++    payload: {
++      canonicalAddressHash: canonical.canonicalAddressHash,
++      canonicalUnit: canonical.canonicalUnit,
++      created,
++      requestId: input.requestId ?? null,
++    },
++    sourceVersion: unit.sourceVersion,
++    unitIdentityEpoch: unit.unitIdentityEpoch,
++  });
++
++  await recordAuditEvent(tx, {
++    kind: created ? "CANONICAL_UNIT_CREATED" : "CANONICAL_UNIT_RESOLVED",
++    actor: input.actor,
++    aggregateType: "physical_units",
++    aggregateId: unit.id,
++    requestId: input.requestId,
++    unitIdentityEpoch: unit.unitIdentityEpoch,
++    details: {
++      created,
++      canonicalizerVersion: canonical.canonicalizerVersion,
++    },
++  });
++
++  return {
++    unitId: unit.id,
++    unitIdentityEpoch: unit.unitIdentityEpoch,
++    created,
++    canonicalAddressHash: canonical.canonicalAddressHash,
++  };
++}
+diff --git a/src/__tests__/utils/phase01-test-db.ts b/src/__tests__/utils/phase01-test-db.ts
+new file mode 100644
+index 00000000..7ff1a507
+--- /dev/null
++++ b/src/__tests__/utils/phase01-test-db.ts
+@@ -0,0 +1,1222 @@
++import { randomUUID } from "crypto";
++import fs from "fs";
++import os from "os";
++import path from "path";
++
++import type { ActorContext } from "@/lib/db/with-actor";
++
++type SQLiteStatement = {
++  all: (...args: unknown[]) => unknown[];
++  get: (...args: unknown[]) => unknown;
++  run: (...args: unknown[]) => unknown;
++};
++
++type SQLiteDatabase = {
++  close: () => void;
++  exec: (sql: string) => void;
++  function: (name: string, fn: (...args: unknown[]) => unknown) => void;
++  prepare: (sql: string) => SQLiteStatement;
++};
++
++const { DatabaseSync } = require("node:sqlite") as {
++  DatabaseSync: new (location: string) => SQLiteDatabase;
++};
++
++type Row = Record<string, unknown>;
++
++interface TxContext {
++  actorSettings: Map<string, string>;
++  lockTimeoutMs: number;
++  ownedLocks: Set<string>;
++}
++
++interface TestTx {
++  __phase01: {
++    db: SQLiteDatabase;
++    context: TxContext;
++  };
++  $executeRawUnsafe: (sql: string) => Promise<number>;
++  $executeRaw: (
++    strings: TemplateStringsArray,
++    ...values: unknown[]
++  ) => Promise<number>;
++  $queryRaw: <T>(
++    strings: TemplateStringsArray,
++    ...values: unknown[]
++  ) => Promise<T>;
++  physicalUnit: {
++    upsert: (args: {
++      where: {
++        canonicalAddressHash_canonicalUnit: {
++          canonicalAddressHash: string;
++          canonicalUnit: string;
++        };
++      };
++      create: {
++        canonicalAddressHash: string;
++        canonicalUnit: string;
++        canonicalizerVersion: string;
++      };
++      update: {
++        canonicalizerVersion: string;
++        sourceVersion: { increment: bigint };
++        rowVersion: { increment: bigint };
++      };
++      select: {
++        id: boolean;
++        unitIdentityEpoch: boolean;
++        sourceVersion: boolean;
++      };
++    }) => Promise<{
++      id: string;
++      unitIdentityEpoch: number;
++      sourceVersion: bigint;
++    }>;
++    findMany: (args: {
++      where: { id: { in: string[] } };
++      select: {
++        id: boolean;
++        unitIdentityEpoch: boolean;
++        supersedesUnitIds: boolean;
++      };
++    }) => Promise<
++      Array<{
++        id: string;
++        unitIdentityEpoch: number;
++        supersedesUnitIds: string[];
++      }>
++    >;
++    update: (args: {
++      where: { id: string };
++      data: Record<string, unknown>;
++    }) => Promise<void>;
++  };
++  hostUnitClaim: {
++    create: (args: { data: Record<string, unknown> }) => Promise<{ id: string }>;
++    update: (args: {
++      where: { id: string };
++      data: Record<string, unknown>;
++    }) => Promise<void>;
++  };
++  listingInventory: {
++    create: (args: { data: Record<string, unknown> }) => Promise<{ id: string }>;
++    update: (args: {
++      where: { id: string };
++      data: Record<string, unknown>;
++    }) => Promise<void>;
++  };
++  identityMutation: {
++    create: (args: {
++      data: Record<string, unknown>;
++      select: { id: boolean };
++    }) => Promise<{ id: string }>;
++  };
++  outboxEvent: {
++    create: (args: {
++      data: Record<string, unknown>;
++      select: { id: boolean };
++    }) => Promise<{ id: string }>;
++  };
++  auditEvent: {
++    create: (args: {
++      data: Record<string, unknown>;
++      select: { id: boolean };
++    }) => Promise<{ id: string }>;
++  };
++}
++
++type TransactionHost = {
++  $transaction: <T>(
++    fnOrArray: ((tx: TestTx) => Promise<T>) | Promise<T>[],
++    _options?: Record<string, unknown>
++  ) => Promise<T>;
++};
++
++const RANGE_LITERAL =
++  /^[[(]\d{4}-\d{2}-\d{2}T[^,]+,\d{4}-\d{2}-\d{2}T.+[)\]]$/;
++
++function toDbScalar(value: unknown): unknown {
++  if (typeof value === "bigint") {
++    return Number(value);
++  }
++  if (Array.isArray(value) || (value && typeof value === "object")) {
++    return JSON.stringify(value);
++  }
++  if (typeof value === "boolean") {
++    return value ? 1 : 0;
++  }
++  return value ?? null;
++}
++
++function hasOwn(object: object, key: string): boolean {
++  return Object.prototype.hasOwnProperty.call(object, key);
++}
++
++function fromJsonArray(value: unknown): string[] {
++  if (typeof value !== "string" || value.length === 0) {
++    return [];
++  }
++  return JSON.parse(value) as string[];
++}
++
++function fromJsonValue<T>(value: unknown): T {
++  if (typeof value !== "string") {
++    return value as T;
++  }
++  return JSON.parse(value) as T;
++}
++
++function readBigInt(value: unknown): bigint {
++  if (typeof value === "bigint") {
++    return value;
++  }
++  return BigInt(Number(value ?? 0));
++}
++
++function createContext(): TxContext {
++  return {
++    actorSettings: new Map(),
++    lockTimeoutMs: 5000,
++    ownedLocks: new Set(),
++  };
++}
++
++function addBigInt(rows: Row[]): Row[] {
++  return rows.map((row) => {
++    const next = { ...row };
++    for (const key of [
++      "source_version",
++      "row_version",
++      "projection_epoch",
++      "unit_identity_epoch",
++      "unit_identity_epoch_written_at",
++      "resulting_epoch",
++      "priority",
++    ]) {
++      if (key in next && typeof next[key] === "number") {
++        next[key] = BigInt(next[key] as number);
++      }
++    }
++    return next;
++  });
++}
++
++class AdvisoryLockManager {
++  private owners = new Map<string, string>();
++  private waiters = new Map<string, Array<() => void>>();
++
++  async acquire(key: string, txId: string): Promise<void> {
++    if (this.owners.get(key) === txId) {
++      return;
++    }
++
++    if (!this.owners.has(key)) {
++      this.owners.set(key, txId);
++      return;
++    }
++
++    await new Promise<void>((resolve) => {
++      const queue = this.waiters.get(key) ?? [];
++      queue.push(resolve);
++      this.waiters.set(key, queue);
++    });
++
++    this.owners.set(key, txId);
++  }
++
++  releaseAll(txId: string): void {
++    for (const [key, owner] of this.owners.entries()) {
++      if (owner !== txId) {
++        continue;
++      }
++
++      const queue = this.waiters.get(key) ?? [];
++      const next = queue.shift();
++      if (next) {
++        this.waiters.set(key, queue);
++        next();
++      } else {
++        this.owners.delete(key);
++        this.waiters.delete(key);
++      }
++    }
++  }
++}
++
++class TransactionQueue {
++  private tail = Promise.resolve();
++
++  async run<T>(fn: () => Promise<T>): Promise<T> {
++    const previous = this.tail;
++    let release = () => {};
++    this.tail = new Promise<void>((resolve) => {
++      release = resolve;
++    });
++
++    await previous;
++    try {
++      return await fn();
++    } finally {
++      release();
++    }
++  }
++}
++
++function registerFunctions(db: SQLiteDatabase, context: TxContext | null): void {
++  db.function("gen_random_uuid", () => randomUUID());
++  db.function("set_config", (name: unknown, value: unknown) => {
++    if (context) {
++      context.actorSettings.set(String(name), value == null ? "" : String(value));
++    }
++    return value ?? "";
++  });
++  db.function("current_setting", (name: unknown) => {
++    if (!context) {
++      return null;
++    }
++    return context.actorSettings.get(String(name)) ?? null;
++  });
++  db.function("hashtext", (value: unknown) => String(value ?? ""));
++  db.function("is_valid_tstzrange", (value: unknown) =>
++    RANGE_LITERAL.test(String(value ?? "")) ? 1 : 0
++  );
++}
++
++function prepare(db: SQLiteDatabase, sql: string) {
++  return db.prepare(sql);
++}
++
++function buildInsert(
++  db: SQLiteDatabase,
++  table: string,
++  data: Record<string, unknown>,
++  returnId = true
++): { id: string } {
++  const id = String(data.id ?? randomUUID());
++  const fullData: Record<string, unknown> = { ...data, id };
++  const columns = Object.keys(fullData);
++  const placeholders = columns.map(() => "?").join(", ");
++  prepare(
++    db,
++    `INSERT INTO "${table}" (${columns
++      .map((column) => `"${column}"`)
++      .join(", ")}) VALUES (${placeholders})`
++  ).run(...columns.map((column) => toDbScalar(fullData[column])));
++
++  return returnId ? { id } : { id: "" };
++}
++
++function buildUpdate(
++  db: SQLiteDatabase,
++  table: string,
++  id: string,
++  data: Record<string, unknown>
++) {
++  const assignments: string[] = [];
++  const values: unknown[] = [];
++
++  for (const [column, rawValue] of Object.entries(data)) {
++    if (
++      rawValue &&
++      typeof rawValue === "object" &&
++      "increment" in (rawValue as { increment?: unknown })
++    ) {
++      assignments.push(`"${column}" = "${column}" + ?`);
++      values.push(
++        Number((rawValue as { increment: bigint }).increment)
++      );
++      continue;
++    }
++
++    assignments.push(`"${column}" = ?`);
++    values.push(toDbScalar(rawValue));
++  }
++
++  if (
++    !Object.prototype.hasOwnProperty.call(data, "updated_at") &&
++    ["physical_units", "host_unit_claims", "listing_inventories"].includes(table)
++  ) {
++    assignments.push(`"updated_at" = CURRENT_TIMESTAMP`);
++  }
++
++  prepare(
++    db,
++    `UPDATE "${table}" SET ${assignments.join(", ")} WHERE id = ?`
++  ).run(...values, id);
++}
++
++function rawQuery(db: SQLiteDatabase, sql: string, values: unknown[] = []): Row[] {
++  return addBigInt(prepare(db, sql).all(...values.map(toDbScalar)) as Row[]);
++}
++
++function normalizeSql(strings: TemplateStringsArray): string {
++  return strings.join("?");
++}
++
++function createTransactionClient(
++  db: SQLiteDatabase,
++  context: TxContext,
++  txId: string,
++  locks: AdvisoryLockManager
++): TestTx {
++  const tx: TestTx = {
++    __phase01: {
++      db,
++      context,
++    },
++    async $executeRawUnsafe(sql: string) {
++      if (sql.includes("SET LOCAL lock_timeout")) {
++        context.lockTimeoutMs = 5000;
++        return 0;
++      }
++
++      prepare(db, sql).run();
++      return 0;
++    },
++    async $executeRaw(strings, ...values) {
++      const sql = normalizeSql(strings);
++
++      if (sql.includes("set_config('app.actor_role'")) {
++        context.actorSettings.set("app.actor_role", String(values[0] ?? ""));
++        return 1;
++      }
++
++      if (sql.includes("set_config('app.actor_id'")) {
++        context.actorSettings.set("app.actor_id", String(values[0] ?? ""));
++        return 1;
++      }
++
++      if (sql.includes("SELECT pg_advisory_xact_lock(hashtext(")) {
++        const key = String(values[0] ?? "");
++        await locks.acquire(key, txId);
++        context.ownedLocks.add(key);
++        return 1;
++      }
++
++      if (sql.includes('INSERT INTO "IdempotencyKey"')) {
++        prepare(
++          db,
++          `INSERT INTO "IdempotencyKey" (
++            id, key, "userId", endpoint, status, "requestHash", "createdAt", "expiresAt"
++          )
++          VALUES (?, ?, ?, ?, 'processing', ?, CURRENT_TIMESTAMP, datetime(CURRENT_TIMESTAMP, '+24 hours'))
++          ON CONFLICT ("userId", endpoint, key) DO NOTHING`
++        ).run(randomUUID(), values[0], values[1], values[2], values[3]);
++        return 1;
++      }
++
++      if (sql.includes('UPDATE "IdempotencyKey"') && sql.includes("SET status = 'completed'")) {
++        prepare(
++          db,
++          `UPDATE "IdempotencyKey"
++           SET status = 'completed',
++               "requestHash" = ?,
++               "resultData" = ?
++           WHERE id = ?`
++        ).run(values[0], values[1], values[2]);
++        return 1;
++      }
++
++      throw new Error(`Unsupported $executeRaw SQL in Phase 01 test harness: ${sql}`);
++    },
++    async $queryRaw(strings, ...values) {
++      const sql = normalizeSql(strings);
++
++      if (sql.includes('FROM "IdempotencyKey"') && sql.includes("FOR UPDATE")) {
++        return rawQuery(
++          db,
++          `SELECT id, status, "requestHash", "resultData"
++           FROM "IdempotencyKey"
++           WHERE "userId" = ?
++             AND endpoint = ?
++             AND key = ?`,
++          values
++        ) as never;
++      }
++
++      throw new Error(`Unsupported $queryRaw SQL in Phase 01 test harness: ${sql}`);
++    },
++    physicalUnit: {
++      async upsert(args) {
++        const existing = prepare(
++          db,
++          `SELECT id, unit_identity_epoch, source_version
++           FROM physical_units
++           WHERE canonical_address_hash = ?
++             AND canonical_unit = ?`
++        ).get(
++          args.where.canonicalAddressHash_canonicalUnit.canonicalAddressHash,
++          args.where.canonicalAddressHash_canonicalUnit.canonicalUnit
++        ) as Row | undefined;
++
++        if (!existing) {
++          const createdId = randomUUID();
++          prepare(
++            db,
++            `INSERT INTO physical_units (
++              id,
++              canonical_address_hash,
++              canonical_unit,
++              canonicalizer_version
++            )
++            VALUES (?, ?, ?, ?)`
++          ).run(
++            createdId,
++            args.create.canonicalAddressHash,
++            args.create.canonicalUnit,
++            args.create.canonicalizerVersion
++          );
++
++          return {
++            id: createdId,
++            unitIdentityEpoch: 1,
++            sourceVersion: BigInt(1),
++          };
++        }
++
++        prepare(
++          db,
++          `UPDATE physical_units
++           SET canonicalizer_version = ?,
++               source_version = source_version + 1,
++               row_version = row_version + 1,
++               updated_at = CURRENT_TIMESTAMP
++           WHERE id = ?`
++        ).run(args.update.canonicalizerVersion, existing.id);
++
++        const updated = prepare(
++          db,
++          `SELECT id, unit_identity_epoch, source_version
++           FROM physical_units
++           WHERE id = ?`
++        ).get(existing.id) as Row;
++
++        return {
++          id: String(updated.id),
++          unitIdentityEpoch: Number(updated.unit_identity_epoch),
++          sourceVersion: readBigInt(updated.source_version),
++        };
++      },
++      async findMany(args) {
++        const placeholders = args.where.id.in.map(() => "?").join(", ");
++        return rawQuery(
++          db,
++          `SELECT id, unit_identity_epoch, supersedes_unit_ids
++           FROM physical_units
++           WHERE id IN (${placeholders})`,
++          args.where.id.in
++        ).map((row) => ({
++          id: String(row.id),
++          unitIdentityEpoch: Number(row.unit_identity_epoch),
++          supersedesUnitIds: fromJsonArray(row.supersedes_unit_ids),
++        }));
++      },
++      async update(args) {
++        const passthrough = Object.fromEntries(
++          Object.entries(args.data).filter(
++            ([key]) =>
++              ![
++                "unitIdentityEpoch",
++                "sourceVersion",
++                "rowVersion",
++                "supersedesUnitIds",
++                "supersededByUnitId",
++              ].includes(key)
++          )
++        );
++
++        buildUpdate(db, "physical_units", args.where.id, {
++          ...passthrough,
++          ...(args.data.unitIdentityEpoch !== undefined
++            ? { unit_identity_epoch: args.data.unitIdentityEpoch }
++            : {}),
++          ...(args.data.sourceVersion !== undefined
++            ? { source_version: args.data.sourceVersion }
++            : {}),
++          ...(args.data.rowVersion !== undefined
++            ? { row_version: args.data.rowVersion }
++            : {}),
++          ...(args.data.supersedesUnitIds !== undefined
++            ? { supersedes_unit_ids: args.data.supersedesUnitIds }
++            : {}),
++          ...(args.data.supersededByUnitId !== undefined
++            ? { superseded_by_unit_id: args.data.supersededByUnitId }
++            : {}),
++        });
++      },
++    },
++    hostUnitClaim: {
++      async create(args) {
++        return buildInsert(db, "host_unit_claims", args.data);
++      },
++      async update(args) {
++        buildUpdate(db, "host_unit_claims", args.where.id, args.data);
++      },
++    },
++    listingInventory: {
++      async create(args) {
++        return buildInsert(db, "listing_inventories", args.data);
++      },
++      async update(args) {
++        buildUpdate(db, "listing_inventories", args.where.id, args.data);
++      },
++    },
++    identityMutation: {
++      async create(args) {
++        return buildInsert(db, "identity_mutations", {
++          kind: args.data.kind,
++          from_unit_ids: args.data.fromUnitIds,
++          to_unit_ids: args.data.toUnitIds,
++          reason_code: args.data.reasonCode,
++          operator_id: args.data.operatorId,
++          resulting_epoch: args.data.resultingEpoch,
++        });
++      },
++    },
++    outboxEvent: {
++      async create(args) {
++        return buildInsert(db, "outbox_events", {
++          aggregate_type: args.data.aggregateType,
++          aggregate_id: args.data.aggregateId,
++          kind: args.data.kind,
++          payload: args.data.payload,
++          source_version: args.data.sourceVersion,
++          unit_identity_epoch: args.data.unitIdentityEpoch,
++          priority: args.data.priority ?? 100,
++        });
++      },
++    },
++    auditEvent: {
++      async create(args) {
++        return buildInsert(db, "audit_events", {
++          kind: args.data.kind,
++          actor_role: args.data.actorRole,
++          actor_id: args.data.actorId,
++          aggregate_type: args.data.aggregateType,
++          aggregate_id: args.data.aggregateId,
++          details: args.data.details ?? {},
++          request_id: args.data.requestId ?? null,
++          unit_identity_epoch: args.data.unitIdentityEpoch ?? null,
++        });
++      },
++    },
++  };
++
++  return tx;
++}
++
++function createSchema(db: SQLiteDatabase): void {
++  db.exec(`
++    PRAGMA foreign_keys = ON;
++    PRAGMA journal_mode = WAL;
++
++    CREATE TABLE "User" (
++      id TEXT PRIMARY KEY
++    );
++
++    CREATE TABLE "Listing" (
++      id TEXT PRIMARY KEY,
++      physical_unit_id TEXT NULL
++    );
++
++    CREATE TABLE "IdempotencyKey" (
++      id TEXT PRIMARY KEY,
++      key TEXT NOT NULL,
++      "userId" TEXT NOT NULL,
++      endpoint TEXT NOT NULL,
++      status TEXT NOT NULL DEFAULT 'processing',
++      "requestHash" TEXT NOT NULL,
++      "resultData" TEXT NULL,
++      "createdAt" TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
++      "expiresAt" TEXT NOT NULL,
++      UNIQUE ("userId", endpoint, key)
++    );
++
++    CREATE INDEX "IdempotencyKey_user_endpoint_idx"
++      ON "IdempotencyKey" ("userId", endpoint);
++
++    CREATE TABLE "physical_units" (
++      id TEXT PRIMARY KEY,
++      unit_identity_epoch INTEGER NOT NULL DEFAULT 1,
++      canonical_address_hash TEXT NOT NULL,
++      canonical_unit TEXT NOT NULL DEFAULT '_none_',
++      canonicalizer_version TEXT NOT NULL,
++      privacy_version INTEGER NOT NULL DEFAULT 1,
++      geocode_status TEXT NOT NULL DEFAULT 'PENDING',
++      lifecycle_status TEXT NOT NULL DEFAULT 'ACTIVE',
++      publish_status TEXT NOT NULL DEFAULT 'DRAFT',
++      supersedes_unit_ids TEXT NOT NULL DEFAULT '[]',
++      superseded_by_unit_id TEXT NULL,
++      source_version INTEGER NOT NULL DEFAULT 1,
++      row_version INTEGER NOT NULL DEFAULT 1,
++      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
++      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
++    );
++
++    CREATE UNIQUE INDEX "physical_units_canonical_unique_idx"
++      ON "physical_units" (canonical_address_hash, canonical_unit);
++    CREATE INDEX "physical_units_lifecycle_status_idx"
++      ON "physical_units" (lifecycle_status);
++    CREATE INDEX "physical_units_publish_status_idx"
++      ON "physical_units" (publish_status);
++
++    CREATE TABLE "host_unit_claims" (
++      id TEXT PRIMARY KEY,
++      unit_id TEXT NOT NULL REFERENCES "physical_units"(id) ON DELETE CASCADE,
++      host_user_id TEXT NOT NULL REFERENCES "User"(id) ON DELETE CASCADE,
++      claim_status TEXT NOT NULL DEFAULT 'UNVERIFIED',
++      unit_identity_epoch_written_at INTEGER NOT NULL,
++      source_version INTEGER NOT NULL DEFAULT 1,
++      row_version INTEGER NOT NULL DEFAULT 1,
++      lifecycle_status TEXT NOT NULL DEFAULT 'ACTIVE',
++      publish_status TEXT NOT NULL DEFAULT 'DRAFT',
++      privacy_version INTEGER NOT NULL DEFAULT 1,
++      canonical_address_hash TEXT NOT NULL,
++      canonicalizer_version TEXT NOT NULL,
++      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
++      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
++      UNIQUE (unit_id, host_user_id)
++    );
++
++    CREATE TABLE "listing_inventories" (
++      id TEXT PRIMARY KEY,
++      unit_id TEXT NOT NULL REFERENCES "physical_units"(id) ON DELETE CASCADE,
++      unit_identity_epoch_written_at INTEGER NOT NULL,
++      inventory_key TEXT NOT NULL,
++      room_category TEXT NOT NULL CHECK (room_category IN ('ENTIRE_PLACE', 'PRIVATE_ROOM', 'SHARED_ROOM')),
++      space_label TEXT NULL,
++      capacity_guests INTEGER NULL,
++      total_beds INTEGER NULL,
++      open_beds INTEGER NULL,
++      available_from TEXT NOT NULL,
++      available_until TEXT NULL,
++      availability_range TEXT NOT NULL CHECK (is_valid_tstzrange(availability_range) = 1),
++      price REAL NOT NULL,
++      lease_min_months INTEGER NULL,
++      lease_max_months INTEGER NULL,
++      lease_negotiable INTEGER NOT NULL DEFAULT 0,
++      gender_preference TEXT NULL,
++      household_gender TEXT NULL,
++      lifecycle_status TEXT NOT NULL DEFAULT 'ACTIVE',
++      publish_status TEXT NOT NULL DEFAULT 'DRAFT',
++      source_version INTEGER NOT NULL DEFAULT 1,
++      row_version INTEGER NOT NULL DEFAULT 1,
++      last_published_version INTEGER NULL,
++      last_embedded_version TEXT NULL,
++      canonicalizer_version TEXT NOT NULL,
++      canonical_address_hash TEXT NOT NULL,
++      privacy_version INTEGER NOT NULL DEFAULT 1,
++      supersedes_unit_ids TEXT NOT NULL DEFAULT '[]',
++      superseded_by_unit_id TEXT NULL,
++      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
++      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
++      UNIQUE (unit_id, inventory_key),
++      CHECK (
++        room_category <> 'ENTIRE_PLACE'
++        OR (
++          capacity_guests IS NOT NULL
++          AND total_beds IS NULL
++          AND open_beds IS NULL
++          AND gender_preference IS NULL
++          AND household_gender IS NULL
++        )
++      ),
++      CHECK (
++        room_category <> 'PRIVATE_ROOM'
++        OR (
++          capacity_guests IS NOT NULL
++          AND total_beds IS NULL
++          AND open_beds IS NULL
++        )
++      ),
++      CHECK (
++        room_category <> 'SHARED_ROOM'
++        OR (
++          total_beds IS NOT NULL
++          AND open_beds IS NOT NULL
++          AND open_beds <= total_beds
++          AND capacity_guests IS NULL
++        )
++      )
++    );
++
++    CREATE TABLE "identity_mutations" (
++      id TEXT PRIMARY KEY,
++      kind TEXT NOT NULL CHECK (kind IN ('MERGE', 'SPLIT', 'CANONICALIZER_UPGRADE', 'MANUAL_MODERATION')),
++      from_unit_ids TEXT NOT NULL,
++      to_unit_ids TEXT NOT NULL,
++      reason_code TEXT NOT NULL,
++      operator_id TEXT NULL REFERENCES "User"(id) ON DELETE SET NULL,
++      resulting_epoch INTEGER NOT NULL,
++      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
++    );
++
++    CREATE TABLE "outbox_events" (
++      id TEXT PRIMARY KEY,
++      aggregate_type TEXT NOT NULL,
++      aggregate_id TEXT NOT NULL,
++      kind TEXT NOT NULL,
++      payload TEXT NOT NULL,
++      source_version INTEGER NOT NULL,
++      unit_identity_epoch INTEGER NOT NULL,
++      priority INTEGER NOT NULL DEFAULT 100,
++      status TEXT NOT NULL DEFAULT 'PENDING',
++      attempt_count INTEGER NOT NULL DEFAULT 0,
++      next_attempt_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
++      last_error TEXT NULL,
++      dlq_reason TEXT NULL,
++      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
++      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
++    );
++
++    CREATE INDEX "outbox_events_pending_idx"
++      ON "outbox_events" (status, priority, next_attempt_at);
++    CREATE INDEX "outbox_events_aggregate_idx"
++      ON "outbox_events" (aggregate_type, aggregate_id, source_version);
++    CREATE INDEX "outbox_events_dlq_idx"
++      ON "outbox_events" (status, created_at);
++
++    CREATE TABLE "cache_invalidations" (
++      id TEXT PRIMARY KEY,
++      unit_id TEXT NOT NULL,
++      projection_epoch INTEGER NOT NULL,
++      unit_identity_epoch INTEGER NOT NULL,
++      reason TEXT NOT NULL,
++      enqueued_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
++      consumed_at TEXT NULL,
++      consumed_by TEXT NULL
++    );
++
++    CREATE INDEX "cache_invalidations_pending_idx"
++      ON "cache_invalidations" (consumed_at);
++    CREATE INDEX "cache_invalidations_unit_enqueued_idx"
++      ON "cache_invalidations" (unit_id, enqueued_at DESC);
++
++    CREATE TABLE "audit_events" (
++      id TEXT PRIMARY KEY,
++      kind TEXT NOT NULL,
++      actor_role TEXT NOT NULL,
++      actor_id TEXT NULL,
++      aggregate_type TEXT NOT NULL,
++      aggregate_id TEXT NOT NULL,
++      details TEXT NOT NULL DEFAULT '{}',
++      request_id TEXT NULL,
++      unit_identity_epoch INTEGER NULL,
++      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
++    );
++
++    CREATE INDEX "audit_events_aggregate_idx"
++      ON "audit_events" (aggregate_type, aggregate_id, created_at DESC);
++    CREATE INDEX "audit_events_kind_idx"
++      ON "audit_events" (kind, created_at DESC);
++    CREATE INDEX "audit_events_actor_idx"
++      ON "audit_events" (actor_id, created_at DESC);
++
++    CREATE TRIGGER "trg_modprec_physical_units"
++      BEFORE UPDATE ON "physical_units"
++      FOR EACH ROW
++      WHEN COALESCE(current_setting('app.actor_role'), 'system') = 'host'
++           AND (
++             NEW.lifecycle_status IS NOT OLD.lifecycle_status
++             OR NEW.publish_status IS NOT OLD.publish_status
++             OR NEW.privacy_version IS NOT OLD.privacy_version
++           )
++    BEGIN
++      SELECT RAISE(ABORT, 'MODERATION_LOCKED: host may not modify moderation columns');
++    END;
++
++    CREATE TRIGGER "trg_modprec_host_unit_claims"
++      BEFORE UPDATE ON "host_unit_claims"
++      FOR EACH ROW
++      WHEN COALESCE(current_setting('app.actor_role'), 'system') = 'host'
++           AND (
++             NEW.lifecycle_status IS NOT OLD.lifecycle_status
++             OR NEW.publish_status IS NOT OLD.publish_status
++             OR NEW.privacy_version IS NOT OLD.privacy_version
++           )
++    BEGIN
++      SELECT RAISE(ABORT, 'MODERATION_LOCKED: host may not modify moderation columns');
++    END;
++
++    CREATE TRIGGER "trg_modprec_listing_inventories"
++      BEFORE UPDATE ON "listing_inventories"
++      FOR EACH ROW
++      WHEN COALESCE(current_setting('app.actor_role'), 'system') = 'host'
++           AND (
++             NEW.lifecycle_status IS NOT OLD.lifecycle_status
++             OR NEW.publish_status IS NOT OLD.publish_status
++             OR NEW.privacy_version IS NOT OLD.privacy_version
++           )
++    BEGIN
++      SELECT RAISE(ABORT, 'MODERATION_LOCKED: host may not modify moderation columns');
++    END;
++
++    CREATE TRIGGER "trg_identity_mutations_append_only_update"
++      BEFORE UPDATE ON "identity_mutations"
++      FOR EACH ROW
++    BEGIN
++      SELECT RAISE(ABORT, 'identity_mutations is append-only');
++    END;
++
++    CREATE TRIGGER "trg_identity_mutations_append_only_delete"
++      BEFORE DELETE ON "identity_mutations"
++      FOR EACH ROW
++    BEGIN
++      SELECT RAISE(ABORT, 'identity_mutations is append-only');
++    END;
++
++    CREATE TRIGGER "trg_audit_events_append_only_update"
++      BEFORE UPDATE ON "audit_events"
++      FOR EACH ROW
++    BEGIN
++      SELECT RAISE(ABORT, 'audit_events is append-only');
++    END;
++
++    CREATE TRIGGER "trg_audit_events_append_only_delete"
++      BEFORE DELETE ON "audit_events"
++      FOR EACH ROW
++    BEGIN
++      SELECT RAISE(ABORT, 'audit_events is append-only');
++    END;
++  `);
++}
++
++export class Phase01TestDb {
++  private readonly dir = fs.mkdtempSync(
++    path.join(os.tmpdir(), "phase01-sqlite-")
++  );
++  private readonly dbPath = path.join(this.dir, "phase01.sqlite");
++  private readonly baseDb: SQLiteDatabase;
++  private readonly queue = new TransactionQueue();
++  private readonly locks = new AdvisoryLockManager();
++
++  readonly client: TransactionHost;
++
++  constructor() {
++    this.baseDb = new DatabaseSync(this.dbPath);
++    registerFunctions(this.baseDb, null);
++    createSchema(this.baseDb);
++    this.client = {
++      $transaction: async (fnOrArray) => {
++        if (Array.isArray(fnOrArray)) {
++          return Promise.all(fnOrArray) as never;
++        }
++
++        return this.queue.run(async () => {
++          const context = createContext();
++          const txDb = new DatabaseSync(this.dbPath);
++          registerFunctions(txDb, context);
++          txDb.exec("BEGIN");
++          const txId = randomUUID();
++          const tx = createTransactionClient(txDb, context, txId, this.locks);
++
++          try {
++            const result = await fnOrArray(tx);
++            txDb.exec("COMMIT");
++            return result;
++          } catch (error) {
++            txDb.exec("ROLLBACK");
++            throw error;
++          } finally {
++            this.locks.releaseAll(txId);
++            txDb.close();
++          }
++        });
++      },
++    };
++  }
++
++  dispose(): void {
++    this.baseDb.close();
++    fs.rmSync(this.dir, { recursive: true, force: true });
++  }
++
++  listTables(): string[] {
++    return rawQuery(
++      this.baseDb,
++      `SELECT name
++       FROM sqlite_master
++       WHERE type = 'table'
++         AND name NOT LIKE 'sqlite_%'`
++    )
++      .map((row) => String(row.name))
++      .sort();
++  }
++
++  listIndexes(): string[] {
++    return rawQuery(
++      this.baseDb,
++      `SELECT name
++       FROM sqlite_master
++       WHERE type = 'index'
++         AND name NOT LIKE 'sqlite_%'`
++    )
++      .map((row) => String(row.name))
++      .sort();
++  }
++
++  run(sql: string, values: unknown[] = []): void {
++    prepare(this.baseDb, sql).run(...values.map(toDbScalar));
++  }
++
++  get<T extends Row>(sql: string, values: unknown[] = []): T {
++    return (prepare(this.baseDb, sql).get(...values.map(toDbScalar)) ?? {}) as T;
++  }
++
++  all<T extends Row>(sql: string, values: unknown[] = []): T[] {
++    return prepare(this.baseDb, sql).all(...values.map(toDbScalar)) as T[];
++  }
++
++  actorSettingFromTx(
++    tx: { __phase01?: { db: SQLiteDatabase; context: TxContext } },
++    key: string
++  ) {
++    return tx.__phase01?.context.actorSettings.get(key) ?? null;
++  }
++
++  currentSettingInTx(
++    tx: { __phase01?: { db: SQLiteDatabase } },
++    key: string
++  ): string | null {
++    const row = tx.__phase01?.db
++      .prepare(`SELECT current_setting(?) AS value`)
++      .get(key) as { value?: string | null } | undefined;
++
++    return row?.value ?? null;
++  }
++
++  currentSettingOutsideTx(key: string): string | null {
++    const row = prepare(this.baseDb, `SELECT current_setting(?) AS value`).get(
++      key
++    ) as { value?: string | null } | undefined;
++
++    return row?.value ?? null;
++  }
++
++  insertUser(id: string): void {
++    prepare(this.baseDb, `INSERT INTO "User" (id) VALUES (?)`).run(id);
++  }
++
++  insertPhysicalUnit(overrides: Partial<Row> = {}): string {
++    const id = String(overrides.id ?? randomUUID());
++    buildInsert(this.baseDb, "physical_units", {
++      id,
++      canonical_address_hash: overrides.canonical_address_hash ?? "hash-default",
++      canonical_unit: overrides.canonical_unit ?? "_none_",
++      canonicalizer_version: overrides.canonicalizer_version ?? "v1.0-2026-04",
++      privacy_version: overrides.privacy_version ?? 1,
++      geocode_status: overrides.geocode_status ?? "PENDING",
++      lifecycle_status: overrides.lifecycle_status ?? "ACTIVE",
++      publish_status: overrides.publish_status ?? "DRAFT",
++      supersedes_unit_ids: overrides.supersedes_unit_ids ?? [],
++      superseded_by_unit_id: overrides.superseded_by_unit_id ?? null,
++      unit_identity_epoch: overrides.unit_identity_epoch ?? 1,
++      source_version: overrides.source_version ?? 1,
++      row_version: overrides.row_version ?? 1,
++    });
++    return id;
++  }
++
++  insertHostUnitClaim(overrides: Partial<Row> = {}): string {
++    const id = String(overrides.id ?? randomUUID());
++    buildInsert(this.baseDb, "host_unit_claims", {
++      id,
++      unit_id: overrides.unit_id,
++      host_user_id: overrides.host_user_id,
++      claim_status: overrides.claim_status ?? "UNVERIFIED",
++      unit_identity_epoch_written_at: overrides.unit_identity_epoch_written_at ?? 1,
++      source_version: overrides.source_version ?? 1,
++      row_version: overrides.row_version ?? 1,
++      lifecycle_status: overrides.lifecycle_status ?? "ACTIVE",
++      publish_status: overrides.publish_status ?? "DRAFT",
++      privacy_version: overrides.privacy_version ?? 1,
++      canonical_address_hash: overrides.canonical_address_hash ?? "hash-default",
++      canonicalizer_version: overrides.canonicalizer_version ?? "v1.0-2026-04",
++    });
++    return id;
++  }
++
++  insertListingInventory(overrides: Partial<Row> = {}): string {
++    const id = String(overrides.id ?? randomUUID());
++    buildInsert(this.baseDb, "listing_inventories", {
++      id,
++      unit_id: overrides.unit_id,
++      unit_identity_epoch_written_at: overrides.unit_identity_epoch_written_at ?? 1,
++      inventory_key: overrides.inventory_key ?? "inventory-1",
++      room_category: overrides.room_category ?? "ENTIRE_PLACE",
++      space_label: overrides.space_label ?? null,
++      capacity_guests: hasOwn(overrides, "capacity_guests")
++        ? overrides.capacity_guests
++        : 2,
++      total_beds: overrides.total_beds ?? null,
++      open_beds: overrides.open_beds ?? null,
++      available_from: overrides.available_from ?? "2026-05-01",
++      available_until: overrides.available_until ?? null,
++      availability_range:
++        overrides.availability_range ??
++        "[2026-05-01T00:00:00Z,2026-06-01T00:00:00Z)",
++      price: overrides.price ?? 1200,
++      lease_min_months: overrides.lease_min_months ?? null,
++      lease_max_months: overrides.lease_max_months ?? null,
++      lease_negotiable: overrides.lease_negotiable ?? 0,
++      gender_preference: overrides.gender_preference ?? null,
++      household_gender: overrides.household_gender ?? null,
++      lifecycle_status: overrides.lifecycle_status ?? "ACTIVE",
++      publish_status: overrides.publish_status ?? "DRAFT",
++      source_version: overrides.source_version ?? 1,
++      row_version: overrides.row_version ?? 1,
++      last_published_version: overrides.last_published_version ?? null,
++      last_embedded_version: overrides.last_embedded_version ?? null,
++      canonicalizer_version: overrides.canonicalizer_version ?? "v1.0-2026-04",
++      canonical_address_hash: overrides.canonical_address_hash ?? "hash-default",
++      privacy_version: overrides.privacy_version ?? 1,
++      supersedes_unit_ids: overrides.supersedes_unit_ids ?? [],
++      superseded_by_unit_id: overrides.superseded_by_unit_id ?? null,
++    });
++    return id;
++  }
++
++  insertIdentityMutation(overrides: Partial<Row> = {}): string {
++    const id = String(overrides.id ?? randomUUID());
++    buildInsert(this.baseDb, "identity_mutations", {
++      id,
++      kind: overrides.kind ?? "MERGE",
++      from_unit_ids: overrides.from_unit_ids ?? ["unit-a"],
++      to_unit_ids: overrides.to_unit_ids ?? ["unit-b"],
++      reason_code: overrides.reason_code ?? "operator_duplicate",
++      operator_id: overrides.operator_id ?? null,
++      resulting_epoch: overrides.resulting_epoch ?? 2,
++    });
++    return id;
++  }
++
++  insertAuditEvent(overrides: Partial<Row> = {}): string {
++    const id = String(overrides.id ?? randomUUID());
++    buildInsert(this.baseDb, "audit_events", {
++      id,
++      kind: overrides.kind ?? "IDENTITY_MUTATION",
++      actor_role: overrides.actor_role ?? "system",
++      actor_id: overrides.actor_id ?? null,
++      aggregate_type: overrides.aggregate_type ?? "identity_mutations",
++      aggregate_id: overrides.aggregate_id ?? "mutation-1",
++      details: overrides.details ?? {},
++      request_id: overrides.request_id ?? null,
++      unit_identity_epoch: overrides.unit_identity_epoch ?? null,
++    });
++    return id;
++  }
++
++  insertOutboxEvent(overrides: Partial<Row> = {}): string {
++    const id = String(overrides.id ?? randomUUID());
++    buildInsert(this.baseDb, "outbox_events", {
++      id,
++      aggregate_type: overrides.aggregate_type ?? "IDENTITY_MUTATION",
++      aggregate_id: overrides.aggregate_id ?? "mutation-1",
++      kind: overrides.kind ?? "IDENTITY_MUTATION",
++      payload: overrides.payload ?? {},
++      source_version: overrides.source_version ?? 1,
++      unit_identity_epoch: overrides.unit_identity_epoch ?? 2,
++      priority: overrides.priority ?? 0,
++      status: overrides.status ?? "PENDING",
++      attempt_count: overrides.attempt_count ?? 0,
++      last_error: overrides.last_error ?? null,
++      dlq_reason: overrides.dlq_reason ?? null,
++    });
++    return id;
++  }
++
++  getPhysicalUnits(): Array<{
++    id: string;
++    sourceVersion: bigint;
++    rowVersion: bigint;
++    unitIdentityEpoch: number;
++    supersedesUnitIds: string[];
++    supersededByUnitId: string | null;
++  }> {
++    return rawQuery(
++      this.baseDb,
++      `SELECT id,
++              source_version,
++              row_version,
++              unit_identity_epoch,
++              supersedes_unit_ids,
++              superseded_by_unit_id
++       FROM physical_units
++       ORDER BY id`
++    ).map((row) => ({
++      id: String(row.id),
++      sourceVersion: readBigInt(row.source_version),
++      rowVersion: readBigInt(row.row_version),
++      unitIdentityEpoch: Number(row.unit_identity_epoch),
++      supersedesUnitIds: fromJsonArray(row.supersedes_unit_ids),
++      supersededByUnitId:
++        row.superseded_by_unit_id == null ? null : String(row.superseded_by_unit_id),
++    }));
++  }
++
++  getIdentityMutations(): Array<{
++    id: string;
++    kind: string;
++    fromUnitIds: string[];
++    toUnitIds: string[];
++    operatorId: string | null;
++    resultingEpoch: number;
++  }> {
++    return rawQuery(
++      this.baseDb,
++      `SELECT id, kind, from_unit_ids, to_unit_ids, operator_id, resulting_epoch
++       FROM identity_mutations
++       ORDER BY created_at`
++    ).map((row) => ({
++      id: String(row.id),
++      kind: String(row.kind),
++      fromUnitIds: fromJsonArray(row.from_unit_ids),
++      toUnitIds: fromJsonArray(row.to_unit_ids),
++      operatorId: row.operator_id == null ? null : String(row.operator_id),
++      resultingEpoch: Number(row.resulting_epoch),
++    }));
++  }
++
++  getOutboxEvents(): Array<{
++    id: string;
++    aggregateType: string;
++    aggregateId: string;
++    kind: string;
++    payload: Record<string, unknown>;
++    priority: number;
++    unitIdentityEpoch: number;
++  }> {
++    return rawQuery(
++      this.baseDb,
++      `SELECT id,
++              aggregate_type,
++              aggregate_id,
++              kind,
++              payload,
++              priority,
++              unit_identity_epoch
++       FROM outbox_events
++       ORDER BY created_at`
++    ).map((row) => ({
++      id: String(row.id),
++      aggregateType: String(row.aggregate_type),
++      aggregateId: String(row.aggregate_id),
++      kind: String(row.kind),
++      payload: fromJsonValue<Record<string, unknown>>(row.payload),
++      priority: Number(row.priority),
++      unitIdentityEpoch: Number(row.unit_identity_epoch),
++    }));
++  }
++}
++
++export function hostActor(id = "host-1"): ActorContext {
++  return { role: "host", id };
++}
++
++export function moderatorActor(id = "moderator-1"): ActorContext {
++  return { role: "moderator", id };
++}
++
++export function systemActor(id: string | null = null): ActorContext {
++  return { role: "system", id };
++}
+diff --git a/src/__tests__/db/phase01-advisory-lock-contention.test.ts b/src/__tests__/db/phase01-advisory-lock-contention.test.ts
+new file mode 100644
+index 00000000..6a495921
+--- /dev/null
++++ b/src/__tests__/db/phase01-advisory-lock-contention.test.ts
+@@ -0,0 +1,60 @@
++import {
++  IDEMPOTENCY_ENDPOINT_RESOLVE_UNIT,
++  type IdempotencySuccess,
++  withIdempotency,
++} from "@/lib/idempotency";
++import { resolveOrCreateUnit } from "@/lib/identity/resolve-or-create-unit";
++import {
++  Phase01TestDb,
++  hostActor,
++} from "@/__tests__/utils/phase01-test-db";
++
++describe("Phase 01 advisory-lock contention", () => {
++  let db: Phase01TestDb;
++
++  beforeEach(() => {
++    db = new Phase01TestDb();
++  });
++
++  afterEach(() => {
++    db.dispose();
++  });
++
++  it("10 parallel callers converge on one physical_units row and 9 resolve existing", async () => {
++    const actor = hostActor();
++    const address = {
++      address: "123 Main St Apt 4B",
++      city: "San Francisco",
++      state: "CA",
++      zip: "94107",
++    };
++
++    const results = await Promise.all(
++      Array.from({ length: 10 }, (_, index) =>
++        withIdempotency<{ created: boolean }>(
++          `phase01-lock-${index}`,
++          "host-1",
++          IDEMPOTENCY_ENDPOINT_RESOLVE_UNIT,
++          address,
++          (tx) =>
++            resolveOrCreateUnit(tx as never, {
++              actor,
++              address,
++              requestId: `req-${index}`,
++            }),
++          { client: db.client as never }
++        )
++      )
++    );
++
++    expect(results.every((result) => result.success)).toBe(true);
++    const successes = results.filter(
++      (result): result is IdempotencySuccess<{ created: boolean }> => result.success
++    );
++
++    expect(successes).toHaveLength(10);
++    expect(successes.filter((result) => result.result.created)).toHaveLength(1);
++    expect(successes.filter((result) => !result.result.created)).toHaveLength(9);
++    expect(db.getPhysicalUnits()).toHaveLength(1);
++  });
++});
+diff --git a/src/__tests__/integration/phase01-identity-mutation.test.ts b/src/__tests__/integration/phase01-identity-mutation.test.ts
+new file mode 100644
+index 00000000..2fc3b036
+--- /dev/null
++++ b/src/__tests__/integration/phase01-identity-mutation.test.ts
+@@ -0,0 +1,170 @@
++import { recordIdentityMutation } from "@/lib/identity/mutate-unit";
++import { Phase01TestDb } from "@/__tests__/utils/phase01-test-db";
++
++describe("Phase 01 identity mutation integration", () => {
++  let db: Phase01TestDb;
++
++  beforeEach(() => {
++    db = new Phase01TestDb();
++    db.insertUser("moderator-1");
++  });
++
++  afterEach(() => {
++    db.dispose();
++  });
++
++  it("rolls back the ledger row and outbox when a failure happens after the INSERT", async () => {
++    const sourceUnitId = db.insertPhysicalUnit({
++      id: "unit-merge-a",
++      canonical_address_hash: "hash-merge-a",
++      unit_identity_epoch: 2,
++    });
++    const targetUnitId = db.insertPhysicalUnit({
++      id: "unit-merge-target",
++      canonical_address_hash: "hash-merge-target",
++      unit_identity_epoch: 4,
++    });
++    const startingUnits = db.getPhysicalUnits();
++
++    await expect(
++      db.client.$transaction(async (tx) => {
++        const failingTx = {
++          ...tx,
++          outboxEvent: {
++            ...tx.outboxEvent,
++            create: jest
++              .fn()
++              .mockRejectedValue(new Error("synthetic outbox failure")),
++          },
++        };
++
++        await recordIdentityMutation(failingTx as never, {
++          kind: "MERGE",
++          fromUnitIds: [sourceUnitId],
++          toUnitIds: [targetUnitId],
++          reasonCode: "operator_duplicate",
++          operatorId: "moderator-1",
++        });
++      })
++    ).rejects.toThrow("synthetic outbox failure");
++
++    expect(db.getIdentityMutations()).toEqual([]);
++    expect(db.getOutboxEvents()).toEqual([]);
++    expect(
++      db.all<{ count: number }>(`SELECT COUNT(*) as count FROM audit_events`)[0].count
++    ).toBe(0);
++    expect(db.getPhysicalUnits()).toEqual(startingUnits);
++  });
++
++  it("supports SPLIT with multiple to_unit_ids and bumps all affected epochs", async () => {
++    const sourceUnitId = db.insertPhysicalUnit({
++      id: "unit-split-source",
++      canonical_address_hash: "hash-split-source",
++      unit_identity_epoch: 5,
++    });
++    const targetUnitOneId = db.insertPhysicalUnit({
++      id: "unit-split-target-1",
++      canonical_address_hash: "hash-split-target-1",
++      unit_identity_epoch: 1,
++      supersedes_unit_ids: ["legacy-parent"],
++    });
++    const targetUnitTwoId = db.insertPhysicalUnit({
++      id: "unit-split-target-2",
++      canonical_address_hash: "hash-split-target-2",
++      unit_identity_epoch: 3,
++    });
++
++    const result = await db.client.$transaction((tx) =>
++      recordIdentityMutation(tx as never, {
++        kind: "SPLIT",
++        fromUnitIds: [sourceUnitId],
++        toUnitIds: [targetUnitOneId, targetUnitTwoId],
++        reasonCode: "operator_split",
++        operatorId: "moderator-1",
++      })
++    );
++
++    expect(result.affectedUnitIds).toEqual([
++      sourceUnitId,
++      targetUnitOneId,
++      targetUnitTwoId,
++    ]);
++
++    expect(db.getIdentityMutations()).toEqual([
++      expect.objectContaining({
++        kind: "SPLIT",
++        fromUnitIds: [sourceUnitId],
++        toUnitIds: [targetUnitOneId, targetUnitTwoId],
++        resultingEpoch: 6,
++      }),
++    ]);
++
++    expect(db.getOutboxEvents()).toEqual([
++      expect.objectContaining({
++        kind: "IDENTITY_MUTATION",
++        priority: 0,
++        unitIdentityEpoch: 6,
++      }),
++    ]);
++
++    expect(db.getPhysicalUnits()).toEqual(
++      expect.arrayContaining([
++        expect.objectContaining({
++          id: sourceUnitId,
++          unitIdentityEpoch: 6,
++        }),
++        expect.objectContaining({
++          id: targetUnitOneId,
++          unitIdentityEpoch: 6,
++          supersedesUnitIds: ["legacy-parent", sourceUnitId],
++        }),
++        expect.objectContaining({
++          id: targetUnitTwoId,
++          unitIdentityEpoch: 6,
++          supersedesUnitIds: [sourceUnitId],
++        }),
++      ])
++    );
++  });
++
++  it("supports CANONICALIZER_UPGRADE with null operator_id and writes priority 0", async () => {
++    const unitId = db.insertPhysicalUnit({
++      id: "unit-upgrade",
++      canonical_address_hash: "hash-upgrade",
++      unit_identity_epoch: 7,
++    });
++
++    const result = await db.client.$transaction((tx) =>
++      recordIdentityMutation(tx as never, {
++        kind: "CANONICALIZER_UPGRADE",
++        fromUnitIds: [unitId],
++        toUnitIds: [unitId],
++        reasonCode: "canonicalizer_upgrade",
++        operatorId: null,
++      })
++    );
++
++    expect(result.resultingEpoch).toBe(8);
++    expect(db.getIdentityMutations()).toEqual([
++      expect.objectContaining({
++        kind: "CANONICALIZER_UPGRADE",
++        operatorId: null,
++        resultingEpoch: 8,
++      }),
++    ]);
++    expect(db.getOutboxEvents()).toEqual([
++      expect.objectContaining({
++        kind: "IDENTITY_MUTATION",
++        priority: 0,
++      }),
++    ]);
++    expect(
++      db.all<{ actor_role: string; actor_id: string | null }>(
++        `SELECT actor_role, actor_id FROM audit_events`
++      )[0]
++    ).toEqual({
++      actor_role: "system",
++      actor_id: null,
++    });
++  });
++});
+diff --git a/src/__tests__/utils/phase01-test-db.ts b/src/__tests__/utils/phase01-test-db.ts
+new file mode 100644
+index 00000000..7ff1a507
+--- /dev/null
++++ b/src/__tests__/utils/phase01-test-db.ts
+@@ -0,0 +1,1222 @@
++import { randomUUID } from "crypto";
++import fs from "fs";
++import os from "os";
++import path from "path";
++
++import type { ActorContext } from "@/lib/db/with-actor";
++
++type SQLiteStatement = {
++  all: (...args: unknown[]) => unknown[];
++  get: (...args: unknown[]) => unknown;
++  run: (...args: unknown[]) => unknown;
++};
++
++type SQLiteDatabase = {
++  close: () => void;
++  exec: (sql: string) => void;
++  function: (name: string, fn: (...args: unknown[]) => unknown) => void;
++  prepare: (sql: string) => SQLiteStatement;
++};
++
++const { DatabaseSync } = require("node:sqlite") as {
++  DatabaseSync: new (location: string) => SQLiteDatabase;
++};
++
++type Row = Record<string, unknown>;
++
++interface TxContext {
++  actorSettings: Map<string, string>;
++  lockTimeoutMs: number;
++  ownedLocks: Set<string>;
++}
++
++interface TestTx {
++  __phase01: {
++    db: SQLiteDatabase;
++    context: TxContext;
++  };
++  $executeRawUnsafe: (sql: string) => Promise<number>;
++  $executeRaw: (
++    strings: TemplateStringsArray,
++    ...values: unknown[]
++  ) => Promise<number>;
++  $queryRaw: <T>(
++    strings: TemplateStringsArray,
++    ...values: unknown[]
++  ) => Promise<T>;
++  physicalUnit: {
++    upsert: (args: {
++      where: {
++        canonicalAddressHash_canonicalUnit: {
++          canonicalAddressHash: string;
++          canonicalUnit: string;
++        };
++      };
++      create: {
++        canonicalAddressHash: string;
++        canonicalUnit: string;
++        canonicalizerVersion: string;
++      };
++      update: {
++        canonicalizerVersion: string;
++        sourceVersion: { increment: bigint };
++        rowVersion: { increment: bigint };
++      };
++      select: {
++        id: boolean;
++        unitIdentityEpoch: boolean;
++        sourceVersion: boolean;
++      };
++    }) => Promise<{
++      id: string;
++      unitIdentityEpoch: number;
++      sourceVersion: bigint;
++    }>;
++    findMany: (args: {
++      where: { id: { in: string[] } };
++      select: {
++        id: boolean;
++        unitIdentityEpoch: boolean;
++        supersedesUnitIds: boolean;
++      };
++    }) => Promise<
++      Array<{
++        id: string;
++        unitIdentityEpoch: number;
++        supersedesUnitIds: string[];
++      }>
++    >;
++    update: (args: {
++      where: { id: string };
++      data: Record<string, unknown>;
++    }) => Promise<void>;
++  };
++  hostUnitClaim: {
++    create: (args: { data: Record<string, unknown> }) => Promise<{ id: string }>;
++    update: (args: {
++      where: { id: string };
++      data: Record<string, unknown>;
++    }) => Promise<void>;
++  };
++  listingInventory: {
++    create: (args: { data: Record<string, unknown> }) => Promise<{ id: string }>;
++    update: (args: {
++      where: { id: string };
++      data: Record<string, unknown>;
++    }) => Promise<void>;
++  };
++  identityMutation: {
++    create: (args: {
++      data: Record<string, unknown>;
++      select: { id: boolean };
++    }) => Promise<{ id: string }>;
++  };
++  outboxEvent: {
++    create: (args: {
++      data: Record<string, unknown>;
++      select: { id: boolean };
++    }) => Promise<{ id: string }>;
++  };
++  auditEvent: {
++    create: (args: {
++      data: Record<string, unknown>;
++      select: { id: boolean };
++    }) => Promise<{ id: string }>;
++  };
++}
++
++type TransactionHost = {
++  $transaction: <T>(
++    fnOrArray: ((tx: TestTx) => Promise<T>) | Promise<T>[],
++    _options?: Record<string, unknown>
++  ) => Promise<T>;
++};
++
++const RANGE_LITERAL =
++  /^[[(]\d{4}-\d{2}-\d{2}T[^,]+,\d{4}-\d{2}-\d{2}T.+[)\]]$/;
++
++function toDbScalar(value: unknown): unknown {
++  if (typeof value === "bigint") {
++    return Number(value);
++  }
++  if (Array.isArray(value) || (value && typeof value === "object")) {
++    return JSON.stringify(value);
++  }
++  if (typeof value === "boolean") {
++    return value ? 1 : 0;
++  }
++  return value ?? null;
++}
++
++function hasOwn(object: object, key: string): boolean {
++  return Object.prototype.hasOwnProperty.call(object, key);
++}
++
++function fromJsonArray(value: unknown): string[] {
++  if (typeof value !== "string" || value.length === 0) {
++    return [];
++  }
++  return JSON.parse(value) as string[];
++}
++
++function fromJsonValue<T>(value: unknown): T {
++  if (typeof value !== "string") {
++    return value as T;
++  }
++  return JSON.parse(value) as T;
++}
++
++function readBigInt(value: unknown): bigint {
++  if (typeof value === "bigint") {
++    return value;
++  }
++  return BigInt(Number(value ?? 0));
++}
++
++function createContext(): TxContext {
++  return {
++    actorSettings: new Map(),
++    lockTimeoutMs: 5000,
++    ownedLocks: new Set(),
++  };
++}
++
++function addBigInt(rows: Row[]): Row[] {
++  return rows.map((row) => {
++    const next = { ...row };
++    for (const key of [
++      "source_version",
++      "row_version",
++      "projection_epoch",
++      "unit_identity_epoch",
++      "unit_identity_epoch_written_at",
++      "resulting_epoch",
++      "priority",
++    ]) {
++      if (key in next && typeof next[key] === "number") {
++        next[key] = BigInt(next[key] as number);
++      }
++    }
++    return next;
++  });
++}
++
++class AdvisoryLockManager {
++  private owners = new Map<string, string>();
++  private waiters = new Map<string, Array<() => void>>();
++
++  async acquire(key: string, txId: string): Promise<void> {
++    if (this.owners.get(key) === txId) {
++      return;
++    }
++
++    if (!this.owners.has(key)) {
++      this.owners.set(key, txId);
++      return;
++    }
++
++    await new Promise<void>((resolve) => {
++      const queue = this.waiters.get(key) ?? [];
++      queue.push(resolve);
++      this.waiters.set(key, queue);
++    });
++
++    this.owners.set(key, txId);
++  }
++
++  releaseAll(txId: string): void {
++    for (const [key, owner] of this.owners.entries()) {
++      if (owner !== txId) {
++        continue;
++      }
++
++      const queue = this.waiters.get(key) ?? [];
++      const next = queue.shift();
++      if (next) {
++        this.waiters.set(key, queue);
++        next();
++      } else {
++        this.owners.delete(key);
++        this.waiters.delete(key);
++      }
++    }
++  }
++}
++
++class TransactionQueue {
++  private tail = Promise.resolve();
++
++  async run<T>(fn: () => Promise<T>): Promise<T> {
++    const previous = this.tail;
++    let release = () => {};
++    this.tail = new Promise<void>((resolve) => {
++      release = resolve;
++    });
++
++    await previous;
++    try {
++      return await fn();
++    } finally {
++      release();
++    }
++  }
++}
++
++function registerFunctions(db: SQLiteDatabase, context: TxContext | null): void {
++  db.function("gen_random_uuid", () => randomUUID());
++  db.function("set_config", (name: unknown, value: unknown) => {
++    if (context) {
++      context.actorSettings.set(String(name), value == null ? "" : String(value));
++    }
++    return value ?? "";
++  });
++  db.function("current_setting", (name: unknown) => {
++    if (!context) {
++      return null;
++    }
++    return context.actorSettings.get(String(name)) ?? null;
++  });
++  db.function("hashtext", (value: unknown) => String(value ?? ""));
++  db.function("is_valid_tstzrange", (value: unknown) =>
++    RANGE_LITERAL.test(String(value ?? "")) ? 1 : 0
++  );
++}
++
++function prepare(db: SQLiteDatabase, sql: string) {
++  return db.prepare(sql);
++}
++
++function buildInsert(
++  db: SQLiteDatabase,
++  table: string,
++  data: Record<string, unknown>,
++  returnId = true
++): { id: string } {
++  const id = String(data.id ?? randomUUID());
++  const fullData: Record<string, unknown> = { ...data, id };
++  const columns = Object.keys(fullData);
++  const placeholders = columns.map(() => "?").join(", ");
++  prepare(
++    db,
++    `INSERT INTO "${table}" (${columns
++      .map((column) => `"${column}"`)
++      .join(", ")}) VALUES (${placeholders})`
++  ).run(...columns.map((column) => toDbScalar(fullData[column])));
++
++  return returnId ? { id } : { id: "" };
++}
++
++function buildUpdate(
++  db: SQLiteDatabase,
++  table: string,
++  id: string,
++  data: Record<string, unknown>
++) {
++  const assignments: string[] = [];
++  const values: unknown[] = [];
++
++  for (const [column, rawValue] of Object.entries(data)) {
++    if (
++      rawValue &&
++      typeof rawValue === "object" &&
++      "increment" in (rawValue as { increment?: unknown })
++    ) {
++      assignments.push(`"${column}" = "${column}" + ?`);
++      values.push(
++        Number((rawValue as { increment: bigint }).increment)
++      );
++      continue;
++    }
++
++    assignments.push(`"${column}" = ?`);
++    values.push(toDbScalar(rawValue));
++  }
++
++  if (
++    !Object.prototype.hasOwnProperty.call(data, "updated_at") &&
++    ["physical_units", "host_unit_claims", "listing_inventories"].includes(table)
++  ) {
++    assignments.push(`"updated_at" = CURRENT_TIMESTAMP`);
++  }
++
++  prepare(
++    db,
++    `UPDATE "${table}" SET ${assignments.join(", ")} WHERE id = ?`
++  ).run(...values, id);
++}
++
++function rawQuery(db: SQLiteDatabase, sql: string, values: unknown[] = []): Row[] {
++  return addBigInt(prepare(db, sql).all(...values.map(toDbScalar)) as Row[]);
++}
++
++function normalizeSql(strings: TemplateStringsArray): string {
++  return strings.join("?");
++}
++
++function createTransactionClient(
++  db: SQLiteDatabase,
++  context: TxContext,
++  txId: string,
++  locks: AdvisoryLockManager
++): TestTx {
++  const tx: TestTx = {
++    __phase01: {
++      db,
++      context,
++    },
++    async $executeRawUnsafe(sql: string) {
++      if (sql.includes("SET LOCAL lock_timeout")) {
++        context.lockTimeoutMs = 5000;
++        return 0;
++      }
++
++      prepare(db, sql).run();
++      return 0;
++    },
++    async $executeRaw(strings, ...values) {
++      const sql = normalizeSql(strings);
++
++      if (sql.includes("set_config('app.actor_role'")) {
++        context.actorSettings.set("app.actor_role", String(values[0] ?? ""));
++        return 1;
++      }
++
++      if (sql.includes("set_config('app.actor_id'")) {
++        context.actorSettings.set("app.actor_id", String(values[0] ?? ""));
++        return 1;
++      }
++
++      if (sql.includes("SELECT pg_advisory_xact_lock(hashtext(")) {
++        const key = String(values[0] ?? "");
++        await locks.acquire(key, txId);
++        context.ownedLocks.add(key);
++        return 1;
++      }
++
++      if (sql.includes('INSERT INTO "IdempotencyKey"')) {
++        prepare(
++          db,
++          `INSERT INTO "IdempotencyKey" (
++            id, key, "userId", endpoint, status, "requestHash", "createdAt", "expiresAt"
++          )
++          VALUES (?, ?, ?, ?, 'processing', ?, CURRENT_TIMESTAMP, datetime(CURRENT_TIMESTAMP, '+24 hours'))
++          ON CONFLICT ("userId", endpoint, key) DO NOTHING`
++        ).run(randomUUID(), values[0], values[1], values[2], values[3]);
++        return 1;
++      }
++
++      if (sql.includes('UPDATE "IdempotencyKey"') && sql.includes("SET status = 'completed'")) {
++        prepare(
++          db,
++          `UPDATE "IdempotencyKey"
++           SET status = 'completed',
++               "requestHash" = ?,
++               "resultData" = ?
++           WHERE id = ?`
++        ).run(values[0], values[1], values[2]);
++        return 1;
++      }
++
++      throw new Error(`Unsupported $executeRaw SQL in Phase 01 test harness: ${sql}`);
++    },
++    async $queryRaw(strings, ...values) {
++      const sql = normalizeSql(strings);
++
++      if (sql.includes('FROM "IdempotencyKey"') && sql.includes("FOR UPDATE")) {
++        return rawQuery(
++          db,
++          `SELECT id, status, "requestHash", "resultData"
++           FROM "IdempotencyKey"
++           WHERE "userId" = ?
++             AND endpoint = ?
++             AND key = ?`,
++          values
++        ) as never;
++      }
++
++      throw new Error(`Unsupported $queryRaw SQL in Phase 01 test harness: ${sql}`);
++    },
++    physicalUnit: {
++      async upsert(args) {
++        const existing = prepare(
++          db,
++          `SELECT id, unit_identity_epoch, source_version
++           FROM physical_units
++           WHERE canonical_address_hash = ?
++             AND canonical_unit = ?`
++        ).get(
++          args.where.canonicalAddressHash_canonicalUnit.canonicalAddressHash,
++          args.where.canonicalAddressHash_canonicalUnit.canonicalUnit
++        ) as Row | undefined;
++
++        if (!existing) {
++          const createdId = randomUUID();
++          prepare(
++            db,
++            `INSERT INTO physical_units (
++              id,
++              canonical_address_hash,
++              canonical_unit,
++              canonicalizer_version
++            )
++            VALUES (?, ?, ?, ?)`
++          ).run(
++            createdId,
++            args.create.canonicalAddressHash,
++            args.create.canonicalUnit,
++            args.create.canonicalizerVersion
++          );
++
++          return {
++            id: createdId,
++            unitIdentityEpoch: 1,
++            sourceVersion: BigInt(1),
++          };
++        }
++
++        prepare(
++          db,
++          `UPDATE physical_units
++           SET canonicalizer_version = ?,
++               source_version = source_version + 1,
++               row_version = row_version + 1,
++               updated_at = CURRENT_TIMESTAMP
++           WHERE id = ?`
++        ).run(args.update.canonicalizerVersion, existing.id);
++
++        const updated = prepare(
++          db,
++          `SELECT id, unit_identity_epoch, source_version
++           FROM physical_units
++           WHERE id = ?`
++        ).get(existing.id) as Row;
++
++        return {
++          id: String(updated.id),
++          unitIdentityEpoch: Number(updated.unit_identity_epoch),
++          sourceVersion: readBigInt(updated.source_version),
++        };
++      },
++      async findMany(args) {
++        const placeholders = args.where.id.in.map(() => "?").join(", ");
++        return rawQuery(
++          db,
++          `SELECT id, unit_identity_epoch, supersedes_unit_ids
++           FROM physical_units
++           WHERE id IN (${placeholders})`,
++          args.where.id.in
++        ).map((row) => ({
++          id: String(row.id),
++          unitIdentityEpoch: Number(row.unit_identity_epoch),
++          supersedesUnitIds: fromJsonArray(row.supersedes_unit_ids),
++        }));
++      },
++      async update(args) {
++        const passthrough = Object.fromEntries(
++          Object.entries(args.data).filter(
++            ([key]) =>
++              ![
++                "unitIdentityEpoch",
++                "sourceVersion",
++                "rowVersion",
++                "supersedesUnitIds",
++                "supersededByUnitId",
++              ].includes(key)
++          )
++        );
++
++        buildUpdate(db, "physical_units", args.where.id, {
++          ...passthrough,
++          ...(args.data.unitIdentityEpoch !== undefined
++            ? { unit_identity_epoch: args.data.unitIdentityEpoch }
++            : {}),
++          ...(args.data.sourceVersion !== undefined
++            ? { source_version: args.data.sourceVersion }
++            : {}),
++          ...(args.data.rowVersion !== undefined
++            ? { row_version: args.data.rowVersion }
++            : {}),
++          ...(args.data.supersedesUnitIds !== undefined
++            ? { supersedes_unit_ids: args.data.supersedesUnitIds }
++            : {}),
++          ...(args.data.supersededByUnitId !== undefined
++            ? { superseded_by_unit_id: args.data.supersededByUnitId }
++            : {}),
++        });
++      },
++    },
++    hostUnitClaim: {
++      async create(args) {
++        return buildInsert(db, "host_unit_claims", args.data);
++      },
++      async update(args) {
++        buildUpdate(db, "host_unit_claims", args.where.id, args.data);
++      },
++    },
++    listingInventory: {
++      async create(args) {
++        return buildInsert(db, "listing_inventories", args.data);
++      },
++      async update(args) {
++        buildUpdate(db, "listing_inventories", args.where.id, args.data);
++      },
++    },
++    identityMutation: {
++      async create(args) {
++        return buildInsert(db, "identity_mutations", {
++          kind: args.data.kind,
++          from_unit_ids: args.data.fromUnitIds,
++          to_unit_ids: args.data.toUnitIds,
++          reason_code: args.data.reasonCode,
++          operator_id: args.data.operatorId,
++          resulting_epoch: args.data.resultingEpoch,
++        });
++      },
++    },
++    outboxEvent: {
++      async create(args) {
++        return buildInsert(db, "outbox_events", {
++          aggregate_type: args.data.aggregateType,
++          aggregate_id: args.data.aggregateId,
++          kind: args.data.kind,
++          payload: args.data.payload,
++          source_version: args.data.sourceVersion,
++          unit_identity_epoch: args.data.unitIdentityEpoch,
++          priority: args.data.priority ?? 100,
++        });
++      },
++    },
++    auditEvent: {
++      async create(args) {
++        return buildInsert(db, "audit_events", {
++          kind: args.data.kind,
++          actor_role: args.data.actorRole,
++          actor_id: args.data.actorId,
++          aggregate_type: args.data.aggregateType,
++          aggregate_id: args.data.aggregateId,
++          details: args.data.details ?? {},
++          request_id: args.data.requestId ?? null,
++          unit_identity_epoch: args.data.unitIdentityEpoch ?? null,
++        });
++      },
++    },
++  };
++
++  return tx;
++}
++
++function createSchema(db: SQLiteDatabase): void {
++  db.exec(`
++    PRAGMA foreign_keys = ON;
++    PRAGMA journal_mode = WAL;
++
++    CREATE TABLE "User" (
++      id TEXT PRIMARY KEY
++    );
++
++    CREATE TABLE "Listing" (
++      id TEXT PRIMARY KEY,
++      physical_unit_id TEXT NULL
++    );
++
++    CREATE TABLE "IdempotencyKey" (
++      id TEXT PRIMARY KEY,
++      key TEXT NOT NULL,
++      "userId" TEXT NOT NULL,
++      endpoint TEXT NOT NULL,
++      status TEXT NOT NULL DEFAULT 'processing',
++      "requestHash" TEXT NOT NULL,
++      "resultData" TEXT NULL,
++      "createdAt" TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
++      "expiresAt" TEXT NOT NULL,
++      UNIQUE ("userId", endpoint, key)
++    );
++
++    CREATE INDEX "IdempotencyKey_user_endpoint_idx"
++      ON "IdempotencyKey" ("userId", endpoint);
++
++    CREATE TABLE "physical_units" (
++      id TEXT PRIMARY KEY,
++      unit_identity_epoch INTEGER NOT NULL DEFAULT 1,
++      canonical_address_hash TEXT NOT NULL,
++      canonical_unit TEXT NOT NULL DEFAULT '_none_',
++      canonicalizer_version TEXT NOT NULL,
++      privacy_version INTEGER NOT NULL DEFAULT 1,
++      geocode_status TEXT NOT NULL DEFAULT 'PENDING',
++      lifecycle_status TEXT NOT NULL DEFAULT 'ACTIVE',
++      publish_status TEXT NOT NULL DEFAULT 'DRAFT',
++      supersedes_unit_ids TEXT NOT NULL DEFAULT '[]',
++      superseded_by_unit_id TEXT NULL,
++      source_version INTEGER NOT NULL DEFAULT 1,
++      row_version INTEGER NOT NULL DEFAULT 1,
++      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
++      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
++    );
++
++    CREATE UNIQUE INDEX "physical_units_canonical_unique_idx"
++      ON "physical_units" (canonical_address_hash, canonical_unit);
++    CREATE INDEX "physical_units_lifecycle_status_idx"
++      ON "physical_units" (lifecycle_status);
++    CREATE INDEX "physical_units_publish_status_idx"
++      ON "physical_units" (publish_status);
++
++    CREATE TABLE "host_unit_claims" (
++      id TEXT PRIMARY KEY,
++      unit_id TEXT NOT NULL REFERENCES "physical_units"(id) ON DELETE CASCADE,
++      host_user_id TEXT NOT NULL REFERENCES "User"(id) ON DELETE CASCADE,
++      claim_status TEXT NOT NULL DEFAULT 'UNVERIFIED',
++      unit_identity_epoch_written_at INTEGER NOT NULL,
++      source_version INTEGER NOT NULL DEFAULT 1,
++      row_version INTEGER NOT NULL DEFAULT 1,
++      lifecycle_status TEXT NOT NULL DEFAULT 'ACTIVE',
++      publish_status TEXT NOT NULL DEFAULT 'DRAFT',
++      privacy_version INTEGER NOT NULL DEFAULT 1,
++      canonical_address_hash TEXT NOT NULL,
++      canonicalizer_version TEXT NOT NULL,
++      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
++      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
++      UNIQUE (unit_id, host_user_id)
++    );
++
++    CREATE TABLE "listing_inventories" (
++      id TEXT PRIMARY KEY,
++      unit_id TEXT NOT NULL REFERENCES "physical_units"(id) ON DELETE CASCADE,
++      unit_identity_epoch_written_at INTEGER NOT NULL,
++      inventory_key TEXT NOT NULL,
++      room_category TEXT NOT NULL CHECK (room_category IN ('ENTIRE_PLACE', 'PRIVATE_ROOM', 'SHARED_ROOM')),
++      space_label TEXT NULL,
++      capacity_guests INTEGER NULL,
++      total_beds INTEGER NULL,
++      open_beds INTEGER NULL,
++      available_from TEXT NOT NULL,
++      available_until TEXT NULL,
++      availability_range TEXT NOT NULL CHECK (is_valid_tstzrange(availability_range) = 1),
++      price REAL NOT NULL,
++      lease_min_months INTEGER NULL,
++      lease_max_months INTEGER NULL,
++      lease_negotiable INTEGER NOT NULL DEFAULT 0,
++      gender_preference TEXT NULL,
++      household_gender TEXT NULL,
++      lifecycle_status TEXT NOT NULL DEFAULT 'ACTIVE',
++      publish_status TEXT NOT NULL DEFAULT 'DRAFT',
++      source_version INTEGER NOT NULL DEFAULT 1,
++      row_version INTEGER NOT NULL DEFAULT 1,
++      last_published_version INTEGER NULL,
++      last_embedded_version TEXT NULL,
++      canonicalizer_version TEXT NOT NULL,
++      canonical_address_hash TEXT NOT NULL,
++      privacy_version INTEGER NOT NULL DEFAULT 1,
++      supersedes_unit_ids TEXT NOT NULL DEFAULT '[]',
++      superseded_by_unit_id TEXT NULL,
++      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
++      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
++      UNIQUE (unit_id, inventory_key),
++      CHECK (
++        room_category <> 'ENTIRE_PLACE'
++        OR (
++          capacity_guests IS NOT NULL
++          AND total_beds IS NULL
++          AND open_beds IS NULL
++          AND gender_preference IS NULL
++          AND household_gender IS NULL
++        )
++      ),
++      CHECK (
++        room_category <> 'PRIVATE_ROOM'
++        OR (
++          capacity_guests IS NOT NULL
++          AND total_beds IS NULL
++          AND open_beds IS NULL
++        )
++      ),
++      CHECK (
++        room_category <> 'SHARED_ROOM'
++        OR (
++          total_beds IS NOT NULL
++          AND open_beds IS NOT NULL
++          AND open_beds <= total_beds
++          AND capacity_guests IS NULL
++        )
++      )
++    );
++
++    CREATE TABLE "identity_mutations" (
++      id TEXT PRIMARY KEY,
++      kind TEXT NOT NULL CHECK (kind IN ('MERGE', 'SPLIT', 'CANONICALIZER_UPGRADE', 'MANUAL_MODERATION')),
++      from_unit_ids TEXT NOT NULL,
++      to_unit_ids TEXT NOT NULL,
++      reason_code TEXT NOT NULL,
++      operator_id TEXT NULL REFERENCES "User"(id) ON DELETE SET NULL,
++      resulting_epoch INTEGER NOT NULL,
++      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
++    );
++
++    CREATE TABLE "outbox_events" (
++      id TEXT PRIMARY KEY,
++      aggregate_type TEXT NOT NULL,
++      aggregate_id TEXT NOT NULL,
++      kind TEXT NOT NULL,
++      payload TEXT NOT NULL,
++      source_version INTEGER NOT NULL,
++      unit_identity_epoch INTEGER NOT NULL,
++      priority INTEGER NOT NULL DEFAULT 100,
++      status TEXT NOT NULL DEFAULT 'PENDING',
++      attempt_count INTEGER NOT NULL DEFAULT 0,
++      next_attempt_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
++      last_error TEXT NULL,
++      dlq_reason TEXT NULL,
++      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
++      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
++    );
++
++    CREATE INDEX "outbox_events_pending_idx"
++      ON "outbox_events" (status, priority, next_attempt_at);
++    CREATE INDEX "outbox_events_aggregate_idx"
++      ON "outbox_events" (aggregate_type, aggregate_id, source_version);
++    CREATE INDEX "outbox_events_dlq_idx"
++      ON "outbox_events" (status, created_at);
++
++    CREATE TABLE "cache_invalidations" (
++      id TEXT PRIMARY KEY,
++      unit_id TEXT NOT NULL,
++      projection_epoch INTEGER NOT NULL,
++      unit_identity_epoch INTEGER NOT NULL,
++      reason TEXT NOT NULL,
++      enqueued_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
++      consumed_at TEXT NULL,
++      consumed_by TEXT NULL
++    );
++
++    CREATE INDEX "cache_invalidations_pending_idx"
++      ON "cache_invalidations" (consumed_at);
++    CREATE INDEX "cache_invalidations_unit_enqueued_idx"
++      ON "cache_invalidations" (unit_id, enqueued_at DESC);
++
++    CREATE TABLE "audit_events" (
++      id TEXT PRIMARY KEY,
++      kind TEXT NOT NULL,
++      actor_role TEXT NOT NULL,
++      actor_id TEXT NULL,
++      aggregate_type TEXT NOT NULL,
++      aggregate_id TEXT NOT NULL,
++      details TEXT NOT NULL DEFAULT '{}',
++      request_id TEXT NULL,
++      unit_identity_epoch INTEGER NULL,
++      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
++    );
++
++    CREATE INDEX "audit_events_aggregate_idx"
++      ON "audit_events" (aggregate_type, aggregate_id, created_at DESC);
++    CREATE INDEX "audit_events_kind_idx"
++      ON "audit_events" (kind, created_at DESC);
++    CREATE INDEX "audit_events_actor_idx"
++      ON "audit_events" (actor_id, created_at DESC);
++
++    CREATE TRIGGER "trg_modprec_physical_units"
++      BEFORE UPDATE ON "physical_units"
++      FOR EACH ROW
++      WHEN COALESCE(current_setting('app.actor_role'), 'system') = 'host'
++           AND (
++             NEW.lifecycle_status IS NOT OLD.lifecycle_status
++             OR NEW.publish_status IS NOT OLD.publish_status
++             OR NEW.privacy_version IS NOT OLD.privacy_version
++           )
++    BEGIN
++      SELECT RAISE(ABORT, 'MODERATION_LOCKED: host may not modify moderation columns');
++    END;
++
++    CREATE TRIGGER "trg_modprec_host_unit_claims"
++      BEFORE UPDATE ON "host_unit_claims"
++      FOR EACH ROW
++      WHEN COALESCE(current_setting('app.actor_role'), 'system') = 'host'
++           AND (
++             NEW.lifecycle_status IS NOT OLD.lifecycle_status
++             OR NEW.publish_status IS NOT OLD.publish_status
++             OR NEW.privacy_version IS NOT OLD.privacy_version
++           )
++    BEGIN
++      SELECT RAISE(ABORT, 'MODERATION_LOCKED: host may not modify moderation columns');
++    END;
++
++    CREATE TRIGGER "trg_modprec_listing_inventories"
++      BEFORE UPDATE ON "listing_inventories"
++      FOR EACH ROW
++      WHEN COALESCE(current_setting('app.actor_role'), 'system') = 'host'
++           AND (
++             NEW.lifecycle_status IS NOT OLD.lifecycle_status
++             OR NEW.publish_status IS NOT OLD.publish_status
++             OR NEW.privacy_version IS NOT OLD.privacy_version
++           )
++    BEGIN
++      SELECT RAISE(ABORT, 'MODERATION_LOCKED: host may not modify moderation columns');
++    END;
++
++    CREATE TRIGGER "trg_identity_mutations_append_only_update"
++      BEFORE UPDATE ON "identity_mutations"
++      FOR EACH ROW
++    BEGIN
++      SELECT RAISE(ABORT, 'identity_mutations is append-only');
++    END;
++
++    CREATE TRIGGER "trg_identity_mutations_append_only_delete"
++      BEFORE DELETE ON "identity_mutations"
++      FOR EACH ROW
++    BEGIN
++      SELECT RAISE(ABORT, 'identity_mutations is append-only');
++    END;
++
++    CREATE TRIGGER "trg_audit_events_append_only_update"
++      BEFORE UPDATE ON "audit_events"
++      FOR EACH ROW
++    BEGIN
++      SELECT RAISE(ABORT, 'audit_events is append-only');
++    END;
++
++    CREATE TRIGGER "trg_audit_events_append_only_delete"
++      BEFORE DELETE ON "audit_events"
++      FOR EACH ROW
++    BEGIN
++      SELECT RAISE(ABORT, 'audit_events is append-only');
++    END;
++  `);
++}
++
++export class Phase01TestDb {
++  private readonly dir = fs.mkdtempSync(
++    path.join(os.tmpdir(), "phase01-sqlite-")
++  );
++  private readonly dbPath = path.join(this.dir, "phase01.sqlite");
++  private readonly baseDb: SQLiteDatabase;
++  private readonly queue = new TransactionQueue();
++  private readonly locks = new AdvisoryLockManager();
++
++  readonly client: TransactionHost;
++
++  constructor() {
++    this.baseDb = new DatabaseSync(this.dbPath);
++    registerFunctions(this.baseDb, null);
++    createSchema(this.baseDb);
++    this.client = {
++      $transaction: async (fnOrArray) => {
++        if (Array.isArray(fnOrArray)) {
++          return Promise.all(fnOrArray) as never;
++        }
++
++        return this.queue.run(async () => {
++          const context = createContext();
++          const txDb = new DatabaseSync(this.dbPath);
++          registerFunctions(txDb, context);
++          txDb.exec("BEGIN");
++          const txId = randomUUID();
++          const tx = createTransactionClient(txDb, context, txId, this.locks);
++
++          try {
++            const result = await fnOrArray(tx);
++            txDb.exec("COMMIT");
++            return result;
++          } catch (error) {
++            txDb.exec("ROLLBACK");
++            throw error;
++          } finally {
++            this.locks.releaseAll(txId);
++            txDb.close();
++          }
++        });
++      },
++    };
++  }
++
++  dispose(): void {
++    this.baseDb.close();
++    fs.rmSync(this.dir, { recursive: true, force: true });
++  }
++
++  listTables(): string[] {
++    return rawQuery(
++      this.baseDb,
++      `SELECT name
++       FROM sqlite_master
++       WHERE type = 'table'
++         AND name NOT LIKE 'sqlite_%'`
++    )
++      .map((row) => String(row.name))
++      .sort();
++  }
++
++  listIndexes(): string[] {
++    return rawQuery(
++      this.baseDb,
++      `SELECT name
++       FROM sqlite_master
++       WHERE type = 'index'
++         AND name NOT LIKE 'sqlite_%'`
++    )
++      .map((row) => String(row.name))
++      .sort();
++  }
++
++  run(sql: string, values: unknown[] = []): void {
++    prepare(this.baseDb, sql).run(...values.map(toDbScalar));
++  }
++
++  get<T extends Row>(sql: string, values: unknown[] = []): T {
++    return (prepare(this.baseDb, sql).get(...values.map(toDbScalar)) ?? {}) as T;
++  }
++
++  all<T extends Row>(sql: string, values: unknown[] = []): T[] {
++    return prepare(this.baseDb, sql).all(...values.map(toDbScalar)) as T[];
++  }
++
++  actorSettingFromTx(
++    tx: { __phase01?: { db: SQLiteDatabase; context: TxContext } },
++    key: string
++  ) {
++    return tx.__phase01?.context.actorSettings.get(key) ?? null;
++  }
++
++  currentSettingInTx(
++    tx: { __phase01?: { db: SQLiteDatabase } },
++    key: string
++  ): string | null {
++    const row = tx.__phase01?.db
++      .prepare(`SELECT current_setting(?) AS value`)
++      .get(key) as { value?: string | null } | undefined;
++
++    return row?.value ?? null;
++  }
++
++  currentSettingOutsideTx(key: string): string | null {
++    const row = prepare(this.baseDb, `SELECT current_setting(?) AS value`).get(
++      key
++    ) as { value?: string | null } | undefined;
++
++    return row?.value ?? null;
++  }
++
++  insertUser(id: string): void {
++    prepare(this.baseDb, `INSERT INTO "User" (id) VALUES (?)`).run(id);
++  }
++
++  insertPhysicalUnit(overrides: Partial<Row> = {}): string {
++    const id = String(overrides.id ?? randomUUID());
++    buildInsert(this.baseDb, "physical_units", {
++      id,
++      canonical_address_hash: overrides.canonical_address_hash ?? "hash-default",
++      canonical_unit: overrides.canonical_unit ?? "_none_",
++      canonicalizer_version: overrides.canonicalizer_version ?? "v1.0-2026-04",
++      privacy_version: overrides.privacy_version ?? 1,
++      geocode_status: overrides.geocode_status ?? "PENDING",
++      lifecycle_status: overrides.lifecycle_status ?? "ACTIVE",
++      publish_status: overrides.publish_status ?? "DRAFT",
++      supersedes_unit_ids: overrides.supersedes_unit_ids ?? [],
++      superseded_by_unit_id: overrides.superseded_by_unit_id ?? null,
++      unit_identity_epoch: overrides.unit_identity_epoch ?? 1,
++      source_version: overrides.source_version ?? 1,
++      row_version: overrides.row_version ?? 1,
++    });
++    return id;
++  }
++
++  insertHostUnitClaim(overrides: Partial<Row> = {}): string {
++    const id = String(overrides.id ?? randomUUID());
++    buildInsert(this.baseDb, "host_unit_claims", {
++      id,
++      unit_id: overrides.unit_id,
++      host_user_id: overrides.host_user_id,
++      claim_status: overrides.claim_status ?? "UNVERIFIED",
++      unit_identity_epoch_written_at: overrides.unit_identity_epoch_written_at ?? 1,
++      source_version: overrides.source_version ?? 1,
++      row_version: overrides.row_version ?? 1,
++      lifecycle_status: overrides.lifecycle_status ?? "ACTIVE",
++      publish_status: overrides.publish_status ?? "DRAFT",
++      privacy_version: overrides.privacy_version ?? 1,
++      canonical_address_hash: overrides.canonical_address_hash ?? "hash-default",
++      canonicalizer_version: overrides.canonicalizer_version ?? "v1.0-2026-04",
++    });
++    return id;
++  }
++
++  insertListingInventory(overrides: Partial<Row> = {}): string {
++    const id = String(overrides.id ?? randomUUID());
++    buildInsert(this.baseDb, "listing_inventories", {
++      id,
++      unit_id: overrides.unit_id,
++      unit_identity_epoch_written_at: overrides.unit_identity_epoch_written_at ?? 1,
++      inventory_key: overrides.inventory_key ?? "inventory-1",
++      room_category: overrides.room_category ?? "ENTIRE_PLACE",
++      space_label: overrides.space_label ?? null,
++      capacity_guests: hasOwn(overrides, "capacity_guests")
++        ? overrides.capacity_guests
++        : 2,
++      total_beds: overrides.total_beds ?? null,
++      open_beds: overrides.open_beds ?? null,
++      available_from: overrides.available_from ?? "2026-05-01",
++      available_until: overrides.available_until ?? null,
++      availability_range:
++        overrides.availability_range ??
++        "[2026-05-01T00:00:00Z,2026-06-01T00:00:00Z)",
++      price: overrides.price ?? 1200,
++      lease_min_months: overrides.lease_min_months ?? null,
++      lease_max_months: overrides.lease_max_months ?? null,
++      lease_negotiable: overrides.lease_negotiable ?? 0,
++      gender_preference: overrides.gender_preference ?? null,
++      household_gender: overrides.household_gender ?? null,
++      lifecycle_status: overrides.lifecycle_status ?? "ACTIVE",
++      publish_status: overrides.publish_status ?? "DRAFT",
++      source_version: overrides.source_version ?? 1,
++      row_version: overrides.row_version ?? 1,
++      last_published_version: overrides.last_published_version ?? null,
++      last_embedded_version: overrides.last_embedded_version ?? null,
++      canonicalizer_version: overrides.canonicalizer_version ?? "v1.0-2026-04",
++      canonical_address_hash: overrides.canonical_address_hash ?? "hash-default",
++      privacy_version: overrides.privacy_version ?? 1,
++      supersedes_unit_ids: overrides.supersedes_unit_ids ?? [],
++      superseded_by_unit_id: overrides.superseded_by_unit_id ?? null,
++    });
++    return id;
++  }
++
++  insertIdentityMutation(overrides: Partial<Row> = {}): string {
++    const id = String(overrides.id ?? randomUUID());
++    buildInsert(this.baseDb, "identity_mutations", {
++      id,
++      kind: overrides.kind ?? "MERGE",
++      from_unit_ids: overrides.from_unit_ids ?? ["unit-a"],
++      to_unit_ids: overrides.to_unit_ids ?? ["unit-b"],
++      reason_code: overrides.reason_code ?? "operator_duplicate",
++      operator_id: overrides.operator_id ?? null,
++      resulting_epoch: overrides.resulting_epoch ?? 2,
++    });
++    return id;
++  }
++
++  insertAuditEvent(overrides: Partial<Row> = {}): string {
++    const id = String(overrides.id ?? randomUUID());
++    buildInsert(this.baseDb, "audit_events", {
++      id,
++      kind: overrides.kind ?? "IDENTITY_MUTATION",
++      actor_role: overrides.actor_role ?? "system",
++      actor_id: overrides.actor_id ?? null,
++      aggregate_type: overrides.aggregate_type ?? "identity_mutations",
++      aggregate_id: overrides.aggregate_id ?? "mutation-1",
++      details: overrides.details ?? {},
++      request_id: overrides.request_id ?? null,
++      unit_identity_epoch: overrides.unit_identity_epoch ?? null,
++    });
++    return id;
++  }
++
++  insertOutboxEvent(overrides: Partial<Row> = {}): string {
++    const id = String(overrides.id ?? randomUUID());
++    buildInsert(this.baseDb, "outbox_events", {
++      id,
++      aggregate_type: overrides.aggregate_type ?? "IDENTITY_MUTATION",
++      aggregate_id: overrides.aggregate_id ?? "mutation-1",
++      kind: overrides.kind ?? "IDENTITY_MUTATION",
++      payload: overrides.payload ?? {},
++      source_version: overrides.source_version ?? 1,
++      unit_identity_epoch: overrides.unit_identity_epoch ?? 2,
++      priority: overrides.priority ?? 0,
++      status: overrides.status ?? "PENDING",
++      attempt_count: overrides.attempt_count ?? 0,
++      last_error: overrides.last_error ?? null,
++      dlq_reason: overrides.dlq_reason ?? null,
++    });
++    return id;
++  }
++
++  getPhysicalUnits(): Array<{
++    id: string;
++    sourceVersion: bigint;
++    rowVersion: bigint;
++    unitIdentityEpoch: number;
++    supersedesUnitIds: string[];
++    supersededByUnitId: string | null;
++  }> {
++    return rawQuery(
++      this.baseDb,
++      `SELECT id,
++              source_version,
++              row_version,
++              unit_identity_epoch,
++              supersedes_unit_ids,
++              superseded_by_unit_id
++       FROM physical_units
++       ORDER BY id`
++    ).map((row) => ({
++      id: String(row.id),
++      sourceVersion: readBigInt(row.source_version),
++      rowVersion: readBigInt(row.row_version),
++      unitIdentityEpoch: Number(row.unit_identity_epoch),
++      supersedesUnitIds: fromJsonArray(row.supersedes_unit_ids),
++      supersededByUnitId:
++        row.superseded_by_unit_id == null ? null : String(row.superseded_by_unit_id),
++    }));
++  }
++
++  getIdentityMutations(): Array<{
++    id: string;
++    kind: string;
++    fromUnitIds: string[];
++    toUnitIds: string[];
++    operatorId: string | null;
++    resultingEpoch: number;
++  }> {
++    return rawQuery(
++      this.baseDb,
++      `SELECT id, kind, from_unit_ids, to_unit_ids, operator_id, resulting_epoch
++       FROM identity_mutations
++       ORDER BY created_at`
++    ).map((row) => ({
++      id: String(row.id),
++      kind: String(row.kind),
++      fromUnitIds: fromJsonArray(row.from_unit_ids),
++      toUnitIds: fromJsonArray(row.to_unit_ids),
++      operatorId: row.operator_id == null ? null : String(row.operator_id),
++      resultingEpoch: Number(row.resulting_epoch),
++    }));
++  }
++
++  getOutboxEvents(): Array<{
++    id: string;
++    aggregateType: string;
++    aggregateId: string;
++    kind: string;
++    payload: Record<string, unknown>;
++    priority: number;
++    unitIdentityEpoch: number;
++  }> {
++    return rawQuery(
++      this.baseDb,
++      `SELECT id,
++              aggregate_type,
++              aggregate_id,
++              kind,
++              payload,
++              priority,
++              unit_identity_epoch
++       FROM outbox_events
++       ORDER BY created_at`
++    ).map((row) => ({
++      id: String(row.id),
++      aggregateType: String(row.aggregate_type),
++      aggregateId: String(row.aggregate_id),
++      kind: String(row.kind),
++      payload: fromJsonValue<Record<string, unknown>>(row.payload),
++      priority: Number(row.priority),
++      unitIdentityEpoch: Number(row.unit_identity_epoch),
++    }));
++  }
++}
++
++export function hostActor(id = "host-1"): ActorContext {
++  return { role: "host", id };
++}
++
++export function moderatorActor(id = "moderator-1"): ActorContext {
++  return { role: "moderator", id };
++}
++
++export function systemActor(id: string | null = null): ActorContext {
++  return { role: "system", id };
++}
+diff --git a/src/__tests__/db/phase01-advisory-lock-contention.test.ts b/src/__tests__/db/phase01-advisory-lock-contention.test.ts
+new file mode 100644
+index 00000000..6a495921
+--- /dev/null
++++ b/src/__tests__/db/phase01-advisory-lock-contention.test.ts
+@@ -0,0 +1,60 @@
++import {
++  IDEMPOTENCY_ENDPOINT_RESOLVE_UNIT,
++  type IdempotencySuccess,
++  withIdempotency,
++} from "@/lib/idempotency";
++import { resolveOrCreateUnit } from "@/lib/identity/resolve-or-create-unit";
++import {
++  Phase01TestDb,
++  hostActor,
++} from "@/__tests__/utils/phase01-test-db";
++
++describe("Phase 01 advisory-lock contention", () => {
++  let db: Phase01TestDb;
++
++  beforeEach(() => {
++    db = new Phase01TestDb();
++  });
++
++  afterEach(() => {
++    db.dispose();
++  });
++
++  it("10 parallel callers converge on one physical_units row and 9 resolve existing", async () => {
++    const actor = hostActor();
++    const address = {
++      address: "123 Main St Apt 4B",
++      city: "San Francisco",
++      state: "CA",
++      zip: "94107",
++    };
++
++    const results = await Promise.all(
++      Array.from({ length: 10 }, (_, index) =>
++        withIdempotency<{ created: boolean }>(
++          `phase01-lock-${index}`,
++          "host-1",
++          IDEMPOTENCY_ENDPOINT_RESOLVE_UNIT,
++          address,
++          (tx) =>
++            resolveOrCreateUnit(tx as never, {
++              actor,
++              address,
++              requestId: `req-${index}`,
++            }),
++          { client: db.client as never }
++        )
++      )
++    );
++
++    expect(results.every((result) => result.success)).toBe(true);
++    const successes = results.filter(
++      (result): result is IdempotencySuccess<{ created: boolean }> => result.success
++    );
++
++    expect(successes).toHaveLength(10);
++    expect(successes.filter((result) => result.result.created)).toHaveLength(1);
++    expect(successes.filter((result) => !result.result.created)).toHaveLength(9);
++    expect(db.getPhysicalUnits()).toHaveLength(1);
++  });
++});
+diff --git a/src/__tests__/integration/phase01-identity-mutation.test.ts b/src/__tests__/integration/phase01-identity-mutation.test.ts
+new file mode 100644
+index 00000000..2fc3b036
+--- /dev/null
++++ b/src/__tests__/integration/phase01-identity-mutation.test.ts
+@@ -0,0 +1,170 @@
++import { recordIdentityMutation } from "@/lib/identity/mutate-unit";
++import { Phase01TestDb } from "@/__tests__/utils/phase01-test-db";
++
++describe("Phase 01 identity mutation integration", () => {
++  let db: Phase01TestDb;
++
++  beforeEach(() => {
++    db = new Phase01TestDb();
++    db.insertUser("moderator-1");
++  });
++
++  afterEach(() => {
++    db.dispose();
++  });
++
++  it("rolls back the ledger row and outbox when a failure happens after the INSERT", async () => {
++    const sourceUnitId = db.insertPhysicalUnit({
++      id: "unit-merge-a",
++      canonical_address_hash: "hash-merge-a",
++      unit_identity_epoch: 2,
++    });
++    const targetUnitId = db.insertPhysicalUnit({
++      id: "unit-merge-target",
++      canonical_address_hash: "hash-merge-target",
++      unit_identity_epoch: 4,
++    });
++    const startingUnits = db.getPhysicalUnits();
++
++    await expect(
++      db.client.$transaction(async (tx) => {
++        const failingTx = {
++          ...tx,
++          outboxEvent: {
++            ...tx.outboxEvent,
++            create: jest
++              .fn()
++              .mockRejectedValue(new Error("synthetic outbox failure")),
++          },
++        };
++
++        await recordIdentityMutation(failingTx as never, {
++          kind: "MERGE",
++          fromUnitIds: [sourceUnitId],
++          toUnitIds: [targetUnitId],
++          reasonCode: "operator_duplicate",
++          operatorId: "moderator-1",
++        });
++      })
++    ).rejects.toThrow("synthetic outbox failure");
++
++    expect(db.getIdentityMutations()).toEqual([]);
++    expect(db.getOutboxEvents()).toEqual([]);
++    expect(
++      db.all<{ count: number }>(`SELECT COUNT(*) as count FROM audit_events`)[0].count
++    ).toBe(0);
++    expect(db.getPhysicalUnits()).toEqual(startingUnits);
++  });
++
++  it("supports SPLIT with multiple to_unit_ids and bumps all affected epochs", async () => {
++    const sourceUnitId = db.insertPhysicalUnit({
++      id: "unit-split-source",
++      canonical_address_hash: "hash-split-source",
++      unit_identity_epoch: 5,
++    });
++    const targetUnitOneId = db.insertPhysicalUnit({
++      id: "unit-split-target-1",
++      canonical_address_hash: "hash-split-target-1",
++      unit_identity_epoch: 1,
++      supersedes_unit_ids: ["legacy-parent"],
++    });
++    const targetUnitTwoId = db.insertPhysicalUnit({
++      id: "unit-split-target-2",
++      canonical_address_hash: "hash-split-target-2",
++      unit_identity_epoch: 3,
++    });
++
++    const result = await db.client.$transaction((tx) =>
++      recordIdentityMutation(tx as never, {
++        kind: "SPLIT",
++        fromUnitIds: [sourceUnitId],
++        toUnitIds: [targetUnitOneId, targetUnitTwoId],
++        reasonCode: "operator_split",
++        operatorId: "moderator-1",
++      })
++    );
++
++    expect(result.affectedUnitIds).toEqual([
++      sourceUnitId,
++      targetUnitOneId,
++      targetUnitTwoId,
++    ]);
++
++    expect(db.getIdentityMutations()).toEqual([
++      expect.objectContaining({
++        kind: "SPLIT",
++        fromUnitIds: [sourceUnitId],
++        toUnitIds: [targetUnitOneId, targetUnitTwoId],
++        resultingEpoch: 6,
++      }),
++    ]);
++
++    expect(db.getOutboxEvents()).toEqual([
++      expect.objectContaining({
++        kind: "IDENTITY_MUTATION",
++        priority: 0,
++        unitIdentityEpoch: 6,
++      }),
++    ]);
++
++    expect(db.getPhysicalUnits()).toEqual(
++      expect.arrayContaining([
++        expect.objectContaining({
++          id: sourceUnitId,
++          unitIdentityEpoch: 6,
++        }),
++        expect.objectContaining({
++          id: targetUnitOneId,
++          unitIdentityEpoch: 6,
++          supersedesUnitIds: ["legacy-parent", sourceUnitId],
++        }),
++        expect.objectContaining({
++          id: targetUnitTwoId,
++          unitIdentityEpoch: 6,
++          supersedesUnitIds: [sourceUnitId],
++        }),
++      ])
++    );
++  });
++
++  it("supports CANONICALIZER_UPGRADE with null operator_id and writes priority 0", async () => {
++    const unitId = db.insertPhysicalUnit({
++      id: "unit-upgrade",
++      canonical_address_hash: "hash-upgrade",
++      unit_identity_epoch: 7,
++    });
++
++    const result = await db.client.$transaction((tx) =>
++      recordIdentityMutation(tx as never, {
++        kind: "CANONICALIZER_UPGRADE",
++        fromUnitIds: [unitId],
++        toUnitIds: [unitId],
++        reasonCode: "canonicalizer_upgrade",
++        operatorId: null,
++      })
++    );
++
++    expect(result.resultingEpoch).toBe(8);
++    expect(db.getIdentityMutations()).toEqual([
++      expect.objectContaining({
++        kind: "CANONICALIZER_UPGRADE",
++        operatorId: null,
++        resultingEpoch: 8,
++      }),
++    ]);
++    expect(db.getOutboxEvents()).toEqual([
++      expect.objectContaining({
++        kind: "IDENTITY_MUTATION",
++        priority: 0,
++      }),
++    ]);
++    expect(
++      db.all<{ actor_role: string; actor_id: string | null }>(
++        `SELECT actor_role, actor_id FROM audit_events`
++      )[0]
++    ).toEqual({
++      actor_role: "system",
++      actor_id: null,
++    });
++  });
++});

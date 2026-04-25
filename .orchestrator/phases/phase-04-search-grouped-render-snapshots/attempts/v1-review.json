@@ -1,0 +1,59 @@
+{
+  "verdict": "APPROVE",
+  "phase": "04",
+  "slug": "search-grouped-render-snapshots",
+  "attempt": "v1",
+  "reviewed_at": "2026-04-23",
+  "findings": [],
+  "evidence": {
+    "flagged_cutover": "Projection reads are gated by FEATURE_PHASE04_PROJECTION_READS; the existing search-doc path remains the default rollback path.",
+    "grouped_contract": "Projection reads group by unit_id and unit_identity_epoch, return representative inventory cards, and store ordered_unit_keys plus legacy ordered_listing_ids.",
+    "version_isolation": "Query hash and v4 cursor contracts include projection_epoch, embedding_version, ranker_profile_version, unit_identity_epoch_floor, and snapshot_version.",
+    "snapshot_behavior": "Legacy cursor contract mismatches return snapshot_expired, Phase 04 hydration filters missing/tombstoned units, backfills holes, and records snapshot_hole_ratio.",
+    "semantic_isolation": "Semantic candidate reads filter by getReadEmbeddingVersion() and publish_status='PUBLISHED'; disable_semantic_search falls back to filter-only projection reads."
+  },
+  "validation": [
+    {
+      "command": "pnpm test -- --runInBand <Phase 04 targeted route/search/schema set>",
+      "result": "PASS",
+      "summary": "16 suites, 231 tests"
+    },
+    {
+      "command": "pnpm test -- --runInBand src/__tests__/components/search/SearchResultsClient.test.tsx",
+      "result": "PASS",
+      "summary": "1 suite, 33 tests"
+    },
+    {
+      "command": "pnpm test -- --runInBand <Phase 02 focused set>",
+      "result": "PASS",
+      "summary": "20 suites, 165 tests"
+    },
+    {
+      "command": "pnpm test -- --runInBand src/__tests__/db/phase03-schema.test.ts src/__tests__/lib/projections/semantic.test.ts src/__tests__/integration/phase03-read-isolation.test.ts",
+      "result": "PASS",
+      "summary": "3 suites, 14 tests"
+    },
+    {
+      "command": "pnpm test -- --runInBand <embedding set>",
+      "result": "PASS",
+      "summary": "9 suites, 140 tests"
+    },
+    {
+      "command": "pnpm exec prisma validate",
+      "result": "PASS"
+    },
+    {
+      "command": "pnpm typecheck",
+      "result": "PASS"
+    },
+    {
+      "command": "pnpm lint",
+      "result": "PASS",
+      "summary": "0 errors, 43 existing warnings"
+    }
+  ],
+  "deferred": [
+    "Broader search sweep still has unrelated api/search/facets raw where-clause guard failures and one unbounded-browse fixture mismatch.",
+    "search-v2-service.test.ts exhausts heap even with --max-old-space-size=8192; this matches prior broad-suite heap/OOM risk and is not treated as a Phase 04 blocker."
+  ]
+}

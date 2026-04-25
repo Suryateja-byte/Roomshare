@@ -341,6 +341,7 @@ export const DesktopHeaderSearch = forwardRef<
       ) {
         [finalMinPrice, finalMaxPrice] = [finalMaxPrice, finalMinPrice];
       }
+      // CFM-604: canonical-on-write guarantee — must go through buildCanonicalSearchUrl.
       const searchUrl = buildCanonicalSearchUrl(
         applySearchQueryChange(
           normalizeSearchQuery(searchUrlParams),

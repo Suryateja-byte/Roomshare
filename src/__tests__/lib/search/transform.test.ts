@@ -15,6 +15,7 @@ import {
 } from "@/lib/search/transform";
 import { CLUSTER_THRESHOLD } from "@/lib/search/types";
 import type { ListingData, MapListingData } from "@/lib/data";
+import { buildPublicAvailability } from "@/lib/search/public-availability";
 
 // Mock marker-utils to control pin limit
 jest.mock("@/lib/maps/marker-utils", () => ({
@@ -60,28 +61,41 @@ describe("search/transform", () => {
   describe("transformToListItem", () => {
     const createListingData = (
       overrides: Partial<ListingData> = {}
-    ): ListingData => ({
-      id: "test-id",
-      title: "Test Listing",
-      description: "Test description",
-      price: 1500,
-      images: ["image1.jpg", "image2.jpg"],
-      availableSlots: 1,
-      totalSlots: 1,
-      amenities: [],
-      houseRules: [],
-      householdLanguages: [],
-      location: {
-        address: "123 Test St",
-        city: "San Francisco",
-        state: "CA",
-        zip: "94102",
-        lat: 37.7749,
-        lng: -122.4194,
-      },
-      isNearMatch: false,
-      ...overrides,
-    });
+    ): ListingData => {
+      const listing = {
+        id: "test-id",
+        title: "Test Listing",
+        description: "Test description",
+        price: 1500,
+        images: ["image1.jpg", "image2.jpg"],
+        availableSlots: 1,
+        totalSlots: 1,
+        amenities: [],
+        houseRules: [],
+        householdLanguages: [],
+        location: {
+          address: "123 Test St",
+          city: "San Francisco",
+          state: "CA",
+          zip: "94102",
+          lat: 37.7749,
+          lng: -122.4194,
+        },
+        isNearMatch: false,
+        ...overrides,
+      };
+
+      return {
+        ...listing,
+        publicAvailability:
+          overrides.publicAvailability ??
+          buildPublicAvailability({
+            availableSlots: listing.availableSlots,
+            totalSlots: listing.totalSlots,
+            moveInDate: listing.moveInDate,
+          }),
+      };
+    };
 
     it("should transform basic listing data", () => {
       const listing = createListingData();
@@ -97,6 +111,12 @@ describe("search/transform", () => {
         badges: undefined,
         availableSlots: 1,
         totalSlots: 1,
+        publicAvailability: buildPublicAvailability({
+          availableSlots: 1,
+          totalSlots: 1,
+        }),
+        groupSummary: null,
+        groupContext: null,
       });
     });
 
@@ -132,33 +152,103 @@ describe("search/transform", () => {
       expect(item.badges).toContain("near-match");
       expect(item.badges).toContain("multi-room");
     });
+
+    it("keeps alias fields aligned with host-managed publicAvailability", () => {
+      const publicAvailability = buildPublicAvailability({
+        availabilitySource: "HOST_MANAGED",
+        openSlots: 2,
+        totalSlots: 4,
+        availableFrom: "2026-06-01",
+        availableUntil: "2026-12-01",
+        minStayMonths: 3,
+        lastConfirmedAt: "2026-04-15T12:30:00.000Z",
+      });
+      const item = transformToListItem(
+        createListingData({
+          availableSlots: 99,
+          totalSlots: 99,
+          availabilitySource: "HOST_MANAGED",
+          openSlots: 2,
+          moveInDate: new Date("2026-06-01T00:00:00.000Z"),
+          availableUntil: new Date("2026-12-01T00:00:00.000Z"),
+          minStayMonths: 3,
+          lastConfirmedAt: new Date("2026-04-15T12:30:00.000Z"),
+          publicAvailability,
+        })
+      );
+
+      expect(item.availableSlots).toBe(2);
+      expect(item.totalSlots).toBe(4);
+      expect(item.publicAvailability).toEqual(publicAvailability);
+    });
+
+    it("builds host-managed fallback publicAvailability when none is provided", () => {
+      const listing = createListingData({
+        availabilitySource: "HOST_MANAGED",
+        openSlots: 2,
+        availableSlots: 2,
+        totalSlots: 4,
+        moveInDate: new Date("2026-06-01T00:00:00.000Z"),
+        availableUntil: new Date("2026-12-01T00:00:00.000Z"),
+        minStayMonths: 3,
+        lastConfirmedAt: new Date("2026-04-15T12:30:00.000Z"),
+      });
+      const item = transformToListItem({
+        ...listing,
+        publicAvailability: undefined as never,
+      });
+
+      expect(item.publicAvailability).toEqual(
+        buildPublicAvailability({
+          availabilitySource: "HOST_MANAGED",
+          openSlots: 2,
+          totalSlots: 4,
+          availableFrom: "2026-06-01",
+          availableUntil: "2026-12-01",
+          minStayMonths: 3,
+          lastConfirmedAt: "2026-04-15T12:30:00.000Z",
+        })
+      );
+      expect(item.availableSlots).toBe(2);
+      expect(item.totalSlots).toBe(4);
+    });
   });
 
   describe("transformToListItems", () => {
     const createListingData = (
       id: string,
       title: string = "Test"
-    ): ListingData => ({
-      id,
-      title,
-      description: "Test description",
-      price: 1000,
-      images: ["img.jpg"],
-      availableSlots: 1,
-      totalSlots: 1,
-      amenities: [],
-      houseRules: [],
-      householdLanguages: [],
-      location: {
-        address: "123 Test St",
-        city: "San Francisco",
-        state: "CA",
-        zip: "94102",
-        lat: 37.7749,
-        lng: -122.4194,
-      },
-      isNearMatch: false,
-    });
+    ): ListingData => {
+      const listing = {
+        id,
+        title,
+        description: "Test description",
+        price: 1000,
+        images: ["img.jpg"],
+        availableSlots: 1,
+        totalSlots: 1,
+        amenities: [],
+        houseRules: [],
+        householdLanguages: [],
+        location: {
+          address: "123 Test St",
+          city: "San Francisco",
+          state: "CA",
+          zip: "94102",
+          lat: 37.7749,
+          lng: -122.4194,
+        },
+        isNearMatch: false,
+      };
+
+      return {
+        ...listing,
+        publicAvailability: buildPublicAvailability({
+          availableSlots: listing.availableSlots,
+          totalSlots: listing.totalSlots,
+        }),
+      };
+    };
 
     it("should transform array of listings", () => {
       const listings = [
@@ -191,6 +281,11 @@ describe("search/transform", () => {
       images: ["img.jpg"],
       location: { lat, lng },
       availableSlots: 1,
+      totalSlots: 2,
+      publicAvailability: buildPublicAvailability({
+        availableSlots: 1,
+        totalSlots: 2,
+      }),
     });
 
     it("should return valid FeatureCollection", () => {
@@ -234,6 +329,11 @@ describe("search/transform", () => {
           images: ["first.jpg", "second.jpg"],
           location: { lat: 37.7749, lng: -122.4194 },
           availableSlots: 1,
+          totalSlots: 2,
+          publicAvailability: buildPublicAvailability({
+            availableSlots: 1,
+            totalSlots: 2,
+          }),
         },
       ];
 
@@ -244,6 +344,12 @@ describe("search/transform", () => {
       expect(props.title).toBe("Test Title");
       expect(props.price).toBe(1500);
       expect(props.image).toBe("first.jpg");
+      expect(props.publicAvailability).toEqual(
+        buildPublicAvailability({
+          availableSlots: 1,
+          totalSlots: 2,
+        })
+      );
     });
 
     it("should use null for image when no images", () => {
@@ -255,6 +361,11 @@ describe("search/transform", () => {
           images: [],
           location: { lat: 37.7749, lng: -122.4194 },
           availableSlots: 1,
+          totalSlots: 1,
+          publicAvailability: buildPublicAvailability({
+            availableSlots: 1,
+            totalSlots: 1,
+          }),
         },
       ];
 
@@ -267,6 +378,40 @@ describe("search/transform", () => {
 
       expect(geojson.type).toBe("FeatureCollection");
       expect(geojson.features).toEqual([]);
+    });
+
+    it("keeps geojson availability aliases aligned for host-managed fallbacks", () => {
+      const geojson = transformToGeoJSON([
+        {
+          id: "host-1",
+          title: "Host Managed",
+          price: 1400,
+          images: ["img.jpg"],
+          availableSlots: 9,
+          totalSlots: 9,
+          availabilitySource: "HOST_MANAGED",
+          openSlots: 2,
+          moveInDate: new Date("2026-06-01T00:00:00.000Z"),
+          availableUntil: new Date("2026-12-01T00:00:00.000Z"),
+          minStayMonths: 3,
+          lastConfirmedAt: new Date("2026-04-15T12:30:00.000Z"),
+          publicAvailability: undefined as never,
+          location: { lat: 37.7749, lng: -122.4194 },
+        },
+      ]);
+
+      expect(geojson.features[0].properties.availableSlots).toBe(2);
+      expect(geojson.features[0].properties.publicAvailability).toEqual(
+        buildPublicAvailability({
+          availabilitySource: "HOST_MANAGED",
+          openSlots: 2,
+          totalSlots: 9,
+          availableFrom: "2026-06-01",
+          availableUntil: "2026-12-01",
+          minStayMonths: 3,
+          lastConfirmedAt: "2026-04-15T12:30:00.000Z",
+        })
+      );
     });
   });
 
@@ -283,6 +428,11 @@ describe("search/transform", () => {
       images: ["img.jpg"],
       location: { lat, lng },
       availableSlots: 1,
+      totalSlots: 2,
+      publicAvailability: buildPublicAvailability({
+        availableSlots: 1,
+        totalSlots: 2,
+      }),
     });
 
     it("should return empty array for empty input", () => {
@@ -299,6 +449,10 @@ describe("search/transform", () => {
         lat: 37.7749,
         lng: -122.4194,
         price: 1500,
+        publicAvailability: buildPublicAvailability({
+          availableSlots: 1,
+          totalSlots: 2,
+        }),
       });
     });
 
@@ -361,6 +515,41 @@ describe("search/transform", () => {
       expect(primaryCount).toBe(15);
       expect(miniCount).toBe(5);
     });
+
+    it("keeps pin publicAvailability aligned with source listing aliases", () => {
+      const publicAvailability = buildPublicAvailability({
+        availabilitySource: "HOST_MANAGED",
+        openSlots: 2,
+        totalSlots: 4,
+        availableFrom: "2026-06-01",
+        availableUntil: "2026-12-01",
+        minStayMonths: 3,
+        lastConfirmedAt: "2026-04-15T12:30:00.000Z",
+      });
+      const pins = transformToPins([
+        createMapListingData("host-1", 37.7749, -122.4194, 1500),
+        {
+          id: "host-2",
+          title: "Host Managed",
+          price: 1500,
+          images: ["img.jpg"],
+          availableSlots: 99,
+          totalSlots: 99,
+          availabilitySource: "HOST_MANAGED",
+          openSlots: 2,
+          moveInDate: new Date("2026-06-01T00:00:00.000Z"),
+          availableUntil: new Date("2026-12-01T00:00:00.000Z"),
+          minStayMonths: 3,
+          lastConfirmedAt: new Date("2026-04-15T12:30:00.000Z"),
+          publicAvailability,
+          location: { lat: 37.7849, lng: -122.4194 },
+        },
+      ]);
+
+      expect(pins.find((pin) => pin.id === "host-2")?.publicAvailability).toEqual(
+        publicAvailability
+      );
+    });
   });
 
   describe("transformToMapResponse", () => {
@@ -375,6 +564,11 @@ describe("search/transform", () => {
       images: ["img.jpg"],
       location: { lat, lng },
       availableSlots: 1,
+      totalSlots: 2,
+      publicAvailability: buildPublicAvailability({
+        availableSlots: 1,
+        totalSlots: 2,
+      }),
     });
 
     it("should always include geojson", () => {
@@ -420,6 +614,23 @@ describe("search/transform", () => {
       expect(response.pins).toEqual([]);
     });
 
+    it("preserves compatibility shape for canonically filtered map listings without reintroducing rows", () => {
+      const listings = [createMapListingData("eligible-only")];
+
+      const response = transformToMapResponse(listings);
+
+      expect(response.geojson.features.map((feature) => feature.properties.id)).toEqual([
+        "eligible-only",
+      ]);
+      expect(response.pins?.map((pin) => pin.id)).toEqual(["eligible-only"]);
+      expect(response.geojson.features[0].properties.publicAvailability).toEqual(
+        buildPublicAvailability({
+          availableSlots: 1,
+          totalSlots: 2,
+        })
+      );
+    });
+
     it("should include pins at threshold boundary (49 listings)", () => {
       const listings = Array.from({ length: 49 }, (_, i) =>
         createMapListingData(`${i}`, 37.7749 + i * 0.01, -122.4194)
@@ -436,6 +647,44 @@ describe("search/transform", () => {
 
       const response = transformToMapResponse(listings);
       expect(response.pins).toBeUndefined();
+    });
+
+    it("keeps geojson and pins aligned on host-managed publicAvailability", () => {
+      const publicAvailability = buildPublicAvailability({
+        availabilitySource: "HOST_MANAGED",
+        openSlots: 2,
+        totalSlots: 4,
+        availableFrom: "2026-06-01",
+        availableUntil: "2026-12-01",
+        minStayMonths: 3,
+        lastConfirmedAt: "2026-04-15T12:30:00.000Z",
+      });
+      const listings: MapListingData[] = [
+        {
+          id: "host-1",
+          title: "Host Managed",
+          price: 1400,
+          images: ["img.jpg"],
+          availableSlots: 99,
+          totalSlots: 99,
+          availabilitySource: "HOST_MANAGED",
+          openSlots: 2,
+          moveInDate: new Date("2026-06-01T00:00:00.000Z"),
+          availableUntil: new Date("2026-12-01T00:00:00.000Z"),
+          minStayMonths: 3,
+          lastConfirmedAt: new Date("2026-04-15T12:30:00.000Z"),
+          publicAvailability,
+          location: { lat: 37.7749, lng: -122.4194 },
+        },
+      ];
+
+      const response = transformToMapResponse(listings);
+
+      expect(response.geojson.features[0].properties.publicAvailability).toEqual(
+        publicAvailability
+      );
+      expect(response.geojson.features[0].properties.availableSlots).toBe(2);
+      expect(response.pins?.[0].publicAvailability).toEqual(publicAvailability);
     });
   });
 });

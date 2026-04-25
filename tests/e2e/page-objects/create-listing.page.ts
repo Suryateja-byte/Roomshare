@@ -218,12 +218,48 @@ export class CreateListingPage {
 
   // ── Image Upload ──
 
+  private async resolveMockUploadUserId(): Promise<string> {
+    const fallbackUserId = process.env.E2E_TEST_USER_ID || "e2e-test-user";
+    const secret = process.env.E2E_TEST_SECRET;
+
+    if (!secret) {
+      return fallbackUserId;
+    }
+
+    try {
+      const response = await this.page.request.post("/api/test-helpers", {
+        data: {
+          action: "findUserByEmail",
+          params: {
+            email: process.env.E2E_TEST_EMAIL || "e2e-test@roomshare.dev",
+          },
+        },
+        headers: {
+          Authorization: `Bearer ${secret}`,
+        },
+        timeout: 10_000,
+      });
+
+      if (!response.ok()) {
+        return fallbackUserId;
+      }
+
+      const data = (await response.json()) as { id?: string };
+      return data.id || fallbackUserId;
+    } catch {
+      return fallbackUserId;
+    }
+  }
+
   /**
    * Mock /api/upload to return instant fake Supabase URLs.
    * Call before uploading images.
    */
   async mockImageUpload() {
     let uploadCount = 0;
+    const supabaseBaseUrl =
+      process.env.NEXT_PUBLIC_SUPABASE_URL || "https://fake.supabase.co";
+    const userId = await this.resolveMockUploadUserId();
     await this.page.route("**/api/upload", async (route) => {
       uploadCount++;
       const id = `mock-${Date.now()}-${uploadCount}`;
@@ -231,7 +267,7 @@ export class CreateListingPage {
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          url: `https://fake.supabase.co/storage/v1/object/public/images/listings/${id}.jpg`,
+          url: `${supabaseBaseUrl}/storage/v1/object/public/images/listings/${userId}/${id}.jpg`,
         }),
       });
     });

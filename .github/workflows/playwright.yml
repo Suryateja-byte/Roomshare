@@ -75,7 +75,11 @@ jobs:
       GOOGLE_CLIENT_ID: 'ci-placeholder-not-used-in-tests'
       GOOGLE_CLIENT_SECRET: 'ci-placeholder-not-used-in-tests'
       TURNSTILE_ENABLED: 'false'
+      ENABLE_SEARCH_DOC: 'true'
+      FEATURE_SEARCH_LISTING_DEDUP: 'true'
+      FEATURE_LISTING_CREATE_COLLISION_WARN: 'true'
       NEXT_PUBLIC_NEARBY_ENABLED: 'true'
+      NEXT_PUBLIC_SUPABASE_URL: 'https://fake.supabase.co'
       # FLAKE-004: Skip globalSetup seed — CI already seeds in an explicit step above
       SKIP_E2E_SEED: 'true'
       # FLAKE-009: Required by invokeSweeper() in booking-hold-expiry tests (32+ chars)

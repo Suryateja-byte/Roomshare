@@ -1,0 +1,31 @@
+Phase 03 v1 implementation closeout
+
+Role sequence:
+- Workflow Orchestrator: accepted the user-provided Phase 03 plan and explicit implementation request for additive migration work.
+- Planning agent: scoped Phase 03 to a dark semantic projection with no live public search cutover.
+- Generating agent: implemented the schema, worker path, dark candidate helper, shadow-swap tooling, and tests.
+- Critic: reviewed the slice and approved it after validation.
+
+Implemented changes:
+- Added production semantic projection migrations for `semantic_inventory_projection` and HNSW index shape.
+- Added Prisma schema model for `SemanticInventoryProjection`.
+- Added Phase 03 flags and embedding version helpers for build/read/rollback behavior.
+- Added `EMBED_NEEDED` outbox kind and handler.
+- Updated inventory projection to move Phase 03-enabled inventories from `PENDING_PROJECTION` to `PENDING_EMBEDDING`, keep filter projection rows `PUBLISHED`, and enqueue `EMBED_NEEDED`.
+- Added semantic projection builder with sanitized public-projection text, content hashing, token budget guard, source-version ordering, and inventory publish completion.
+- Added dark candidate helper pinned to `embedding_version` and `PUBLISHED` status.
+- Added semantic tombstone fan-out behind the Phase 03 projection-write flag.
+- Added shadow-swap script and runbook.
+- Added Phase 03 PGlite fixture and focused schema/projection/read-isolation tests.
+
+Validation:
+- Phase 03 targeted Jest set: PASS, 3 suites / 14 tests.
+- Phase 02 focused Jest set: PASS, 20 suites / 165 tests.
+- Existing embedding Jest set: PASS, 8 suites / 118 tests.
+- pnpm typecheck: PASS.
+- pnpm lint: PASS with 45 existing warnings and 0 errors.
+- pnpm exec prisma validate: PASS.
+
+Deferred:
+- Optional broad `pnpm test --runInBand` was not rerun for this closeout because the previous broad run hit Node heap exhaustion in unrelated UI/component suites. Required Phase 03, Phase 02, embedding, typecheck, lint, and Prisma validation passed.
+- Live public search cutover remains out of scope until Phase 04.

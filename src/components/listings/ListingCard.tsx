@@ -1,17 +1,34 @@
 "use client";
 
-import { memo, useState, useCallback } from "react";
+import {
+  memo,
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+  useEffect,
+} from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Star, Home, MapPin } from "lucide-react";
 import FavoriteButton from "../FavoriteButton";
 import { ImageCarousel } from "./ImageCarousel";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/format";
 import {
+  getAvailabilityPresentation,
+  type AvailabilityPublicAvailability,
+} from "@/lib/search/availability-presentation";
+import {
   useListingFocusActions,
   useIsListingFocused,
 } from "@/contexts/ListingFocusContext";
 import { SlotBadge } from "./SlotBadge";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
+import type { GroupContextPresentation, GroupSummary } from "@/lib/search-types";
+import { buildListingDetailHref } from "@/lib/search/listing-detail-link";
+import GroupDatesPanel from "./GroupDatesPanel";
+import GroupDatesModal from "./GroupDatesModal";
 
 export interface Listing {
   id: string;
@@ -32,6 +49,16 @@ export interface Listing {
   roomType?: string;
   moveInDate?: Date | string;
   leaseDuration?: string;
+  /**
+   * Normalized availability contract (CFM-202/404). When present,
+   * slot/availability labels are derived from this rather than the legacy
+   * availableSlots/totalSlots fields, and the card uses availableFrom /
+   * publicStatus / freshnessBucket to render freshness-aware strings.
+   */
+  publicAvailability?: AvailabilityPublicAvailability;
+  groupKey?: string | null;
+  groupSummary?: GroupSummary | null;
+  groupContext?: GroupContextPresentation | null;
 }
 
 // State abbreviation map
@@ -167,12 +194,14 @@ const PLACEHOLDER_IMAGES = [
 
 interface ListingCardProps {
   listing: Listing;
+  href?: string;
   isSaved?: boolean;
   className?: string;
   mobileVariant?: "default" | "feed";
   priority?: boolean;
   showTotalPrice?: boolean;
   estimatedMonths?: number;
+  queryHashPrefix8?: string;
 }
 
 function arePropsEqual(
@@ -195,29 +224,78 @@ function arePropsEqual(
     String(pl.moveInDate) === String(nl.moveInDate) &&
     pl.location.city === nl.location.city &&
     pl.location.state === nl.location.state &&
+    pl.publicAvailability?.openSlots === nl.publicAvailability?.openSlots &&
+    pl.publicAvailability?.totalSlots === nl.publicAvailability?.totalSlots &&
+    pl.publicAvailability?.publicStatus ===
+      nl.publicAvailability?.publicStatus &&
+    pl.publicAvailability?.freshnessBucket ===
+      nl.publicAvailability?.freshnessBucket &&
+    pl.publicAvailability?.availableFrom ===
+      nl.publicAvailability?.availableFrom &&
+    pl.groupKey === nl.groupKey &&
+    pl.groupContext?.contextKey === nl.groupContext?.contextKey &&
+    pl.groupSummary?.groupKey === nl.groupSummary?.groupKey &&
+    (pl.groupSummary?.members ?? [])
+      .map(
+        (member) =>
+          [
+            member.listingId,
+            member.availableFrom,
+            member.availableUntil ?? "",
+            member.startDate ?? "",
+            member.endDate ?? "",
+            member.openSlots,
+            member.totalSlots,
+            member.isCanonical ? "1" : "0",
+          ].join(":")
+      )
+      .join(",") ===
+      (nl.groupSummary?.members ?? [])
+        .map(
+          (member) =>
+            [
+              member.listingId,
+              member.availableFrom,
+              member.availableUntil ?? "",
+              member.startDate ?? "",
+              member.endDate ?? "",
+              member.openSlots,
+              member.totalSlots,
+              member.isCanonical ? "1" : "0",
+            ].join(":")
+        )
+        .join(",") &&
+    prev.href === next.href &&
     prev.isSaved === next.isSaved &&
     prev.className === next.className &&
     prev.mobileVariant === next.mobileVariant &&
     prev.priority === next.priority &&
     prev.showTotalPrice === next.showTotalPrice &&
-    prev.estimatedMonths === next.estimatedMonths
+    prev.estimatedMonths === next.estimatedMonths &&
+    prev.queryHashPrefix8 === next.queryHashPrefix8
   );
 }
 
 function ListingCardInner({
   listing,
+  href,
   isSaved,
   className,
   mobileVariant = "default",
   priority = false,
   showTotalPrice = false,
   estimatedMonths = 1,
+  queryHashPrefix8,
 }: ListingCardProps) {
   const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
   const [isDragging, setIsDragging] = useState(false);
+  const [isGroupDatesOpen, setIsGroupDatesOpen] = useState(false);
   const { setHovered, setActive, hasProvider, focusSourceRef } =
     useListingFocusActions();
   const { isHovered, isActive } = useIsListingFocused(listing.id);
+  const router = useRouter();
+  const isMobile = useMediaQuery("(max-width: 767px)") === true;
+  const groupTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   const handleImageError = useCallback((index: number) => {
     setImageErrors((prev) => new Set(prev).add(index));
@@ -236,7 +314,23 @@ function ListingCardInner({
     : [PLACEHOLDER_IMAGES[placeholderIndex]];
   const showImagePlaceholder = !hasValidImages;
 
-  const isAvailable = listing.availableSlots > 0;
+  const groupSummary = listing.groupSummary ?? null;
+  const groupContext = listing.groupContext ?? null;
+  const hasGroupDates =
+    (groupSummary?.members?.length ?? 0) > 1 &&
+    groupContext?.completeness === "complete";
+  const effectiveOpenSlots =
+    listing.publicAvailability?.openSlots ?? listing.availableSlots;
+  const effectiveTotalSlots =
+    listing.publicAvailability?.totalSlots ?? listing.totalSlots;
+  const panelId = `group-dates-panel-${listing.id}`;
+  const triggerId = `${panelId}-trigger`;
+  const availabilityPresentation = getAvailabilityPresentation({
+    availableSlots: listing.availableSlots,
+    totalSlots: listing.totalSlots,
+    publicAvailability: listing.publicAvailability,
+    groupContext,
+  });
   const avgRating = Number.isFinite(listing.avgRating)
     ? listing.avgRating
     : null;
@@ -254,10 +348,65 @@ function ListingCardInner({
     listing.location.state
   );
   const imageAlt = `${displayTitle} in ${formattedLocation}`;
+  const listingHref = href ?? `/listings/${listing.id}`;
+  const extraDateCount = Math.max((groupSummary?.members?.length ?? 0) - 1, 0);
 
   const displayRoomType = formatRoomType(listing.roomType);
-  const displayMoveIn = formatMoveInDate(listing.moveInDate);
+  const displayMoveIn = formatMoveInDate(
+    listing.publicAvailability?.availableFrom ?? listing.moveInDate
+  );
   const displayLease = formatLeaseDuration(listing.leaseDuration);
+  const groupTriggerLabel = useMemo(() => {
+    if (!hasGroupDates) return null;
+    return `+${extraDateCount} more date${extraDateCount === 1 ? "" : "s"}`;
+  }, [extraDateCount, hasGroupDates]);
+
+  useEffect(() => {
+    setIsGroupDatesOpen(false);
+  }, [isMobile, listing.id]);
+
+  const focusTrigger = useCallback(() => {
+    requestAnimationFrame(() => {
+      groupTriggerRef.current?.focus();
+    });
+  }, []);
+
+  const closeGroupDates = useCallback(
+    (returnFocus = true) => {
+      setIsGroupDatesOpen(false);
+      if (returnFocus) {
+        focusTrigger();
+      }
+    },
+    [focusTrigger]
+  );
+
+  const handleGroupDatesTrigger = useCallback(() => {
+    setIsGroupDatesOpen((previousOpen) => {
+      if (previousOpen) {
+        return false;
+      }
+      return true;
+    });
+  }, []);
+
+  const handleGroupMemberClick = useCallback(
+    (member: NonNullable<GroupSummary["members"]>[number]) => {
+      closeGroupDates(false);
+      router.push(
+        buildListingDetailHref(member.listingId, {
+          startDate: member.startDate,
+          endDate: member.endDate,
+        })
+      );
+    },
+    [closeGroupDates, router]
+  );
+
+  const handleGroupOverflowClick = useCallback(() => {
+    closeGroupDates(false);
+    router.push(listingHref);
+  }, [closeGroupDates, listingHref, router]);
 
   const srParts: string[] = [];
   srParts.push(
@@ -268,18 +417,9 @@ function ListingCardInner({
   if (hasRating) srParts.push(`rated ${avgRating!.toFixed(1)} out of 5`);
   else srParts.push("new listing");
 
-  if (listing.totalSlots > 1) {
-    srParts.push(
-      isAvailable
-        ? `${listing.availableSlots} of ${listing.totalSlots} spots available`
-        : "currently filled"
-    );
-  } else {
-    srParts.push(
-      isAvailable
-        ? `${listing.availableSlots} spot${listing.availableSlots !== 1 ? "s" : ""} available`
-        : "currently filled"
-    );
+  srParts.push(availabilityPresentation.ariaLabel);
+  if (availabilityPresentation.secondaryGroupLabel) {
+    srParts.push(availabilityPresentation.secondaryGroupLabel);
   }
   srParts.push(formattedLocation);
   if (displayMoveIn) srParts.push(displayMoveIn);
@@ -333,10 +473,11 @@ function ListingCardInner({
       </div>
 
       <Link
-        href={`/listings/${listing.id}`}
+        href={listingHref}
         onClick={isDragging ? (e) => e.preventDefault() : undefined}
+        data-testid="listing-card-link"
         className={cn(
-          "block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 flex-1 flex flex-col",
+          "block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 flex flex-1 flex-col",
           isDragging && "pointer-events-none"
         )}
       >
@@ -363,8 +504,9 @@ function ListingCardInner({
 
           <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
             <SlotBadge
-              availableSlots={listing.availableSlots}
-              totalSlots={listing.totalSlots}
+              availableSlots={effectiveOpenSlots}
+              totalSlots={effectiveTotalSlots}
+              publicAvailability={listing.publicAvailability}
               overlay
             />
             {isTopRated ? (
@@ -431,8 +573,56 @@ function ListingCardInner({
               ? [displayMoveIn, displayLease].filter(Boolean).join(" · ") || formattedLocation
               : [formattedLocation, displayMoveIn, displayLease].filter(Boolean).join(" · ")}
           </p>
+          {availabilityPresentation.secondaryGroupLabel ? (
+            <p className="mt-2 text-xs font-medium text-on-surface-variant">
+              {availabilityPresentation.secondaryGroupLabel}
+            </p>
+          ) : null}
         </div>
       </Link>
+      {hasGroupDates && groupSummary ? (
+        <>
+          <div className="px-4 pb-4">
+            <button
+              ref={groupTriggerRef}
+              id={triggerId}
+              type="button"
+              role="button"
+              tabIndex={0}
+              data-testid="group-dates-trigger"
+              aria-controls={panelId}
+              aria-expanded={isGroupDatesOpen}
+              aria-haspopup={isMobile ? "dialog" : undefined}
+              className="inline-flex min-h-[32px] items-center rounded-full px-1 py-1 text-sm font-medium text-primary transition-colors hover:text-primary/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
+              onClick={handleGroupDatesTrigger}
+            >
+              {groupTriggerLabel}
+            </button>
+          </div>
+          {isGroupDatesOpen && !isMobile ? (
+            <GroupDatesPanel
+              canonical={listing}
+              summary={groupSummary}
+              queryHashPrefix8={queryHashPrefix8}
+              panelId={panelId}
+              triggerId={triggerId}
+              onMemberClick={handleGroupMemberClick}
+              onOverflowClick={handleGroupOverflowClick}
+              onClose={() => closeGroupDates(true)}
+            />
+          ) : null}
+          <GroupDatesModal
+            canonical={listing}
+            summary={groupSummary}
+            queryHashPrefix8={queryHashPrefix8}
+            panelId={panelId}
+            open={isMobile && isGroupDatesOpen}
+            onClose={() => closeGroupDates(true)}
+            onMemberClick={handleGroupMemberClick}
+            onOverflowClick={handleGroupOverflowClick}
+          />
+        </>
+      ) : null}
     </article>
   );
 }

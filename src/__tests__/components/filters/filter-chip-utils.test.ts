@@ -529,7 +529,7 @@ describe("filter-chip-utils", () => {
 
       const result = clearAllFilters(params);
 
-      expect(result).toContain("where=downtown");
+      expect(result).toContain("locationLabel=downtown");
       expect(result).toContain("lat=37.7");
       expect(result).toContain("lng=-122.4");
       expect(result).not.toContain("minPrice");
@@ -576,7 +576,7 @@ describe("filter-chip-utils", () => {
       const preserved = new URLSearchParams(result);
 
       // Should preserve these
-      expect(preserved.get("where")).toBe("downtown");
+      expect(preserved.get("locationLabel")).toBe("downtown");
       expect(preserved.get("lat")).toBe("37.7");
       expect(preserved.get("lng")).toBe("-122.4");
       expect(preserved.get("sort")).toBe("newest");

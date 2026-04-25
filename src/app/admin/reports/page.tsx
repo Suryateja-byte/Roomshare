@@ -10,7 +10,15 @@ export const metadata = {
   description: "Manage reports on the RoomShare platform",
 };
 
-export default async function AdminReportsPage() {
+const ALLOWED_REPORT_KINDS = ["ABUSE_REPORT", "PRIVATE_FEEDBACK"] as const;
+
+type AdminReportsPageProps = {
+  searchParams: Promise<{ kind?: string }>;
+};
+
+export default async function AdminReportsPage({
+  searchParams,
+}: AdminReportsPageProps) {
   const session = await auth();
 
   if (!session?.user?.id) {
@@ -27,9 +35,18 @@ export default async function AdminReportsPage() {
     redirect("/");
   }
 
+  const params = await searchParams;
+  const rawKind = params.kind;
+  const kindFilter: (typeof ALLOWED_REPORT_KINDS)[number] | null =
+    ALLOWED_REPORT_KINDS.includes(rawKind as (typeof ALLOWED_REPORT_KINDS)[number])
+      ? (rawKind as (typeof ALLOWED_REPORT_KINDS)[number])
+      : null;
+  const where = kindFilter ? { kind: kindFilter } : undefined;
+
   // Fetch all reports, total count, and open count in parallel to minimize TTFB
   const [reports, totalReports, openReportsCount] = await Promise.all([
     prisma.report.findMany({
+      where,
       include: {
         listing: {
           select: {
@@ -65,8 +82,13 @@ export default async function AdminReportsPage() {
       ],
       take: 100, // Limit for initial load
     }),
-    prisma.report.count(),
-    prisma.report.count({ where: { status: "OPEN" } }),
+    prisma.report.count({ where }),
+    prisma.report.count({
+      where: {
+        status: "OPEN",
+        ...(kindFilter ? { kind: kindFilter } : {}),
+      },
+    }),
   ]);
 
   return (
@@ -95,14 +117,18 @@ export default async function AdminReportsPage() {
                 Reports Management
               </h1>
               <p className="text-on-surface-variant">
-                Review and resolve user reports
+                Review abuse reports and private feedback
               </p>
             </div>
           </div>
         </div>
 
         {/* Report List */}
-        <ReportList initialReports={reports} totalReports={totalReports} />
+        <ReportList
+          initialReports={reports}
+          totalReports={totalReports}
+          initialKindFilter={kindFilter ?? "all"}
+        />
       </div>
     </div>
   );

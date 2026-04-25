@@ -1,5 +1,6 @@
 import type { ListingData, MapListingData } from "@/lib/search-types";
 import type { NormalizedSearchQuery } from "@/lib/search/search-query";
+import { buildPublicAvailability } from "@/lib/search/public-availability";
 import {
   createSearchResponseMeta,
   type SearchListPayload,
@@ -144,6 +145,14 @@ function createListing(
       lat: Number((anchor.lat + latOffset).toFixed(5)),
       lng: Number((anchor.lng + lngOffset).toFixed(5)),
     },
+    publicAvailability:
+      overrides.publicAvailability ??
+      buildPublicAvailability({
+        availableSlots: overrides.availableSlots ?? 1,
+        totalSlots: overrides.totalSlots ?? 2,
+        moveInDate:
+          overrides.moveInDate ?? new Date("2026-06-01T00:00:00.000Z"),
+      }),
     isNearMatch: overrides.isNearMatch,
   };
 }
@@ -301,11 +310,14 @@ function toMapListings(listings: ListingData[]): MapListingData[] {
     title: listing.title,
     price: listing.price,
     availableSlots: listing.availableSlots,
+    totalSlots: listing.totalSlots,
     images: listing.images.slice(0, 1),
+    moveInDate: listing.moveInDate,
     location: {
       lat: listing.location.lat,
       lng: listing.location.lng,
     },
+    publicAvailability: listing.publicAvailability,
   }));
 }
 

@@ -2,8 +2,13 @@
  * Tests for saved-search server actions
  */
 
-jest.mock("@/lib/prisma", () => ({
-  prisma: {
+jest.mock("@/lib/prisma", () => {
+  const prisma: {
+    $transaction: jest.Mock;
+    savedSearch: Record<string, jest.Mock>;
+    alertSubscription: Record<string, jest.Mock>;
+  } = {
+    $transaction: jest.fn(),
     savedSearch: {
       count: jest.fn(),
       create: jest.fn(),
@@ -11,8 +16,16 @@ jest.mock("@/lib/prisma", () => ({
       delete: jest.fn(),
       update: jest.fn(),
     },
-  },
-}));
+    alertSubscription: {
+      upsert: jest.fn(),
+    },
+  };
+  prisma.$transaction.mockImplementation(
+    async (callback: (tx: unknown) => unknown) => callback(prisma)
+  );
+
+  return { prisma };
+});
 
 jest.mock("@/auth", () => ({
   auth: jest.fn(),
@@ -20,6 +33,15 @@ jest.mock("@/auth", () => ({
 
 jest.mock("next/cache", () => ({
   revalidatePath: jest.fn(),
+}));
+
+const mockEvaluateSavedSearchAlertPaywall = jest.fn();
+jest.mock("@/lib/payments/search-alert-paywall", () => ({
+  evaluateSavedSearchAlertPaywall: (...args: unknown[]) =>
+    mockEvaluateSavedSearchAlertPaywall(...args),
+  resolveSavedSearchEffectiveAlertState: jest.requireActual(
+    "@/lib/payments/search-alert-paywall"
+  ).resolveSavedSearchEffectiveAlertState,
 }));
 
 import {
@@ -48,6 +70,13 @@ describe("Saved Search Actions", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (auth as jest.Mock).mockResolvedValue(mockSession);
+    mockEvaluateSavedSearchAlertPaywall.mockResolvedValue({
+      enabled: false,
+      mode: "PASS_ACTIVE",
+      activePassExpiresAt: null,
+      requiresPurchase: false,
+      offers: [],
+    });
   });
 
   describe("saveSearch", () => {
@@ -74,6 +103,7 @@ describe("Saved Search Actions", () => {
       (prisma.savedSearch.count as jest.Mock).mockResolvedValue(5);
       (prisma.savedSearch.create as jest.Mock).mockResolvedValue({
         id: "search-123",
+        alertEnabled: true,
       });
 
       const result = await saveSearch({
@@ -83,7 +113,7 @@ describe("Saved Search Actions", () => {
       });
 
       expect(prisma.savedSearch.create).toHaveBeenCalledWith({
-        data: {
+        data: expect.objectContaining({
           userId: "user-123",
           name: "My Search",
           query: "apartment",
@@ -93,18 +123,50 @@ describe("Saved Search Actions", () => {
             maxPrice: 1500,
             roomType: "Private Room",
           }),
+          searchSpecJson: expect.objectContaining({
+            version: "2026-04-23.phase07-saved-search-v1",
+            filters: expect.objectContaining({
+              query: "apartment",
+              minPrice: 500,
+              maxPrice: 1500,
+              roomType: "Private Room",
+            }),
+            requestedOccupants: 1,
+          }),
+          searchSpecHash: expect.any(String),
+          embeddingVersionAtSave: expect.any(String),
+          rankerProfileVersionAtSave: expect.any(String),
+          unitIdentityEpochFloor: 1,
+          active: true,
           alertEnabled: true,
           alertFrequency: "DAILY",
+          alertSubscriptions: {
+            create: {
+              user: { connect: { id: "user-123" } },
+              channel: "EMAIL",
+              frequency: "DAILY",
+              active: true,
+            },
+          },
+        }),
+        select: {
+          id: true,
+          alertEnabled: true,
         },
       });
       expect(revalidatePath).toHaveBeenCalledWith("/saved-searches");
-      expect(result).toEqual({ success: true, searchId: "search-123" });
+      expect(result).toEqual({
+        success: true,
+        searchId: "search-123",
+        effectiveAlertState: "ACTIVE",
+      });
     });
 
     it("defaults alertEnabled to true", async () => {
       (prisma.savedSearch.count as jest.Mock).mockResolvedValue(0);
       (prisma.savedSearch.create as jest.Mock).mockResolvedValue({
         id: "search-123",
+        alertEnabled: true,
       });
 
       await saveSearch({ name: "Test", filters: mockFilters });
@@ -114,9 +176,39 @@ describe("Saved Search Actions", () => {
           data: expect.objectContaining({
             alertEnabled: true,
             alertFrequency: "DAILY",
+            alertSubscriptions: {
+              create: expect.objectContaining({
+                channel: "EMAIL",
+                frequency: "DAILY",
+                active: true,
+              }),
+            },
           }),
         })
       );
+    });
+
+    it("returns LOCKED when alerts are enabled but no active pass exists", async () => {
+      (prisma.savedSearch.count as jest.Mock).mockResolvedValue(0);
+      (prisma.savedSearch.create as jest.Mock).mockResolvedValue({
+        id: "search-123",
+        alertEnabled: true,
+      });
+      mockEvaluateSavedSearchAlertPaywall.mockResolvedValue({
+        enabled: true,
+        mode: "PAYWALL_REQUIRED",
+        activePassExpiresAt: null,
+        requiresPurchase: true,
+        offers: [],
+      });
+
+      const result = await saveSearch({ name: "Test", filters: mockFilters });
+
+      expect(result).toEqual({
+        success: true,
+        searchId: "search-123",
+        effectiveAlertState: "LOCKED",
+      });
     });
 
     it("handles database errors", async () => {
@@ -141,8 +233,8 @@ describe("Saved Search Actions", () => {
 
     it("returns user saved searches", async () => {
       const mockSearches = [
-        { id: "s1", name: "Search 1", filters: {} },
-        { id: "s2", name: "Search 2", filters: {} },
+        { id: "s1", name: "Search 1", filters: {}, alertEnabled: true },
+        { id: "s2", name: "Search 2", filters: {}, alertEnabled: false },
       ];
       (prisma.savedSearch.findMany as jest.Mock).mockResolvedValue(
         mockSearches
@@ -154,7 +246,10 @@ describe("Saved Search Actions", () => {
         where: { userId: "user-123" },
         orderBy: { createdAt: "desc" },
       });
-      expect(result).toEqual(mockSearches);
+      expect(result).toEqual([
+        { id: "s1", name: "Search 1", filters: {}, alertEnabled: true, effectiveAlertState: "ACTIVE" },
+        { id: "s2", name: "Search 2", filters: {}, alertEnabled: false, effectiveAlertState: "DISABLED" },
+      ]);
     });
 
     it("returns empty array on error", async () => {
@@ -213,7 +308,11 @@ describe("Saved Search Actions", () => {
     });
 
     it("enables alert", async () => {
-      (prisma.savedSearch.update as jest.Mock).mockResolvedValue({});
+      (prisma.savedSearch.update as jest.Mock).mockResolvedValue({
+        id: "search-123",
+        alertEnabled: true,
+        alertFrequency: "DAILY",
+      });
 
       const result = await toggleSearchAlert("search-123", true);
 
@@ -223,12 +322,39 @@ describe("Saved Search Actions", () => {
           userId: "user-123",
         },
         data: { alertEnabled: true },
+        select: { id: true, alertEnabled: true, alertFrequency: true },
       });
-      expect(result).toEqual({ success: true });
+      expect(prisma.alertSubscription.upsert).toHaveBeenCalledWith({
+        where: {
+          savedSearchId_channel: {
+            savedSearchId: "search-123",
+            channel: "EMAIL",
+          },
+        },
+        create: {
+          savedSearchId: "search-123",
+          userId: "user-123",
+          channel: "EMAIL",
+          frequency: "DAILY",
+          active: true,
+        },
+        update: {
+          active: true,
+          frequency: "DAILY",
+        },
+      });
+      expect(result).toEqual({
+        success: true,
+        effectiveAlertState: "ACTIVE",
+      });
     });
 
     it("disables alert", async () => {
-      (prisma.savedSearch.update as jest.Mock).mockResolvedValue({});
+      (prisma.savedSearch.update as jest.Mock).mockResolvedValue({
+        id: "search-123",
+        alertEnabled: false,
+        alertFrequency: "DAILY",
+      });
 
       const result = await toggleSearchAlert("search-123", false);
 
@@ -238,8 +364,53 @@ describe("Saved Search Actions", () => {
           userId: "user-123",
         },
         data: { alertEnabled: false },
+        select: { id: true, alertEnabled: true, alertFrequency: true },
       });
-      expect(result).toEqual({ success: true });
+      expect(prisma.alertSubscription.upsert).toHaveBeenCalledWith({
+        where: {
+          savedSearchId_channel: {
+            savedSearchId: "search-123",
+            channel: "EMAIL",
+          },
+        },
+        create: {
+          savedSearchId: "search-123",
+          userId: "user-123",
+          channel: "EMAIL",
+          frequency: "DAILY",
+          active: false,
+        },
+        update: {
+          active: false,
+          frequency: "DAILY",
+        },
+      });
+      expect(result).toEqual({
+        success: true,
+        effectiveAlertState: "DISABLED",
+      });
+    });
+
+    it("returns LOCKED when enabling alerts without an active pass", async () => {
+      (prisma.savedSearch.update as jest.Mock).mockResolvedValue({
+        id: "search-123",
+        alertEnabled: true,
+        alertFrequency: "DAILY",
+      });
+      mockEvaluateSavedSearchAlertPaywall.mockResolvedValue({
+        enabled: true,
+        mode: "PAYWALL_REQUIRED",
+        activePassExpiresAt: null,
+        requiresPurchase: true,
+        offers: [],
+      });
+
+      const result = await toggleSearchAlert("search-123", true);
+
+      expect(result).toEqual({
+        success: true,
+        effectiveAlertState: "LOCKED",
+      });
     });
 
     it("handles database errors", async () => {

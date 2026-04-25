@@ -1,0 +1,46 @@
+Branch: codex/contact-first-multislot
+Base commit: 9e1514db4ce165cfb6d877dd0d6e2f5a4bebc35b
+
+Phase 08 modified tracked files:
+- next.config.ts
+- package.json
+- pnpm-lock.yaml
+- prisma/schema.prisma
+- public/sw.js
+- src/app/api/cron/outbox-drain/route.ts
+- src/app/api/geocoding/autocomplete/route.ts
+- src/app/api/map-listings/route.ts
+- src/app/api/search-count/route.ts
+- src/app/api/search/listings/route.ts
+- src/app/api/search/v2/route.ts
+- src/app/listings/[id]/ListingPageClient.tsx
+- src/app/listings/[id]/page.tsx
+- src/components/ServiceWorkerRegistration.tsx
+- src/lib/env.ts
+- src/lib/listings/public-detail.ts
+- src/lib/public-cache/cache-policy.ts
+- src/lib/public-cache/state.ts
+- existing public-cache tests
+
+Phase 08 added files:
+- .orchestrator/phases/phase-08-client-cache-coherence/*
+- docs/runbooks/public-cache-coherence.md
+- prisma/migrations/20260508000000_phase08_client_cache_coherence/*
+- src/app/api/public-cache/events/route.ts
+- src/app/api/public-cache/push-subscription/route.ts
+- src/lib/public-cache/events.ts
+- src/lib/public-cache/headers.ts
+- src/lib/public-cache/push.ts
+- src/__tests__/api/public-cache-events.test.ts
+- src/__tests__/api/public-cache-push-subscription.test.ts
+- src/__tests__/db/phase08-schema.test.ts
+- src/__tests__/lib/public-cache/headers.test.ts
+- src/__tests__/utils/pglite-phase08.ts
+
+Pre-existing untracked local files were preserved and ignored:
+- .claude/
+- .env.test
+- .omc/
+- playwright/.cache/
+- roomshare_final_production_plan_v10*.docx
+- tmp_production_plan_extract.txt

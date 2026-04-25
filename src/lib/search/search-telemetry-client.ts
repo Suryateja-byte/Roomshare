@@ -1,5 +1,7 @@
 "use client";
 
+import type { LegacyUrlAlias } from "@/lib/search-params";
+
 type SearchClientMetric =
   | {
       metric: "search_client_abort_total";
@@ -13,6 +15,31 @@ type SearchClientMetric =
       queryHash?: string;
       responseQueryHash?: string;
       reason: string;
+    }
+  | {
+      metric: "search_snapshot_expired_total";
+      route: "search-results-client";
+      queryHash?: string;
+      reason: "search_contract_changed" | "snapshot_missing" | "snapshot_expired";
+    }
+  | {
+      metric: "cfm.search.legacy_url_count";
+      alias: LegacyUrlAlias;
+      surface: "spa";
+    }
+  | {
+      metric: "search_dedup_open_panel_click";
+      groupSize: number;
+      queryHashPrefix8: string;
+    }
+  | {
+      metric: "search_dedup_member_click";
+      groupSize: number;
+      memberIndex: number;
+    }
+  | {
+      metric: "listing_create_collision_action_selected";
+      action: "update" | "add_date" | "create_separate" | "cancel";
     };
 
 export function emitSearchClientMetric(metric: SearchClientMetric): void {
@@ -35,5 +62,44 @@ export function emitSearchClientMetric(metric: SearchClientMetric): void {
     headers: { "Content-Type": "application/json" },
   }).catch(() => {
     // Telemetry must never affect UX.
+  });
+}
+
+export function emitSearchDedupOpenPanelClick({
+  groupSize,
+  queryHashPrefix8,
+}: {
+  groupSize: number;
+  queryHashPrefix8: string;
+}): void {
+  emitSearchClientMetric({
+    metric: "search_dedup_open_panel_click",
+    groupSize,
+    queryHashPrefix8,
+  });
+}
+
+export function emitSearchDedupMemberClick({
+  groupSize,
+  memberIndex,
+}: {
+  groupSize: number;
+  memberIndex: number;
+}): void {
+  emitSearchClientMetric({
+    metric: "search_dedup_member_click",
+    groupSize,
+    memberIndex,
+  });
+}
+
+export function emitListingCreateCollisionActionSelected({
+  action,
+}: {
+  action: "update" | "add_date" | "create_separate" | "cancel";
+}): void {
+  emitSearchClientMetric({
+    metric: "listing_create_collision_action_selected",
+    action,
   });
 }

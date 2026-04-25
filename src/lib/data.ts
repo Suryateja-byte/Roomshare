@@ -11,6 +11,8 @@ import {
 import { hasActiveFilters } from "@/lib/search-params";
 import { clampBoundsToMaxSpan } from "@/lib/validation";
 import { sanitizeMapListings } from "@/lib/maps/sanitize-map-listings";
+import { buildGroupMetadataById } from "@/lib/search/dedup";
+import { normalizeAddress } from "@/lib/search/normalize-address";
 import {
   MIN_QUERY_LENGTH,
   MAX_QUERY_LENGTH,
@@ -18,6 +20,16 @@ import {
   MAP_FETCH_MAX_LNG_SPAN,
 } from "@/lib/constants";
 import { queryWithTimeout } from "@/lib/query-timeout";
+import { buildAvailabilitySqlFragments } from "@/lib/availability";
+import {
+  buildPublicAvailability,
+  isListingEligibleForPublicSearch,
+  resolvePublicAvailability,
+} from "@/lib/search/public-availability";
+
+function isPresent<T>(value: T | null | undefined): value is T {
+  return value != null;
+}
 
 // Re-export types and utilities from search-types for backward compatibility.
 // These were extracted to break the circular dependency: data.ts <-> search-doc-queries.ts.
@@ -55,6 +67,8 @@ import {
 // Re-export for backward compatibility
 export { MIN_QUERY_LENGTH, MAX_QUERY_LENGTH };
 
+const HOST_MANAGED_STALE_INTERVAL_SQL = "INTERVAL '21 days'";
+
 // Unified count function for API routes
 // Gates behind isSearchDocEnabled() to support V1 fallback
 // Returns null for unbounded browse (no query, no bounds) or >100 results
@@ -87,6 +101,101 @@ export async function getLimitedCount(
 function parseDateOnly(value: string): Date {
   const [year, month, day] = value.split("-").map(Number);
   return new Date(year, month - 1, day);
+}
+
+function buildListSearchAvailabilitySqlFragments(options: {
+  minAvailableSlots?: number;
+  moveInDate?: string;
+  endDate?: string;
+  startParamIndex: number;
+}) {
+  const {
+    effectiveAvailableSql: legacyEffectiveAvailableSql,
+    params: legacyParams,
+    nextParamIndex: legacyNextParamIndex,
+  } = buildAvailabilitySqlFragments({
+    listingIdRef: 'l.id',
+    totalSlotsRef: 'l."totalSlots"',
+    minAvailableSlots: options.minAvailableSlots,
+    startDate: options.moveInDate,
+    endDate: options.endDate,
+    startParamIndex: options.startParamIndex,
+  });
+
+  const params = [...legacyParams];
+  let paramIndex = legacyNextParamIndex;
+  const hostManagedMinSlotsParam = `$${paramIndex++}`;
+  params.push(Math.max(options.minAvailableSlots ?? 1, 1));
+
+  let requestedMoveInDateParam: string | null = null;
+  let hostManagedMoveInLowerBoundSql = "TRUE";
+  if (options.moveInDate) {
+    requestedMoveInDateParam = `$${paramIndex++}`;
+    params.push(parseDateOnly(options.moveInDate));
+    hostManagedMoveInLowerBoundSql = `
+      l."moveInDate"::date <= ${requestedMoveInDateParam}::date
+    `.trim();
+  }
+
+  let hostManagedWindowCoverageSql = "TRUE";
+  if (options.endDate) {
+    const requestedEndDateParam = `$${paramIndex++}`;
+    params.push(parseDateOnly(options.endDate));
+    hostManagedWindowCoverageSql = `(
+      l."availableUntil" IS NULL
+      OR l."availableUntil"::date >= ${requestedEndDateParam}::date
+    )`;
+  } else if (requestedMoveInDateParam) {
+    hostManagedWindowCoverageSql = `(
+      l."availableUntil" IS NULL
+      OR l."availableUntil"::date >= ${requestedMoveInDateParam}::date
+    )`;
+  }
+
+  const hostManagedSlotConditionSql = `(
+    l."openSlots" IS NOT NULL
+    AND l."openSlots" >= ${hostManagedMinSlotsParam}
+    AND l."totalSlots" >= 1
+    AND l."openSlots" <= l."totalSlots"
+    AND l."moveInDate" IS NOT NULL
+    AND ${hostManagedMoveInLowerBoundSql}
+    AND l."minStayMonths" >= 1
+    AND (
+      l."availableUntil" IS NULL
+      OR l."availableUntil"::date >= CURRENT_DATE
+    )
+    AND (
+      l."availableUntil" IS NULL
+      OR l."availableUntil"::date >= l."moveInDate"::date
+    )
+    AND ${hostManagedWindowCoverageSql}
+    AND (
+      l."lastConfirmedAt" IS NULL
+      OR l."lastConfirmedAt" > NOW() - ${HOST_MANAGED_STALE_INTERVAL_SQL}
+    )
+  )`;
+
+  return {
+    effectiveAvailableSql: `(
+      CASE
+        WHEN 'HOST_MANAGED' = 'HOST_MANAGED'
+          THEN GREATEST(COALESCE(l."openSlots", 0), 0)::int
+        ELSE ${legacyEffectiveAvailableSql}
+      END
+    )`,
+    slotConditionSql: `(
+      (
+        'HOST_MANAGED' = 'HOST_MANAGED'
+        AND ${hostManagedSlotConditionSql}
+      )
+      OR (
+        'HOST_MANAGED' <> 'HOST_MANAGED'
+        AND ${legacyEffectiveAvailableSql} >= ${hostManagedMinSlotsParam}
+      )
+    )`,
+    params,
+    nextParamIndex: paramIndex,
+  };
 }
 
 // hasValidCoordinates, crossesAntimeridian, ListingWithMetadata — see @/lib/search-types
@@ -332,6 +441,7 @@ export async function getMapListings(
     amenities,
     houseRules,
     moveInDate,
+    endDate,
     leaseDuration,
     roomType,
     genderPreference,
@@ -348,16 +458,27 @@ export async function getMapListings(
     );
   }
 
-  // Build WHERE conditions dynamically
-  // minAvailableSlots defaults to 1 (at least one slot available)
-  const slotThreshold = Math.max(minAvailableSlots ?? 1, 1);
-  const queryParams: (string | number | boolean | null | Date | string[])[] = [
-    slotThreshold,
-  ];
-  let paramIndex = 2;
+  const {
+    effectiveAvailableSql,
+    slotConditionSql,
+    params: availabilityParams,
+    nextParamIndex,
+  } = buildListSearchAvailabilitySqlFragments({
+    minAvailableSlots,
+    endDate,
+    startParamIndex: 1,
+    moveInDate,
+  });
+
+  const queryParams = availabilityParams as Array<
+    string | number | boolean | null | Date | string[]
+  >;
+  let paramIndex = nextParamIndex;
   const conditions: string[] = [
-    'l."availableSlots" >= $1',
+    slotConditionSql,
     "l.status = 'ACTIVE'",
+    `COALESCE(FALSE, FALSE) = FALSE`,
+    `COALESCE(l."statusReason", '') <> 'MIGRATION_REVIEW'`,
     "ST_X(loc.coords::geometry) IS NOT NULL",
     "ST_Y(loc.coords::geometry) IS NOT NULL",
     "NOT (ST_X(loc.coords::geometry) = 0 AND ST_Y(loc.coords::geometry) = 0)",
@@ -451,7 +572,7 @@ export async function getMapListings(
 
   // Booking mode filter (SQL level, case-insensitive)
   if (bookingMode && bookingMode !== "any") {
-    conditions.push(`l."booking_mode" = $${paramIndex++}`);
+    conditions.push(`'SHARED' = $${paramIndex++}`);
     queryParams.push(bookingMode);
   }
 
@@ -508,13 +629,26 @@ export async function getMapListings(
   const sqlQuery = `
         SELECT
             l.id,
+            l."ownerId" as "ownerId",
             l.title,
             l.price,
-            l."availableSlots",
+            ${effectiveAvailableSql} as "availableSlots",
+            l."totalSlots",
+            'HOST_MANAGED',
+            l."openSlots",
+            l."availableUntil",
+            l."minStayMonths",
+            l."lastConfirmedAt",
+            l."statusReason",
+            FALSE,
+            l.status,
+            l."moveInDate",
             l."roomType",
             l.images,
+            loc.address,
             loc.city,
             loc.state,
+            loc.zip,
             ST_X(loc.coords::geometry) as lng,
             ST_Y(loc.coords::geometry) as lat,
             COALESCE(r.avg_rating, 0) as "avgRating",
@@ -535,24 +669,96 @@ export async function getMapListings(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Raw SQL query returns untyped rows; mapped to ListingData below
     const listings = await queryWithTimeout<any>(sqlQuery, queryParams);
 
-    return sanitizeMapListings(
-      listings.map((l) => ({
-        id: l.id,
-        title: l.title,
-        price: Number(l.price),
-        availableSlots: l.availableSlots,
-        images: l.images || [],
-        roomType: l.roomType ?? undefined,
-        location: {
-          city: l.city ?? undefined,
-          state: l.state ?? undefined,
-          lat: l.lat,
-          lng: l.lng,
-        },
-        avgRating: Number(l.avgRating) || 0,
-        reviewCount: Number(l.reviewCount) || 0,
+    const mappedListings = listings
+      .map((l) => {
+        const moveInDate = l.moveInDate ? new Date(l.moveInDate) : undefined;
+        const availableUntil = l.availableUntil
+          ? new Date(l.availableUntil)
+          : null;
+        const lastConfirmedAt = l.lastConfirmedAt
+          ? new Date(l.lastConfirmedAt)
+          : null;
+        const resolvedAvailability = resolvePublicAvailability(
+          {
+            ...l,
+            moveInDate,
+            availableUntil,
+            lastConfirmedAt,
+            minStayMonths:
+              l.minStayMonths != null ? Number(l.minStayMonths) : undefined,
+          },
+          {
+            legacySnapshot: {
+              totalSlots: l.totalSlots,
+              effectiveAvailableSlots: l.availableSlots,
+            },
+          }
+        );
+
+        if (
+          !isListingEligibleForPublicSearch({
+            needsMigrationReview: l.needsMigrationReview,
+            statusReason: l.statusReason,
+            resolvedAvailability,
+          })
+        ) {
+          return null;
+        }
+
+        return {
+          id: l.id,
+          title: l.title,
+          price: Number(l.price),
+          availableSlots: resolvedAvailability.effectiveAvailableSlots,
+          totalSlots: resolvedAvailability.totalSlots,
+          availabilitySource: resolvedAvailability.availabilitySource,
+          openSlots: resolvedAvailability.openSlots,
+          availableUntil,
+          minStayMonths: resolvedAvailability.minStayMonths,
+          lastConfirmedAt,
+          status: l.status,
+          statusReason: l.statusReason,
+          images: l.images || [],
+          roomType: l.roomType ?? undefined,
+          moveInDate,
+          location: {
+            city: l.city ?? undefined,
+            state: l.state ?? undefined,
+            lat: l.lat,
+            lng: l.lng,
+          },
+          publicAvailability: resolvedAvailability,
+          avgRating: Number(l.avgRating) || 0,
+          reviewCount: Number(l.reviewCount) || 0,
+        };
+      })
+      .filter(isPresent);
+
+    const sanitizedListings = sanitizeMapListings(mappedListings);
+    const groupMetadataById = buildGroupMetadataById(
+      listings.map((listing) => ({
+        id: listing.id,
+        ownerId: listing.ownerId ?? "",
+        normalizedAddress: normalizeAddress({
+          address: listing.address ?? null,
+          city: listing.city ?? null,
+          state: listing.state ?? null,
+          zip: listing.zip ?? null,
+        }),
+        priceCents: Math.round(Number(listing.price) * 100),
+        title: listing.title,
+        roomType: listing.roomType ?? null,
+        moveInDate: listing.moveInDate ?? null,
+        availableUntil: listing.availableUntil ?? null,
+        openSlots: listing.openSlots ?? null,
+        totalSlots: Number(listing.totalSlots) || 0,
       }))
     );
+
+    return sanitizedListings.map((listing) => {
+      const groupMetadata = groupMetadataById.get(listing.id);
+      return groupMetadata ? { ...listing, ...groupMetadata } : listing;
+    });
   } catch (error) {
     const dataError = wrapDatabaseError(error, "getMapListings");
     dataError.log({
@@ -572,6 +778,7 @@ export async function getListingsPaginated(
     maxPrice,
     amenities,
     moveInDate,
+    endDate,
     leaseDuration,
     houseRules,
     roomType,
@@ -624,15 +831,26 @@ export async function getListingsPaginated(
       );
     }
 
-    // Build dynamic WHERE conditions for SQL
-    // minAvailableSlots defaults to 1 (at least one slot available)
-    const slotThreshold = Math.max(minAvailableSlots ?? 1, 1);
-    const queryParams: (string | number | boolean | null | Date | string[])[] =
-      [slotThreshold];
-    let paramIndex = 2;
+    const {
+      effectiveAvailableSql,
+      slotConditionSql,
+      params: availabilityParams,
+      nextParamIndex,
+    } = buildListSearchAvailabilitySqlFragments({
+      minAvailableSlots,
+      moveInDate,
+      endDate,
+      startParamIndex: 1,
+    });
+    const queryParams = availabilityParams as Array<
+      string | number | boolean | null | Date | string[]
+    >;
+    let paramIndex = nextParamIndex;
     const conditions: string[] = [
-      'l."availableSlots" >= $1',
+      slotConditionSql,
       "l.status = 'ACTIVE'",
+      `COALESCE(FALSE, FALSE) = FALSE`,
+      `COALESCE(l."statusReason", '') <> 'MIGRATION_REVIEW'`,
       // Exclude listings with invalid coordinates (null, zero, or out of range)
       "ST_X(loc.coords::geometry) IS NOT NULL",
       "ST_Y(loc.coords::geometry) IS NOT NULL",
@@ -727,7 +945,7 @@ export async function getListingsPaginated(
 
     // Booking mode filter (SQL level, case-insensitive)
     if (bookingMode && bookingMode !== "any") {
-      conditions.push(`l."booking_mode" = $${paramIndex++}`);
+      conditions.push(`'SHARED' = $${paramIndex++}`);
       queryParams.push(bookingMode);
     }
 
@@ -827,7 +1045,7 @@ export async function getListingsPaginated(
             l.description,
             l.price,
             l.images,
-            l."availableSlots",
+            ${effectiveAvailableSql} as "availableSlots",
             l."totalSlots",
             l.amenities,
             l."houseRules",
@@ -838,6 +1056,14 @@ export async function getListingsPaginated(
             l."leaseDuration",
             l."roomType",
             l."moveInDate",
+            'HOST_MANAGED',
+            l."openSlots",
+            l."availableUntil",
+            l."minStayMonths",
+            l."lastConfirmedAt",
+            l."statusReason",
+            FALSE,
+            l.status,
             l."createdAt",
             l."viewCount",
             loc.city,
@@ -876,34 +1102,80 @@ export async function getListingsPaginated(
       totalPages > 0 ? Math.max(1, Math.min(effectivePage, totalPages)) : 1;
 
     // Map results and apply JS-level filters for amenities/house rules/languages
-    const results = listings.map((l) => ({
-      id: l.id,
-      title: l.title,
-      description: l.description,
-      price: Number(l.price),
-      images: l.images || [],
-      availableSlots: l.availableSlots,
-      totalSlots: l.totalSlots,
-      amenities: l.amenities || [],
-      houseRules: l.houseRules || [],
-      householdLanguages: l.household_languages || [],
-      primaryHomeLanguage: l.primary_home_language,
-      genderPreference: l.genderPreference,
-      householdGender: l.householdGender,
-      leaseDuration: l.leaseDuration,
-      roomType: l.roomType,
-      moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
-      createdAt: l.createdAt ? new Date(l.createdAt) : new Date(),
-      viewCount: Number(l.viewCount) || 0,
-      avgRating: Number(l.avg_rating) || 0,
-      reviewCount: Number(l.review_count) || 0,
-      location: {
-        city: l.city,
-        state: l.state,
-        lat: Number(l.lat) || 0,
-        lng: Number(l.lng) || 0,
-      },
-    }));
+    const results = listings
+      .map((l) => {
+        const moveInDate = l.moveInDate ? new Date(l.moveInDate) : undefined;
+        const availableUntil = l.availableUntil
+          ? new Date(l.availableUntil)
+          : null;
+        const lastConfirmedAt = l.lastConfirmedAt
+          ? new Date(l.lastConfirmedAt)
+          : null;
+        const resolvedAvailability = resolvePublicAvailability(
+          {
+            ...l,
+            moveInDate,
+            availableUntil,
+            lastConfirmedAt,
+            minStayMonths:
+              l.minStayMonths != null ? Number(l.minStayMonths) : undefined,
+          },
+          {
+            legacySnapshot: {
+              totalSlots: l.totalSlots,
+              effectiveAvailableSlots: l.availableSlots,
+            },
+          }
+        );
+
+        if (
+          !isListingEligibleForPublicSearch({
+            needsMigrationReview: l.needsMigrationReview,
+            statusReason: l.statusReason,
+            resolvedAvailability,
+          })
+        ) {
+          return null;
+        }
+
+        return {
+          id: l.id,
+          title: l.title,
+          description: l.description,
+          price: Number(l.price),
+          images: l.images || [],
+          availableSlots: resolvedAvailability.effectiveAvailableSlots,
+          totalSlots: resolvedAvailability.totalSlots,
+          availabilitySource: resolvedAvailability.availabilitySource,
+          openSlots: resolvedAvailability.openSlots,
+          availableUntil,
+          minStayMonths: resolvedAvailability.minStayMonths,
+          lastConfirmedAt,
+          status: l.status,
+          statusReason: l.statusReason,
+          amenities: l.amenities || [],
+          houseRules: l.houseRules || [],
+          householdLanguages: l.household_languages || [],
+          primaryHomeLanguage: l.primary_home_language,
+          genderPreference: l.genderPreference,
+          householdGender: l.householdGender,
+          leaseDuration: l.leaseDuration,
+          roomType: l.roomType,
+          moveInDate,
+          publicAvailability: resolvedAvailability,
+          createdAt: l.createdAt ? new Date(l.createdAt) : new Date(),
+          viewCount: Number(l.viewCount) || 0,
+          avgRating: Number(l.avg_rating) || 0,
+          reviewCount: Number(l.review_count) || 0,
+          location: {
+            city: l.city,
+            state: l.state,
+            lat: Number(l.lat) || 0,
+            lng: Number(l.lng) || 0,
+          },
+        };
+      })
+    .filter(isPresent);
 
     // All filters are now applied at SQL level for accurate pagination counts:
     // - Languages: GIN index with && operator (OR logic)
@@ -946,6 +1218,7 @@ async function getListingsCountEfficient(
     maxPrice,
     amenities,
     moveInDate,
+    endDate,
     leaseDuration,
     houseRules,
     roomType,
@@ -957,10 +1230,21 @@ async function getListingsCountEfficient(
   } = params;
 
   // Build dynamic WHERE conditions for SQL (same logic as getListingsPaginated)
-  const slotThreshold = Math.max(minAvailableSlots ?? 1, 1);
+  const {
+    slotConditionSql,
+    params: availabilityParams,
+    nextParamIndex,
+  } = buildListSearchAvailabilitySqlFragments({
+    minAvailableSlots,
+    moveInDate,
+    endDate,
+    startParamIndex: 1,
+  });
   const conditions: string[] = [
-    `l."availableSlots" >= $1`,
+    slotConditionSql,
     "l.status = 'ACTIVE'",
+    `COALESCE(FALSE, FALSE) = FALSE`,
+    `COALESCE(l."statusReason", '') <> 'MIGRATION_REVIEW'`,
     // Exclude listings with invalid coordinates
     "ST_X(loc.coords::geometry) IS NOT NULL",
     "ST_Y(loc.coords::geometry) IS NOT NULL",
@@ -968,10 +1252,10 @@ async function getListingsCountEfficient(
     "ST_Y(loc.coords::geometry) BETWEEN -90 AND 90",
     "ST_X(loc.coords::geometry) BETWEEN -180 AND 180",
   ];
-  const queryParams: (string | number | boolean | null | Date | string[])[] = [
-    slotThreshold,
-  ];
-  let paramIndex = 2;
+  const queryParams = availabilityParams as Array<
+    string | number | boolean | null | Date | string[]
+  >;
+  let paramIndex = nextParamIndex;
 
   // Geographic bounds filter with antimeridian support
   if (bounds) {
@@ -1337,6 +1621,11 @@ export async function getSavedListings(userId: string): Promise<ListingData[]> {
       leaseDuration: l.leaseDuration ?? undefined,
       roomType: l.roomType ?? undefined,
       moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
+      publicAvailability: buildPublicAvailability({
+        availableSlots: l.availableSlots,
+        totalSlots: l.totalSlots,
+        moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
+      }),
       location: {
         address: l.address,
         city: l.city,

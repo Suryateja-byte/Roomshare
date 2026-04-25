@@ -9,6 +9,34 @@
 
 import crypto from "crypto";
 import { getServerEnv } from "@/lib/env";
+import {
+  AUTO_PAUSE_COUNT_METRIC,
+  AUTO_PAUSE_CRON_ELIGIBLE_METRIC,
+  AUTO_PAUSE_CRON_EMITTED_METRIC,
+  AUTO_PAUSE_CRON_ERROR_STAGES,
+  AUTO_PAUSE_CRON_SKIP_REASONS,
+  FRESHNESS_CRON_ELIGIBLE_METRIC,
+  FRESHNESS_CRON_EMITTED_METRIC,
+  FRESHNESS_CRON_ERROR_STAGES,
+  FRESHNESS_NOTIFICATION_KINDS,
+  FRESHNESS_NOTIFICATION_SENT_METRIC,
+  getAutoPauseCronTelemetrySnapshot,
+  getFreshnessCronTelemetrySnapshot,
+} from "@/lib/freshness/freshness-cron-telemetry";
+import { getFreshnessOpsMetricsSnapshot } from "@/lib/freshness/ops-metrics";
+import { getCfmOpsTelemetrySnapshot } from "@/lib/metrics/cfm-ops-telemetry";
+import {
+  PRIVATE_FEEDBACK_CATEGORIES,
+  PRIVATE_FEEDBACK_DENIAL_REASONS,
+} from "@/lib/reports/private-feedback";
+import { getPrivateFeedbackTelemetrySnapshot } from "@/lib/reports/private-feedback-telemetry";
+import { LEGACY_URL_ALIASES, LEGACY_URL_SURFACES } from "@/lib/search-params";
+import {
+  getSearchDocCronTelemetrySnapshot,
+  SEARCH_DOC_CRON_CAS_SUPPRESSION_REASON_LABELS,
+  SEARCH_DOC_CRON_ERROR_REASON_LABELS,
+  SEARCH_DOC_CRON_REASON_LABELS,
+} from "@/lib/search/search-doc-cron-telemetry";
 import { getSearchTelemetrySnapshot } from "@/lib/search/search-telemetry";
 
 export const runtime = "nodejs";
@@ -38,6 +66,10 @@ function computePercentile(sorted: number[], p: number): number {
   return sorted[Math.max(0, idx)];
 }
 
+function toPrometheusMetricName(metric: string): string {
+  return metric.replaceAll(".", "_");
+}
+
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
   const { METRICS_SECRET: expectedToken } = getServerEnv();
@@ -55,6 +87,12 @@ export async function GET(request: Request) {
 
   const memory = process.memoryUsage();
   const version = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 8) || "dev";
+  const feedbackTelemetry = getPrivateFeedbackTelemetrySnapshot();
+  const freshnessTelemetry = getFreshnessCronTelemetrySnapshot();
+  const autoPauseTelemetry = getAutoPauseCronTelemetrySnapshot();
+  const cfmOpsTelemetry = getCfmOpsTelemetrySnapshot();
+  const freshnessOpsMetrics = await getFreshnessOpsMetricsSnapshot();
+  const searchDocCronTelemetry = getSearchDocCronTelemetrySnapshot();
   const searchTelemetry = getSearchTelemetrySnapshot();
 
   // Compute duration percentiles from samples
@@ -134,6 +172,18 @@ export async function GET(request: Request) {
     `# TYPE search_load_more_error_total counter`,
     `search_load_more_error_total ${searchTelemetry.loadMoreErrorTotal}`,
     ``,
+    `# HELP search_snapshot_expired_total Total number of expired or mismatched search snapshots observed by clients`,
+    `# TYPE search_snapshot_expired_total counter`,
+    `search_snapshot_expired_total ${searchTelemetry.snapshotExpiredTotal}`,
+    ``,
+    `# HELP search_snapshot_hole_ratio_average Average ratio of missing or tombstoned unit keys during snapshot hydration`,
+    `# TYPE search_snapshot_hole_ratio_average gauge`,
+    `search_snapshot_hole_ratio_average ${searchTelemetry.snapshotHoleRatioAverage}`,
+    ``,
+    `# HELP search_snapshot_hole_responses_total Total number of snapshot hydration responses sampled for hole ratio`,
+    `# TYPE search_snapshot_hole_responses_total counter`,
+    `search_snapshot_hole_responses_total ${searchTelemetry.snapshotHoleResponsesTotal}`,
+    ``,
     `# HELP search_zero_results_total Total number of zero-result search responses`,
     `# TYPE search_zero_results_total counter`,
     `search_zero_results_total ${searchTelemetry.zeroResultsTotal}`,
@@ -141,6 +191,198 @@ export async function GET(request: Request) {
     `# HELP search_client_abort_total Total number of aborted client search requests`,
     `# TYPE search_client_abort_total counter`,
     `search_client_abort_total ${searchTelemetry.clientAbortTotal}`,
+    ``,
+    `# HELP cfm_search_legacy_url_count Total number of legacy search URL aliases observed`,
+    `# TYPE cfm_search_legacy_url_count counter`,
+    ...LEGACY_URL_SURFACES.flatMap((surface) =>
+      LEGACY_URL_ALIASES.map(
+        (alias) =>
+          `cfm_search_legacy_url_count{alias="${alias}",surface="${surface}"} ${searchTelemetry.legacyUrlCounts[surface][alias]}`
+      )
+    ),
+    ``,
+    `# HELP cfm_feedback_submission_count Total number of accepted private feedback submissions`,
+    `# TYPE cfm_feedback_submission_count counter`,
+    ...PRIVATE_FEEDBACK_CATEGORIES.map(
+      (category) =>
+        `cfm_feedback_submission_count{category="${category}"} ${feedbackTelemetry.submissionCounts[category]}`
+    ),
+    ``,
+    `# HELP cfm_feedback_denied_count Total number of denied private feedback submissions`,
+    `# TYPE cfm_feedback_denied_count counter`,
+    ...PRIVATE_FEEDBACK_DENIAL_REASONS.map(
+      (reason) =>
+        `cfm_feedback_denied_count{reason="${reason}"} ${feedbackTelemetry.deniedCounts[reason]}`
+    ),
+    ``,
+    `# HELP cfm_listing_freshness_bucket_count Current count of confirmed host-managed listings by freshness bucket`,
+    `# TYPE cfm_listing_freshness_bucket_count gauge`,
+    `cfm_listing_freshness_bucket_count{bucket="normal"} ${freshnessOpsMetrics.freshnessBucketCounts.normal}`,
+    `cfm_listing_freshness_bucket_count{bucket="reminder"} ${freshnessOpsMetrics.freshnessBucketCounts.reminder}`,
+    `cfm_listing_freshness_bucket_count{bucket="warning"} ${freshnessOpsMetrics.freshnessBucketCounts.warning}`,
+    `cfm_listing_freshness_bucket_count{bucket="auto_paused"} ${freshnessOpsMetrics.freshnessBucketCounts.auto_paused}`,
+    ``,
+    `# HELP cfm_listing_stale_in_search_count Current count of stale host-managed listings that still satisfy the public-search predicate`,
+    `# TYPE cfm_listing_stale_in_search_count gauge`,
+    `cfm_listing_stale_in_search_count ${freshnessOpsMetrics.staleInSearchCount}`,
+    ``,
+    `# HELP cfm_listing_stale_still_active_count Current count of 30-day stale host-managed listings that are still ACTIVE`,
+    `# TYPE cfm_listing_stale_still_active_count gauge`,
+    `cfm_listing_stale_still_active_count ${freshnessOpsMetrics.staleStillActiveCount}`,
+    ``,
+    `# HELP cfm_review_legacy_eligible_count Current count of accepted-booking listing review pairs that remain reviewable`,
+    `# TYPE cfm_review_legacy_eligible_count gauge`,
+    `cfm_review_legacy_eligible_count ${freshnessOpsMetrics.legacyEligibleCount}`,
+    ``,
+    `# HELP cfm_review_unauthorized_create_count Total number of denied public review attempts without an accepted booking`,
+    `# TYPE cfm_review_unauthorized_create_count counter`,
+    `cfm_review_unauthorized_create_count ${cfmOpsTelemetry.unauthorizedCreateCount}`,
+    ``,
+    `# HELP cfm_review_contact_only_attempt_count Total number of listing-review attempts that qualified only for private feedback`,
+    `# TYPE cfm_review_contact_only_attempt_count counter`,
+    `cfm_review_contact_only_attempt_count ${cfmOpsTelemetry.contactOnlyAttemptCount}`,
+    ``,
+    `# HELP cfm_listing_freshness_recovered_count Total number of successful host-managed freshness recoveries`,
+    `# TYPE cfm_listing_freshness_recovered_count counter`,
+    `cfm_listing_freshness_recovered_count ${cfmOpsTelemetry.freshnessRecoveredCount}`,
+    ``,
+    `# HELP ${toPrometheusMetricName(FRESHNESS_CRON_ELIGIBLE_METRIC)} Total number of due listings selected in the latest freshness cron run`,
+    `# TYPE ${toPrometheusMetricName(FRESHNESS_CRON_ELIGIBLE_METRIC)} gauge`,
+    ...FRESHNESS_NOTIFICATION_KINDS.map(
+      (kind) =>
+        `${toPrometheusMetricName(FRESHNESS_CRON_ELIGIBLE_METRIC)}{kind="${kind}"} ${freshnessTelemetry.eligibleCounts[kind]}`
+    ),
+    ``,
+    `# HELP ${toPrometheusMetricName(FRESHNESS_CRON_EMITTED_METRIC)} Total number of freshness reminder or warning notifications emitted`,
+    `# TYPE ${toPrometheusMetricName(FRESHNESS_CRON_EMITTED_METRIC)} counter`,
+    ...FRESHNESS_NOTIFICATION_KINDS.map(
+      (kind) =>
+        `${toPrometheusMetricName(FRESHNESS_CRON_EMITTED_METRIC)}{kind="${kind}"} ${freshnessTelemetry.emittedCounts[kind]}`
+    ),
+    ``,
+    `# HELP ${toPrometheusMetricName(FRESHNESS_NOTIFICATION_SENT_METRIC)} Total number of canonical freshness reminder or warning notifications emitted`,
+    `# TYPE ${toPrometheusMetricName(FRESHNESS_NOTIFICATION_SENT_METRIC)} counter`,
+    ...FRESHNESS_NOTIFICATION_KINDS.map(
+      (kind) =>
+        `${toPrometheusMetricName(FRESHNESS_NOTIFICATION_SENT_METRIC)}{kind="${kind}"} ${freshnessTelemetry.notificationSentCounts[kind]}`
+    ),
+    ``,
+    `# HELP cfm_cron_freshness_reminder_error_count Total number of freshness cron failures by kind and stage`,
+    `# TYPE cfm_cron_freshness_reminder_error_count counter`,
+    ...FRESHNESS_NOTIFICATION_KINDS.flatMap((kind) =>
+      FRESHNESS_CRON_ERROR_STAGES.map(
+        (stage) =>
+          `cfm_cron_freshness_reminder_error_count{kind="${kind}",stage="${stage}"} ${freshnessTelemetry.errorCounts[kind][stage]}`
+      )
+    ),
+    ``,
+    `# HELP cfm_cron_freshness_reminder_skipped_preference_count Total number of reminder emails skipped due to host email preferences`,
+    `# TYPE cfm_cron_freshness_reminder_skipped_preference_count counter`,
+    ...FRESHNESS_NOTIFICATION_KINDS.map(
+      (kind) =>
+        `cfm_cron_freshness_reminder_skipped_preference_count{kind="${kind}"} ${freshnessTelemetry.skippedPreferenceCounts[kind]}`
+    ),
+    ``,
+    `# HELP cfm_cron_freshness_reminder_skipped_auto_pause_count Total number of freshness candidates skipped because they reached auto-pause age`,
+    `# TYPE cfm_cron_freshness_reminder_skipped_auto_pause_count counter`,
+    `cfm_cron_freshness_reminder_skipped_auto_pause_count ${freshnessTelemetry.skippedAutoPauseCount}`,
+    ``,
+    `# HELP cfm_cron_freshness_reminder_skipped_unconfirmed_count Total number of freshness candidates skipped because lastConfirmedAt was missing`,
+    `# TYPE cfm_cron_freshness_reminder_skipped_unconfirmed_count counter`,
+    `cfm_cron_freshness_reminder_skipped_unconfirmed_count ${freshnessTelemetry.skippedUnconfirmedCount}`,
+    ``,
+    `# HELP cfm_cron_freshness_reminder_skipped_stale_row_count Total number of freshness token updates skipped because the row changed during dispatch`,
+    `# TYPE cfm_cron_freshness_reminder_skipped_stale_row_count counter`,
+    `cfm_cron_freshness_reminder_skipped_stale_row_count ${freshnessTelemetry.skippedStaleRowCount}`,
+    ``,
+    `# HELP cfm_cron_freshness_reminder_skipped_suspended_count Total number of freshness candidates skipped because the owner is suspended`,
+    `# TYPE cfm_cron_freshness_reminder_skipped_suspended_count counter`,
+    `cfm_cron_freshness_reminder_skipped_suspended_count ${freshnessTelemetry.skippedSuspendedCount}`,
+    ``,
+    `# HELP cfm_cron_freshness_reminder_budget_exhausted_count Total number of freshness cron runs that stopped because the time budget was exhausted`,
+    `# TYPE cfm_cron_freshness_reminder_budget_exhausted_count counter`,
+    `cfm_cron_freshness_reminder_budget_exhausted_count ${freshnessTelemetry.budgetExhaustedCount}`,
+    ``,
+    `# HELP cfm_cron_freshness_reminder_lock_held_count Total number of freshness cron invocations skipped because another run already held the advisory lock`,
+    `# TYPE cfm_cron_freshness_reminder_lock_held_count counter`,
+    `cfm_cron_freshness_reminder_lock_held_count ${freshnessTelemetry.lockHeldCount}`,
+    ``,
+    `# HELP ${toPrometheusMetricName(AUTO_PAUSE_COUNT_METRIC)} Total number of listings successfully auto-paused for stale availability`,
+    `# TYPE ${toPrometheusMetricName(AUTO_PAUSE_COUNT_METRIC)} counter`,
+    `${toPrometheusMetricName(AUTO_PAUSE_COUNT_METRIC)} ${autoPauseTelemetry.autoPausedCount}`,
+    ``,
+    `# HELP ${toPrometheusMetricName(AUTO_PAUSE_CRON_ELIGIBLE_METRIC)} Total number of due listings selected in the latest stale auto-pause run`,
+    `# TYPE ${toPrometheusMetricName(AUTO_PAUSE_CRON_ELIGIBLE_METRIC)} gauge`,
+    `${toPrometheusMetricName(AUTO_PAUSE_CRON_ELIGIBLE_METRIC)} ${autoPauseTelemetry.eligibleCount}`,
+    ``,
+    `# HELP ${toPrometheusMetricName(AUTO_PAUSE_CRON_EMITTED_METRIC)} Total number of stale auto-pause notifications emitted after a successful pause`,
+    `# TYPE ${toPrometheusMetricName(AUTO_PAUSE_CRON_EMITTED_METRIC)} counter`,
+    `${toPrometheusMetricName(AUTO_PAUSE_CRON_EMITTED_METRIC)} ${autoPauseTelemetry.emittedCount}`,
+    ``,
+    `# HELP cfm_cron_stale_auto_pause_error_count Total number of stale auto-pause failures by stage`,
+    `# TYPE cfm_cron_stale_auto_pause_error_count counter`,
+    ...AUTO_PAUSE_CRON_ERROR_STAGES.map(
+      (stage) =>
+        `cfm_cron_stale_auto_pause_error_count{stage="${stage}"} ${autoPauseTelemetry.errorCounts[stage]}`
+    ),
+    ``,
+    `# HELP cfm_cron_stale_auto_pause_skipped_count Total number of stale auto-pause candidates skipped by bounded reason`,
+    `# TYPE cfm_cron_stale_auto_pause_skipped_count counter`,
+    ...AUTO_PAUSE_CRON_SKIP_REASONS.map(
+      (reason) =>
+        `cfm_cron_stale_auto_pause_skipped_count{reason="${reason}"} ${autoPauseTelemetry.skippedCounts[reason]}`
+    ),
+    ``,
+    `# HELP cfm_cron_stale_auto_pause_budget_exhausted_count Total number of stale auto-pause runs that stopped because the time budget was exhausted`,
+    `# TYPE cfm_cron_stale_auto_pause_budget_exhausted_count counter`,
+    `cfm_cron_stale_auto_pause_budget_exhausted_count ${autoPauseTelemetry.budgetExhaustedCount}`,
+    ``,
+    `# HELP cfm_cron_stale_auto_pause_lock_held_count Total number of stale auto-pause invocations skipped because another run already held the advisory lock`,
+    `# TYPE cfm_cron_stale_auto_pause_lock_held_count counter`,
+    `cfm_cron_stale_auto_pause_lock_held_count ${autoPauseTelemetry.lockHeldCount}`,
+    ``,
+    `# HELP cfm_search_doc_divergence_count Total number of detected search doc divergences in the latest cron run`,
+    `# TYPE cfm_search_doc_divergence_count gauge`,
+    ...SEARCH_DOC_CRON_REASON_LABELS.map(
+      (reason) =>
+        `cfm_search_doc_divergence_count{reason="${reason}"} ${searchDocCronTelemetry.divergenceCounts[reason]}`
+    ),
+    ``,
+    `# HELP cfm_search_doc_repaired_count Total number of repaired search doc divergences`,
+    `# TYPE cfm_search_doc_repaired_count counter`,
+    ...SEARCH_DOC_CRON_REASON_LABELS.map(
+      (reason) =>
+        `cfm_search_doc_repaired_count{reason="${reason}"} ${searchDocCronTelemetry.repairedCounts[reason]}`
+    ),
+    ``,
+    `# HELP cfm_search_doc_cas_suppressed_count Total number of CAS-suppressed write attempts by the search doc cron`,
+    `# TYPE cfm_search_doc_cas_suppressed_count counter`,
+    ...SEARCH_DOC_CRON_CAS_SUPPRESSION_REASON_LABELS.map(
+      (reason) =>
+        `cfm_search_doc_cas_suppressed_count{reason="${reason}"} ${searchDocCronTelemetry.casSuppressedCounts[reason]}`
+    ),
+    ``,
+    `# HELP cfm_search_doc_cron_last_run_partial 1 if the most recent cron run recorded partial/interrupted metrics, 0 if the run completed cleanly`,
+    `# TYPE cfm_search_doc_cron_last_run_partial gauge`,
+    `cfm_search_doc_cron_last_run_partial ${searchDocCronTelemetry.lastRunPartial ? 1 : 0}`,
+    ``,
+    `# HELP cfm_search_dirty_queue_age_seconds Age of dirty search-doc queue entries in seconds from the latest cron batch`,
+    `# TYPE cfm_search_dirty_queue_age_seconds summary`,
+    `cfm_search_dirty_queue_age_seconds{quantile="0.5"} ${searchDocCronTelemetry.dirtyQueueAgeSeconds.p50}`,
+    `cfm_search_dirty_queue_age_seconds{quantile="0.95"} ${searchDocCronTelemetry.dirtyQueueAgeSeconds.p95}`,
+    `cfm_search_dirty_queue_age_seconds_count ${searchDocCronTelemetry.dirtyQueueAgeSeconds.count}`,
+    `cfm_search_dirty_queue_age_seconds_sum ${searchDocCronTelemetry.dirtyQueueAgeSeconds.sum}`,
+    ``,
+    `# HELP cfm_search_refresh_processed_count Total number of search doc refresh upserts processed`,
+    `# TYPE cfm_search_refresh_processed_count counter`,
+    `cfm_search_refresh_processed_count ${searchDocCronTelemetry.processedCount}`,
+    ``,
+    `# HELP cfm_search_refresh_error_count Total number of search doc refresh projection errors`,
+    `# TYPE cfm_search_refresh_error_count counter`,
+    ...SEARCH_DOC_CRON_ERROR_REASON_LABELS.map(
+      (reason) =>
+        `cfm_search_refresh_error_count{reason="${reason}"} ${searchDocCronTelemetry.errorCounts[reason]}`
+    ),
   ].join("\n");
 
   return new Response(prometheusFormat, {

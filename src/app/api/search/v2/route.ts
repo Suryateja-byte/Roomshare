@@ -16,7 +16,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { features } from "@/lib/env";
-import { buildRawParamsFromSearchParams } from "@/lib/search-params";
+import {
+  buildRawParamsFromSearchParams,
+  type RawSearchParams,
+} from "@/lib/search-params";
 import { withRateLimitRedis } from "@/lib/with-rate-limit-redis";
 import {
   createContextFromHeaders,
@@ -28,6 +31,9 @@ import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
 import { getSearchRateLimitIdentifier } from "@/lib/search-rate-limit-identifier";
+import { normalizeSearchQuery } from "@/lib/search/search-query";
+import { createSearchResponseMeta } from "@/lib/search/search-response";
+import { buildPublicCacheHeadersForListings } from "@/lib/public-cache/headers";
 
 /**
  * Check if v2 is enabled via feature flag or URL param.
@@ -75,6 +81,11 @@ export async function GET(request: NextRequest) {
       // Build raw params from URL search params
       const searchParams = request.nextUrl.searchParams;
       const rawParams = buildRawParamsFromSearchParams(searchParams);
+      const buildFallbackMeta = () =>
+        createSearchResponseMeta(
+          normalizeSearchQuery(rawParams as RawSearchParams),
+          "v2"
+        );
 
       // Delegate to shared v2 service (handles searchDoc, keyset, ranking)
       // P1-6 FIX: Add timeout protection to prevent indefinite hangs
@@ -87,6 +98,7 @@ export async function GET(request: NextRequest) {
       // Handle unbounded search (text query without geographic bounds)
       // This is not an error - it's a signal to the client to prompt for location
       if (result.unboundedSearch) {
+        const meta = buildFallbackMeta();
         return NextResponse.json(
           {
             unboundedSearch: true,
@@ -94,7 +106,7 @@ export async function GET(request: NextRequest) {
             map: null,
             meta: {
               mode: "pins",
-              queryHash: null,
+              queryHash: meta.queryHash,
               generatedAt: new Date().toISOString(),
             },
           },
@@ -102,6 +114,40 @@ export async function GET(request: NextRequest) {
             status: 200,
             headers: {
               "Cache-Control": "no-cache, no-store",
+              "x-request-id": requestId,
+            },
+          }
+        );
+      }
+
+      if (result.admissionError) {
+        return NextResponse.json(
+          {
+            error: "admission_rejected",
+            admissionError: result.admissionError,
+            meta: buildFallbackMeta(),
+          },
+          {
+            status: result.admissionError.status,
+            headers: {
+              "Cache-Control": "no-store",
+              "x-request-id": requestId,
+            },
+          }
+        );
+      }
+
+      if (result.snapshotExpired) {
+        return NextResponse.json(
+          {
+            error: "snapshot_expired",
+            snapshotExpired: result.snapshotExpired,
+            meta: buildFallbackMeta(),
+          },
+          {
+            status: 409,
+            headers: {
+              "Cache-Control": "no-store",
               "x-request-id": requestId,
             },
           }
@@ -124,6 +170,11 @@ export async function GET(request: NextRequest) {
           // CDN caching for search results
           "Cache-Control":
             "public, s-maxage=60, max-age=30, stale-while-revalidate=120",
+          ...buildPublicCacheHeadersForListings({
+            listings: result.paginatedResult?.items ?? [],
+            projectionEpoch: result.response.meta.projectionEpoch,
+            embeddingVersion: result.response.meta.embeddingVersion,
+          }),
           "x-request-id": requestId,
           Vary: "Accept-Encoding",
         },

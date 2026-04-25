@@ -1,0 +1,2475 @@
+diff --git a/jest.setup.js b/jest.setup.js
+index aa709907..aaa9cd9f 100644
+--- a/jest.setup.js
++++ b/jest.setup.js
+@@ -203,6 +203,13 @@ const mockPrismaClient = {
+   blockedUser: { ...mockPrismaModel },
+   verificationRequest: { ...mockPrismaModel },
+   auditLog: { ...mockPrismaModel },
++  physicalUnit: { ...mockPrismaModel },
++  hostUnitClaim: { ...mockPrismaModel },
++  listingInventory: { ...mockPrismaModel },
++  identityMutation: { ...mockPrismaModel },
++  outboxEvent: { ...mockPrismaModel },
++  cacheInvalidation: { ...mockPrismaModel },
++  auditEvent: { ...mockPrismaModel },
+   typingStatus: { ...mockPrismaModel },
+   conversationDeletion: { ...mockPrismaModel },
+   passwordResetToken: { ...mockPrismaModel },
+diff --git a/prisma/schema.prisma b/prisma/schema.prisma
+index e36409fd..4f42e73c 100644
+--- a/prisma/schema.prisma
++++ b/prisma/schema.prisma
+@@ -100,22 +100,23 @@ model PasswordResetToken {
+   @@index([expires])
+ }
+ 
+-model Listing {
+-  id                      String                    @id @default(cuid())
+-  ownerId                 String
+-  title                   String
+-  description             String
+-  price                   Decimal                   @db.Decimal(10, 2)
+-  images                  String[]                  @default([])
+-  amenities               String[]
+-  houseRules              String[]
+-  leaseDuration           String?
+-  roomType                String?
+-  normalizedAddress       String?
+-  householdLanguages      String[]                  @default([]) @map("household_languages")
+-  primaryHomeLanguage     String?                   @map("primary_home_language")
+-  genderPreference        String?
+-  householdGender         String?
++model Listing {
++  id                      String                    @id @default(cuid())
++  ownerId                 String
++  title                   String
++  description             String
++  price                   Decimal                   @db.Decimal(10, 2)
++  images                  String[]                  @default([])
++  amenities               String[]
++  houseRules              String[]
++  leaseDuration           String?
++  roomType                String?
++  normalizedAddress       String?
++  physicalUnitId          String?                   @map("physical_unit_id")
++  householdLanguages      String[]                  @default([]) @map("household_languages")
++  primaryHomeLanguage     String?                   @map("primary_home_language")
++  genderPreference        String?
++  householdGender         String?
+   totalSlots              Int
+   availableSlots          Int
+   openSlots               Int?
+@@ -548,18 +549,159 @@ model TypingStatus {
+ // Idempotency Keys for preventing duplicate submissions (e.g., booking, payment)
+ // Keys are stored with cached results and expire after 24 hours
+ // P0-04: Uses INSERT ON CONFLICT + FOR UPDATE for atomic claim with no race window
+-model IdempotencyKey {
+-  id          String   @id @default(cuid())
+-  key         String // Client-provided key (unique per user+endpoint)
+-  userId      String // User who made the request
+-  endpoint    String // Which endpoint (e.g., "createBooking")
++model IdempotencyKey {
++  id          String   @id @default(cuid())
++  key         String // Client-provided key (unique per user+endpoint)
++  userId      String // User who made the request
++  endpoint    String // Which endpoint (e.g., "createBooking")
+   status      String   @default("processing") // 'processing' | 'completed'
+   requestHash String // SHA-256 hash of request body for replay detection
+   resultData  Json? // Cached result of the operation
+   createdAt   DateTime @default(now())
+   expiresAt   DateTime // Auto-expire after 24 hours
+ 
+-  @@unique([userId, endpoint, key], map: "IdempotencyKey_user_endpoint_key_idx")
+-  @@index([expiresAt])
+-  @@index([userId, endpoint])
+-}
++  @@unique([userId, endpoint, key], map: "IdempotencyKey_user_endpoint_key_idx")
++  @@index([expiresAt])
++  @@index([userId, endpoint])
++}
++
++model PhysicalUnit {
++  id                   String   @id @default(cuid())
++  unitIdentityEpoch    Int      @default(1) @map("unit_identity_epoch")
++  canonicalAddressHash String   @map("canonical_address_hash")
++  canonicalUnit        String   @default("_none_") @map("canonical_unit")
++  canonicalizerVersion String   @map("canonicalizer_version")
++  privacyVersion       Int      @default(1) @map("privacy_version")
++  geocodeStatus        String   @default("PENDING") @map("geocode_status")
++  lifecycleStatus      String   @default("ACTIVE") @map("lifecycle_status")
++  publishStatus        String   @default("DRAFT") @map("publish_status")
++  supersedesUnitIds    String[] @default([]) @map("supersedes_unit_ids")
++  supersededByUnitId   String?  @map("superseded_by_unit_id")
++  sourceVersion        BigInt   @default(1) @map("source_version")
++  rowVersion           BigInt   @default(1) @map("row_version")
++  createdAt            DateTime @default(now()) @map("created_at")
++  updatedAt            DateTime @updatedAt @map("updated_at")
++
++  @@unique([canonicalAddressHash, canonicalUnit], map: "physical_units_canonical_unique_idx")
++  @@index([lifecycleStatus])
++  @@index([publishStatus])
++  @@map("physical_units")
++}
++
++model HostUnitClaim {
++  id                       String   @id @default(cuid())
++  unitId                   String   @map("unit_id")
++  hostUserId               String   @map("host_user_id")
++  claimStatus              String   @default("UNVERIFIED") @map("claim_status")
++  unitIdentityEpochWrittenAt Int    @map("unit_identity_epoch_written_at")
++  sourceVersion            BigInt   @default(1) @map("source_version")
++  rowVersion               BigInt   @default(1) @map("row_version")
++  lifecycleStatus          String   @default("ACTIVE") @map("lifecycle_status")
++  publishStatus            String   @default("DRAFT") @map("publish_status")
++  privacyVersion           Int      @default(1) @map("privacy_version")
++  canonicalAddressHash     String   @map("canonical_address_hash")
++  canonicalizerVersion     String   @map("canonicalizer_version")
++  createdAt                DateTime @default(now()) @map("created_at")
++  updatedAt                DateTime @updatedAt @map("updated_at")
++
++  @@unique([unitId, hostUserId])
++  @@map("host_unit_claims")
++}
++
++model ListingInventory {
++  id                        String                  @id @default(cuid())
++  unitId                    String                  @map("unit_id")
++  unitIdentityEpochWrittenAt Int                    @map("unit_identity_epoch_written_at")
++  inventoryKey              String                  @map("inventory_key")
++  roomCategory              String                  @map("room_category")
++  spaceLabel                String?                 @map("space_label")
++  capacityGuests            Int?                    @map("capacity_guests")
++  totalBeds                 Int?                    @map("total_beds")
++  openBeds                  Int?                    @map("open_beds")
++  availableFrom             DateTime                @db.Date @map("available_from")
++  availableUntil            DateTime?               @db.Date @map("available_until")
++  availabilityRange         Unsupported("tstzrange") @map("availability_range")
++  price                     Decimal                 @db.Decimal(10, 2)
++  leaseMinMonths            Int?                    @map("lease_min_months")
++  leaseMaxMonths            Int?                    @map("lease_max_months")
++  leaseNegotiable           Boolean                 @default(false) @map("lease_negotiable")
++  genderPreference          String?                 @map("gender_preference")
++  householdGender           String?                 @map("household_gender")
++  lifecycleStatus           String                  @default("ACTIVE") @map("lifecycle_status")
++  publishStatus             String                  @default("DRAFT") @map("publish_status")
++  sourceVersion             BigInt                  @default(1) @map("source_version")
++  rowVersion                BigInt                  @default(1) @map("row_version")
++  lastPublishedVersion      BigInt?                 @map("last_published_version")
++  lastEmbeddedVersion       String?                 @map("last_embedded_version")
++  canonicalizerVersion      String                  @map("canonicalizer_version")
++  canonicalAddressHash      String                  @map("canonical_address_hash")
++  privacyVersion            Int                     @default(1) @map("privacy_version")
++  supersedesUnitIds         String[]                @default([]) @map("supersedes_unit_ids")
++  supersededByUnitId        String?                 @map("superseded_by_unit_id")
++  createdAt                 DateTime                @default(now()) @map("created_at")
++  updatedAt                 DateTime                @updatedAt @map("updated_at")
++
++  @@unique([unitId, inventoryKey])
++  @@map("listing_inventories")
++}
++
++model IdentityMutation {
++  id             String   @id @default(cuid())
++  kind           String
++  fromUnitIds    String[] @map("from_unit_ids")
++  toUnitIds      String[] @map("to_unit_ids")
++  reasonCode     String   @map("reason_code")
++  operatorId     String?  @map("operator_id")
++  resultingEpoch Int      @map("resulting_epoch")
++  createdAt      DateTime @default(now()) @map("created_at")
++
++  @@map("identity_mutations")
++}
++
++model OutboxEvent {
++  id                String   @id @default(cuid())
++  aggregateType     String   @map("aggregate_type")
++  aggregateId       String   @map("aggregate_id")
++  kind              String
++  payload           Json
++  sourceVersion     BigInt   @map("source_version")
++  unitIdentityEpoch Int      @map("unit_identity_epoch")
++  priority          Int      @default(100)
++  status            String   @default("PENDING")
++  attemptCount      Int      @default(0) @map("attempt_count")
++  nextAttemptAt     DateTime @default(now()) @map("next_attempt_at")
++  lastError         String?  @map("last_error")
++  dlqReason         String?  @map("dlq_reason")
++  createdAt         DateTime @default(now()) @map("created_at")
++  updatedAt         DateTime @updatedAt @map("updated_at")
++
++  @@map("outbox_events")
++}
++
++model CacheInvalidation {
++  id                String   @id @default(cuid())
++  unitId            String   @map("unit_id")
++  projectionEpoch   BigInt   @map("projection_epoch")
++  unitIdentityEpoch Int      @map("unit_identity_epoch")
++  reason            String
++  enqueuedAt        DateTime @default(now()) @map("enqueued_at")
++  consumedAt        DateTime? @map("consumed_at")
++  consumedBy        String?  @map("consumed_by")
++
++  @@map("cache_invalidations")
++}
++
++model AuditEvent {
++  id                String   @id @default(cuid())
++  kind              String
++  actorRole         String   @map("actor_role")
++  actorId           String?  @map("actor_id")
++  aggregateType     String   @map("aggregate_type")
++  aggregateId       String   @map("aggregate_id")
++  details           Json
++  requestId         String?  @map("request_id")
++  unitIdentityEpoch Int?     @map("unit_identity_epoch")
++  createdAt         DateTime @default(now()) @map("created_at")
++
++  @@map("audit_events")
++}
+diff --git a/src/lib/env.ts b/src/lib/env.ts
+index 08863ac2..f201ffbc 100644
+--- a/src/lib/env.ts
++++ b/src/lib/env.ts
+@@ -571,6 +571,9 @@ export const features = {
+   get listingCreateCollisionWarn() {
+     return process.env.FEATURE_LISTING_CREATE_COLLISION_WARN === "true";
+   },
++  get phase01CanonicalWrites() {
++    return process.env.FEATURE_PHASE01_CANONICAL_WRITES === "true";
++  },
+   // Search debug ranking (only allowed in non-production, or with explicit env override)
+   // This gates ?debugRank=1 and ?ranker=1 URL overrides to prevent leaking debug signals
+   get searchDebugRanking() {
+diff --git a/src/lib/idempotency.ts b/src/lib/idempotency.ts
+index c390f4e4..c0b2d9a1 100644
+--- a/src/lib/idempotency.ts
++++ b/src/lib/idempotency.ts
+@@ -294,3 +294,9 @@ export function idempotencyResponse<T>(result: IdempotencyResult<T>): {
+     headers: result.cached ? { "X-Idempotency-Replayed": "true" } : undefined,
+   };
+ }
++
++export const IDEMPOTENCY_ENDPOINT_RESOLVE_UNIT =
++  "identity:resolveOrCreateUnit" as const;
++export const IDEMPOTENCY_ENDPOINT_MUTATE_UNIT =
++  "identity:mutateUnit" as const;
++export const IDEMPOTENCY_ENDPOINT_CONTACT = "identity:contact" as const;
+diff --git a/prisma/migrations/20260501000000_phase01_canonical_identity_tables/migration.sql b/prisma/migrations/20260501000000_phase01_canonical_identity_tables/migration.sql
+new file mode 100644
+index 00000000..ca218286
+--- /dev/null
++++ b/prisma/migrations/20260501000000_phase01_canonical_identity_tables/migration.sql
+@@ -0,0 +1,231 @@
++-- Phase 01: canonical identity foundation tables
++--
++-- Rollback:
++--   DROP TABLE IF EXISTS "audit_events" CASCADE;
++--   DROP TABLE IF EXISTS "cache_invalidations" CASCADE;
++--   DROP TABLE IF EXISTS "outbox_events" CASCADE;
++--   DROP TABLE IF EXISTS "identity_mutations" CASCADE;
++--   DROP TABLE IF EXISTS "listing_inventories" CASCADE;
++--   DROP TABLE IF EXISTS "host_unit_claims" CASCADE;
++--   DROP TABLE IF EXISTS "physical_units" CASCADE;
++--
++-- Data safety:
++-- - All tables are additive and created empty.
++-- - No existing read-path table is rewritten.
++-- - No backfill runs in this migration.
++
++CREATE TABLE "physical_units" (
++  id TEXT PRIMARY KEY,
++  unit_identity_epoch INTEGER NOT NULL DEFAULT 1,
++  canonical_address_hash TEXT NOT NULL,
++  canonical_unit TEXT NOT NULL DEFAULT '_none_',
++  canonicalizer_version TEXT NOT NULL,
++  privacy_version INTEGER NOT NULL DEFAULT 1,
++  geocode_status TEXT NOT NULL DEFAULT 'PENDING',
++  lifecycle_status TEXT NOT NULL DEFAULT 'ACTIVE',
++  publish_status TEXT NOT NULL DEFAULT 'DRAFT',
++  supersedes_unit_ids TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
++  superseded_by_unit_id TEXT NULL,
++  source_version BIGINT NOT NULL DEFAULT 1,
++  row_version BIGINT NOT NULL DEFAULT 1,
++  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
++  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
++);
++
++CREATE UNIQUE INDEX "physical_units_canonical_unique_idx"
++  ON "physical_units" (canonical_address_hash, canonical_unit);
++
++CREATE INDEX "physical_units_lifecycle_status_idx"
++  ON "physical_units" (lifecycle_status);
++
++CREATE INDEX "physical_units_publish_status_idx"
++  ON "physical_units" (publish_status);
++
++CREATE TABLE "host_unit_claims" (
++  id TEXT PRIMARY KEY,
++  unit_id TEXT NOT NULL REFERENCES "physical_units"(id) ON DELETE CASCADE,
++  host_user_id TEXT NOT NULL REFERENCES "User"(id) ON DELETE CASCADE,
++  claim_status TEXT NOT NULL DEFAULT 'UNVERIFIED',
++  unit_identity_epoch_written_at INTEGER NOT NULL,
++  source_version BIGINT NOT NULL DEFAULT 1,
++  row_version BIGINT NOT NULL DEFAULT 1,
++  lifecycle_status TEXT NOT NULL DEFAULT 'ACTIVE',
++  publish_status TEXT NOT NULL DEFAULT 'DRAFT',
++  privacy_version INTEGER NOT NULL DEFAULT 1,
++  canonical_address_hash TEXT NOT NULL,
++  canonicalizer_version TEXT NOT NULL,
++  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
++  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
++  CONSTRAINT "host_unit_claims_unit_id_host_user_id_key"
++    UNIQUE (unit_id, host_user_id)
++);
++
++CREATE TABLE "listing_inventories" (
++  id TEXT PRIMARY KEY,
++  unit_id TEXT NOT NULL REFERENCES "physical_units"(id) ON DELETE CASCADE,
++  unit_identity_epoch_written_at INTEGER NOT NULL,
++  inventory_key TEXT NOT NULL,
++  room_category TEXT NOT NULL CHECK (room_category IN ('ENTIRE_PLACE', 'PRIVATE_ROOM', 'SHARED_ROOM')),
++  space_label TEXT NULL,
++  capacity_guests INTEGER NULL,
++  total_beds INTEGER NULL,
++  open_beds INTEGER NULL,
++  available_from DATE NOT NULL,
++  available_until DATE NULL,
++  availability_range TSTZRANGE NOT NULL,
++  price NUMERIC(10, 2) NOT NULL,
++  lease_min_months INTEGER NULL,
++  lease_max_months INTEGER NULL,
++  lease_negotiable BOOLEAN NOT NULL DEFAULT FALSE,
++  gender_preference TEXT NULL,
++  household_gender TEXT NULL,
++  lifecycle_status TEXT NOT NULL DEFAULT 'ACTIVE',
++  publish_status TEXT NOT NULL DEFAULT 'DRAFT',
++  source_version BIGINT NOT NULL DEFAULT 1,
++  row_version BIGINT NOT NULL DEFAULT 1,
++  last_published_version BIGINT NULL,
++  last_embedded_version TEXT NULL,
++  canonicalizer_version TEXT NOT NULL,
++  canonical_address_hash TEXT NOT NULL,
++  privacy_version INTEGER NOT NULL DEFAULT 1,
++  supersedes_unit_ids TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
++  superseded_by_unit_id TEXT NULL,
++  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
++  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
++  CONSTRAINT "listing_inventories_unit_id_inventory_key_key"
++    UNIQUE (unit_id, inventory_key)
++);
++
++ALTER TABLE "listing_inventories"
++  ADD CONSTRAINT "inventory_category_entire_place_shape"
++  CHECK (
++    room_category <> 'ENTIRE_PLACE'
++    OR (
++      capacity_guests IS NOT NULL
++      AND available_from IS NOT NULL
++      AND availability_range IS NOT NULL
++      AND price IS NOT NULL
++      AND total_beds IS NULL
++      AND open_beds IS NULL
++      AND gender_preference IS NULL
++      AND household_gender IS NULL
++    )
++  ) NOT VALID;
++
++ALTER TABLE "listing_inventories"
++  VALIDATE CONSTRAINT "inventory_category_entire_place_shape";
++
++ALTER TABLE "listing_inventories"
++  ADD CONSTRAINT "inventory_category_private_room_shape"
++  CHECK (
++    room_category <> 'PRIVATE_ROOM'
++    OR (
++      capacity_guests IS NOT NULL
++      AND available_from IS NOT NULL
++      AND availability_range IS NOT NULL
++      AND price IS NOT NULL
++      AND total_beds IS NULL
++      AND open_beds IS NULL
++    )
++  ) NOT VALID;
++
++ALTER TABLE "listing_inventories"
++  VALIDATE CONSTRAINT "inventory_category_private_room_shape";
++
++ALTER TABLE "listing_inventories"
++  ADD CONSTRAINT "inventory_category_shared_room_shape"
++  CHECK (
++    room_category <> 'SHARED_ROOM'
++    OR (
++      total_beds IS NOT NULL
++      AND open_beds IS NOT NULL
++      AND open_beds <= total_beds
++      AND available_from IS NOT NULL
++      AND availability_range IS NOT NULL
++      AND price IS NOT NULL
++      AND capacity_guests IS NULL
++    )
++  ) NOT VALID;
++
++ALTER TABLE "listing_inventories"
++  VALIDATE CONSTRAINT "inventory_category_shared_room_shape";
++
++CREATE TABLE "identity_mutations" (
++  id TEXT PRIMARY KEY,
++  kind TEXT NOT NULL CHECK (kind IN ('MERGE', 'SPLIT', 'CANONICALIZER_UPGRADE', 'MANUAL_MODERATION')),
++  from_unit_ids TEXT[] NOT NULL,
++  to_unit_ids TEXT[] NOT NULL,
++  reason_code TEXT NOT NULL,
++  operator_id TEXT NULL REFERENCES "User"(id) ON DELETE SET NULL,
++  resulting_epoch INTEGER NOT NULL,
++  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
++);
++
++CREATE TABLE "outbox_events" (
++  id TEXT PRIMARY KEY,
++  aggregate_type TEXT NOT NULL,
++  aggregate_id TEXT NOT NULL,
++  kind TEXT NOT NULL,
++  payload JSONB NOT NULL,
++  source_version BIGINT NOT NULL,
++  unit_identity_epoch INTEGER NOT NULL,
++  priority SMALLINT NOT NULL DEFAULT 100,
++  status TEXT NOT NULL DEFAULT 'PENDING',
++  attempt_count INTEGER NOT NULL DEFAULT 0,
++  next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
++  last_error TEXT NULL,
++  dlq_reason TEXT NULL,
++  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
++  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
++);
++
++CREATE INDEX "outbox_events_pending_idx"
++  ON "outbox_events" (status, priority, next_attempt_at)
++  WHERE status IN ('PENDING', 'IN_FLIGHT');
++
++CREATE INDEX "outbox_events_aggregate_idx"
++  ON "outbox_events" (aggregate_type, aggregate_id, source_version);
++
++CREATE INDEX "outbox_events_dlq_idx"
++  ON "outbox_events" (status, created_at)
++  WHERE status = 'DLQ';
++
++CREATE TABLE "cache_invalidations" (
++  id TEXT PRIMARY KEY,
++  unit_id TEXT NOT NULL,
++  projection_epoch BIGINT NOT NULL,
++  unit_identity_epoch INTEGER NOT NULL,
++  reason TEXT NOT NULL,
++  enqueued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
++  consumed_at TIMESTAMPTZ NULL,
++  consumed_by TEXT NULL
++);
++
++CREATE INDEX "cache_invalidations_pending_idx"
++  ON "cache_invalidations" (consumed_at)
++  WHERE consumed_at IS NULL;
++
++CREATE INDEX "cache_invalidations_unit_enqueued_idx"
++  ON "cache_invalidations" (unit_id, enqueued_at DESC);
++
++CREATE TABLE "audit_events" (
++  id TEXT PRIMARY KEY,
++  kind TEXT NOT NULL,
++  actor_role TEXT NOT NULL,
++  actor_id TEXT NULL,
++  aggregate_type TEXT NOT NULL,
++  aggregate_id TEXT NOT NULL,
++  details JSONB NOT NULL DEFAULT '{}'::jsonb,
++  request_id TEXT NULL,
++  unit_identity_epoch INTEGER NULL,
++  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
++);
++
++CREATE INDEX "audit_events_aggregate_idx"
++  ON "audit_events" (aggregate_type, aggregate_id, created_at DESC);
++
++CREATE INDEX "audit_events_kind_idx"
++  ON "audit_events" (kind, created_at DESC);
++
++CREATE INDEX "audit_events_actor_idx"
++  ON "audit_events" (actor_id, created_at DESC);
+diff --git a/prisma/migrations/20260501000000_phase01_canonical_identity_tables/README.md b/prisma/migrations/20260501000000_phase01_canonical_identity_tables/README.md
+new file mode 100644
+index 00000000..ec1a6c4f
+--- /dev/null
++++ b/prisma/migrations/20260501000000_phase01_canonical_identity_tables/README.md
+@@ -0,0 +1,41 @@
++# phase01_canonical_identity_tables
++
++## Summary
++
++Creates the Phase 01 canonical write-side tables:
++
++- `physical_units`
++- `host_unit_claims`
++- `listing_inventories`
++- `identity_mutations`
++- `outbox_events`
++- `cache_invalidations`
++- `audit_events`
++
++This is an additive, write-only schema expansion. No public read path is rewired.
++
++## Rollback
++
++Rollback is fully reversible while the tables are still Phase-01 empty:
++
++1. `DROP TABLE "audit_events" CASCADE;`
++2. `DROP TABLE "cache_invalidations" CASCADE;`
++3. `DROP TABLE "outbox_events" CASCADE;`
++4. `DROP TABLE "identity_mutations" CASCADE;`
++5. `DROP TABLE "listing_inventories" CASCADE;`
++6. `DROP TABLE "host_unit_claims" CASCADE;`
++7. `DROP TABLE "physical_units" CASCADE;`
++
++The repo uses manual rollback SQL comments, not `down.sql`.
++
++## Data-safety
++
++- Every table is created empty.
++- No backfill runs in this phase.
++- Existing `Listing`, `Location`, `Booking`, and `ListingDayInventory` rows are untouched.
++- The canonical unique index is additive.
++
++## Lock footprint
++
++- `CREATE TABLE` and `ALTER TABLE ... ADD CONSTRAINT` take `AccessExclusiveLock` on the new Phase 01 tables only.
++- No lock is taken on existing hot-path tables in this migration.
+diff --git a/prisma/migrations/20260501010000_phase01_moderation_precedence_trigger/migration.sql b/prisma/migrations/20260501010000_phase01_moderation_precedence_trigger/migration.sql
+new file mode 100644
+index 00000000..0432c19d
+--- /dev/null
++++ b/prisma/migrations/20260501010000_phase01_moderation_precedence_trigger/migration.sql
+@@ -0,0 +1,83 @@
++-- Phase 01: moderation precedence and append-only trigger guards
++--
++-- Rollback:
++--   DROP TRIGGER IF EXISTS "trg_modprec_physical_units" ON "physical_units";
++--   DROP TRIGGER IF EXISTS "trg_modprec_host_unit_claims" ON "host_unit_claims";
++--   DROP TRIGGER IF EXISTS "trg_modprec_listing_inventories" ON "listing_inventories";
++--   DROP TRIGGER IF EXISTS "trg_identity_mutations_append_only" ON "identity_mutations";
++--   DROP TRIGGER IF EXISTS "trg_audit_events_append_only" ON "audit_events";
++--   DROP FUNCTION IF EXISTS "enforce_moderation_precedence"();
++--   DROP FUNCTION IF EXISTS "forbid_update_delete"();
++--
++-- PG compatibility:
++-- - Uses only plpgsql, current_setting(), and IS DISTINCT FROM.
++-- - Tested against PG 14/15/16 semantics.
++
++CREATE OR REPLACE FUNCTION "enforce_moderation_precedence"()
++RETURNS TRIGGER
++LANGUAGE plpgsql
++AS $$
++DECLARE
++  actor_role TEXT := current_setting('app.actor_role', true);
++BEGIN
++  IF actor_role IS NULL OR actor_role = '' THEN
++    actor_role := 'system';
++  END IF;
++
++  IF actor_role = 'host'
++    AND (
++      NEW.lifecycle_status IS DISTINCT FROM OLD.lifecycle_status
++      OR NEW.publish_status IS DISTINCT FROM OLD.publish_status
++      OR NEW.privacy_version IS DISTINCT FROM OLD.privacy_version
++    ) THEN
++    RAISE EXCEPTION
++      USING MESSAGE = 'MODERATION_LOCKED: host may not modify moderation columns',
++            ERRCODE = 'P0001',
++            HINT = 'moderation';
++  END IF;
++
++  RETURN NEW;
++END;
++$$;
++
++ALTER FUNCTION "enforce_moderation_precedence"()
++  SET search_path = public, pg_catalog;
++
++CREATE TRIGGER "trg_modprec_physical_units"
++  BEFORE UPDATE ON "physical_units"
++  FOR EACH ROW
++  EXECUTE FUNCTION "enforce_moderation_precedence"();
++
++CREATE TRIGGER "trg_modprec_host_unit_claims"
++  BEFORE UPDATE ON "host_unit_claims"
++  FOR EACH ROW
++  EXECUTE FUNCTION "enforce_moderation_precedence"();
++
++CREATE TRIGGER "trg_modprec_listing_inventories"
++  BEFORE UPDATE ON "listing_inventories"
++  FOR EACH ROW
++  EXECUTE FUNCTION "enforce_moderation_precedence"();
++
++CREATE OR REPLACE FUNCTION "forbid_update_delete"()
++RETURNS TRIGGER
++LANGUAGE plpgsql
++AS $$
++BEGIN
++  RAISE EXCEPTION
++    USING MESSAGE = format('%s is append-only', TG_TABLE_NAME),
++          ERRCODE = 'P0001';
++END;
++$$;
++
++ALTER FUNCTION "forbid_update_delete"()
++  SET search_path = public, pg_catalog;
++
++CREATE TRIGGER "trg_identity_mutations_append_only"
++  BEFORE UPDATE OR DELETE ON "identity_mutations"
++  FOR EACH ROW
++  EXECUTE FUNCTION "forbid_update_delete"();
++
++CREATE TRIGGER "trg_audit_events_append_only"
++  BEFORE UPDATE OR DELETE ON "audit_events"
++  FOR EACH ROW
++  EXECUTE FUNCTION "forbid_update_delete"();
+diff --git a/prisma/migrations/20260501010000_phase01_moderation_precedence_trigger/README.md b/prisma/migrations/20260501010000_phase01_moderation_precedence_trigger/README.md
+new file mode 100644
+index 00000000..ff94f8b7
+--- /dev/null
++++ b/prisma/migrations/20260501010000_phase01_moderation_precedence_trigger/README.md
+@@ -0,0 +1,29 @@
++# phase01_moderation_precedence_trigger
++
++## Summary
++
++Installs:
++
++- the moderation-precedence trigger on the three canonical Phase 01 tables
++- append-only trigger guards on `identity_mutations` and `audit_events`
++
++The trigger reads `app.actor_role` from transaction-local GUC state.
++
++## Rollback
++
++1. Drop the five triggers.
++2. Drop `enforce_moderation_precedence()`.
++3. Drop `forbid_update_delete()`.
++
++The rollback SQL is embedded in `migration.sql` comments.
++
++## Data-safety
++
++- This migration changes trigger behavior only.
++- No rows are rewritten.
++- Existing public read-path tables are untouched.
++
++## Lock footprint
++
++- Trigger creation takes short-lived DDL locks on the new Phase 01 tables only.
++- No long-running data scan or backfill occurs.
+diff --git a/prisma/migrations/20260501020000_phase01_add_listing_physical_unit_id/migration.sql b/prisma/migrations/20260501020000_phase01_add_listing_physical_unit_id/migration.sql
+new file mode 100644
+index 00000000..e72aadf0
+--- /dev/null
++++ b/prisma/migrations/20260501020000_phase01_add_listing_physical_unit_id/migration.sql
+@@ -0,0 +1,11 @@
++-- Phase 01: reserve Listing.physical_unit_id for Phase 02 backfills
++--
++-- Rollback:
++--   ALTER TABLE "Listing" DROP COLUMN IF EXISTS "physical_unit_id";
++--
++-- Data safety:
++-- - Additive nullable column.
++-- - No index, FK, or backfill in Phase 01.
++
++ALTER TABLE "Listing"
++  ADD COLUMN "physical_unit_id" TEXT NULL;
+diff --git a/prisma/migrations/20260501020000_phase01_add_listing_physical_unit_id/README.md b/prisma/migrations/20260501020000_phase01_add_listing_physical_unit_id/README.md
+new file mode 100644
+index 00000000..81811be8
+--- /dev/null
++++ b/prisma/migrations/20260501020000_phase01_add_listing_physical_unit_id/README.md
+@@ -0,0 +1,23 @@
++# phase01_add_listing_physical_unit_id
++
++## Summary
++
++Adds the nullable `Listing.physical_unit_id` placeholder column required for later
++canonical backfills. Phase 01 does not add an index, foreign key, or any reader.
++
++## Rollback
++
++- `ALTER TABLE "Listing" DROP COLUMN "physical_unit_id";`
++
++This is fully reversible because the new column is empty on creation.
++
++## Data-safety
++
++- The migration is additive only.
++- No existing listing row is rewritten.
++- No backfill or read-path change ships in this phase.
++
++## Lock footprint
++
++- `ALTER TABLE ... ADD COLUMN` takes a brief `AccessExclusiveLock` on `Listing`.
++- The column is nullable with no default, so no table rewrite is required.
+diff --git a/src/lib/identity/canonicalizer-version.ts b/src/lib/identity/canonicalizer-version.ts
+new file mode 100644
+index 00000000..3eb3de5a
+--- /dev/null
++++ b/src/lib/identity/canonicalizer-version.ts
+@@ -0,0 +1,7 @@
++/** Identifier encoding the active normalization ruleset. */
++export const CANONICALIZER_VERSION = "v1.0-2026-04" as const;
++
++/** Returns true when the provided version matches the current canonicalizer. */
++export function isCurrentCanonicalizerVersion(version: string): boolean {
++  return version === CANONICALIZER_VERSION;
++}
+diff --git a/src/lib/identity/canonical-address.ts b/src/lib/identity/canonical-address.ts
+new file mode 100644
+index 00000000..80e1edd9
+--- /dev/null
++++ b/src/lib/identity/canonical-address.ts
+@@ -0,0 +1,126 @@
++import crypto from "crypto";
++import { CANONICALIZER_VERSION } from "@/lib/identity/canonicalizer-version";
++
++export interface RawAddressInput {
++  address: string;
++  city: string;
++  state: string;
++  zip: string;
++  unit?: string | null;
++  country?: string;
++}
++
++export interface CanonicalAddressOutput {
++  canonicalAddressHash: string;
++  canonicalUnit: string;
++  canonicalizerVersion: string;
++}
++
++const TOKEN_NORMALIZATIONS: Record<string, string> = {
++  apartment: "apt",
++  avenue: "ave",
++  boulevard: "blvd",
++  circle: "cir",
++  court: "ct",
++  drive: "dr",
++  east: "e",
++  floor: "fl",
++  highway: "hwy",
++  lane: "ln",
++  north: "n",
++  parkway: "pkwy",
++  place: "pl",
++  road: "rd",
++  room: "rm",
++  south: "s",
++  street: "st",
++  suite: "ste",
++  terrace: "ter",
++  trail: "trl",
++  unit: "unit",
++  west: "w",
++};
++
++const UNIT_PREFIXES = new Set(["apt", "apartment", "room", "rm", "ste", "suite", "unit"]);
++
++function stripControlChars(value: string): string {
++  return value.replace(/[\u0000-\u001F\u007F]/g, " ");
++}
++
++function normalizeText(value: string): string {
++  const withoutDiacritics = stripControlChars(value)
++    .normalize("NFKD")
++    .replace(/\p{M}+/gu, "");
++
++  const collapsed = withoutDiacritics
++    .replace(/[^\p{L}\p{N}\s]/gu, " ")
++    .trim()
++    .replace(/\s+/g, " ")
++    .toLowerCase();
++
++  if (!collapsed) {
++    return "";
++  }
++
++  return collapsed
++    .split(" ")
++    .map((token) => TOKEN_NORMALIZATIONS[token] ?? token)
++    .join(" ");
++}
++
++function normalizeZip(zip: string): string {
++  const digits = zip.replace(/\D/g, "");
++  return digits.slice(0, 5);
++}
++
++function normalizeUnit(unit: string | null | undefined): string {
++  const normalized = normalizeText(unit ?? "");
++
++  if (!normalized || normalized === "null") {
++    return "_none_";
++  }
++
++  const tokens = normalized.split(" ");
++  const strippedTokens =
++    tokens.length > 1 && UNIT_PREFIXES.has(tokens[0]) ? tokens.slice(1) : tokens;
++  const collapsed = strippedTokens.join(" ").trim();
++
++  return collapsed || "_none_";
++}
++
++function buildTuple(input: RawAddressInput): { tuple: string; canonicalUnit: string } {
++  const canonicalUnit = normalizeUnit(input.unit);
++  const country = normalizeText(input.country ?? "US") || "us";
++
++  return {
++    canonicalUnit,
++    tuple: [
++      normalizeText(input.address),
++      normalizeText(input.city),
++      normalizeText(input.state),
++      normalizeZip(input.zip),
++      canonicalUnit,
++      country,
++    ].join("|"),
++  };
++}
++
++/**
++ * Normalize raw address fields into a stable canonical identity.
++ */
++export function canonicalizeAddress(
++  input: RawAddressInput
++): CanonicalAddressOutput {
++  const { tuple, canonicalUnit } = buildTuple(input);
++  const canonicalAddressHash = crypto
++    .createHash("sha256")
++    .update(tuple)
++    .digest("base64url")
++    .slice(0, 32);
++
++  return {
++    canonicalAddressHash,
++    canonicalUnit,
++    canonicalizerVersion: CANONICALIZER_VERSION,
++  };
++}
+diff --git a/src/lib/identity/advisory-locks.ts b/src/lib/identity/advisory-locks.ts
+new file mode 100644
+index 00000000..7297cbf3
+--- /dev/null
++++ b/src/lib/identity/advisory-locks.ts
+@@ -0,0 +1,51 @@
++import type { TransactionClient } from "@/lib/db/with-actor";
++import { AdvisoryLockContentionError } from "@/lib/identity/errors";
++
++export const LOCK_PREFIX_CANONICAL_UNIT = "p1:unit:" as const;
++export const LOCK_PREFIX_IDENTITY_MUTATION = "p1:idmut:" as const;
++
++function isLockTimeoutError(error: unknown): boolean {
++  if (!error || typeof error !== "object") {
++    return false;
++  }
++
++  const candidate = error as {
++    code?: string;
++    message?: string;
++    meta?: { code?: string; message?: string };
++  };
++  const code = candidate.code ?? candidate.meta?.code ?? "";
++  const message = candidate.message ?? candidate.meta?.message ?? "";
++
++  return (
++    code === "55P03" ||
++    message.includes("lock timeout") ||
++    message.includes("canceling statement due to lock timeout")
++  );
++}
++
++/** Lock-key string for canonical-unit resolve-or-create. */
++export function canonicalUnitLockKey(canonicalAddressHash: string): string {
++  return `${LOCK_PREFIX_CANONICAL_UNIT}${canonicalAddressHash}`;
++}
++
++/** Lock-key string for a per-unit identity mutation. */
++export function identityMutationLockKey(unitId: string): string {
++  return `${LOCK_PREFIX_IDENTITY_MUTATION}${unitId}`;
++}
++
++/** Acquire a transaction-scoped advisory lock. */
++export async function acquireXactLock(
++  tx: TransactionClient,
++  key: string
++): Promise<void> {
++  try {
++    await tx.$executeRawUnsafe("SET LOCAL lock_timeout = '5s'");
++    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`;
++  } catch (error) {
++    if (isLockTimeoutError(error)) {
++      throw new AdvisoryLockContentionError();
++    }
++    throw error;
++  }
++}
+diff --git a/src/lib/identity/resolve-or-create-unit.ts b/src/lib/identity/resolve-or-create-unit.ts
+new file mode 100644
+index 00000000..1bb76870
+--- /dev/null
++++ b/src/lib/identity/resolve-or-create-unit.ts
+@@ -0,0 +1,101 @@
++import type { TransactionClient } from "@/lib/db/with-actor";
++import { setActorContext } from "@/lib/db/with-actor";
++import { appendOutboxEvent } from "@/lib/outbox/append";
++import { recordAuditEvent } from "@/lib/audit/events";
++import {
++  acquireXactLock,
++  canonicalUnitLockKey,
++} from "@/lib/identity/advisory-locks";
++import {
++  canonicalizeAddress,
++  type RawAddressInput,
++} from "@/lib/identity/canonical-address";
++
++export interface ResolveOrCreateUnitInput {
++  address: RawAddressInput;
++  actor: { role: "host" | "moderator" | "system"; id: string | null };
++  requestId?: string;
++}
++
++export interface ResolveOrCreateUnitResult {
++  unitId: string;
++  unitIdentityEpoch: number;
++  created: boolean;
++  canonicalAddressHash: string;
++}
++
++/**
++ * Resolve or create the canonical physical_units row for the given address.
++ */
++export async function resolveOrCreateUnit(
++  tx: TransactionClient,
++  input: ResolveOrCreateUnitInput
++): Promise<ResolveOrCreateUnitResult> {
++  await setActorContext(tx, input.actor);
++
++  const canonical = canonicalizeAddress(input.address);
++  await acquireXactLock(
++    tx,
++    canonicalUnitLockKey(canonical.canonicalAddressHash)
++  );
++
++  const unit = await tx.physicalUnit.upsert({
++    where: {
++      canonicalAddressHash_canonicalUnit: {
++        canonicalAddressHash: canonical.canonicalAddressHash,
++        canonicalUnit: canonical.canonicalUnit,
++      },
++    },
++    create: {
++      canonicalAddressHash: canonical.canonicalAddressHash,
++      canonicalUnit: canonical.canonicalUnit,
++      canonicalizerVersion: canonical.canonicalizerVersion,
++    },
++    update: {
++      canonicalizerVersion: canonical.canonicalizerVersion,
++      sourceVersion: { increment: BigInt(1) },
++      rowVersion: { increment: BigInt(1) },
++    },
++    select: {
++      id: true,
++      unitIdentityEpoch: true,
++      sourceVersion: true,
++    },
++  });
++
++  const created = unit.sourceVersion === BigInt(1);
++
++  await appendOutboxEvent(tx, {
++    aggregateType: "PHYSICAL_UNIT",
++    aggregateId: unit.id,
++    kind: "UNIT_UPSERTED",
++    payload: {
++      canonicalAddressHash: canonical.canonicalAddressHash,
++      canonicalUnit: canonical.canonicalUnit,
++      created,
++      requestId: input.requestId ?? null,
++    },
++    sourceVersion: unit.sourceVersion,
++    unitIdentityEpoch: unit.unitIdentityEpoch,
++  });
++
++  await recordAuditEvent(tx, {
++    kind: created ? "CANONICAL_UNIT_CREATED" : "CANONICAL_UNIT_RESOLVED",
++    actor: input.actor,
++    aggregateType: "physical_units",
++    aggregateId: unit.id,
++    requestId: input.requestId,
++    unitIdentityEpoch: unit.unitIdentityEpoch,
++    details: {
++      created,
++      canonicalizerVersion: canonical.canonicalizerVersion,
++    },
++  });
++
++  return {
++    unitId: unit.id,
++    unitIdentityEpoch: unit.unitIdentityEpoch,
++    created,
++    canonicalAddressHash: canonical.canonicalAddressHash,
++  };
++}
+diff --git a/src/lib/identity/mutate-unit.ts b/src/lib/identity/mutate-unit.ts
+new file mode 100644
+index 00000000..398f4a57
+--- /dev/null
++++ b/src/lib/identity/mutate-unit.ts
+@@ -0,0 +1,187 @@
++import { z } from "zod";
++import type { TransactionClient } from "@/lib/db/with-actor";
++import { recordAuditEvent } from "@/lib/audit/events";
++import { appendOutboxEvent } from "@/lib/outbox/append";
++import {
++  acquireXactLock,
++  identityMutationLockKey,
++} from "@/lib/identity/advisory-locks";
++
++export type IdentityMutationKind =
++  | "MERGE"
++  | "SPLIT"
++  | "CANONICALIZER_UPGRADE"
++  | "MANUAL_MODERATION";
++
++export interface IdentityMutationInput {
++  kind: IdentityMutationKind;
++  fromUnitIds: string[];
++  toUnitIds: string[];
++  reasonCode: string;
++  operatorId: string | null;
++}
++
++export interface IdentityMutationResult {
++  mutationId: string;
++  resultingEpoch: number;
++  affectedUnitIds: string[];
++}
++
++const ALLOWED_REASON_CODES = [
++  "operator_duplicate",
++  "operator_split",
++  "operator_reconcile",
++  "canonicalizer_upgrade",
++  "manual_moderation",
++  "moderation_review",
++  "system_reconcile",
++] as const;
++
++const IdentityMutationInputSchema = z.object({
++  kind: z.enum([
++    "MERGE",
++    "SPLIT",
++    "CANONICALIZER_UPGRADE",
++    "MANUAL_MODERATION",
++  ]),
++  fromUnitIds: z.array(z.string().trim().min(1)).min(1),
++  toUnitIds: z.array(z.string().trim().min(1)).min(1),
++  reasonCode: z.enum(ALLOWED_REASON_CODES),
++  operatorId: z.string().trim().min(1).nullable(),
++});
++
++function uniq(values: string[]): string[] {
++  return Array.from(new Set(values));
++}
++
++function dedupeSupersedes(existing: string[], incoming: string[]): string[] {
++  return uniq([...existing, ...incoming]);
++}
++
++export async function recordIdentityMutation(
++  tx: TransactionClient,
++  input: IdentityMutationInput
++): Promise<IdentityMutationResult> {
++  const parsed = IdentityMutationInputSchema.parse({
++    ...input,
++    fromUnitIds: uniq(input.fromUnitIds),
++    toUnitIds: uniq(input.toUnitIds),
++  });
++
++  const affectedUnitIds = uniq([...parsed.fromUnitIds, ...parsed.toUnitIds]).sort();
++  for (const unitId of affectedUnitIds) {
++    await acquireXactLock(tx, identityMutationLockKey(unitId));
++  }
++
++  const units = await tx.physicalUnit.findMany({
++    where: { id: { in: affectedUnitIds } },
++    select: {
++      id: true,
++      unitIdentityEpoch: true,
++      supersedesUnitIds: true,
++    },
++  });
++
++  const foundIds = new Set(units.map((unit) => unit.id));
++  for (const unitId of affectedUnitIds) {
++    if (!foundIds.has(unitId)) {
++      throw new Error(`Unknown physical unit: ${unitId}`);
++    }
++  }
++
++  const resultingEpoch =
++    Math.max(...units.map((unit) => unit.unitIdentityEpoch), 0) + 1;
++
++  const mutation = await tx.identityMutation.create({
++    data: {
++      kind: parsed.kind,
++      fromUnitIds: parsed.fromUnitIds,
++      toUnitIds: parsed.toUnitIds,
++      reasonCode: parsed.reasonCode,
++      operatorId: parsed.operatorId,
++      resultingEpoch,
++    },
++    select: { id: true },
++  });
++
++  const unitById = new Map(units.map((unit) => [unit.id, unit]));
++
++  for (const unitId of affectedUnitIds) {
++    const current = unitById.get(unitId);
++    if (!current) {
++      continue;
++    }
++
++    const data: {
++      unitIdentityEpoch: number;
++      sourceVersion: { increment: bigint };
++      rowVersion: { increment: bigint };
++      supersededByUnitId?: string | null;
++      supersedesUnitIds?: string[];
++    } = {
++      unitIdentityEpoch: resultingEpoch,
++      sourceVersion: { increment: BigInt(1) },
++      rowVersion: { increment: BigInt(1) },
++    };
++
++    if (parsed.kind === "MERGE" && parsed.toUnitIds.length === 1) {
++      if (parsed.fromUnitIds.includes(unitId)) {
++        data.supersededByUnitId = parsed.toUnitIds[0];
++      }
++      if (parsed.toUnitIds.includes(unitId)) {
++        data.supersedesUnitIds = dedupeSupersedes(
++          current.supersedesUnitIds,
++          parsed.fromUnitIds
++        );
++      }
++    }
++
++    if (parsed.kind === "SPLIT" && parsed.toUnitIds.includes(unitId)) {
++      data.supersedesUnitIds = dedupeSupersedes(
++        current.supersedesUnitIds,
++        parsed.fromUnitIds
++      );
++    }
++
++    await tx.physicalUnit.update({
++      where: { id: unitId },
++      data,
++    });
++  }
++
++  await appendOutboxEvent(tx, {
++    aggregateType: "IDENTITY_MUTATION",
++    aggregateId: mutation.id,
++    kind: "IDENTITY_MUTATION",
++    payload: {
++      kind: parsed.kind,
++      fromUnitIds: parsed.fromUnitIds,
++      toUnitIds: parsed.toUnitIds,
++      reasonCode: parsed.reasonCode,
++    },
++    sourceVersion: BigInt(1),
++    unitIdentityEpoch: resultingEpoch,
++    priority: 0,
++  });
++
++  await recordAuditEvent(tx, {
++    kind: "IDENTITY_MUTATION",
++    actor: {
++      role: parsed.operatorId ? "moderator" : "system",
++      id: parsed.operatorId,
++    },
++    aggregateType: "identity_mutations",
++    aggregateId: mutation.id,
++    unitIdentityEpoch: resultingEpoch,
++    details: {
++      affectedUnitCount: affectedUnitIds.length,
++      reasonCode: parsed.reasonCode,
++    },
++  });
++
++  return {
++    mutationId: mutation.id,
++    resultingEpoch,
++    affectedUnitIds,
++  };
++}
+diff --git a/src/lib/identity/errors.ts b/src/lib/identity/errors.ts
+new file mode 100644
+index 00000000..d1db36f7
+--- /dev/null
++++ b/src/lib/identity/errors.ts
+@@ -0,0 +1,39 @@
++export class ModerationLockedError extends Error {
++  readonly code = "MODERATION_LOCKED" as const;
++  readonly httpStatus = 423 as const;
++  readonly reason: "SUPPRESSED" | "PAUSED" | "REVIEW";
++
++  constructor(
++    reason: ModerationLockedError["reason"],
++    message = "The requested row is moderation locked."
++  ) {
++    super(message);
++    this.name = "ModerationLockedError";
++    this.reason = reason;
++  }
++}
++
++export class StaleVersionError extends Error {
++  readonly code = "STALE_VERSION" as const;
++  readonly httpStatus = 409 as const;
++  readonly currentRowVersion: bigint;
++
++  constructor(
++    currentRowVersion: bigint,
++    message = "The row version does not match the current record."
++  ) {
++    super(message);
++    this.name = "StaleVersionError";
++    this.currentRowVersion = currentRowVersion;
++  }
++}
++
++export class AdvisoryLockContentionError extends Error {
++  readonly code = "ADVISORY_LOCK_CONTENTION" as const;
++  readonly httpStatus = 503 as const;
++
++  constructor(message = "Timed out while waiting for a canonical advisory lock.") {
++    super(message);
++    this.name = "AdvisoryLockContentionError";
++  }
++}
+diff --git a/src/lib/db/with-actor.ts b/src/lib/db/with-actor.ts
+new file mode 100644
+index 00000000..9b53d08b
+--- /dev/null
++++ b/src/lib/db/with-actor.ts
+@@ -0,0 +1,91 @@
++import "server-only";
++
++import { Prisma } from "@prisma/client";
++import { prisma } from "@/lib/prisma";
++import { ModerationLockedError } from "@/lib/identity/errors";
++
++export type TransactionClient = Parameters<
++  Parameters<typeof prisma.$transaction>[0]
++>[0];
++
++export type ActorRole = "host" | "moderator" | "system";
++
++export interface ActorContext {
++  role: ActorRole;
++  id: string | null;
++}
++
++function isModerationLockedError(error: unknown): boolean {
++  if (!error || typeof error !== "object") {
++    return false;
++  }
++
++  const candidate = error as {
++    message?: string;
++    meta?: { message?: string; hint?: string };
++  };
++  const message = candidate.message ?? candidate.meta?.message ?? "";
++  const hint = candidate.meta?.hint ?? "";
++
++  return message.includes("MODERATION_LOCKED") || hint === "moderation";
++}
++
++function moderationReasonFromError(
++  error: unknown
++): ModerationLockedError["reason"] {
++  if (!error || typeof error !== "object") {
++    return "REVIEW";
++  }
++
++  const message = (error as { message?: string }).message ?? "";
++  if (message.includes("SUPPRESSED")) {
++    return "SUPPRESSED";
++  }
++  if (message.includes("PAUSED")) {
++    return "PAUSED";
++  }
++  return "REVIEW";
++}
++
++export async function setActorContext(
++  tx: TransactionClient,
++  actor: ActorContext
++): Promise<void> {
++  await tx.$executeRaw`
++    SELECT set_config('app.actor_role', ${actor.role}, true)
++  `;
++  await tx.$executeRaw`
++    SELECT set_config('app.actor_id', ${actor.id ?? ""}, true)
++  `;
++}
++
++/**
++ * Run `fn` inside a SERIALIZABLE transaction with request-scoped actor GUCs.
++ */
++export async function withActor<T>(
++  actor: ActorContext,
++  fn: (tx: TransactionClient) => Promise<T>,
++  options?: {
++    isolationLevel?: Prisma.TransactionIsolationLevel;
++    timeoutMs?: number;
++  }
++): Promise<T> {
++  try {
++    return await prisma.$transaction(
++      async (tx) => {
++        await setActorContext(tx, actor);
++        return fn(tx);
++      },
++      {
++        isolationLevel:
++          options?.isolationLevel ?? Prisma.TransactionIsolationLevel.Serializable,
++        timeout: options?.timeoutMs ?? 30000,
++      }
++    );
++  } catch (error) {
++    if (isModerationLockedError(error)) {
++      throw new ModerationLockedError(moderationReasonFromError(error));
++    }
++    throw error;
++  }
++}
+diff --git a/src/lib/db/optimistic-lock.ts b/src/lib/db/optimistic-lock.ts
+new file mode 100644
+index 00000000..76bfede0
+--- /dev/null
++++ b/src/lib/db/optimistic-lock.ts
+@@ -0,0 +1,17 @@
++import { StaleVersionError } from "@/lib/identity/errors";
++
++/**
++ * Compare the caller's expected row version to the current row.
++ */
++export function requireRowVersion(
++  currentRowVersion: bigint,
++  ifMatchRowVersion: bigint | null
++): void {
++  if (ifMatchRowVersion === null) {
++    return;
++  }
++
++  if (currentRowVersion !== ifMatchRowVersion) {
++    throw new StaleVersionError(currentRowVersion);
++  }
++}
+diff --git a/src/lib/outbox/append.ts b/src/lib/outbox/append.ts
+new file mode 100644
+index 00000000..fae80681
+--- /dev/null
++++ b/src/lib/outbox/append.ts
+@@ -0,0 +1,52 @@
++import { Prisma } from "@prisma/client";
++import { z } from "zod";
++import type { TransactionClient } from "@/lib/db/with-actor";
++
++const OutboxAggregateTypeSchema = z.enum([
++  "PHYSICAL_UNIT",
++  "LISTING_INVENTORY",
++  "HOST_UNIT_CLAIM",
++  "IDENTITY_MUTATION",
++]);
++
++const OutboxKindSchema = z.enum([
++  "UNIT_UPSERTED",
++  "INVENTORY_UPSERTED",
++  "IDENTITY_MUTATION",
++  "TOMBSTONE",
++]);
++
++const AppendOutboxInputSchema = z.object({
++  aggregateType: OutboxAggregateTypeSchema,
++  aggregateId: z.string().trim().min(1),
++  kind: OutboxKindSchema,
++  payload: z.record(z.string(), z.unknown()),
++  sourceVersion: z.bigint(),
++  unitIdentityEpoch: z.number().int().positive(),
++  priority: z.number().int().min(0).max(32767).optional(),
++});
++
++export type OutboxAggregateType = z.infer<typeof OutboxAggregateTypeSchema>;
++export type OutboxKind = z.infer<typeof OutboxKindSchema>;
++export type AppendOutboxInput = z.infer<typeof AppendOutboxInputSchema>;
++
++export async function appendOutboxEvent(
++  tx: TransactionClient,
++  input: AppendOutboxInput
++): Promise<{ outboxEventId: string }> {
++  const parsed = AppendOutboxInputSchema.parse(input);
++  const created = await tx.outboxEvent.create({
++    data: {
++      aggregateType: parsed.aggregateType,
++      aggregateId: parsed.aggregateId,
++      kind: parsed.kind,
++      payload: parsed.payload as Prisma.InputJsonObject,
++      sourceVersion: parsed.sourceVersion,
++      unitIdentityEpoch: parsed.unitIdentityEpoch,
++      priority: parsed.priority ?? 100,
++    },
++    select: { id: true },
++  });
++
++  return { outboxEventId: created.id };
++}
+diff --git a/src/lib/audit/events.ts b/src/lib/audit/events.ts
+new file mode 100644
+index 00000000..15c0ebdd
+--- /dev/null
++++ b/src/lib/audit/events.ts
+@@ -0,0 +1,72 @@
++import { Prisma } from "@prisma/client";
++import { z } from "zod";
++import type { TransactionClient } from "@/lib/db/with-actor";
++
++const AuditEventKindSchema = z.enum([
++  "CANONICAL_UNIT_RESOLVED",
++  "CANONICAL_UNIT_CREATED",
++  "IDENTITY_MUTATION",
++  "MODERATION_LOCKED_REJECTED",
++  "HOST_CLAIM_UPSERTED",
++  "INVENTORY_UPSERTED",
++]);
++
++const AuditAggregateTypeSchema = z.enum([
++  "physical_units",
++  "host_unit_claims",
++  "listing_inventories",
++  "identity_mutations",
++]);
++
++const PII_BLOCKLIST = /(email|phone|password|address|token|secret)/i;
++
++const AuditDetailsSchema = z
++  .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
++  .superRefine((details, ctx) => {
++    for (const key of Object.keys(details)) {
++      if (PII_BLOCKLIST.test(key)) {
++        ctx.addIssue({
++          code: z.ZodIssueCode.custom,
++          message: `PII-like detail keys are not allowed: ${key}`,
++        });
++      }
++    }
++  });
++
++const AuditEventInputSchema = z.object({
++  kind: AuditEventKindSchema,
++  actor: z.object({
++    role: z.enum(["host", "moderator", "system"]),
++    id: z.string().trim().min(1).nullable(),
++  }),
++  aggregateType: AuditAggregateTypeSchema,
++  aggregateId: z.string().trim().min(1),
++  details: AuditDetailsSchema.optional(),
++  requestId: z.string().trim().min(1).optional(),
++  unitIdentityEpoch: z.number().int().positive().optional(),
++});
++
++export type AuditEventKind = z.infer<typeof AuditEventKindSchema>;
++export type AuditEventInput = z.infer<typeof AuditEventInputSchema>;
++
++export async function recordAuditEvent(
++  tx: TransactionClient,
++  input: AuditEventInput
++): Promise<{ auditEventId: string }> {
++  const parsed = AuditEventInputSchema.parse(input);
++  const created = await tx.auditEvent.create({
++    data: {
++      kind: parsed.kind,
++      actorRole: parsed.actor.role,
++      actorId: parsed.actor.id,
++      aggregateType: parsed.aggregateType,
++      aggregateId: parsed.aggregateId,
++      details: (parsed.details ?? {}) as Prisma.InputJsonObject,
++      requestId: parsed.requestId ?? null,
++      unitIdentityEpoch: parsed.unitIdentityEpoch ?? null,
++    },
++    select: { id: true },
++  });
++
++  return { auditEventId: created.id };
++}
+diff --git a/src/lib/flags/phase01.ts b/src/lib/flags/phase01.ts
+new file mode 100644
+index 00000000..4f506065
+--- /dev/null
++++ b/src/lib/flags/phase01.ts
+@@ -0,0 +1,17 @@
++import { features } from "@/lib/env";
++
++export function isPhase01CanonicalWritesEnabled(): boolean {
++  return features.phase01CanonicalWrites;
++}
++
++export const PHASE01_KILL_SWITCHES = {
++  disable_new_publication: false,
++  pause_identity_reconcile: false,
++} as const;
++
++export type Phase01KillSwitch = keyof typeof PHASE01_KILL_SWITCHES;
++
++/** Phase 01 stub: all kill switches remain disabled. */
++export function isKillSwitchActive(name: Phase01KillSwitch): boolean {
++  return PHASE01_KILL_SWITCHES[name];
++}
+diff --git a/src/lib/validation/category/schema.ts b/src/lib/validation/category/schema.ts
+new file mode 100644
+index 00000000..1de91d45
+--- /dev/null
++++ b/src/lib/validation/category/schema.ts
+@@ -0,0 +1,87 @@
++import { z } from "zod";
++
++export const RoomCategory = z.enum([
++  "ENTIRE_PLACE",
++  "PRIVATE_ROOM",
++  "SHARED_ROOM",
++]);
++export type RoomCategory = z.infer<typeof RoomCategory>;
++
++const forcedNull = z
++  .union([z.null(), z.undefined()])
++  .transform(() => null as null);
++
++const requiredPositiveInt = z.coerce.number().int().positive();
++const requiredNonNegativeInt = z.coerce.number().int().min(0);
++const optionalString = z
++  .string()
++  .trim()
++  .min(1)
++  .max(128)
++  .optional()
++  .nullable()
++  .transform((value) => value ?? null);
++
++const dateOnly = z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/);
++const tstzRange = z
++  .string()
++  .trim()
++  .regex(/^[[(].+,.+[)\]]$/, "availabilityRange must be a valid tstzrange literal");
++
++const BaseInventoryInputSchema = z.object({
++  roomCategory: RoomCategory,
++  inventoryKey: z.string().trim().min(1).max(128).optional(),
++  spaceLabel: optionalString,
++  capacityGuests: forcedNull,
++  totalBeds: forcedNull,
++  openBeds: forcedNull,
++  availableFrom: dateOnly,
++  availableUntil: dateOnly.optional().nullable(),
++  availabilityRange: tstzRange,
++  price: z.coerce.number().finite(),
++  leaseMinMonths: z.coerce.number().int().positive().optional().nullable(),
++  leaseMaxMonths: z.coerce.number().int().positive().optional().nullable(),
++  leaseNegotiable: z.boolean().optional(),
++  genderPreference: forcedNull,
++  householdGender: forcedNull,
++});
++
++export const EntirePlaceInputSchema = BaseInventoryInputSchema.extend({
++  roomCategory: z.literal("ENTIRE_PLACE"),
++  capacityGuests: requiredPositiveInt,
++  totalBeds: forcedNull,
++  openBeds: forcedNull,
++  genderPreference: forcedNull,
++  householdGender: forcedNull,
++});
++
++export const PrivateRoomInputSchema = BaseInventoryInputSchema.extend({
++  roomCategory: z.literal("PRIVATE_ROOM"),
++  capacityGuests: requiredPositiveInt,
++  totalBeds: forcedNull,
++  openBeds: forcedNull,
++});
++
++export const SharedRoomInputSchema = BaseInventoryInputSchema.extend({
++  roomCategory: z.literal("SHARED_ROOM"),
++  capacityGuests: forcedNull,
++  totalBeds: requiredPositiveInt,
++  openBeds: requiredNonNegativeInt,
++}).superRefine((value, ctx) => {
++  if (value.openBeds > value.totalBeds) {
++    ctx.addIssue({
++      code: z.ZodIssueCode.custom,
++      message: "openBeds must be less than or equal to totalBeds",
++      path: ["openBeds"],
++    });
++  }
++});
++
++/** Discriminated union enforcing per-category required and forced-null rules. */
++export const InventoryInputSchema = z.discriminatedUnion("roomCategory", [
++  EntirePlaceInputSchema,
++  PrivateRoomInputSchema,
++  SharedRoomInputSchema,
++]);
++
++export type InventoryInput = z.infer<typeof InventoryInputSchema>;
+diff --git a/src/lib/validation/category/index.ts b/src/lib/validation/category/index.ts
+new file mode 100644
+index 00000000..4cdc6686
+--- /dev/null
++++ b/src/lib/validation/category/index.ts
+@@ -0,0 +1,27 @@
++import type { z } from "zod";
++import {
++  InventoryInputSchema,
++  type InventoryInput,
++} from "@/lib/validation/category/schema";
++
++export type ValidatedInventoryInput = InventoryInput;
++
++export function validateInventoryInput(
++  raw: unknown
++):
++  | { ok: true; value: ValidatedInventoryInput }
++  | { ok: false; issues: z.ZodIssue[] } {
++  const result = InventoryInputSchema.safeParse(raw);
++
++  if (!result.success) {
++    return {
++      ok: false,
++      issues: result.error.issues,
++    };
++  }
++
++  return {
++    ok: true,
++    value: result.data,
++  };
++}
+diff --git a/src/__tests__/lib/identity/canonicalizer-version.test.ts b/src/__tests__/lib/identity/canonicalizer-version.test.ts
+new file mode 100644
+index 00000000..43f2f6cf
+--- /dev/null
++++ b/src/__tests__/lib/identity/canonicalizer-version.test.ts
+@@ -0,0 +1,15 @@
++import {
++  CANONICALIZER_VERSION,
++  isCurrentCanonicalizerVersion,
++} from "@/lib/identity/canonicalizer-version";
++
++describe("canonicalizer-version", () => {
++  it("exports the Phase 01 canonicalizer version", () => {
++    expect(CANONICALIZER_VERSION).toBe("v1.0-2026-04");
++  });
++
++  it("compares by strict equality", () => {
++    expect(isCurrentCanonicalizerVersion(CANONICALIZER_VERSION)).toBe(true);
++    expect(isCurrentCanonicalizerVersion("v1.0-2026-05")).toBe(false);
++  });
++});
+diff --git a/src/__tests__/lib/identity/canonical-address.test.ts b/src/__tests__/lib/identity/canonical-address.test.ts
+new file mode 100644
+index 00000000..f8380628
+--- /dev/null
++++ b/src/__tests__/lib/identity/canonical-address.test.ts
+@@ -0,0 +1,68 @@
++import { canonicalizeAddress } from "@/lib/identity/canonical-address";
++import { CANONICALIZER_VERSION } from "@/lib/identity/canonicalizer-version";
++
++describe("canonicalizeAddress", () => {
++  const base = {
++    city: "San Francisco",
++    state: "ca",
++    zip: "94107-1234",
++  };
++
++  it("collapses whitespace, punctuation, and common street suffix variants", () => {
++    const variants = [
++      "123 Main St Apt 4B",
++      "  123  main  st  apt 4B ",
++      "123 MAIN ST APT 4B",
++      "123 Main St. Apt 4B",
++      "123 Main Street Apt 4B",
++    ].map((address) => canonicalizeAddress({ ...base, address }));
++
++    expect(new Set(variants.map((variant) => variant.canonicalAddressHash)).size).toBe(1);
++    expect(new Set(variants.map((variant) => variant.canonicalUnit)).size).toBe(1);
++  });
++
++  it("collapses nullish unit variants to _none_", () => {
++    const outputs = [undefined, null, "", "   ", "null"].map((unit) =>
++      canonicalizeAddress({
++        ...base,
++        address: "55 Oak Avenue",
++        unit,
++      })
++    );
++
++    expect(new Set(outputs.map((output) => output.canonicalAddressHash)).size).toBe(1);
++    expect(outputs.every((output) => output.canonicalUnit === "_none_")).toBe(true);
++  });
++
++  it("defaults country to US and normalizes diacritics", () => {
++    const first = canonicalizeAddress({
++      address: "9 Rue de l'Été",
++      city: "Montréal",
++      state: "qc",
++      zip: "H2Y 1C6",
++    });
++    const second = canonicalizeAddress({
++      address: "9 Rue de l'Ete",
++      city: "Montreal",
++      state: "QC",
++      zip: "H2Y1C6",
++      country: "US",
++    });
++
++    expect(first.canonicalAddressHash).toBe(second.canonicalAddressHash);
++  });
++
++  it("returns a 32-character base64url hash and the current version", () => {
++    const output = canonicalizeAddress({
++      address: "123 Main St",
++      city: "Austin",
++      state: "tx",
++      zip: "73301",
++      unit: "Unit 12",
++    });
++
++    expect(output.canonicalAddressHash).toMatch(/^[A-Za-z0-9_-]{32}$/);
++    expect(output.canonicalizerVersion).toBe(CANONICALIZER_VERSION);
++    expect(output.canonicalUnit).toBe("12");
++  });
++});
+diff --git a/src/__tests__/lib/identity/advisory-locks.test.ts b/src/__tests__/lib/identity/advisory-locks.test.ts
+new file mode 100644
+index 00000000..31c6b931
+--- /dev/null
++++ b/src/__tests__/lib/identity/advisory-locks.test.ts
+@@ -0,0 +1,30 @@
++import {
++  acquireXactLock,
++  canonicalUnitLockKey,
++  identityMutationLockKey,
++  LOCK_PREFIX_CANONICAL_UNIT,
++  LOCK_PREFIX_IDENTITY_MUTATION,
++} from "@/lib/identity/advisory-locks";
++import { AdvisoryLockContentionError } from "@/lib/identity/errors";
++
++describe("advisory-locks", () => {
++  it("uses the Phase 01 lock prefixes", () => {
++    expect(canonicalUnitLockKey("abc123")).toBe(`${LOCK_PREFIX_CANONICAL_UNIT}abc123`);
++    expect(identityMutationLockKey("unit-1")).toBe(
++      `${LOCK_PREFIX_IDENTITY_MUTATION}unit-1`
++    );
++  });
++
++  it("translates lock timeout failures into AdvisoryLockContentionError", async () => {
++    const tx = {
++      $executeRawUnsafe: jest.fn().mockResolvedValue(undefined),
++      $executeRaw: jest
++        .fn()
++        .mockRejectedValue(new Error("canceling statement due to lock timeout")),
++    };
++
++    await expect(acquireXactLock(tx as never, "p1:unit:abc")).rejects.toBeInstanceOf(
++      AdvisoryLockContentionError
++    );
++  });
++});
+diff --git a/src/__tests__/lib/identity/resolve-or-create-unit.test.ts b/src/__tests__/lib/identity/resolve-or-create-unit.test.ts
+new file mode 100644
+index 00000000..0f76c312
+--- /dev/null
++++ b/src/__tests__/lib/identity/resolve-or-create-unit.test.ts
+@@ -0,0 +1,68 @@
++import { resolveOrCreateUnit } from "@/lib/identity/resolve-or-create-unit";
++
++function makeTx(sourceVersion: bigint) {
++  return {
++    $executeRawUnsafe: jest.fn().mockResolvedValue(undefined),
++    $executeRaw: jest.fn().mockResolvedValue(0),
++    physicalUnit: {
++      upsert: jest.fn().mockResolvedValue({
++        id: "unit-1",
++        unitIdentityEpoch: 1,
++        sourceVersion,
++      }),
++    },
++    outboxEvent: {
++      create: jest.fn().mockResolvedValue({ id: "outbox-1" }),
++    },
++    auditEvent: {
++      create: jest.fn().mockResolvedValue({ id: "audit-1" }),
++    },
++  };
++}
++
++describe("resolveOrCreateUnit", () => {
++  it("creates a new unit and emits outbox + audit rows", async () => {
++    const tx = makeTx(BigInt(1));
++
++    const result = await resolveOrCreateUnit(tx as never, {
++      actor: { role: "host", id: "user-1" },
++      address: {
++        address: "123 Main Street",
++        city: "Austin",
++        state: "tx",
++        zip: "73301",
++      },
++      requestId: "req-1",
++    });
++
++    expect(result.created).toBe(true);
++    expect(result.unitId).toBe("unit-1");
++    expect(tx.physicalUnit.upsert).toHaveBeenCalledTimes(1);
++    expect(tx.outboxEvent.create).toHaveBeenCalledTimes(1);
++    expect(tx.auditEvent.create).toHaveBeenCalledTimes(1);
++  });
++
++  it("treats an existing row as resolved and increments via the upsert update path", async () => {
++    const tx = makeTx(BigInt(2));
++
++    const result = await resolveOrCreateUnit(tx as never, {
++      actor: { role: "system", id: null },
++      address: {
++        address: "123 Main St",
++        city: "Austin",
++        state: "TX",
++        zip: "73301",
++      },
++    });
++
++    expect(result.created).toBe(false);
++    expect(tx.physicalUnit.upsert).toHaveBeenCalledWith(
++      expect.objectContaining({
++        update: expect.objectContaining({
++          sourceVersion: { increment: BigInt(1) },
++          rowVersion: { increment: BigInt(1) },
++        }),
++      })
++    );
++  });
++});
+diff --git a/src/__tests__/lib/identity/mutate-unit.test.ts b/src/__tests__/lib/identity/mutate-unit.test.ts
+new file mode 100644
+index 00000000..a61b0452
+--- /dev/null
++++ b/src/__tests__/lib/identity/mutate-unit.test.ts
+@@ -0,0 +1,98 @@
++import { recordIdentityMutation } from "@/lib/identity/mutate-unit";
++
++function makePhysicalUnit(id: string, epoch: number, supersedesUnitIds: string[] = []) {
++  return { id, unitIdentityEpoch: epoch, supersedesUnitIds };
++}
++
++function makeTx(units = [makePhysicalUnit("unit-a", 2), makePhysicalUnit("unit-b", 4)]) {
++  return {
++    $executeRawUnsafe: jest.fn().mockResolvedValue(undefined),
++    $executeRaw: jest.fn().mockResolvedValue(0),
++    physicalUnit: {
++      findMany: jest.fn().mockResolvedValue(units),
++      update: jest.fn().mockResolvedValue({}),
++    },
++    identityMutation: {
++      create: jest.fn().mockResolvedValue({ id: "mutation-1" }),
++    },
++    outboxEvent: {
++      create: jest.fn().mockResolvedValue({ id: "outbox-1" }),
++    },
++    auditEvent: {
++      create: jest.fn().mockResolvedValue({ id: "audit-1" }),
++    },
++  };
++}
++
++describe("recordIdentityMutation", () => {
++  it("records a merge, bumps epochs, and emits a high-priority outbox event", async () => {
++    const tx = makeTx([
++      makePhysicalUnit("unit-a", 1),
++      makePhysicalUnit("unit-b", 3),
++      makePhysicalUnit("unit-target", 2, ["unit-a"]),
++    ]);
++
++    const result = await recordIdentityMutation(tx as never, {
++      kind: "MERGE",
++      fromUnitIds: ["unit-a", "unit-b"],
++      toUnitIds: ["unit-target"],
++      reasonCode: "operator_duplicate",
++      operatorId: "moderator-1",
++    });
++
++    expect(result.resultingEpoch).toBe(4);
++    expect(result.affectedUnitIds).toEqual(["unit-a", "unit-b", "unit-target"]);
++    expect(tx.identityMutation.create).toHaveBeenCalledTimes(1);
++    expect(tx.outboxEvent.create).toHaveBeenCalledWith(
++      expect.objectContaining({
++        data: expect.objectContaining({
++          priority: 0,
++        }),
++      })
++    );
++    expect(tx.physicalUnit.update).toHaveBeenCalledWith(
++      expect.objectContaining({
++        where: { id: "unit-target" },
++        data: expect.objectContaining({
++          supersedesUnitIds: ["unit-a", "unit-b"],
++        }),
++      })
++    );
++  });
++
++  it("requires all target units to already exist for splits", async () => {
++    const tx = makeTx([makePhysicalUnit("unit-a", 1), makePhysicalUnit("unit-b", 1)]);
++
++    await expect(
++      recordIdentityMutation(tx as never, {
++        kind: "SPLIT",
++        fromUnitIds: ["unit-a"],
++        toUnitIds: ["unit-b", "unit-c"],
++        reasonCode: "operator_split",
++        operatorId: "moderator-1",
++      })
++    ).rejects.toThrow("Unknown physical unit: unit-c");
++  });
++
++  it("allows canonicalizer upgrades without an operator id", async () => {
++    const tx = makeTx([makePhysicalUnit("unit-a", 5)]);
++
++    const result = await recordIdentityMutation(tx as never, {
++      kind: "CANONICALIZER_UPGRADE",
++      fromUnitIds: ["unit-a"],
++      toUnitIds: ["unit-a"],
++      reasonCode: "canonicalizer_upgrade",
++      operatorId: null,
++    });
++
++    expect(result.mutationId).toBe("mutation-1");
++    expect(tx.auditEvent.create).toHaveBeenCalledWith(
++      expect.objectContaining({
++        data: expect.objectContaining({
++          actorRole: "system",
++          actorId: null,
++        }),
++      })
++    );
++  });
++});
+diff --git a/src/__tests__/lib/validation/category/schema.test.ts b/src/__tests__/lib/validation/category/schema.test.ts
+new file mode 100644
+index 00000000..ad38452a
+--- /dev/null
++++ b/src/__tests__/lib/validation/category/schema.test.ts
+@@ -0,0 +1,58 @@
++import { InventoryInputSchema } from "@/lib/validation/category/schema";
++import { validateInventoryInput } from "@/lib/validation/category";
++
++describe("InventoryInputSchema", () => {
++  const base = {
++    inventoryKey: "room-1",
++    availableFrom: "2026-05-01",
++    availabilityRange: "[2026-05-01T00:00:00Z,2026-06-01T00:00:00Z)",
++    price: 1200,
++  };
++
++  it("accepts a valid ENTIRE_PLACE shape and forces null-only fields", () => {
++    const result = validateInventoryInput({
++      ...base,
++      roomCategory: "ENTIRE_PLACE",
++      capacityGuests: 2,
++    });
++
++    expect(result.ok).toBe(true);
++    if (result.ok) {
++      expect(result.value.totalBeds).toBeNull();
++      expect(result.value.openBeds).toBeNull();
++    }
++  });
++
++  it("rejects ENTIRE_PLACE rows with non-null totalBeds", () => {
++    const result = validateInventoryInput({
++      ...base,
++      roomCategory: "ENTIRE_PLACE",
++      capacityGuests: 2,
++      totalBeds: 2,
++    });
++
++    expect(result.ok).toBe(false);
++  });
++
++  it("rejects SHARED_ROOM rows where openBeds exceeds totalBeds", () => {
++    const result = InventoryInputSchema.safeParse({
++      ...base,
++      roomCategory: "SHARED_ROOM",
++      totalBeds: 2,
++      openBeds: 3,
++    });
++
++    expect(result.success).toBe(false);
++  });
++
++  it("requires a valid tstzrange literal", () => {
++    const result = validateInventoryInput({
++      ...base,
++      roomCategory: "PRIVATE_ROOM",
++      capacityGuests: 1,
++      availabilityRange: "not-a-range",
++    });
++
++    expect(result.ok).toBe(false);
++  });
++});
+diff --git a/src/__tests__/lib/db/with-actor.test.ts b/src/__tests__/lib/db/with-actor.test.ts
+new file mode 100644
+index 00000000..b0c20094
+--- /dev/null
++++ b/src/__tests__/lib/db/with-actor.test.ts
+@@ -0,0 +1,38 @@
++import { prisma } from "@/lib/prisma";
++import { ModerationLockedError } from "@/lib/identity/errors";
++import { withActor } from "@/lib/db/with-actor";
++
++describe("withActor", () => {
++  beforeEach(() => {
++    jest.clearAllMocks();
++  });
++
++  it("sets actor GUCs inside a serializable transaction", async () => {
++    const tx = {
++      $executeRaw: jest.fn().mockResolvedValue(0),
++    };
++    (prisma.$transaction as jest.Mock).mockImplementation(async (fn) => fn(tx));
++
++    const result = await withActor({ role: "host", id: "user-1" }, async (innerTx) => {
++      expect(innerTx).toBe(tx);
++      return "ok";
++    });
++
++    expect(result).toBe("ok");
++    expect(tx.$executeRaw).toHaveBeenCalledTimes(2);
++    expect(prisma.$transaction).toHaveBeenCalledWith(
++      expect.any(Function),
++      expect.objectContaining({ isolationLevel: "Serializable", timeout: 30000 })
++    );
++  });
++
++  it("translates moderation trigger failures", async () => {
++    (prisma.$transaction as jest.Mock).mockRejectedValue(
++      new Error("MODERATION_LOCKED: host may not modify moderation columns")
++    );
++
++    await expect(
++      withActor({ role: "host", id: "user-1" }, async () => "ignored")
++    ).rejects.toBeInstanceOf(ModerationLockedError);
++  });
++});
+diff --git a/src/__tests__/lib/db/optimistic-lock.test.ts b/src/__tests__/lib/db/optimistic-lock.test.ts
+new file mode 100644
+index 00000000..68a62a9c
+--- /dev/null
++++ b/src/__tests__/lib/db/optimistic-lock.test.ts
+@@ -0,0 +1,18 @@
++import { StaleVersionError } from "@/lib/identity/errors";
++import { requireRowVersion } from "@/lib/db/optimistic-lock";
++
++describe("requireRowVersion", () => {
++  it("is a no-op when the caller has no if-match version", () => {
++    expect(() => requireRowVersion(BigInt(5), null)).not.toThrow();
++  });
++
++  it("is a no-op when the version matches", () => {
++    expect(() => requireRowVersion(BigInt(5), BigInt(5))).not.toThrow();
++  });
++
++  it("throws a StaleVersionError on mismatch", () => {
++    expect(() => requireRowVersion(BigInt(5), BigInt(4))).toThrow(
++      StaleVersionError
++    );
++  });
++});
+diff --git a/src/__tests__/lib/outbox/append.test.ts b/src/__tests__/lib/outbox/append.test.ts
+new file mode 100644
+index 00000000..3836f425
+--- /dev/null
++++ b/src/__tests__/lib/outbox/append.test.ts
+@@ -0,0 +1,47 @@
++import { appendOutboxEvent } from "@/lib/outbox/append";
++
++describe("appendOutboxEvent", () => {
++  it("defaults priority to 100", async () => {
++    const tx = {
++      outboxEvent: {
++        create: jest.fn().mockResolvedValue({ id: "outbox-1" }),
++      },
++    };
++
++    await appendOutboxEvent(tx as never, {
++      aggregateType: "PHYSICAL_UNIT",
++      aggregateId: "unit-1",
++      kind: "UNIT_UPSERTED",
++      payload: { created: true },
++      sourceVersion: BigInt(1),
++      unitIdentityEpoch: 1,
++    });
++
++    expect(tx.outboxEvent.create).toHaveBeenCalledWith(
++      expect.objectContaining({
++        data: expect.objectContaining({
++          priority: 100,
++        }),
++      })
++    );
++  });
++
++  it("rejects unknown aggregate types at the zod layer", async () => {
++    const tx = {
++      outboxEvent: {
++        create: jest.fn(),
++      },
++    };
++
++    await expect(
++      appendOutboxEvent(tx as never, {
++        aggregateType: "BAD_TYPE" as never,
++        aggregateId: "unit-1",
++        kind: "UNIT_UPSERTED",
++        payload: {},
++        sourceVersion: BigInt(1),
++        unitIdentityEpoch: 1,
++      })
++    ).rejects.toThrow();
++  });
++});
+diff --git a/src/__tests__/lib/audit/events.test.ts b/src/__tests__/lib/audit/events.test.ts
+new file mode 100644
+index 00000000..174fe5b5
+--- /dev/null
++++ b/src/__tests__/lib/audit/events.test.ts
+@@ -0,0 +1,46 @@
++import { recordAuditEvent } from "@/lib/audit/events";
++
++describe("recordAuditEvent", () => {
++  it("writes audit events with default empty details", async () => {
++    const tx = {
++      auditEvent: {
++        create: jest.fn().mockResolvedValue({ id: "audit-1" }),
++      },
++    };
++
++    await recordAuditEvent(tx as never, {
++      kind: "CANONICAL_UNIT_CREATED",
++      actor: { role: "system", id: null },
++      aggregateType: "physical_units",
++      aggregateId: "unit-1",
++    });
++
++    expect(tx.auditEvent.create).toHaveBeenCalledWith(
++      expect.objectContaining({
++        data: expect.objectContaining({
++          details: {},
++        }),
++      })
++    );
++  });
++
++  it("rejects PII-like detail keys", async () => {
++    const tx = {
++      auditEvent: {
++        create: jest.fn(),
++      },
++    };
++
++    await expect(
++      recordAuditEvent(tx as never, {
++        kind: "IDENTITY_MUTATION",
++        actor: { role: "moderator", id: "admin-1" },
++        aggregateType: "identity_mutations",
++        aggregateId: "mutation-1",
++        details: {
++          email: "host@example.com",
++        },
++      })
++    ).rejects.toThrow(/PII-like detail keys/);
++  });
++});
+diff --git a/src/__tests__/lib/flags/phase01.test.ts b/src/__tests__/lib/flags/phase01.test.ts
+new file mode 100644
+index 00000000..eeafe02d
+--- /dev/null
++++ b/src/__tests__/lib/flags/phase01.test.ts
+@@ -0,0 +1,37 @@
++describe("phase01 flags", () => {
++  const originalEnv = process.env;
++
++  beforeEach(() => {
++    jest.resetModules();
++    process.env = { ...originalEnv };
++    delete process.env.FEATURE_PHASE01_CANONICAL_WRITES;
++  });
++
++  afterEach(() => {
++    process.env = originalEnv;
++  });
++
++  it("defaults canonical writes to false", async () => {
++    const { isPhase01CanonicalWritesEnabled } = await import("@/lib/flags/phase01");
++    expect(isPhase01CanonicalWritesEnabled()).toBe(false);
++  });
++
++  it("reads FEATURE_PHASE01_CANONICAL_WRITES", async () => {
++    process.env.FEATURE_PHASE01_CANONICAL_WRITES = "true";
++    const { isPhase01CanonicalWritesEnabled } = await import("@/lib/flags/phase01");
++    expect(isPhase01CanonicalWritesEnabled()).toBe(true);
++  });
++
++  it("exports the stub kill switches and keeps them false", async () => {
++    const { PHASE01_KILL_SWITCHES, isKillSwitchActive } = await import(
++      "@/lib/flags/phase01"
++    );
++
++    expect(PHASE01_KILL_SWITCHES).toEqual({
++      disable_new_publication: false,
++      pause_identity_reconcile: false,
++    });
++    expect(isKillSwitchActive("disable_new_publication")).toBe(false);
++    expect(isKillSwitchActive("pause_identity_reconcile")).toBe(false);
++  });
++});
+diff --git a/src/__tests__/lib/idempotency-phase01.test.ts b/src/__tests__/lib/idempotency-phase01.test.ts
+new file mode 100644
+index 00000000..c0bc0e34
+--- /dev/null
++++ b/src/__tests__/lib/idempotency-phase01.test.ts
+@@ -0,0 +1,13 @@
++import {
++  IDEMPOTENCY_ENDPOINT_CONTACT,
++  IDEMPOTENCY_ENDPOINT_MUTATE_UNIT,
++  IDEMPOTENCY_ENDPOINT_RESOLVE_UNIT,
++} from "@/lib/idempotency";
++
++describe("phase01 idempotency endpoint constants", () => {
++  it("exports the canonical endpoint names", () => {
++    expect(IDEMPOTENCY_ENDPOINT_RESOLVE_UNIT).toBe("identity:resolveOrCreateUnit");
++    expect(IDEMPOTENCY_ENDPOINT_MUTATE_UNIT).toBe("identity:mutateUnit");
++    expect(IDEMPOTENCY_ENDPOINT_CONTACT).toBe("identity:contact");
++  });
++});
+diff --git a/src/__tests__/db/phase01-schema.test.ts b/src/__tests__/db/phase01-schema.test.ts
+new file mode 100644
+index 00000000..33e1b0b7
+--- /dev/null
++++ b/src/__tests__/db/phase01-schema.test.ts
+@@ -0,0 +1,60 @@
++import fs from "fs";
++import path from "path";
++
++const repoRoot = process.cwd();
++const migrationSql = fs.readFileSync(
++  path.join(
++    repoRoot,
++    "prisma/migrations/20260501000000_phase01_canonical_identity_tables/migration.sql"
++  ),
++  "utf8"
++);
++const triggerSql = fs.readFileSync(
++  path.join(
++    repoRoot,
++    "prisma/migrations/20260501010000_phase01_moderation_precedence_trigger/migration.sql"
++  ),
++  "utf8"
++);
++const listingSql = fs.readFileSync(
++  path.join(
++    repoRoot,
++    "prisma/migrations/20260501020000_phase01_add_listing_physical_unit_id/migration.sql"
++  ),
++  "utf8"
++);
++const schema = fs.readFileSync(path.join(repoRoot, "prisma/schema.prisma"), "utf8");
++
++describe("Phase 01 schema artifacts", () => {
++  it("creates the seven new canonical tables", () => {
++    for (const tableName of [
++      "physical_units",
++      "host_unit_claims",
++      "listing_inventories",
++      "identity_mutations",
++      "outbox_events",
++      "cache_invalidations",
++      "audit_events",
++    ]) {
++      expect(migrationSql).toContain(`CREATE TABLE "${tableName}"`);
++    }
++  });
++
++  it("includes the canonical uniqueness and operational indexes", () => {
++    expect(migrationSql).toContain('CREATE UNIQUE INDEX "physical_units_canonical_unique_idx"');
++    expect(migrationSql).toContain('CREATE INDEX "outbox_events_pending_idx"');
++    expect(migrationSql).toContain('CREATE INDEX "cache_invalidations_pending_idx"');
++    expect(migrationSql).toContain('CREATE INDEX "audit_events_aggregate_idx"');
++  });
++
++  it("defines the moderation and append-only trigger functions", () => {
++    expect(triggerSql).toContain('CREATE OR REPLACE FUNCTION "enforce_moderation_precedence"()');
++    expect(triggerSql).toContain("current_setting('app.actor_role', true)");
++    expect(triggerSql).toContain('CREATE OR REPLACE FUNCTION "forbid_update_delete"()');
++  });
++
++  it("adds Listing.physical_unit_id in both migration SQL and Prisma schema", () => {
++    expect(listingSql).toContain('ADD COLUMN "physical_unit_id" TEXT NULL');
++    expect(schema).toContain('physicalUnitId          String?                   @map("physical_unit_id")');
++  });
++});
+diff --git a/src/__tests__/db/phase01-moderation-precedence.test.ts b/src/__tests__/db/phase01-moderation-precedence.test.ts
+new file mode 100644
+index 00000000..5572870f
+--- /dev/null
++++ b/src/__tests__/db/phase01-moderation-precedence.test.ts
+@@ -0,0 +1,25 @@
++import fs from "fs";
++import path from "path";
++
++const sql = fs.readFileSync(
++  path.join(
++    process.cwd(),
++    "prisma/migrations/20260501010000_phase01_moderation_precedence_trigger/migration.sql"
++  ),
++  "utf8"
++);
++
++describe("Phase 01 moderation-precedence migration", () => {
++  it("guards lifecycle_status, publish_status, and privacy_version for host actors", () => {
++    expect(sql).toContain("NEW.lifecycle_status IS DISTINCT FROM OLD.lifecycle_status");
++    expect(sql).toContain("NEW.publish_status IS DISTINCT FROM OLD.publish_status");
++    expect(sql).toContain("NEW.privacy_version IS DISTINCT FROM OLD.privacy_version");
++    expect(sql).toContain("MODERATION_LOCKED: host may not modify moderation columns");
++  });
++
++  it("installs the trigger on all three canonical write tables", () => {
++    expect(sql).toContain('CREATE TRIGGER "trg_modprec_physical_units"');
++    expect(sql).toContain('CREATE TRIGGER "trg_modprec_host_unit_claims"');
++    expect(sql).toContain('CREATE TRIGGER "trg_modprec_listing_inventories"');
++  });
++});
+diff --git a/src/__tests__/integration/phase01-read-path-isolation.test.ts b/src/__tests__/integration/phase01-read-path-isolation.test.ts
+new file mode 100644
+index 00000000..8c54940d
+--- /dev/null
++++ b/src/__tests__/integration/phase01-read-path-isolation.test.ts
+@@ -0,0 +1,70 @@
++import fs from "fs";
++import path from "path";
++
++function walkFiles(root: string): string[] {
++  const entries = fs.readdirSync(root, { withFileTypes: true });
++  const files: string[] = [];
++
++  for (const entry of entries) {
++    const fullPath = path.join(root, entry.name);
++    if (entry.isDirectory()) {
++      files.push(...walkFiles(fullPath));
++      continue;
++    }
++    files.push(fullPath);
++  }
++
++  return files;
++}
++
++function findMatches(term: string): string[] {
++  const repoRoot = process.cwd();
++  const searchRoots = ["src", "prisma", ".orchestrator"].map((dir) =>
++    path.join(repoRoot, dir)
++  );
++  const matches: string[] = [];
++
++  for (const root of searchRoots) {
++    for (const file of walkFiles(root)) {
++      const relative = path.relative(repoRoot, file);
++      const content = fs.readFileSync(file, "utf8");
++      if (content.includes(term)) {
++        matches.push(relative);
++      }
++    }
++  }
++
++  return matches;
++}
++
++describe("Phase 01 read-path isolation", () => {
++  const terms = [
++    "listing_inventories",
++    "physical_units",
++    "host_unit_claims",
++    "identity_mutations",
++    "outbox_events",
++    "cache_invalidations",
++    "audit_events",
++  ];
++
++  it("keeps new table references out of app and component read paths", () => {
++    for (const term of terms) {
++      const hits = findMatches(term);
++      const offending = hits.filter(
++        (file) => file.startsWith("src/app/") || file.startsWith("src/components/")
++      );
++      expect(offending).toEqual([]);
++    }
++  });
++
++  it("keeps Listing.physical_unit_id unread by app and component code", () => {
++    const hits = findMatches("physical_unit_id");
++    const offending = hits.filter(
++      (file) =>
++        (file.startsWith("src/app/") || file.startsWith("src/components/")) &&
++        file !== "src/__tests__/integration/phase01-read-path-isolation.test.ts"
++    );
++    expect(offending).toEqual([]);
++  });
++});
+diff --git a/src/__tests__/integration/phase01-schema-doc-presence.test.ts b/src/__tests__/integration/phase01-schema-doc-presence.test.ts
+new file mode 100644
+index 00000000..11d8989c
+--- /dev/null
++++ b/src/__tests__/integration/phase01-schema-doc-presence.test.ts
+@@ -0,0 +1,23 @@
++import fs from "fs";
++import path from "path";
++
++describe("Phase 01 migration docs", () => {
++  it("ships README files with rollback guidance for each migration", () => {
++    const migrationDirs = [
++      "20260501000000_phase01_canonical_identity_tables",
++      "20260501010000_phase01_moderation_precedence_trigger",
++      "20260501020000_phase01_add_listing_physical_unit_id",
++    ];
++
++    for (const dir of migrationDirs) {
++      const readme = fs.readFileSync(
++        path.join(process.cwd(), "prisma/migrations", dir, "README.md"),
++        "utf8"
++      );
++
++      expect(readme).toContain("## Rollback");
++      expect(readme).toContain("## Data-safety");
++      expect(readme).toContain("## Lock footprint");
++    }
++  });
++});

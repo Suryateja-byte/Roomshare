@@ -1,0 +1,22 @@
+Scoped status at Phase 03 v1 closeout:
+
+M  .orchestrator/state.json
+M  prisma/schema.prisma
+M  src/lib/env.ts
+M  src/lib/outbox/append.ts
+?? .orchestrator/phases/phase-03-semantic-projection/
+?? docs/runbooks/embedding-swap.md
+?? prisma/migrations/20260503000000_phase03_semantic_projection/
+?? prisma/migrations/20260503010000_phase03_semantic_projection_hnsw/
+?? scripts/embedding-shadow-swap.ts
+?? src/__tests__/db/phase03-schema.test.ts
+?? src/__tests__/integration/phase03-read-isolation.test.ts
+?? src/__tests__/lib/projections/semantic.test.ts
+?? src/__tests__/utils/pglite-phase03.ts
+?? src/lib/embeddings/version.ts
+?? src/lib/outbox/dlq.ts
+?? src/lib/outbox/drain.ts
+?? src/lib/outbox/handlers.ts
+?? src/lib/projections/
+
+Note: the repository had a broad dirty/untracked worktree before this slice. Existing unrelated changes were preserved and not reverted.

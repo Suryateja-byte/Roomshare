@@ -1,0 +1,18 @@
+Scoped unified diff for this pass is at [generator-v2.diff](/home/surya/roomshare/.orchestrator/phases/phase-01-foundations-identity-lifecycle/attempts/v2/generator-v2.diff). It includes the Phase 01 code/test changes only; I did not touch the unrelated WIP `search/*`, `booking/*`, `SlotBadge`, or similar files.
+
+Reviewer fixes implemented: DB-backed Phase 01 test harness and suites, the two missing spec files, `MERGE`/`SPLIT` arity enforcement in [mutate-unit.ts](/home/surya/roomshare/src/lib/identity/mutate-unit.ts), subprocess-free [phase01-read-path-isolation.test.ts](/home/surya/roomshare/src/__tests__/integration/phase01-read-path-isolation.test.ts), scoped coverage thresholds in [jest.config.js](/home/surya/roomshare/jest.config.js), the `resolve-or-create-unit` documentation fixes, and the audit PII blocklist tightening in [events.ts](/home/surya/roomshare/src/lib/audit/events.ts).
+
+**Verification**
+- `pnpm lint`: exit `0`. No errors. 38 existing warnings remain in unrelated files such as `src/app/api/search/facets/route.ts`, `src/components/Map.tsx`, `src/components/search/InlineFilterStrip.tsx`, and others.
+- `pnpm typecheck`: exit `0`.
+- `pnpm test`: exit `1`. Full-run summary was `27 failed, 2 skipped, 400 passed`. The failures are in pre-existing WIP/baseline-red areas, including `api/search/facets`, booking whole-unit/multi-slot, `actions/chat-dedup`, `api/map-listings-route`, and `components/search/InlineFilterStrip`. No Phase 01 suite appears in the full-run failure summary.
+- `pnpm test --coverage --runInBand ...<Phase 01 scoped suite list>...`: exit `0`. `17/17` suites passed, `66/66` tests passed. Coverage on the enforced scopes:
+  - `src/lib/identity/**`: `97.54%` statements, `100%` functions, `97.41%` lines
+  - `src/lib/validation/category/**`: `90.9%` statements, `100%` functions, `100%` lines
+
+**Deviation Notes**
+- PGlite was not used. There is no locally installed PGlite or real Postgres runtime in this sandbox, and `prisma dev` is a network-fetched subcommand here, so it was unavailable offline.
+- Because of that, the migration SQL was not literally applied against PGlite/Postgres in tests. I used an isolated in-process SQL harness at [phase01-test-db.ts](/home/surya/roomshare/src/__tests__/utils/phase01-test-db.ts) to exercise Phase 01 schema, checks, triggers, transaction rollback, and serialization behavior without touching the shared Supabase DB.
+- Advisory-lock serialization did prove out in that harness: the new [phase01-advisory-lock-contention.test.ts](/home/surya/roomshare/src/__tests__/db/phase01-advisory-lock-contention.test.ts) runs 10 parallel `withIdempotency(...resolveOrCreateUnit...)` calls and ends with exactly 1 `physical_units` row and 9 `created: false` results.
+- The required new files were added: [phase01-advisory-lock-contention.test.ts](/home/surya/roomshare/src/__tests__/db/phase01-advisory-lock-contention.test.ts) and [phase01-identity-mutation.test.ts](/home/surya/roomshare/src/__tests__/integration/phase01-identity-mutation.test.ts).
+- The Phase 01 slice is green in focused runs, including the previously problematic read-path isolation test. The full repo `pnpm test` still exits `1`, but from pre-existing WIP failures outside Phase 01 rather than from this slice.

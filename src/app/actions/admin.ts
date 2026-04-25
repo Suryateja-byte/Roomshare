@@ -7,13 +7,14 @@ import { revalidatePath } from "next/cache";
 import { ListingStatus, ReportStatus } from "@prisma/client";
 import { logAdminAction } from "@/lib/audit";
 import { logger } from "@/lib/logger";
-import { markListingDirty } from "@/lib/search/search-doc-dirty";
+import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 import {
   checkRateLimit,
   RATE_LIMITS,
   getClientIPFromHeaders,
 } from "@/lib/rate-limit";
 import { headers } from "next/headers";
+import { restoreConsumptionsForHostBan } from "@/lib/payments/contact-restoration";
 
 // Helper to check admin status — exported for use in other admin action files (verification.ts etc.)
 export async function requireAdmin() {
@@ -101,7 +102,6 @@ export async function getUsers(options?: {
           _count: {
             select: {
               listings: true,
-              bookings: true,
               reviewsWritten: true,
             },
           },
@@ -233,6 +233,10 @@ export async function suspendUser(userId: string, suspend: boolean) {
       data: { isSuspended: suspend },
     });
 
+    if (suspend) {
+      await restoreConsumptionsForHostBan(userId);
+    }
+
     // Audit log
     await logAdminAction({
       adminId: adminCheck.userId!,
@@ -306,6 +310,7 @@ export async function getListingsForAdmin(options?: {
           title: true,
           price: true,
           status: true,
+          version: true,
           images: true,
           viewCount: true,
           createdAt: true,
@@ -325,7 +330,6 @@ export async function getListingsForAdmin(options?: {
           _count: {
             select: {
               reports: true,
-              bookings: true,
             },
           },
         },
@@ -350,7 +354,8 @@ export async function getListingsForAdmin(options?: {
 
 export async function updateListingStatus(
   listingId: string,
-  status: ListingStatus
+  status: ListingStatus,
+  expectedVersion: number
 ) {
   const adminCheck = await requireAdmin();
   if (adminCheck.error) {
@@ -370,51 +375,89 @@ export async function updateListingStatus(
   }
 
   try {
-    const listing = await prisma.listing.findUnique({
-      where: { id: listingId },
-      select: { status: true, title: true, ownerId: true },
-    });
+    const result = await prisma.$transaction(async (tx) => {
+      const [listing] = await tx.$queryRaw<
+        Array<{
+          id: string;
+          status: ListingStatus;
+          title: string;
+          ownerId: string;
+          version: number;
+          statusReason: string | null;
+        }>
+      >`
+        SELECT
+          id,
+          status,
+          title,
+          "ownerId",
+          version,
+          "statusReason"
+        FROM "Listing"
+        WHERE id = ${listingId}
+        FOR UPDATE
+      `;
 
-    if (!listing) {
-      return { error: "Listing not found" };
-    }
+      if (!listing) {
+        return { error: "Listing not found" } as const;
+      }
 
-    await prisma.listing.update({
-      where: { id: listingId },
-      data: { status },
-    });
+      if (listing.version !== expectedVersion) {
+        return {
+          error: "This listing was updated elsewhere. Reload and try again.",
+          code: "VERSION_CONFLICT",
+        } as const;
+      }
 
-    // Fire-and-forget: mark listing dirty for search doc refresh
-    markListingDirty(listingId, "status_changed").catch((err) => {
-      logger.sync.warn("markListingDirty failed", {
-        action: "adminUpdateListingStatus",
-        listingId,
-        reason: "status_changed",
-        error: err instanceof Error ? err.message : String(err),
+      await tx.listing.update({
+        where: { id: listingId },
+        data: { status, version: listing.version + 1 },
       });
+
+      await markListingDirtyInTx(tx, listingId, "status_changed");
+
+      return {
+        success: true,
+        listingTitle: listing.title,
+        ownerId: listing.ownerId,
+        previousStatus: listing.status,
+        status,
+        statusReason: listing.statusReason,
+        version: listing.version + 1,
+      } as const;
     });
+
+    if ("error" in result) {
+      return result;
+    }
 
     // Audit log
     await logAdminAction({
       adminId: adminCheck.userId!,
-      action:
-        status === "PAUSED"
+        action:
+        result.status === "PAUSED"
           ? "LISTING_HIDDEN"
-          : status === "RENTED"
+          : result.status === "RENTED"
             ? "LISTING_RENTED"
             : "LISTING_RESTORED",
       targetType: "Listing",
       targetId: listingId,
       details: {
-        previousStatus: listing.status,
-        newStatus: status,
-        listingTitle: listing.title,
-        ownerId: listing.ownerId,
+        previousStatus: result.previousStatus,
+        newStatus: result.status,
+        statusReason: result.statusReason,
+        listingTitle: result.listingTitle,
+        ownerId: result.ownerId,
       },
     });
 
     revalidatePath("/admin/listings");
-    return { success: true };
+    return {
+      success: true,
+      status: result.status,
+      statusReason: result.statusReason,
+      version: result.version,
+    };
   } catch (error) {
     logger.sync.error("Failed to update listing status (admin)", {
       action: "updateListingStatus",
@@ -425,6 +468,35 @@ export async function updateListingStatus(
     });
     return { error: "Failed to update listing status" };
   }
+}
+
+export async function reviewListingMigration(
+  listingId: string,
+  expectedVersion: number
+) {
+  const adminCheck = await requireAdmin();
+  if (adminCheck.error) {
+    return { error: adminCheck.error };
+  }
+
+  const headersList = await headers();
+  const ip = getClientIPFromHeaders(headersList);
+  const rl = await checkRateLimit(
+    `${ip}:${adminCheck.userId}`,
+    "adminWrite",
+    RATE_LIMITS.adminWrite
+  );
+  if (!rl.success) {
+    return { error: "Too many requests. Please slow down." };
+  }
+
+  void listingId;
+  void expectedVersion;
+
+  return {
+    error: "Listing migration review was retired with the contact-first cutover.",
+    code: "MIGRATION_REVIEW_RETIRED",
+  };
 }
 
 export async function deleteListing(listingId: string) {
@@ -454,50 +526,10 @@ export async function deleteListing(listingId: string) {
 
       if (!listing) throw new Error("NOT_FOUND");
 
-      // Check for active ACCEPTED bookings INSIDE the transaction
-      const activeAcceptedBookings = await tx.booking.count({
-        where: {
-          listingId,
-          status: "ACCEPTED",
-          endDate: { gte: new Date() },
-        },
-      });
-
-      if (activeAcceptedBookings > 0) {
-        throw new Error("ACTIVE_BOOKINGS");
-      }
-
-      // Get pending bookings for notifications
-      const pendingBookings = await tx.booking.findMany({
-        where: { listingId, status: "PENDING" },
-        select: { id: true, tenantId: true },
-      });
-
-      // Cancel pending bookings explicitly
-      await tx.booking.updateMany({
-        where: { listingId, status: "PENDING" },
-        data: { status: "CANCELLED" },
-      });
-
-      // Batch-create notifications for affected tenants
-      if (pendingBookings.length > 0) {
-        await tx.notification.createMany({
-          data: pendingBookings
-            .filter((booking) => booking.tenantId != null)
-            .map((booking) => ({
-              userId: booking.tenantId!,
-              type: "BOOKING_CANCELLED",
-              title: "Booking Request Cancelled",
-              message: `Your pending booking request for "${listing.title}" has been cancelled because the listing was removed by an administrator.`,
-              link: "/bookings",
-            })),
-        });
-      }
-
       // Delete the listing
       await tx.listing.delete({ where: { id: listingId } });
 
-      return { listing, pendingBookingsCount: pendingBookings.length };
+      return { listing };
     });
 
     // Audit log AFTER successful transaction
@@ -510,20 +542,14 @@ export async function deleteListing(listingId: string) {
         listingTitle: result.listing.title,
         ownerId: result.listing.ownerId,
         previousStatus: result.listing.status,
-        pendingBookingsNotified: result.pendingBookingsCount,
       },
     });
 
     revalidatePath("/admin/listings");
-    return { success: true, notifiedTenants: result.pendingBookingsCount };
+    return { success: true, notifiedTenants: 0 };
   } catch (error) {
     if (error instanceof Error) {
       if (error.message === "NOT_FOUND") return { error: "Listing not found" };
-      if (error.message === "ACTIVE_BOOKINGS") {
-        // Intentionally simplified response: the UI uses /api/listings/[id]/can-delete
-        // for detailed activeBookings info, not this action's error shape.
-        return { error: "Cannot delete listing with active bookings" };
-      }
     }
     logger.sync.error("Failed to delete listing (admin)", {
       action: "deleteListing",
@@ -725,52 +751,6 @@ export async function resolveReportAndRemoveListing(
 
       if (!listing) throw new Error("LISTING_NOT_FOUND");
 
-      // BIZ-01: Check for active ACCEPTED bookings before deletion
-      const activeAcceptedBookings = await tx.booking.count({
-        where: {
-          listingId: report.listingId,
-          status: "ACCEPTED",
-          endDate: { gte: new Date() },
-        },
-      });
-
-      if (activeAcceptedBookings > 0) {
-        throw new Error("ACTIVE_BOOKINGS");
-      }
-
-      // Get affected bookings (PENDING) for notifications
-      const affectedBookings = await tx.booking.findMany({
-        where: {
-          listingId: report.listingId,
-          status: "PENDING",
-        },
-        select: { id: true, tenantId: true },
-      });
-
-      // Cancel affected bookings explicitly
-      await tx.booking.updateMany({
-        where: {
-          listingId: report.listingId,
-          status: "PENDING",
-        },
-        data: { status: "CANCELLED" },
-      });
-
-      // Batch-create notifications for affected tenants (skip deleted accounts)
-      if (affectedBookings.length > 0) {
-        await tx.notification.createMany({
-          data: affectedBookings
-            .filter((booking) => booking.tenantId != null)
-            .map((booking) => ({
-              userId: booking.tenantId!,
-              type: "BOOKING_CANCELLED",
-              title: "Booking Cancelled - Listing Removed",
-              message: `Your booking for "${listing.title}" has been cancelled because the listing was removed due to a policy violation.`,
-              link: "/bookings",
-            })),
-        });
-      }
-
       // Update report status
       await tx.report.update({
         where: { id: reportId },
@@ -788,7 +768,6 @@ export async function resolveReportAndRemoveListing(
       return {
         report,
         listing,
-        affectedBookingsCount: affectedBookings.length,
       };
     });
 
@@ -806,7 +785,6 @@ export async function resolveReportAndRemoveListing(
         reporterId: result.report.reporterId,
         adminNotes: notes || "Listing removed due to policy violation",
         listingRemoved: true,
-        affectedBookings: result.affectedBookingsCount,
       },
     });
 
@@ -821,22 +799,18 @@ export async function resolveReportAndRemoveListing(
         ownerId: result.listing.ownerId,
         deletedDueToReport: reportId,
         adminNotes: notes || "Listing removed due to policy violation",
-        affectedBookings: result.affectedBookingsCount,
       },
     });
 
     revalidatePath("/admin/reports");
     revalidatePath("/admin/listings");
-    return { success: true, affectedBookings: result.affectedBookingsCount };
+    return { success: true, affectedBookings: 0 };
   } catch (error) {
     if (error instanceof Error) {
       if (error.message === "REPORT_NOT_FOUND")
         return { error: "Report not found" };
       if (error.message === "LISTING_NOT_FOUND")
         return { error: "Listing not found" };
-      if (error.message === "ACTIVE_BOOKINGS") {
-        return { error: "Cannot remove listing with active bookings" };
-      }
     }
     logger.sync.error("Failed to resolve report with listing removal", {
       action: "resolveReportAndRemoveListing",
@@ -865,7 +839,6 @@ export async function getAdminStats() {
       activeListings,
       pendingVerifications,
       openReports,
-      totalBookings,
       totalMessages,
     ] = await Promise.all([
       prisma.user.count(),
@@ -875,7 +848,6 @@ export async function getAdminStats() {
       prisma.listing.count({ where: { status: "ACTIVE" } }),
       prisma.verificationRequest.count({ where: { status: "PENDING" } }),
       prisma.report.count({ where: { status: "OPEN" } }),
-      prisma.booking.count(),
       prisma.message.count(),
     ]);
 
@@ -887,7 +859,7 @@ export async function getAdminStats() {
       activeListings,
       pendingVerifications,
       openReports,
-      totalBookings,
+      totalBookings: 0,
       totalMessages,
     };
   } catch (error) {

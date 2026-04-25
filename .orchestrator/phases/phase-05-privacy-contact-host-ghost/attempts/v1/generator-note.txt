@@ -1,0 +1,29 @@
+Phase 05 generator note
+
+Summary:
+- Added additive Phase 05 schema support for contact_attempts, host_contact_channels,
+  and phone_reveal_audits.
+- Added PGlite Phase 05 fixture and schema tests.
+- Added public-read privacy leak guard helpers and regression tests.
+- Hardened contact-host admission with observed unit epoch support, neutral block
+  response, and idempotent durable contact attempt writes.
+- Added encrypted phone reveal core, /api/phone-reveal route, disable kill switch,
+  rate limit, fail-closed dependency behavior, and audit writes.
+- Added outbound message phone/email soft-flag telemetry without hard-blocking sends.
+- Strengthened host-ghost restoration tests for fake-clock SLA, host reply skip,
+  and host read-receipt skip behavior.
+
+Checks run:
+- Phase 05 targeted Jest set: 10 suites, 76 tests passed.
+- Phase 04 regression Jest set: 17 suites, 264 tests passed.
+- Phase 03 targeted Jest set: 3 suites, 14 tests passed.
+- Phase 02 focused Jest set: 17 suites, 125 tests passed.
+- Follow-up chat/outbound-guard focused test after final review adjustment: 2 suites, 39 tests passed.
+- pnpm exec prisma validate: passed.
+- pnpm typecheck: passed.
+- pnpm lint: passed with 0 errors and 43 existing warnings.
+
+Deferred:
+- Broad pnpm test --runInBand was not rerun in Phase 05. Phase 04 already recorded
+  unrelated broad-search failures and a search-v2-service OOM; focused Phase 02-05
+  and required static checks are green.

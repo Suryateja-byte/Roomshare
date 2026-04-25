@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { updateListingStatus, deleteListing } from "@/app/actions/admin";
 import { formatPrice } from "@/lib/format";
@@ -11,7 +11,6 @@ import {
   MapPin,
   DollarSign,
   Flag,
-  Calendar,
   Trash2,
   Play,
   Pause,
@@ -29,6 +28,7 @@ interface Listing {
   title: string;
   price: number;
   status: ListingStatus;
+  version: number;
   images: string[];
   viewCount: number;
   createdAt: Date;
@@ -43,7 +43,6 @@ interface Listing {
   } | null;
   _count: {
     reports: number;
-    bookings: number;
   };
 }
 
@@ -79,17 +78,35 @@ export default function ListingList({
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
+  useEffect(() => {
+    setListings(initialListings);
+  }, [initialListings]);
+
   const handleStatusChange = async (
     listingId: string,
-    newStatus: ListingStatus
+    newStatus: ListingStatus,
+    expectedVersion: number
   ) => {
     setProcessingId(listingId);
     try {
-      const result = await updateListingStatus(listingId, newStatus);
+      const result = await updateListingStatus(
+        listingId,
+        newStatus,
+        expectedVersion
+      );
       if (result.success) {
         setListings((prev) =>
           prev.map((l) =>
-            l.id === listingId ? { ...l, status: newStatus } : l
+            l.id === listingId
+              ? {
+                  ...l,
+                  status: result.status ?? newStatus,
+                  version:
+                    typeof result.version === "number"
+                      ? result.version
+                      : l.version,
+                }
+              : l
           )
         );
       } else if (result.error) {
@@ -249,10 +266,6 @@ export default function ListingList({
                             <Eye className="w-3 h-3" />
                             {listing.viewCount} views
                           </span>
-                          <span className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
-                            {listing._count.bookings} bookings
-                          </span>
                         </div>
                         <p className="text-xs text-on-surface-variant mt-1">
                           Owner: {listing.owner.name || "Unknown"} (
@@ -288,9 +301,13 @@ export default function ListingList({
                             <div className="absolute right-0 top-full mt-1 w-48 bg-surface-container-lowest rounded-lg shadow-ambient-lg border border-outline-variant/20 py-1 z-10">
                               {listing.status !== "ACTIVE" && (
                                 <button
-                                  onClick={() =>
-                                    handleStatusChange(listing.id, "ACTIVE")
-                                  }
+                                onClick={() =>
+                                  handleStatusChange(
+                                    listing.id,
+                                    "ACTIVE",
+                                    listing.version
+                                  )
+                                }
                                   disabled={processingId === listing.id}
                                   className="w-full px-4 py-2 text-left text-sm hover:bg-surface-container-high/50 flex items-center gap-2 disabled:opacity-60"
                                 >
@@ -304,9 +321,13 @@ export default function ListingList({
                               )}
                               {listing.status !== "PAUSED" && (
                                 <button
-                                  onClick={() =>
-                                    handleStatusChange(listing.id, "PAUSED")
-                                  }
+                                onClick={() =>
+                                  handleStatusChange(
+                                    listing.id,
+                                    "PAUSED",
+                                    listing.version
+                                  )
+                                }
                                   disabled={processingId === listing.id}
                                   className="w-full px-4 py-2 text-left text-sm hover:bg-surface-container-high/50 flex items-center gap-2 disabled:opacity-60"
                                 >
@@ -320,9 +341,13 @@ export default function ListingList({
                               )}
                               {listing.status !== "RENTED" && (
                                 <button
-                                  onClick={() =>
-                                    handleStatusChange(listing.id, "RENTED")
-                                  }
+                                onClick={() =>
+                                  handleStatusChange(
+                                    listing.id,
+                                    "RENTED",
+                                    listing.version
+                                  )
+                                }
                                   disabled={processingId === listing.id}
                                   className="w-full px-4 py-2 text-left text-sm hover:bg-surface-container-high/50 flex items-center gap-2 disabled:opacity-60"
                                 >

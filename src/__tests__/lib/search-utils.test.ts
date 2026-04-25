@@ -22,7 +22,7 @@ describe("buildSearchUrl", () => {
       lng: -122.4194,
     };
     const url = buildSearchUrl(filters);
-    expect(url).toContain("where=San+Francisco");
+    expect(url).toContain("locationLabel=San+Francisco");
     expect(url).toContain("what=quiet+roommates");
   });
 
@@ -46,6 +46,16 @@ describe("buildSearchUrl", () => {
     const filters: SearchFilters = { moveInDate: FUTURE_MOVE_IN_DATE };
     const url = buildSearchUrl(filters);
     expect(url).toContain(`moveInDate=${FUTURE_MOVE_IN_DATE}`);
+  });
+
+  it("should build URL with an explicit endDate", () => {
+    const filters: SearchFilters = {
+      moveInDate: FUTURE_MOVE_IN_DATE,
+      endDate: "2027-03-01",
+    };
+    const url = buildSearchUrl(filters);
+    expect(url).toContain(`moveInDate=${FUTURE_MOVE_IN_DATE}`);
+    expect(url).toContain("endDate=2027-03-01");
   });
 
   it("should build URL with leaseDuration", () => {
@@ -78,6 +88,7 @@ describe("buildSearchUrl", () => {
       maxPrice: 1000,
       amenities: [AMENITY_ONE],
       moveInDate: FUTURE_MOVE_IN_DATE,
+      endDate: "2027-03-01",
       leaseDuration: "6 months",
       houseRules: [HOUSE_RULE_ONE],
       roomType: "Private Room",
@@ -88,6 +99,7 @@ describe("buildSearchUrl", () => {
     expect(url).toContain("maxPrice=1000");
     expect(url).toContain(`amenities=${encodeURIComponent(AMENITY_ONE).replace(/%20/g, "+")}`);
     expect(url).toContain(`moveInDate=${FUTURE_MOVE_IN_DATE}`);
+    expect(url).toContain("endDate=2027-03-01");
     expect(url).toContain("leaseDuration=6+months");
     expect(url).toContain(
       `houseRules=${encodeURIComponent(HOUSE_RULE_ONE).replace(/%20/g, "+")}`
@@ -217,6 +229,7 @@ describe("SearchFilters interface", () => {
       maxPrice: 1000,
       amenities: [AMENITY_ONE],
       moveInDate: FUTURE_MOVE_IN_DATE,
+      endDate: "2027-03-01",
       leaseDuration: "12 months",
       houseRules: [HOUSE_RULE_TWO],
       roomType: "Shared",
@@ -227,6 +240,7 @@ describe("SearchFilters interface", () => {
     expect(filters.maxPrice).toBe(1000);
     expect(filters.amenities).toEqual([AMENITY_ONE]);
     expect(filters.moveInDate).toBe(FUTURE_MOVE_IN_DATE);
+    expect(filters.endDate).toBe("2027-03-01");
     expect(filters.leaseDuration).toBe("12 months");
     expect(filters.houseRules).toEqual([HOUSE_RULE_TWO]);
     expect(filters.roomType).toBe("Shared");

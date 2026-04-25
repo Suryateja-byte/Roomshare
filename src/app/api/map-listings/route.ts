@@ -35,6 +35,7 @@ import * as Sentry from "@sentry/nextjs";
 import { getSearchRateLimitIdentifier } from "@/lib/search-rate-limit-identifier";
 import {
   createSearchResponseMeta,
+  SEARCH_RESPONSE_VERSION,
   type SearchMapState,
 } from "@/lib/search/search-response";
 import { normalizeSearchQuery } from "@/lib/search/search-query";
@@ -44,6 +45,15 @@ import {
   SEARCH_SCENARIO_HEADER,
 } from "@/lib/search/testing/search-scenarios";
 import { recordSearchRequestLatency } from "@/lib/search/search-telemetry";
+import {
+  loadValidQuerySnapshot,
+  PHASE04_SNAPSHOT_VERSION,
+  toSnapshotResponseMeta,
+} from "@/lib/search/query-snapshots";
+import type { SearchV2Map } from "@/lib/search/types";
+import { searchV2MapToListings } from "@/lib/search/v2-map-data";
+import { hydratePhase04MapSnapshot } from "@/lib/search/projection-search";
+import { buildPublicCacheHeadersForSearchState } from "@/lib/public-cache/headers";
 
 export const runtime = "nodejs";
 
@@ -59,6 +69,8 @@ export async function GET(request: NextRequest) {
       const rawParams = buildRawParamsFromSearchParams(searchParams);
       const requestedQueryHash =
         request.headers.get("x-search-query-hash")?.trim() || null;
+      const querySnapshotId =
+        searchParams.get("query_snapshot_id")?.trim() || null;
       const normalizedQuery = normalizeSearchQuery(rawParams as RawSearchParams);
       const baseMeta = createSearchResponseMeta(normalizedQuery, "map-api");
       const meta = requestedQueryHash
@@ -82,6 +94,109 @@ export async function GET(request: NextRequest) {
             queryHash: meta.queryHash,
           });
           return rateLimitResponse;
+        }
+      }
+
+      if (querySnapshotId) {
+        const snapshotResult = await loadValidQuerySnapshot(querySnapshotId);
+        if (!snapshotResult.ok) {
+          return NextResponse.json(
+            {
+              error: "snapshot_expired",
+              snapshotExpired: {
+                queryHash: meta.queryHash,
+                reason: snapshotResult.reason,
+              },
+              meta,
+            },
+            {
+              status: 409,
+              headers: {
+                "Cache-Control": "no-store",
+                "x-request-id": requestId,
+              },
+            }
+          );
+        }
+
+        const snapshot = snapshotResult.snapshot;
+        if (snapshot.snapshotVersion === PHASE04_SNAPSHOT_VERSION) {
+          const state = await hydratePhase04MapSnapshot({
+            querySnapshotId,
+            queryHash: requestedQueryHash ?? snapshot.queryHash,
+          });
+          if ("error" in state) {
+            return NextResponse.json(
+              {
+                error: state.error,
+                snapshotExpired: state.snapshotExpired,
+                meta,
+              },
+              {
+                status: 409,
+                headers: {
+                  "Cache-Control": "no-store",
+                  "x-request-id": requestId,
+                },
+              }
+            );
+          }
+          return NextResponse.json(state, {
+            headers: {
+              "Cache-Control": "no-store",
+              "x-request-id": requestId,
+            },
+          });
+        }
+        if (
+          (requestedQueryHash && snapshot.queryHash !== requestedQueryHash) ||
+          snapshot.responseVersion !== SEARCH_RESPONSE_VERSION
+        ) {
+          return NextResponse.json(
+            {
+              error: "snapshot_expired",
+              snapshotExpired: {
+                queryHash: requestedQueryHash ?? snapshot.queryHash,
+                reason: "search_contract_changed",
+              },
+              meta: requestedQueryHash
+                ? { ...toSnapshotResponseMeta(snapshot), queryHash: requestedQueryHash }
+                : toSnapshotResponseMeta(snapshot),
+            },
+            {
+              status: 409,
+              headers: {
+                "Cache-Control": "no-store",
+                "x-request-id": requestId,
+              },
+            }
+          );
+        }
+
+        if (snapshot.mapPayload) {
+          const storedMap = snapshot.mapPayload as unknown as SearchV2Map;
+          const snapshotMeta = requestedQueryHash
+            ? { ...toSnapshotResponseMeta(snapshot), queryHash: requestedQueryHash }
+            : toSnapshotResponseMeta(snapshot);
+
+          return NextResponse.json(
+            {
+              kind: "ok",
+              data: {
+                listings: searchV2MapToListings(storedMap),
+                ...(storedMap.truncated !== undefined
+                  ? { truncated: storedMap.truncated }
+                  : {}),
+              },
+              meta: snapshotMeta,
+            } satisfies SearchMapState,
+            {
+              headers: {
+                "Cache-Control": "no-store",
+                "x-request-id": requestId,
+              },
+            }
+          );
         }
       }
 
@@ -242,6 +357,7 @@ export async function GET(request: NextRequest) {
           // max-age: browser cache duration (shorter to allow user refresh)
           "Cache-Control":
             "public, s-maxage=60, max-age=30, stale-while-revalidate=120",
+          ...buildPublicCacheHeadersForSearchState(state),
           "x-request-id": requestId,
           // Vary by Accept-Encoding for proper CDN compression handling
           Vary: "Accept-Encoding",

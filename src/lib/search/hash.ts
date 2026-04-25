@@ -20,11 +20,14 @@ import {
 export {
   encodeKeysetCursor,
   decodeKeysetCursor,
+  encodeSnapshotCursor,
+  decodeSnapshotCursor,
   buildCursorFromRow,
   decodeCursorAny,
   decodeLegacyCursor,
   SORT_OPTIONS,
   type KeysetCursor,
+  type SnapshotCursor,
   type SortOption,
   type CursorRowData,
 } from "./cursor";

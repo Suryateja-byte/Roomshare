@@ -36,16 +36,20 @@ jest.mock("@/lib/errors/data-errors", () => {
   return actual;
 });
 
-jest.mock("@/lib/search-params", () => ({
-  buildRawParamsFromSearchParams: jest.fn().mockReturnValue({}),
-  parseSearchParams: jest.fn().mockReturnValue({
-    filterParams: {},
-    requestedPage: 1,
-    sortOption: "recommended",
-    boundsRequired: false,
-    browseMode: true,
-  }),
-}));
+jest.mock("@/lib/search-params", () => {
+  const actual = jest.requireActual("@/lib/search-params");
+  return {
+    ...actual,
+    buildRawParamsFromSearchParams: jest.fn().mockReturnValue({}),
+    parseSearchParams: jest.fn().mockReturnValue({
+      filterParams: {},
+      requestedPage: 1,
+      sortOption: "recommended",
+      boundsRequired: false,
+      browseMode: true,
+    }),
+  };
+});
 
 // P2-3: Mock rate limiting to return null (allow request)
 jest.mock("@/lib/with-rate-limit", () => ({
@@ -97,6 +101,9 @@ jest.mock("@/lib/search-alerts", () => ({
 
 jest.mock("@/lib/search/search-doc-dirty", () => ({
   markListingDirty: jest.fn().mockResolvedValue(undefined),
+  markListingsDirty: jest.fn().mockResolvedValue(undefined),
+  markListingDirtyInTx: jest.fn().mockResolvedValue(undefined),
+  markListingsDirtyInTx: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock("@/lib/schemas", () => {

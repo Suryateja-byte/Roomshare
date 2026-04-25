@@ -1,0 +1,110 @@
+{
+  "verdict": "REJECT",
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "category": "tests",
+      "location": ".orchestrator/phases/phase-01-foundations-identity-lifecycle/attempts/v1/stdout.txt:9",
+      "issue": "`pnpm test` (full repo) exits 1. At minimum src/__tests__/integration/phase01-read-path-isolation.test.ts was observed failing with spawnSync EPERM during the generator run (see phase01-failure-detail.txt). The manager protocol declares that any Phase 01 test failing in the full `pnpm test` run is a BLOCKER on AC#9, regardless of whether the test passes in the slice.",
+      "required-outcome": "`pnpm test` with no filter must exit 0 on this diff. The phase01-read-path-isolation test (and every other Phase 01 test) must pass inside the full-repo Jest run, not only in a slice. If sandbox EPERM forced the rewrite from execSync to fs.readdirSync, that rewrite must be re-verified by a complete `pnpm test` run on a machine without the sandbox restriction."
+    },
+    {
+      "severity": "BLOCKER",
+      "category": "tests",
+      "location": "src/__tests__/db/phase01-schema.test.ts:29-41",
+      "issue": "AC#1 (migration applies cleanly; all tables and indexes present) is verified by `expect(migrationSql).toContain(\"CREATE TABLE\")` — a text scan of the SQL file, not a DB-boundary test. Spec T1.1 explicitly calls for `prisma migrate reset --force` in Jest global setup and asserts `information_schema.tables`; T1.2 requires proof the indexes exist after migration apply. Generator stdout.txt:18 openly admits real migration apply was not executed.",
+      "required-outcome": "AC#1 must be proven by actually applying the migration to a Postgres instance (real or testcontainer) and querying `information_schema.tables` and `pg_indexes` to confirm the seven tables and required indexes exist. A text-search against migration.sql is insufficient."
+    },
+    {
+      "severity": "BLOCKER",
+      "category": "tests",
+      "location": "src/__tests__/db/phase01-schema.test.ts",
+      "issue": "AC#2 (DB-level CHECK constraints reject invalid category shapes) has no DB-enforced rejection test. Spec T2.1–T2.6 demand attempting an INSERT that violates each per-category CHECK and asserting the INSERT errors. The delivered file contains only text-scan asserts; no attempt is made to INSERT a bad row against the actual DB.",
+      "required-outcome": "Provide tests that connect to a real (or testcontainer) Postgres, run the Phase 01 migrations, attempt to INSERT each of the six bad row shapes (ENTIRE_PLACE with total_beds; SHARED_ROOM with null open_beds; PRIVATE_ROOM with total_beds; SHARED_ROOM with open_beds > total_beds; ENTIRE_PLACE with gender_preference; valid ENTIRE_PLACE), and assert the SQL driver throws a CHECK constraint violation (or succeeds) accordingly."
+    },
+    {
+      "severity": "BLOCKER",
+      "category": "tests",
+      "location": "src/__tests__/db/phase01-moderation-precedence.test.ts:13-24",
+      "issue": "AC#3 (moderation-precedence trigger rejects host-role UPDATE to publish_status/lifecycle_status/privacy_version; append-only triggers reject UPDATE/DELETE on identity_mutations/audit_events; wrapper surfaces 423 Locked) is verified by `expect(sql).toContain(...)` text scan of the migration file. Spec T3.1–T3.8 demand actual DB-level trigger firing tests (host-role UPDATE inside withActor must raise MODERATION_LOCKED; moderator-role UPDATE must succeed; missing actor defaults to system; append-only triggers must reject UPDATE and DELETE). None of these are exercised.",
+      "required-outcome": "Run the moderation-precedence trigger against a real Postgres: `withActor({role:'host'}, ...)` attempting to UPDATE publish_status must throw ModerationLockedError (HTTP 423 shape); same for lifecycle_status and privacy_version on all three canonical tables; moderator role must succeed; default/missing GUC must be treated as 'system'; UPDATE/DELETE on identity_mutations and audit_events must raise the append-only trigger. Replace the text-scan test with real-DB assertions."
+    },
+    {
+      "severity": "BLOCKER",
+      "category": "tests",
+      "location": "src/__tests__/db/phase01-advisory-lock-contention.test.ts",
+      "issue": "AC#5 (advisory-lock wrapper serializes concurrent resolve-or-create: 10 parallel → 1 insert) has no corresponding test file. Spec test file #34 (`phase01-advisory-lock-contention.test.ts`) is not present; `ls src/__tests__/db/` returns only `phase01-moderation-precedence.test.ts`, `phase01-schema.test.ts`, plus pre-existing files.",
+      "required-outcome": "Add `src/__tests__/db/phase01-advisory-lock-contention.test.ts` that runs 10 parallel `withIdempotency(...)`-wrapped `resolveOrCreateUnit(...)` calls for the same canonical address against a real Postgres, asserts exactly one physical_units row exists after all Promises settle, and that 9 callers observed `created: false`."
+    },
+    {
+      "severity": "BLOCKER",
+      "category": "tests",
+      "location": "src/__tests__/integration/phase01-identity-mutation.test.ts",
+      "issue": "AC#6 (identity_mutations MERGE/SPLIT ledger + outbox emission in same transaction; atomic rollback) has no corresponding integration test file. Spec test file #35 (`phase01-identity-mutation.test.ts`) does not exist. The delivered `src/__tests__/lib/identity/mutate-unit.test.ts` mocks tx, physicalUnit, identityMutation, outboxEvent, and auditEvent — it cannot prove tx atomicity. Spec T6.1 explicitly requires simulating a failure after ledger insert but before outbox append and asserting both rows absent after rollback.",
+      "required-outcome": "Add `src/__tests__/integration/phase01-identity-mutation.test.ts` that runs recordIdentityMutation inside a real tx, forces a failure after the identity_mutations INSERT but before the outbox_events INSERT (e.g., via a spy or a raw abort), commits/rolls back, then queries identity_mutations and outbox_events to confirm neither row persists. Also cover T6.2 (SPLIT supports multiple to_unit_ids), T6.3 (CANONICALIZER_UPGRADE with null operator), T6.4 (priority=0 for IDENTITY_MUTATION), and T6.5 (epoch bump on all affected units) against a real DB."
+    },
+    {
+      "severity": "BLOCKER",
+      "category": "tests",
+      "location": "src/__tests__/db/phase01-schema.test.ts",
+      "issue": "AC#7 (source_version / row_version increment on UPDATE; stale If-Match → 409) is only covered for the pure function `requireRowVersion`. Spec T7.1 and T7.2 require executing two sequential upserts against a real DB and asserting source_version/row_version went from 1 → 2. No such DB-backed test exists.",
+      "required-outcome": "Add real-DB tests that insert a physical_units row, upsert the same canonical key twice, and assert `source_version` and `row_version` increment by 1 each time. Ensure the stale-If-Match path is exercised end-to-end via requireRowVersion as well."
+    },
+    {
+      "severity": "MAJOR",
+      "category": "plan-adherence",
+      "location": "src/lib/identity/mutate-unit.ts:40-51",
+      "issue": "IdentityMutationInputSchema does not enforce the spec contract that MERGE toUnitIds must be a single element and SPLIT fromUnitIds must be a single element (spec §Function Signatures lines 476-480 state `fromUnitIds must be non-empty; single-element for SPLIT` and `toUnitIds must be non-empty; single-element for MERGE`). The schema accepts `kind: 'MERGE'` with 3 toUnitIds and silently no-ops the supersedesUnitIds tracking at mutate-unit.ts:127 (`parsed.kind === 'MERGE' && parsed.toUnitIds.length === 1`). This allows semantically-invalid mutations to pass validation.",
+      "required-outcome": "Schema must reject MERGE input with toUnitIds.length !== 1 and SPLIT input with fromUnitIds.length !== 1, via a zod refinement. A dedicated unit test must assert both rejections."
+    },
+    {
+      "severity": "MAJOR",
+      "category": "tests",
+      "location": "jest.config.*",
+      "issue": "AC#9 requires ≥90% coverage on `src/lib/identity/**` and `src/lib/validation/category/**` modules. Jest config has no `coverageThreshold`. Generator stdout.txt never reports a coverage number for the new modules. Coverage claim is unverifiable.",
+      "required-outcome": "Run `pnpm test --coverage` scoped to Phase 01 paths and produce a coverage summary demonstrating ≥90% statement coverage on src/lib/identity/, src/lib/validation/category/, src/lib/db/, src/lib/outbox/, src/lib/audit/, and src/lib/flags/. Attach the paste to the attempt artifact."
+    },
+    {
+      "severity": "MAJOR",
+      "category": "tests",
+      "location": "src/__tests__/lib/identity/resolve-or-create-unit.test.ts:7-20",
+      "issue": "AC#4 T4.3 requires that resolveOrCreateUnit called 5 times with whitespace/casing/empty-unit variants produce exactly one physical_units row. The delivered test mocks the Prisma client so `upsert` is a jest.fn returning a static shape; the single-row invariant is not proven at the DB layer. The canonical-address hash-equivalence test passes but does not carry over to a real INSERT/ON-CONFLICT contract.",
+      "required-outcome": "Add a real-DB test that calls resolveOrCreateUnit 5 times inside withActor for the 5 canonical address variants listed in spec T4.1 and asserts `SELECT COUNT(*) FROM physical_units` equals 1."
+    },
+    {
+      "severity": "MINOR",
+      "category": "code-quality",
+      "location": "src/lib/identity/resolve-or-create-unit.ts:34",
+      "issue": "resolveOrCreateUnit calls setActorContext(tx, input.actor) directly, but the spec §Data Flow Sequence 1 shows the caller using withActor() which already calls setActorContext. When a caller follows the sequence, setActorContext runs twice. Not a correctness bug (set_config with is_local=true is idempotent inside a tx), but duplicated work and a layering smell.",
+      "required-outcome": "Either document that resolveOrCreateUnit must NOT be called outside withActor (and remove the internal setActorContext call), or keep it and document that the internal call is a defensive idempotent guard. Pick one model and stick to it."
+    },
+    {
+      "severity": "MINOR",
+      "category": "code-quality",
+      "location": "src/lib/identity/resolve-or-create-unit.ts:66",
+      "issue": "`const created = unit.sourceVersion === BigInt(1);` diverges from the canonical Postgres idiom `RETURNING (xmax = 0) AS created` that spec §Data Flow Sequence 1 explicitly names. The proxy works today because the update branch always increments sourceVersion, but it couples the `created` flag to a version-counter invariant rather than the authoritative xmax signal.",
+      "required-outcome": "Use `(xmax = 0) AS created` via $queryRaw on the upsert, or document the assumption clearly in a code comment with a test that would fail if the invariant ever drifted."
+    },
+    {
+      "severity": "MINOR",
+      "category": "tests",
+      "location": "src/__tests__/lib/identity/canonical-address.test.ts",
+      "issue": "Edge cases UT-3 (zip+4 collapses to 5-digit zip), UT-5 (output length always 32 chars), UT-6–UT-8 (GUC visibility/reset inside tx), UT-13 (availability_range tstzrange present and valid in DB), and UT-15 (IDEMPOTENCY_ENDPOINT constants) are partially covered but not all enumerated tests in spec §Additional unit tests exist. For instance the GUC-visibility tests (UT-6/7/8) require a real tx to observe `current_setting`; the delivered with-actor.test.ts mocks $executeRaw and does not verify the GUC propagation.",
+      "required-outcome": "Add the missing unit tests, particularly the ones requiring a real DB to observe actor GUCs inside a rolled-back tx."
+    },
+    {
+      "severity": "NIT",
+      "category": "code-quality",
+      "location": "src/lib/audit/events.ts:21",
+      "issue": "PII_BLOCKLIST regex includes 'address' which collides with legitimate audit keys like 'addressHash' or 'canonicalAddress'. Any detail key containing 'address' (case-insensitive) is rejected.",
+      "required-outcome": "Tighten the blocklist to whole-word or field-exact matching (e.g., allow 'canonicalAddressHash' while still blocking 'email'/'phone'/'password'/'address' as standalone). Add a unit test that exercises the collision."
+    }
+  ],
+  "convergence": "improving",
+  "deferred": [
+    "Add a lint/ESLint rule that bans direct Prisma calls to physical_units / host_unit_claims / listing_inventories outside withActor — spec §Edge Cases #4 notes this as a future guard.",
+    "ListingInventory.availabilityRange is declared Unsupported(\"tstzrange\"); Phase 02+ will need raw SQL inserts or a Prisma preview feature to write to this field. Not in scope for Phase 01 which does not write the table.",
+    "Consider adding Listing.physical_unit_id FK to physical_units in Phase 02 (spec (C)#2 defers this).",
+    "Rollback-runbook.md referenced in spec §Rollback is not authored; not a Phase 01 acceptance criterion but worth adding before Phase 02 merges."
+  ]
+}

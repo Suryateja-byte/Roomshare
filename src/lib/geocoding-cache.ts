@@ -15,8 +15,13 @@ export interface GeocodingResult {
   bbox?: [number, number, number, number];
 }
 
-const TTL_SECONDS = 24 * 60 * 60; // 24 hours (geocoding results are stable)
+const DEFAULT_TTL_SECONDS = 24 * 60 * 60; // 24 hours (legacy geocoding results are stable)
 const CACHE_PREFIX = "geocode:";
+
+export interface GeocodingCacheOptions {
+  cacheVersion?: string;
+  ttlSeconds?: number;
+}
 
 // --- Redis client (lazy singleton) ---
 let redis: Redis | null = null;
@@ -45,23 +50,41 @@ function getRedis(): Redis | null {
 // --- In-memory fallback (same as before, for dev / missing Redis env) ---
 interface CacheEntry {
   results: GeocodingResult[];
-  timestamp: number;
+  expiresAt: number;
 }
 
 const MAX_ENTRIES = 100;
-const TTL_MS = TTL_SECONDS * 1000;
 const memoryCache = new Map<string, CacheEntry>();
 
 function normalizeQuery(query: string): string {
   return query.toLowerCase().trim();
 }
 
+function normalizeCacheVersion(cacheVersion?: string): string {
+  return cacheVersion?.trim() || "legacy";
+}
+
+function getTtlMs(options?: GeocodingCacheOptions): number {
+  const ttlSeconds = options?.ttlSeconds;
+  if (typeof ttlSeconds !== "number" || !Number.isFinite(ttlSeconds) || ttlSeconds <= 0) {
+    return DEFAULT_TTL_SECONDS * 1000;
+  }
+
+  return Math.trunc(ttlSeconds * 1000);
+}
+
+function buildCacheKey(query: string, options?: GeocodingCacheOptions): string {
+  const normalizedVersion = normalizeCacheVersion(options?.cacheVersion);
+  return `${normalizedVersion}:${normalizeQuery(query)}`;
+}
+
 // --- Public API ---
 
 export async function getCachedResults(
-  query: string
+  query: string,
+  options?: GeocodingCacheOptions
 ): Promise<GeocodingResult[] | null> {
-  const normalized = normalizeQuery(query);
+  const normalized = buildCacheKey(query, options);
   const redisClient = getRedis();
 
   if (redisClient) {
@@ -79,7 +102,7 @@ export async function getCachedResults(
   const entry = memoryCache.get(normalized);
   if (!entry) return null;
 
-  if (Date.now() - entry.timestamp > TTL_MS) {
+  if (Date.now() > entry.expiresAt) {
     memoryCache.delete(normalized);
     return null;
   }
@@ -92,15 +115,17 @@ export async function getCachedResults(
 
 export async function setCachedResults(
   query: string,
-  results: GeocodingResult[]
+  results: GeocodingResult[],
+  options?: GeocodingCacheOptions
 ): Promise<void> {
-  const normalized = normalizeQuery(query);
+  const normalized = buildCacheKey(query, options);
+  const ttlMs = getTtlMs(options);
   const redisClient = getRedis();
 
   if (redisClient) {
     try {
       await redisClient.set(`${CACHE_PREFIX}${normalized}`, results, {
-        ex: TTL_SECONDS,
+        ex: Math.max(1, Math.trunc(ttlMs / 1000)),
       });
       return;
     } catch {
@@ -109,7 +134,7 @@ export async function setCachedResults(
   }
 
   // In-memory fallback
-  memoryCache.set(normalized, { results, timestamp: Date.now() });
+  memoryCache.set(normalized, { results, expiresAt: Date.now() + ttlMs });
 
   // Enforce max size (evict oldest)
   while (memoryCache.size > MAX_ENTRIES) {

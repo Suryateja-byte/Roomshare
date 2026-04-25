@@ -1,3 +1,4 @@
+import { normalizeSearchFilters } from "@/lib/search-params";
 import { BOUNDS_EPSILON } from "./types";
 
 export interface HashableSearchQuery {
@@ -11,11 +12,16 @@ export interface HashableSearchQuery {
   roomType?: string;
   leaseDuration?: string;
   moveInDate?: string;
+  endDate?: string;
   genderPreference?: string;
   householdGender?: string;
   bookingMode?: string;
   minAvailableSlots?: number;
   nearMatches?: boolean;
+  projectionEpoch?: string | number | bigint | null;
+  embeddingVersion?: string | null;
+  rankerProfileVersion?: string | null;
+  unitIdentityEpochFloor?: number | null;
   bounds?: {
     minLat: number;
     maxLat: number;
@@ -24,33 +30,80 @@ export interface HashableSearchQuery {
   };
 }
 
+export const SEARCH_QUERY_HASH_VERSION =
+  "2026-04-15.cfm-search-contract-v1";
+
 function quantizeBound(value: number): number {
   return Math.round(value / BOUNDS_EPSILON) * BOUNDS_EPSILON;
 }
 
 function normalizeHashableSearchQuery(query: HashableSearchQuery) {
+  const normalized = normalizeSearchFilters(
+    {
+      query: query.query,
+      vibeQuery: query.vibeQuery,
+      minPrice: query.minPrice,
+      maxPrice: query.maxPrice,
+      amenities: query.amenities,
+      houseRules: query.houseRules,
+      languages: query.languages,
+      roomType: query.roomType,
+      leaseDuration: query.leaseDuration,
+      moveInDate: query.moveInDate,
+      endDate: query.endDate,
+      genderPreference: query.genderPreference,
+      householdGender: query.householdGender,
+      bookingMode: query.bookingMode,
+      minAvailableSlots: query.minAvailableSlots,
+      nearMatches: query.nearMatches,
+      bounds: query.bounds,
+    },
+    {
+      invalidRange: "drop",
+    }
+  );
+  const versionTokens: Record<string, string | number | null> = {};
+  if ("projectionEpoch" in query) {
+    versionTokens.projectionEpoch =
+      query.projectionEpoch !== null && query.projectionEpoch !== undefined
+        ? String(query.projectionEpoch)
+        : null;
+  }
+  if ("embeddingVersion" in query) {
+    versionTokens.embeddingVersion = query.embeddingVersion ?? null;
+  }
+  if ("rankerProfileVersion" in query) {
+    versionTokens.rankerProfileVersion = query.rankerProfileVersion ?? null;
+  }
+  if ("unitIdentityEpochFloor" in query) {
+    versionTokens.unitIdentityEpochFloor = query.unitIdentityEpochFloor ?? null;
+  }
+
   return {
-    q: (query.query ?? "").toLowerCase().trim(),
-    what: (query.vibeQuery ?? "").toLowerCase().trim(),
-    minPrice: query.minPrice ?? null,
-    maxPrice: query.maxPrice ?? null,
-    amenities: [...(query.amenities ?? [])].sort(),
-    houseRules: [...(query.houseRules ?? [])].sort(),
-    languages: [...(query.languages ?? [])].sort(),
-    roomType: (query.roomType ?? "").toLowerCase(),
-    leaseDuration: (query.leaseDuration ?? "").toLowerCase(),
-    moveInDate: query.moveInDate ?? "",
-    genderPreference: (query.genderPreference ?? "").toLowerCase(),
-    householdGender: (query.householdGender ?? "").toLowerCase(),
-    bookingMode: (query.bookingMode ?? "").toLowerCase(),
-    minAvailableSlots: query.minAvailableSlots ?? null,
-    nearMatches: query.nearMatches ?? false,
-    bounds: query.bounds
+    v: SEARCH_QUERY_HASH_VERSION,
+    q: (normalized.query ?? "").toLowerCase(),
+    what: (normalized.vibeQuery ?? "").toLowerCase(),
+    minPrice: normalized.minPrice ?? null,
+    maxPrice: normalized.maxPrice ?? null,
+    amenities: [...(normalized.amenities ?? [])].sort(),
+    houseRules: [...(normalized.houseRules ?? [])].sort(),
+    languages: [...(normalized.languages ?? [])].sort(),
+    roomType: (normalized.roomType ?? "").toLowerCase(),
+    leaseDuration: (normalized.leaseDuration ?? "").toLowerCase(),
+    moveInDate: normalized.moveInDate ?? "",
+    endDate: normalized.endDate ?? "",
+    genderPreference: (normalized.genderPreference ?? "").toLowerCase(),
+    householdGender: (normalized.householdGender ?? "").toLowerCase(),
+    bookingMode: (normalized.bookingMode ?? "").toLowerCase(),
+    minAvailableSlots: normalized.minAvailableSlots ?? null,
+    nearMatches: normalized.nearMatches ?? false,
+    ...versionTokens,
+    bounds: normalized.bounds
       ? {
-          minLat: quantizeBound(query.bounds.minLat),
-          maxLat: quantizeBound(query.bounds.maxLat),
-          minLng: quantizeBound(query.bounds.minLng),
-          maxLng: quantizeBound(query.bounds.maxLng),
+          minLat: quantizeBound(normalized.bounds.minLat),
+          maxLat: quantizeBound(normalized.bounds.maxLat),
+          minLng: quantizeBound(normalized.bounds.minLng),
+          maxLng: quantizeBound(normalized.bounds.maxLng),
         }
       : null,
   };

@@ -7,7 +7,7 @@
  *
  * References:
  *   src/app/messages/page.tsx:10-11 — redirect('/login')
- *   src/app/bookings/page.tsx:15 — redirect('/login')
+ *   src/app/bookings/page.tsx — retired bookmark redirects through /messages
  *   src/app/settings/page.tsx:18 — redirect('/login?callbackUrl=/settings')
  *   src/app/profile/page.tsx:10 — redirect('/login')
  *   src/auth.config.ts:14-29 — Middleware authorized callback (protects /dashboard)
@@ -23,16 +23,16 @@ test.describe("Session Expiry: Navigation & Redirects", () => {
     test.slow();
   });
 
-  test(`${tags.auth} ${tags.sessionExpiry} - SE-N01: Navigate to /bookings with expired cookie redirects to /login`, async ({
+  test(`${tags.auth} ${tags.sessionExpiry} - SE-N01: Retired /bookings route with expired cookie redirects to /login`, async ({
     page,
   }) => {
     await clearAuthCookies(page);
 
-    // Navigate to protected page
+    // Navigate to the retired protected bookmark route.
     await page.goto("/bookings");
 
-    // Server-side auth check should redirect to /login
-    await expectLoginRedirect(page);
+    // Server-side auth check should redirect to /login with the contact-first target.
+    await expectLoginRedirect(page, "/messages");
   });
 
   test(`${tags.auth} ${tags.sessionExpiry} - SE-N02: Navigate to /messages with expired cookie redirects to /login`, async ({

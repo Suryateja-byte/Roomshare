@@ -4,6 +4,7 @@
 export {
   DataError,
   QueryError,
+  SchemaMismatchError,
   ConnectionError,
   DataTransformError,
   isDataError,

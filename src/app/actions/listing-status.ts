@@ -5,13 +5,16 @@ import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
 import { checkSuspension } from "./suspension";
 import { logger } from "@/lib/logger";
-import { markListingDirty } from "@/lib/search/search-doc-dirty";
+import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 import { z } from "zod";
 import {
   checkRateLimit,
   RATE_LIMITS,
   getClientIPFromHeaders,
 } from "@/lib/rate-limit";
+import { features } from "@/lib/env";
+import { getModerationWriteLockResult } from "@/lib/listings/moderation-write-lock";
+import { recordFreshnessRecovered } from "@/lib/metrics/cfm-ops-telemetry";
 // Basic listingId format check — rejects empty/absurdly long strings
 // without being as strict as CUID/UUID validation (allows test IDs)
 const isReasonableId = (id: string) =>
@@ -21,12 +24,33 @@ const isReasonableId = (id: string) =>
   /^[\w-]+$/.test(id);
 
 export type ListingStatus = "ACTIVE" | "PAUSED" | "RENTED";
+export type HostManagedRecoveryMode = "RECONFIRM" | "REOPEN";
 
 const statusSchema = z.enum(["ACTIVE", "PAUSED", "RENTED"]);
+const versionSchema = z.number().int().min(0);
+const recoveryModeSchema = z.enum(["RECONFIRM", "REOPEN"]);
+type LockedListingRow = {
+  id: string;
+  ownerId: string;
+  version: number;
+  status: ListingStatus;
+  statusReason: string | null;
+  openSlots: number;
+  availableSlots: number;
+  totalSlots: number;
+  moveInDate: Date | null;
+  availableUntil: Date | null;
+  minStayMonths: number | null;
+  lastConfirmedAt: Date | null;
+  freshnessReminderSentAt: Date | null;
+  freshnessWarningSentAt: Date | null;
+  autoPausedAt: Date | null;
+};
 
 export async function updateListingStatus(
   listingId: string,
-  status: ListingStatus
+  status: ListingStatus,
+  expectedVersion: number
 ) {
   // Validate listingId format to avoid unnecessary DB round-trips
   if (!isReasonableId(listingId)) {
@@ -37,6 +61,9 @@ export async function updateListingStatus(
   const parsed = statusSchema.safeParse(status);
   if (!parsed.success) {
     return { error: "Invalid status value" };
+  }
+  if (!versionSchema.safeParse(expectedVersion).success) {
+    return { error: "Invalid listing version", code: "INVALID_VERSION" };
   }
 
   const session = await auth();
@@ -53,8 +80,24 @@ export async function updateListingStatus(
     const result = await prisma.$transaction(
       async (tx) => {
         // Lock listing row to prevent concurrent modifications
-        const rows = await tx.$queryRaw<{ ownerId: string }[]>`
-        SELECT "ownerId" FROM "Listing"
+        const rows = await tx.$queryRaw<LockedListingRow[]>`
+        SELECT
+          "id",
+          "ownerId",
+          "version",
+          "status",
+          "statusReason",
+          "openSlots",
+          "availableSlots",
+          "totalSlots",
+          "moveInDate",
+          "availableUntil",
+          "minStayMonths",
+          "lastConfirmedAt",
+          "freshnessReminderSentAt",
+          "freshnessWarningSentAt",
+          "autoPausedAt"
+        FROM "Listing"
         WHERE id = ${listingId}
         FOR UPDATE
       `;
@@ -67,27 +110,43 @@ export async function updateListingStatus(
           return { error: "You can only update your own listings" } as const;
         }
 
-        if (status === "PAUSED") {
-          const activeBookings = await tx.booking.count({
-            where: {
-              listingId,
-              status: { in: ["ACCEPTED", "PENDING", "HELD"] },
-            },
-          });
-          if (activeBookings > 0) {
-            return {
-              error:
-                "Cannot pause a listing with active, pending, or held bookings. Please resolve them first.",
-            } as const;
-          }
+        const currentListing = rows[0];
+        const writeLock = features.moderationWriteLocks
+          ? getModerationWriteLockResult({
+              actor: "host",
+              statusReason: currentListing.statusReason,
+            })
+          : null;
+
+        if (writeLock) {
+          return {
+            error: writeLock.error,
+            code: writeLock.code,
+            lockReason: writeLock.lockReason,
+          } as const;
+        }
+
+        if (currentListing.version !== expectedVersion) {
+          return {
+            error:
+              "This listing changed while you were editing it. Refresh and try again.",
+            code: "VERSION_CONFLICT",
+          } as const;
         }
 
         await tx.listing.update({
           where: { id: listingId },
-          data: { status },
+          data: { status, version: currentListing.version + 1 },
         });
 
-        return { success: true } as const;
+        await markListingDirtyInTx(tx, listingId, "status_changed");
+
+        return {
+          success: true,
+          status,
+          version: currentListing.version + 1,
+          statusReason: currentListing.statusReason ?? null,
+        } as const;
       },
       { timeout: 10000 }
     );
@@ -96,21 +155,16 @@ export async function updateListingStatus(
       return result;
     }
 
-    // Side effects OUTSIDE transaction (no locks held)
-    markListingDirty(listingId, "status_changed").catch((err) => {
-      logger.sync.warn("markListingDirty failed", {
-        action: "updateListingStatus",
-        listingId,
-        reason: "status_changed",
-        error: err instanceof Error ? err.message : String(err),
-      });
-    });
-
     revalidatePath(`/listings/${listingId}`);
     revalidatePath("/profile");
     revalidatePath("/search");
 
-    return { success: true };
+    return {
+      success: true,
+      status: result.status,
+      statusReason: result.statusReason,
+      version: result.version,
+    };
   } catch (error) {
     logger.sync.error("Failed to update listing status", {
       action: "updateListingStatus",
@@ -119,6 +173,192 @@ export async function updateListingStatus(
       error: error instanceof Error ? error.message : "Unknown error",
     });
     return { error: "Failed to update listing status" };
+  }
+}
+
+export async function reviewListingMigration(
+  listingId: string,
+  expectedVersion: number
+) {
+  if (!isReasonableId(listingId)) {
+    return { error: "Invalid listing ID format" };
+  }
+
+  if (!versionSchema.safeParse(expectedVersion).success) {
+    return { error: "Invalid listing version", code: "INVALID_VERSION" };
+  }
+
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { error: "Unauthorized" };
+  }
+
+  const suspension = await checkSuspension();
+  if (suspension.suspended) {
+    return { error: suspension.error || "Account suspended" };
+  }
+
+  void listingId;
+  void expectedVersion;
+  return {
+    error: "Listing migration review was retired with the contact-first cutover.",
+    code: "MIGRATION_REVIEW_RETIRED",
+  };
+}
+
+export async function recoverHostManagedListing(
+  listingId: string,
+  expectedVersion: number,
+  mode: HostManagedRecoveryMode
+) {
+  if (!isReasonableId(listingId)) {
+    return { error: "Invalid listing ID format" };
+  }
+
+  if (!versionSchema.safeParse(expectedVersion).success) {
+    return { error: "Invalid listing version", code: "INVALID_VERSION" };
+  }
+
+  if (!recoveryModeSchema.safeParse(mode).success) {
+    return { error: "Invalid recovery mode" };
+  }
+
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { error: "Unauthorized" };
+  }
+
+  const suspension = await checkSuspension();
+  if (suspension.suspended) {
+    return { error: suspension.error || "Account suspended" };
+  }
+
+  try {
+    const result = await prisma.$transaction(
+      async (tx) => {
+        const rows = await tx.$queryRaw<LockedListingRow[]>`
+        SELECT
+          "id",
+          "ownerId",
+          "version",
+          "status",
+          "statusReason",
+          "openSlots",
+          "availableSlots",
+          "totalSlots",
+          "moveInDate",
+          "availableUntil",
+          "minStayMonths",
+          "lastConfirmedAt",
+          "freshnessReminderSentAt",
+          "freshnessWarningSentAt",
+          "autoPausedAt"
+        FROM "Listing"
+        WHERE id = ${listingId}
+        FOR UPDATE
+      `;
+
+        if (rows.length === 0) {
+          return { error: "Listing not found" } as const;
+        }
+
+        if (rows[0].ownerId !== session.user.id) {
+          return { error: "You can only update your own listings" } as const;
+        }
+
+        const currentListing = rows[0];
+        const writeLock = features.moderationWriteLocks
+          ? getModerationWriteLockResult({
+              actor: "host",
+              statusReason: currentListing.statusReason,
+            })
+          : null;
+
+        if (writeLock) {
+          return {
+            error: writeLock.error,
+            code: writeLock.code,
+            lockReason: writeLock.lockReason,
+          } as const;
+        }
+
+        if (currentListing.version !== expectedVersion) {
+          return {
+            error:
+              "This listing changed while you were editing it. Refresh and try again.",
+            code: "VERSION_CONFLICT",
+          } as const;
+        }
+
+        const nextStatus = mode === "REOPEN" ? "ACTIVE" : currentListing.status;
+        const nextStatusReason =
+          currentListing.statusReason === "STALE_AUTO_PAUSE" ||
+          currentListing.statusReason === "FRESHNESS_WARNING"
+            ? null
+            : currentListing.statusReason;
+        const nextVersion = currentListing.version + 1;
+
+        if (nextStatus === "ACTIVE" && (currentListing.openSlots ?? 0) <= 0) {
+          return {
+            error: "Active host-managed listings require at least one open slot.",
+            code: "HOST_MANAGED_ACTIVE_REQUIRES_OPEN_SLOTS",
+          } as const;
+        }
+
+        await tx.listing.update({
+          where: { id: listingId },
+          data: {
+            status: nextStatus,
+            statusReason: nextStatusReason,
+            version: nextVersion,
+            lastConfirmedAt: new Date(),
+            freshnessReminderSentAt: null,
+            freshnessWarningSentAt: null,
+            autoPausedAt: null,
+          },
+        });
+
+        await markListingDirtyInTx(tx, listingId, "status_changed");
+
+        return {
+          success: true,
+          status: nextStatus,
+          statusReason: nextStatusReason,
+          version: nextVersion,
+        } as const;
+      },
+      { timeout: 10000 }
+    );
+
+    if ("error" in result) {
+      return result;
+    }
+
+    recordFreshnessRecovered({
+      listingId,
+      ownerId: session.user.id,
+      mode,
+    });
+
+    revalidatePath(`/listings/${listingId}`);
+    revalidatePath(`/listings/${listingId}/edit`);
+    revalidatePath("/profile");
+    revalidatePath("/search");
+
+    return {
+      success: true,
+      status: result.status,
+      statusReason: result.statusReason,
+      version: result.version,
+    };
+  } catch (error) {
+    logger.sync.error("Failed to recover host-managed listing", {
+      action: "recoverHostManagedListing",
+      listingId,
+      mode,
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+    return { error: "Failed to recover listing availability" };
   }
 }
 
@@ -148,18 +388,12 @@ export async function incrementViewCount(listingId: string) {
   }
 
   try {
-    await prisma.listing.update({
-      where: { id: listingId },
-      data: { viewCount: { increment: 1 } },
-    });
-    // Fire-and-forget: mark listing dirty for search doc refresh
-    markListingDirty(listingId, "view_count").catch((err) => {
-      logger.sync.warn("markListingDirty failed", {
-        action: "incrementViewCount",
-        listingId,
-        reason: "view_count",
-        error: err instanceof Error ? err.message : String(err),
+    await prisma.$transaction(async (tx) => {
+      await tx.listing.update({
+        where: { id: listingId },
+        data: { viewCount: { increment: 1 } },
       });
+      await markListingDirtyInTx(tx, listingId, "view_count");
     });
     return { success: true };
   } catch (error) {

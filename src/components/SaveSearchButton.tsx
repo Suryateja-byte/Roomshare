@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { saveSearch } from "@/app/actions/saved-search";
 import {
   normalizeSearchFilters,
   searchParamsToSearchFilters,
   type SearchFilters,
 } from "@/lib/search-utils";
+import { redirectToUrl } from "@/lib/client-redirect";
 import { Bookmark, Loader2, X, Bell, BellOff } from "lucide-react";
 import { toast } from "sonner";
-import { useSearchParams } from "next/navigation";
 import { FocusTrap } from "@/components/ui/FocusTrap";
 
 interface SaveSearchButtonProps {
@@ -21,11 +22,14 @@ type AlertFrequency = "INSTANT" | "DAILY" | "WEEKLY";
 export default function SaveSearchButton({
   className = "",
 }: SaveSearchButtonProps) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState("");
   const [alertEnabled, setAlertEnabled] = useState(true);
   const [alertFrequency, setAlertFrequency] = useState<AlertFrequency>("DAILY");
   const [isLoading, setIsLoading] = useState(false);
+  const [isOpeningCheckout, setIsOpeningCheckout] = useState(false);
+  const [lockedSearchId, setLockedSearchId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const searchParams = useSearchParams();
   const triggerButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -84,7 +88,49 @@ export default function SaveSearchButton({
   const handleOpen = () => {
     setName(generateDefaultName());
     setError(null);
+    setLockedSearchId(null);
+    setIsOpeningCheckout(false);
     setIsOpen(true);
+  };
+
+  const handleUnlockAlerts = async () => {
+    if (isOpeningCheckout) {
+      return;
+    }
+
+    setIsOpeningCheckout(true);
+    try {
+      const response = await fetch("/api/payments/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          purchaseContext: "SEARCH_ALERTS",
+          productCode: "MOVERS_PASS_30D",
+        }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as
+        | { error?: string; checkoutUrl?: string }
+        | null;
+
+      if (response.status === 401) {
+        router.push("/login");
+        return;
+      }
+
+      if (!response.ok || !payload?.checkoutUrl) {
+        setError(payload?.error || "Failed to open checkout");
+        return;
+      }
+
+      redirectToUrl(payload.checkoutUrl);
+    } catch (_error) {
+      setError("Failed to open checkout");
+    } finally {
+      setIsOpeningCheckout(false);
+    }
   };
 
   const handleSave = async () => {
@@ -107,8 +153,14 @@ export default function SaveSearchButton({
       if ("error" in result) {
         setError(result.error ?? "Failed to save search");
       } else {
-        setIsOpen(false);
-        toast.success("Search saved successfully!");
+        if (result.effectiveAlertState === "LOCKED" && alertEnabled) {
+          setLockedSearchId(result.searchId);
+          toast.success("Search saved. Unlock alerts to start notifications.");
+        } else {
+          setIsOpen(false);
+          setLockedSearchId(null);
+          toast.success("Search saved successfully!");
+        }
       }
     } catch (_err) {
       setError("Something went wrong");
@@ -178,6 +230,7 @@ export default function SaveSearchButton({
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
+                    disabled={lockedSearchId !== null}
                     placeholder="e.g., Downtown apartments under $1500"
                     className="w-full px-4 py-2.5 border border-outline-variant/20 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
                     aria-describedby={error ? "save-search-error" : undefined}
@@ -206,6 +259,7 @@ export default function SaveSearchButton({
                     <button
                       type="button"
                       onClick={() => setAlertEnabled(!alertEnabled)}
+                      disabled={lockedSearchId !== null}
                       role="switch"
                       aria-checked={alertEnabled}
                       aria-label="Email alerts"
@@ -237,6 +291,7 @@ export default function SaveSearchButton({
                               key={freq}
                               type="button"
                               onClick={() => setAlertFrequency(freq)}
+                              disabled={lockedSearchId !== null}
                               className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                                 alertFrequency === freq
                                   ? "bg-primary text-on-primary"
@@ -273,17 +328,34 @@ export default function SaveSearchButton({
                   </p>
                 )}
 
+                {lockedSearchId && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                    <p className="font-medium text-amber-900">
+                      Search saved. Alerts are locked until you unlock
+                      Mover&apos;s Pass.
+                    </p>
+                    <p className="mt-1">
+                      Your preferences are saved, and alerts will start after
+                      checkout completes.
+                    </p>
+                  </div>
+                )}
+
                 {/* Actions */}
                 <div className="flex gap-3 pt-2">
                   <button
                     onClick={() => setIsOpen(false)}
                     className="flex-1 px-4 py-2.5 border border-outline-variant/20 rounded-lg font-medium text-on-surface-variant hover:bg-surface-canvas transition-colors"
                   >
-                    Cancel
+                    {lockedSearchId ? "Close" : "Cancel"}
                   </button>
                   <button
-                    onClick={handleSave}
-                    disabled={isLoading}
+                    onClick={
+                      lockedSearchId
+                        ? () => void handleUnlockAlerts()
+                        : handleSave
+                    }
+                    disabled={isLoading || isOpeningCheckout}
                     className="flex-1 px-4 py-2.5 bg-primary text-on-primary rounded-lg font-medium hover:bg-primary/90 disabled:opacity-60 transition-colors flex items-center justify-center gap-2"
                   >
                     {isLoading ? (
@@ -291,6 +363,13 @@ export default function SaveSearchButton({
                         <Loader2 className="w-4 h-4 animate-spin" />
                         Saving...
                       </>
+                    ) : isOpeningCheckout ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Opening...
+                      </>
+                    ) : lockedSearchId ? (
+                      "Unlock Alerts"
                     ) : (
                       "Save Search"
                     )}

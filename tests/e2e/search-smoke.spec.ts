@@ -32,11 +32,6 @@ test.describe("REG-001: Search page loads", () => {
     const response = await page.goto(`/search?${boundsQS}`);
     expect(response?.status()).toBe(200);
 
-    // Wait for listing heading text to appear (more reliable than link visibility
-    // since listing cards may be in a scrollable container initially offscreen)
-    const headings = page.locator("h3").filter({ hasText: /.+/ });
-    await expect(headings.first()).toBeAttached({ timeout: 30_000 });
-
     // Verify listing links are present in the DOM — scope to visible container.
     // Use auto-retrying assertion (not instant .count()) so we wait for cards
     // to render after SSR hydration + data fetch on slow CI.

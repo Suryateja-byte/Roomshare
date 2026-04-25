@@ -77,6 +77,12 @@ jest.mock("@/components/chat/BlockedConversationBanner", () => ({
   default: () => <div data-testid="blocked-banner">blocked</div>,
 }));
 
+jest.mock("@/components/PrivateFeedbackDialog", () => ({
+  __esModule: true,
+  default: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="private-feedback-dialog">dialog</div> : null,
+}));
+
 jest.mock("@/components/CharacterCounter", () => ({
   __esModule: true,
   default: ({ current, max }: { current: number; max: number }) => (
@@ -240,10 +246,14 @@ describe("Route ChatWindow", () => {
 
     render(
       <ChatWindow
+        canLeavePrivateFeedback={false}
         initialMessages={[]}
         conversationId="conv-123"
         currentUserId="user-123"
         currentUserName="Current User"
+        listingId="listing-1"
+        listingOwnerId="owner-1"
+        listingTitle="Listing One"
         otherUserId="other-user"
         otherUserName="Other User"
         otherUserImage={null}
@@ -298,10 +308,14 @@ describe("Route ChatWindow", () => {
 
     render(
       <ChatWindow
+        canLeavePrivateFeedback={false}
         initialMessages={[]}
         conversationId="conv-123"
         currentUserId="user-123"
         currentUserName="Current User"
+        listingId="listing-1"
+        listingOwnerId="owner-1"
+        listingTitle="Listing One"
         otherUserId="other-user"
         otherUserName="Other User"
         otherUserImage={null}
@@ -373,10 +387,14 @@ describe("Route ChatWindow", () => {
 
     const { unmount } = render(
       <ChatWindow
+        canLeavePrivateFeedback={false}
         initialMessages={[]}
         conversationId="conv-123"
         currentUserId="user-123"
         currentUserName="Current User"
+        listingId="listing-1"
+        listingOwnerId="owner-1"
+        listingTitle="Listing One"
         otherUserId="other-user"
         otherUserName="Other User"
         otherUserImage={null}
@@ -415,10 +433,14 @@ describe("Route ChatWindow", () => {
 
     render(
       <ChatWindow
+        canLeavePrivateFeedback={false}
         initialMessages={[]}
         conversationId="conv-123"
         currentUserId="user-123"
         currentUserName="Current User"
+        listingId="listing-1"
+        listingOwnerId="owner-1"
+        listingTitle="Listing One"
         otherUserId="other-user"
         otherUserName="Other User"
         otherUserImage={null}
