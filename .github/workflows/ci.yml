@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
       - uses: actions/setup-node@v6
@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
       - uses: actions/setup-node@v6
@@ -66,7 +66,7 @@ jobs:
       - name: Install pgvector extension in PostgreSQL
         run: |
           bash .github/scripts/install-pgvector.sh
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
       - uses: actions/setup-node@v6
@@ -89,7 +89,7 @@ jobs:
       NODE_OPTIONS: '--experimental-vm-modules --max-old-space-size=8192'
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
       - uses: actions/setup-node@v6
@@ -113,7 +113,7 @@ jobs:
       NODE_OPTIONS: '--experimental-vm-modules --max-old-space-size=4096'
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
       - uses: actions/setup-node@v6
@@ -131,7 +131,7 @@ jobs:
       NODE_OPTIONS: '--experimental-vm-modules --max-old-space-size=8192'
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
       - uses: actions/setup-node@v6
@@ -154,7 +154,7 @@ jobs:
       NODE_OPTIONS: '--experimental-vm-modules --max-old-space-size=4096'
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
       - uses: actions/setup-node@v6
@@ -179,7 +179,7 @@ jobs:
       NODE_OPTIONS: '--experimental-vm-modules --max-old-space-size=4096'
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
       - uses: actions/setup-node@v6
@@ -200,7 +200,7 @@ jobs:
       NODE_OPTIONS: '--experimental-vm-modules --max-old-space-size=4096'
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
       - uses: actions/setup-node@v6
@@ -216,7 +216,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
       - uses: actions/setup-node@v6
@@ -235,7 +235,7 @@ jobs:
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
       - uses: actions/setup-node@v6
