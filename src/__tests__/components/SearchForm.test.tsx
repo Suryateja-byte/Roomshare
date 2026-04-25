@@ -321,6 +321,113 @@ describe("SearchForm", () => {
       expect(pushCall).toContain("maxLng=");
     });
 
+    it("normalizes inverted homepage budget values on submit", () => {
+      render(<SearchForm variant="home" />);
+
+      fireEvent.change(screen.getByLabelText(/minimum budget/i), {
+        target: { value: "1500" },
+      });
+      fireEvent.change(screen.getByLabelText(/maximum budget/i), {
+        target: { value: "900" },
+      });
+      fireEvent.submit(screen.getByRole("search"));
+      jest.advanceTimersByTime(500);
+
+      const pushCall = mockPush.mock.calls[0]?.[0] ?? "";
+      expect(pushCall).toContain("/search?");
+      expect(pushCall).toContain("minPrice=900");
+      expect(pushCall).toContain("maxPrice=1500");
+    });
+
+    it("drops invalid homepage budget values and clamps negatives", () => {
+      render(<SearchForm variant="home" />);
+
+      fireEvent.change(screen.getByLabelText(/minimum budget/i), {
+        target: { value: "-50" },
+      });
+      fireEvent.change(screen.getByLabelText(/maximum budget/i), {
+        target: { value: "abc" },
+      });
+      fireEvent.submit(screen.getByRole("search"));
+      jest.advanceTimersByTime(500);
+
+      const pushCall = mockPush.mock.calls[0]?.[0] ?? "";
+      expect(pushCall).toContain("minPrice=0");
+      expect(pushCall).not.toContain("maxPrice=NaN");
+      expect(pushCall).not.toContain("maxPrice=abc");
+    });
+
+    it("applies drawer filters from the home variant into the search URL", async () => {
+      render(<SearchForm variant="home" />);
+
+      await user.click(screen.getByRole("button", { name: /filters/i }));
+      fireEvent.change(screen.getByPlaceholderText("Select move-in date"), {
+        target: { value: "2026-06-01" },
+      });
+      await user.click(screen.getByRole("button", { name: "Wifi" }));
+      fireEvent.click(screen.getByTestId("filter-modal-apply"));
+
+      const pushCall = mockPush.mock.calls[0]?.[0] ?? "";
+      expect(pushCall).toContain("moveInDate=2026-06-01");
+      expect(pushCall).toContain("amenities=Wifi");
+    });
+
+    it("keeps pending homepage budget values when applying drawer filters", async () => {
+      render(<SearchForm variant="home" />);
+
+      await user.type(screen.getByLabelText(/minimum budget/i), "900");
+      await user.type(screen.getByLabelText(/maximum budget/i), "1500");
+      await user.click(screen.getByRole("button", { name: /filters/i }));
+      await user.click(screen.getByRole("button", { name: "Wifi" }));
+      fireEvent.click(screen.getByTestId("filter-modal-apply"));
+
+      const pushCall = mockPush.mock.calls[0]?.[0] ?? "";
+      expect(pushCall).toContain("minPrice=900");
+      expect(pushCall).toContain("maxPrice=1500");
+      expect(pushCall).toContain("amenities=Wifi");
+    });
+
+    it("submits selected homepage location with pending budget and drawer filters", async () => {
+      render(<SearchForm variant="home" />);
+
+      await user.type(screen.getByLabelText(/minimum budget/i), "900");
+      await user.type(screen.getByLabelText(/maximum budget/i), "1500");
+      await user.click(screen.getByRole("button", { name: /filters/i }));
+      await user.click(screen.getByRole("button", { name: "Wifi" }));
+      await user.click(screen.getByRole("button", { name: /close filters/i }));
+      await user.type(screen.getByTestId("location-input"), "San Francisco");
+      await user.click(screen.getByTestId("select-location"));
+      jest.advanceTimersByTime(500);
+
+      const pushCall = mockPush.mock.calls[0]?.[0] ?? "";
+      expect(pushCall).toContain("locationLabel=San+Francisco");
+      expect(pushCall).toContain("lat=37.7749");
+      expect(pushCall).toContain("lng=-122.4194");
+      expect(pushCall).toContain("minPrice=900");
+      expect(pushCall).toContain("maxPrice=1500");
+      expect(pushCall).toContain("amenities=Wifi");
+    });
+
+    it("clears home filters without leaving stale filter params", async () => {
+      mockSearchParams.set("minPrice", "900");
+      mockSearchParams.set("maxPrice", "1500");
+      mockSearchParams.set("amenities", "Wifi");
+      mockSearchParams.set("lat", "37.7749");
+      mockSearchParams.set("lng", "-122.4194");
+      render(<SearchForm variant="home" />);
+
+      await user.click(screen.getByRole("button", { name: /filters/i }));
+      fireEvent.click(screen.getByTestId("filter-modal-clear-all"));
+
+      const pushCall = mockPush.mock.calls[0]?.[0] ?? "";
+      expect(pushCall).toContain("/search?");
+      expect(pushCall).toContain("lat=37.7749");
+      expect(pushCall).toContain("lng=-122.4194");
+      expect(pushCall).not.toContain("minPrice");
+      expect(pushCall).not.toContain("maxPrice");
+      expect(pushCall).not.toContain("amenities");
+    });
+
     it("shows the location warning when text is entered without a selection", async () => {
       render(<SearchForm variant="home" />);
 

@@ -1,151 +1,123 @@
+import Image from "next/image";
 import Link from "next/link";
 import FooterNavLink from "./FooterNavLink";
 import ComingSoonButton from "./ComingSoonButton";
 
+const columns = [
+  {
+    label: "Platform",
+    items: [
+      { label: "Browse", href: "/search" },
+      { label: "List a Room", href: "/listings/create" },
+      { label: "Matching" },
+      { label: "Cities" },
+    ],
+  },
+  {
+    label: "Company",
+    items: [
+      { label: "About", href: "/about" },
+      { label: "Careers" },
+      { label: "Blog" },
+      { label: "Press" },
+    ],
+  },
+  {
+    label: "Support",
+    items: [
+      { label: "Safety" },
+      { label: "Help Center" },
+      { label: "Contact" },
+      { label: "Community" },
+    ],
+  },
+  {
+    label: "Legal",
+    items: [
+      { label: "Privacy" },
+      { label: "Terms" },
+      { label: "Accessibility" },
+      { label: "Fair housing" },
+    ],
+  },
+];
+
 export default function Footer() {
   return (
-    <footer className="bg-surface-container-high pt-12 md:pt-24 pb-[calc(6rem+env(safe-area-inset-bottom,0px))] sm:pb-16 md:pb-12 overflow-hidden">
-      <div className="max-w-7xl mx-auto px-6 sm:px-8">
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-8 md:gap-16 mb-12 md:mb-20">
-          {/* Brand Section */}
-          <div className="col-span-2 md:col-span-2">
+    <footer className="overflow-hidden bg-surface-container-high pb-[calc(6rem+env(safe-area-inset-bottom,0px))] pt-14 sm:pb-16 md:pb-12 md:pt-20">
+      <div className="container">
+        <div className="grid gap-10 pb-12 sm:grid-cols-2 md:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))] md:gap-12 md:pb-16">
+          <div className="sm:col-span-2 md:col-span-1">
             <Link
               href="/"
-              className="inline-flex items-center gap-2.5 mb-6 group"
+              className="mb-6 inline-flex items-center"
+              aria-label="RoomShare home"
             >
-              <div className="w-8 h-8 bg-on-surface rounded-lg flex items-center justify-center text-surface-container-lowest font-bold text-lg group-hover:scale-110 transition-transform shadow-ambient shadow-on-surface/10">
-                R
-              </div>
-              <span className="font-display font-semibold text-lg tracking-[-0.03em] text-on-surface">
-                RoomShare
-                <span className="text-primary">.</span>
-              </span>
+              <Image
+                src="/images/home/rs-logo.svg?v=2"
+                alt=""
+                width={138}
+                height={30}
+                className="h-8 w-auto"
+              />
             </Link>
-            <p className="text-on-surface-variant text-sm font-light leading-relaxed max-w-xs">
+            <span className="block font-display text-xl font-semibold tracking-tight text-on-surface">
+              RoomShare
+            </span>
+            <p className="mt-4 max-w-xs text-sm leading-relaxed text-on-surface-variant">
               Find your people, not just a place.
             </p>
+            <p className="mt-3 max-w-xs text-sm leading-relaxed text-on-surface-variant">
+              A slow, warm, verified way to find a home with people you will
+              actually live with.
+            </p>
+            <div className="mt-7 flex gap-2">
+              {["Instagram", "LinkedIn", "Substack"].map((label) => (
+                <ComingSoonButton
+                  key={label}
+                  aria-label={`${label} (coming soon)`}
+                  className="grid h-10 w-10 place-items-center rounded-full bg-surface-container-lowest text-xs font-bold uppercase tracking-[0.08em] text-on-surface shadow-ambient-sm transition-colors hover:text-primary"
+                >
+                  {label.slice(0, 1)}
+                </ComingSoonButton>
+              ))}
+            </div>
           </div>
 
-          {/* Platform Links */}
-          <nav aria-label="Platform">
-            <h2 className="font-body uppercase tracking-[0.1em] text-sm text-on-surface-variant mb-6">
-              Platform
-            </h2>
-            <ul className="flex flex-col gap-3 text-sm text-on-surface-variant font-light">
-              <li>
-                <FooterNavLink
-                  href="/search"
-                  className="hover:text-primary transition-colors min-h-[44px] inline-flex items-center"
-                >
-                  Browse
-                </FooterNavLink>
-              </li>
-              <li>
-                <FooterNavLink
-                  href="/listings/create"
-                  className="hover:text-primary transition-colors min-h-[44px] inline-flex items-center"
-                >
-                  List a Room
-                </FooterNavLink>
-              </li>
-              <li>
-                <ComingSoonButton className="hover:text-on-surface transition-colors text-left min-h-[44px] inline-flex items-center">
-                  Safety
-                </ComingSoonButton>
-              </li>
-            </ul>
-          </nav>
-
-          {/* Company Links */}
-          <nav aria-label="Company">
-            <h2 className="font-body uppercase tracking-[0.1em] text-sm text-on-surface-variant mb-6">
-              Company
-            </h2>
-            <ul className="flex flex-col gap-3 text-sm text-on-surface-variant font-light">
-              <li>
-                <FooterNavLink
-                  href="/about"
-                  className="hover:text-primary transition-colors min-h-[44px] inline-flex items-center"
-                >
-                  About
-                </FooterNavLink>
-              </li>
-              <li>
-                <ComingSoonButton className="hover:text-on-surface transition-colors text-left min-h-[44px] inline-flex items-center">
-                  Careers
-                </ComingSoonButton>
-              </li>
-              <li>
-                <ComingSoonButton className="hover:text-on-surface transition-colors text-left min-h-[44px] inline-flex items-center">
-                  Blog
-                </ComingSoonButton>
-              </li>
-            </ul>
-          </nav>
-
-          {/* Support — no real links, only placeholders */}
-          <nav aria-label="Support">
-            <h2 className="font-body uppercase tracking-[0.1em] text-sm text-on-surface-variant mb-6">
-              Support
-            </h2>
-            <ul className="flex flex-col gap-3 text-sm text-on-surface-variant font-light">
-              <li>
-                <ComingSoonButton className="hover:text-on-surface transition-colors text-left min-h-[44px] inline-flex items-center">
-                  Help Center
-                </ComingSoonButton>
-              </li>
-              <li>
-                <ComingSoonButton className="hover:text-on-surface transition-colors text-left min-h-[44px] inline-flex items-center">
-                  Contact
-                </ComingSoonButton>
-              </li>
-            </ul>
-          </nav>
-
-          {/* Legal — no real links, only placeholders */}
-          <nav aria-label="Legal">
-            <h2 className="font-body uppercase tracking-[0.1em] text-sm text-on-surface-variant mb-6">
-              Legal
-            </h2>
-            <ul className="flex flex-col gap-3 text-sm text-on-surface-variant font-light">
-              <li>
-                <ComingSoonButton className="hover:text-on-surface transition-colors text-left min-h-[44px] inline-flex items-center">
-                  Privacy
-                </ComingSoonButton>
-              </li>
-              <li>
-                <ComingSoonButton className="hover:text-on-surface transition-colors text-left min-h-[44px] inline-flex items-center">
-                  Terms
-                </ComingSoonButton>
-              </li>
-            </ul>
-          </nav>
+          {columns.map((column) => (
+            <nav key={column.label} aria-label={column.label}>
+              <h2 className="mb-5 font-body text-sm uppercase tracking-[0.12em] text-on-surface-variant">
+                {column.label}
+              </h2>
+              <ul className="flex list-none flex-col gap-2 p-0 text-sm text-on-surface-variant">
+                {column.items.map((item) => (
+                  <li key={item.label}>
+                    {item.href ? (
+                      <FooterNavLink
+                        href={item.href}
+                        className="inline-flex min-h-[44px] items-center transition-colors hover:text-primary"
+                      >
+                        {item.label}
+                      </FooterNavLink>
+                    ) : (
+                      <ComingSoonButton className="inline-flex min-h-[44px] items-center text-left transition-colors hover:text-on-surface">
+                        {item.label}
+                      </ComingSoonButton>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          ))}
         </div>
 
-        {/* Bottom Bar */}
-        <div className="pt-6 md:pt-10 flex flex-col sm:flex-row items-center justify-between gap-6">
-          <p className="text-xs font-bold text-on-surface-variant uppercase tracking-[0.2em] order-2 sm:order-1">
-            © {new Date().getFullYear()} RoomShare Inc.
-          </p>
-          <div className="flex items-center gap-6 sm:gap-8 order-1 sm:order-2">
-            <ComingSoonButton
-              aria-label="Instagram (coming soon)"
-              className="text-xs font-bold text-on-surface-variant hover:text-on-surface uppercase tracking-[0.2em] transition-colors min-h-[44px] inline-flex items-center"
-            >
-              Instagram
-            </ComingSoonButton>
-            <ComingSoonButton
-              aria-label="X, formerly Twitter (coming soon)"
-              className="text-xs font-bold text-on-surface-variant hover:text-on-surface uppercase tracking-[0.2em] transition-colors min-h-[44px] inline-flex items-center"
-            >
-              X
-            </ComingSoonButton>
-            <ComingSoonButton
-              aria-label="LinkedIn (coming soon)"
-              className="text-xs font-bold text-on-surface-variant hover:text-on-surface uppercase tracking-[0.2em] transition-colors min-h-[44px] inline-flex items-center"
-            >
-              LinkedIn
-            </ComingSoonButton>
+        <div className="pt-8">
+          <div className="font-display text-[clamp(5rem,19vw,16rem)] leading-[0.84] tracking-[-0.04em] text-on-surface">
+            Roomshare<span className="italic text-primary">.</span>
+          </div>
+          <div className="mt-6 flex flex-col gap-3 border-t border-on-surface/10 pt-6 text-xs font-semibold uppercase tracking-[0.16em] text-on-surface-variant sm:flex-row sm:items-center sm:justify-between">
+            <p>© {new Date().getFullYear()} RoomShare Inc.</p>
+            <p>ISSN 2026-0417</p>
           </div>
         </div>
       </div>

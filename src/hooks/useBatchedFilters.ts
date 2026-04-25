@@ -20,6 +20,7 @@ import {
   applySearchQueryChange,
   buildCanonicalSearchUrl,
   normalizeSearchQuery,
+  type NormalizedSearchQuery,
 } from "@/lib/search/search-query";
 
 /**
@@ -224,6 +225,87 @@ function filtersEqual(a: BatchedFilterValues, b: BatchedFilterValues): boolean {
   );
 }
 
+function parseBudgetValue(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed)) return undefined;
+  return Math.max(0, parsed);
+}
+
+function formatBudgetValue(value: number | undefined): string {
+  if (value === undefined) return "";
+  return Number.isInteger(value) ? String(value) : String(value);
+}
+
+export function sanitizePendingFilters(
+  pending: BatchedFilterValues
+): BatchedFilterValues {
+  let nextMinPrice = parseBudgetValue(pending.minPrice);
+  let nextMaxPrice = parseBudgetValue(pending.maxPrice);
+
+  if (
+    nextMinPrice !== undefined &&
+    nextMaxPrice !== undefined &&
+    nextMinPrice > nextMaxPrice
+  ) {
+    [nextMinPrice, nextMaxPrice] = [nextMaxPrice, nextMinPrice];
+  }
+
+  const { moveInDate, endDate } = normalizeCommittedDateRange(
+    pending.moveInDate,
+    pending.endDate
+  );
+
+  return {
+    ...pending,
+    minPrice: formatBudgetValue(nextMinPrice),
+    maxPrice: formatBudgetValue(nextMaxPrice),
+    moveInDate,
+    endDate,
+  };
+}
+
+export function buildSearchFilterPatchFromPending(
+  pending: BatchedFilterValues
+): Partial<NormalizedSearchQuery> {
+  const sanitizedPending = sanitizePendingFilters(pending);
+  const parsedMinSlots = sanitizedPending.minSlots
+    ? Number.parseInt(sanitizedPending.minSlots, 10)
+    : NaN;
+
+  return {
+    minPrice: sanitizedPending.minPrice
+      ? Number(sanitizedPending.minPrice)
+      : undefined,
+    maxPrice: sanitizedPending.maxPrice
+      ? Number(sanitizedPending.maxPrice)
+      : undefined,
+    roomType: sanitizedPending.roomType || undefined,
+    leaseDuration: sanitizedPending.leaseDuration || undefined,
+    moveInDate: sanitizedPending.moveInDate || undefined,
+    endDate: sanitizedPending.endDate || undefined,
+    amenities:
+      sanitizedPending.amenities.length > 0
+        ? sanitizedPending.amenities
+        : undefined,
+    houseRules:
+      sanitizedPending.houseRules.length > 0
+        ? sanitizedPending.houseRules
+        : undefined,
+    languages:
+      sanitizedPending.languages.length > 0
+        ? sanitizedPending.languages
+        : undefined,
+    genderPreference: sanitizedPending.genderPreference || undefined,
+    householdGender: sanitizedPending.householdGender || undefined,
+    minSlots:
+      Number.isFinite(parsedMinSlots) && parsedMinSlots >= 2
+        ? parsedMinSlots
+        : undefined,
+  };
+}
+
 // --- Hook ---
 
 export interface UseBatchedFiltersReturn {
@@ -406,25 +488,9 @@ export function useBatchedFilters(
     forceSyncUntilRef.current = Date.now() + FORCE_SYNC_WINDOW_MS;
     const basePending = pendingRef.current;
     const nextPending = overrides ? { ...basePending, ...overrides } : basePending;
-    const nextMinPrice = nextPending.minPrice
-      ? Number.parseFloat(nextPending.minPrice)
-      : undefined;
-    const nextMaxPrice = nextPending.maxPrice
-      ? Number.parseFloat(nextPending.maxPrice)
-      : undefined;
-    const { endDate: nextEndDate } = normalizeCommittedDateRange(
-      nextPending.moveInDate,
-      nextPending.endDate
-    );
-    const sanitizedPending = {
-      ...nextPending,
-      endDate: nextEndDate,
-    };
-    const parsedMinSlots = nextPending.minSlots
-      ? parseInt(nextPending.minSlots, 10)
-      : NaN;
+    const sanitizedPending = sanitizePendingFilters(nextPending);
 
-    if (overrides) {
+    if (!filtersEqual(sanitizedPending, basePending)) {
       pendingRef.current = sanitizedPending;
       setPendingState(sanitizedPending);
     }
@@ -434,32 +500,11 @@ export function useBatchedFilters(
     );
     // CFM-604: canonical-on-write guarantee — must go through buildCanonicalSearchUrl.
     const searchUrl = buildCanonicalSearchUrl(
-      applySearchQueryChange(currentQuery, "filter", {
-        minPrice: Number.isFinite(nextMinPrice) ? nextMinPrice : undefined,
-        maxPrice: Number.isFinite(nextMaxPrice) ? nextMaxPrice : undefined,
-        roomType: sanitizedPending.roomType || undefined,
-        leaseDuration: sanitizedPending.leaseDuration || undefined,
-        moveInDate: sanitizedPending.moveInDate || undefined,
-        endDate: nextEndDate || undefined,
-        amenities:
-          sanitizedPending.amenities.length > 0
-            ? sanitizedPending.amenities
-            : undefined,
-        houseRules:
-          sanitizedPending.houseRules.length > 0
-            ? sanitizedPending.houseRules
-            : undefined,
-        languages:
-          sanitizedPending.languages.length > 0
-            ? sanitizedPending.languages
-            : undefined,
-        genderPreference: sanitizedPending.genderPreference || undefined,
-        householdGender: sanitizedPending.householdGender || undefined,
-        minSlots:
-          Number.isFinite(parsedMinSlots) && parsedMinSlots >= 2
-            ? parsedMinSlots
-            : undefined,
-      })
+      applySearchQueryChange(
+        currentQuery,
+        "filter",
+        buildSearchFilterPatchFromPending(sanitizedPending)
+      )
     );
 
     if (transitionContext) {
