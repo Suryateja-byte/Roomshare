@@ -1655,8 +1655,8 @@ export const COORD_PRECISION = 5;
 
 export interface ListingGroup {
   key: string; // "40.71281,-74.00598"
-  lat: number; // TRUE coordinate
-  lng: number; // TRUE coordinate (not offset)
+  lat: number; // Approximate public coordinate in discovery payloads
+  lng: number; // Approximate public coordinate in discovery payloads
   listings: MapMarkerListing[]; // All listings at this point
 }
 
@@ -3966,8 +3966,8 @@ export interface SearchV2Response {
 /** Tiered pin for sparse results (< 50 listings) */
 export interface SearchV2Pin {
   id: string;
-  lat: number;
-  lng: number;
+  lat: number; // Approximate public coordinate
+  lng: number; // Approximate public coordinate
   price?: number | null;
   tier?: "primary" | "mini"; // Primary = larger price pill, mini = small dot
   stackCount?: number; // Multiple listings at same location

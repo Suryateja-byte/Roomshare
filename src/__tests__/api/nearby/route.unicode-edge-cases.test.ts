@@ -68,7 +68,7 @@ describe("POST /api/nearby - Unicode and i18n Edge Cases", () => {
       _id: `place-${Date.now()}-${Math.random()}`,
       name,
       formattedAddress: address,
-      categories: ["test"],
+      categories: ["food-beverage"],
       location: {
         type: "Point",
         coordinates: [-122.4194, 37.7749],
@@ -102,7 +102,7 @@ describe("POST /api/nearby - Unicode and i18n Edge Cases", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -118,7 +118,7 @@ describe("POST /api/nearby - Unicode and i18n Edge Cases", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -134,7 +134,7 @@ describe("POST /api/nearby - Unicode and i18n Edge Cases", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -152,7 +152,7 @@ describe("POST /api/nearby - Unicode and i18n Edge Cases", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -168,7 +168,7 @@ describe("POST /api/nearby - Unicode and i18n Edge Cases", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -184,7 +184,7 @@ describe("POST /api/nearby - Unicode and i18n Edge Cases", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -202,7 +202,7 @@ describe("POST /api/nearby - Unicode and i18n Edge Cases", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -218,7 +218,7 @@ describe("POST /api/nearby - Unicode and i18n Edge Cases", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -234,7 +234,7 @@ describe("POST /api/nearby - Unicode and i18n Edge Cases", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -250,7 +250,7 @@ describe("POST /api/nearby - Unicode and i18n Edge Cases", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -268,7 +268,7 @@ describe("POST /api/nearby - Unicode and i18n Edge Cases", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -284,7 +284,7 @@ describe("POST /api/nearby - Unicode and i18n Edge Cases", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -300,7 +300,7 @@ describe("POST /api/nearby - Unicode and i18n Edge Cases", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -316,7 +316,7 @@ describe("POST /api/nearby - Unicode and i18n Edge Cases", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -335,7 +335,7 @@ describe("POST /api/nearby - Unicode and i18n Edge Cases", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -352,7 +352,7 @@ describe("POST /api/nearby - Unicode and i18n Edge Cases", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -369,7 +369,7 @@ describe("POST /api/nearby - Unicode and i18n Edge Cases", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -385,7 +385,7 @@ describe("POST /api/nearby - Unicode and i18n Edge Cases", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -404,7 +404,7 @@ describe("POST /api/nearby - Unicode and i18n Edge Cases", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -423,7 +423,7 @@ describe("POST /api/nearby - Unicode and i18n Edge Cases", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -439,7 +439,7 @@ describe("POST /api/nearby - Unicode and i18n Edge Cases", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();

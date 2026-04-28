@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  memo,
-  useState,
-  useCallback,
-  useMemo,
-  useRef,
-  useEffect,
-} from "react";
+import { memo, useState, useCallback, useMemo, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Star, Home, MapPin } from "lucide-react";
@@ -25,7 +18,10 @@ import {
 } from "@/contexts/ListingFocusContext";
 import { SlotBadge } from "./SlotBadge";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
-import type { GroupContextPresentation, GroupSummary } from "@/lib/search-types";
+import type {
+  GroupContextPresentation,
+  GroupSummary,
+} from "@/lib/search-types";
 import { buildListingDetailHref } from "@/lib/search/listing-detail-link";
 import GroupDatesPanel from "./GroupDatesPanel";
 import GroupDatesModal from "./GroupDatesModal";
@@ -198,6 +194,7 @@ interface ListingCardProps {
   isSaved?: boolean;
   className?: string;
   mobileVariant?: "default" | "feed";
+  desktopVariant?: "grid" | "row";
   priority?: boolean;
   showTotalPrice?: boolean;
   estimatedMonths?: number;
@@ -236,8 +233,21 @@ function arePropsEqual(
     pl.groupContext?.contextKey === nl.groupContext?.contextKey &&
     pl.groupSummary?.groupKey === nl.groupSummary?.groupKey &&
     (pl.groupSummary?.members ?? [])
-      .map(
-        (member) =>
+      .map((member) =>
+        [
+          member.listingId,
+          member.availableFrom,
+          member.availableUntil ?? "",
+          member.startDate ?? "",
+          member.endDate ?? "",
+          member.openSlots,
+          member.totalSlots,
+          member.isCanonical ? "1" : "0",
+        ].join(":")
+      )
+      .join(",") ===
+      (nl.groupSummary?.members ?? [])
+        .map((member) =>
           [
             member.listingId,
             member.availableFrom,
@@ -248,27 +258,13 @@ function arePropsEqual(
             member.totalSlots,
             member.isCanonical ? "1" : "0",
           ].join(":")
-      )
-      .join(",") ===
-      (nl.groupSummary?.members ?? [])
-        .map(
-          (member) =>
-            [
-              member.listingId,
-              member.availableFrom,
-              member.availableUntil ?? "",
-              member.startDate ?? "",
-              member.endDate ?? "",
-              member.openSlots,
-              member.totalSlots,
-              member.isCanonical ? "1" : "0",
-            ].join(":")
         )
         .join(",") &&
     prev.href === next.href &&
     prev.isSaved === next.isSaved &&
     prev.className === next.className &&
     prev.mobileVariant === next.mobileVariant &&
+    prev.desktopVariant === next.desktopVariant &&
     prev.priority === next.priority &&
     prev.showTotalPrice === next.showTotalPrice &&
     prev.estimatedMonths === next.estimatedMonths &&
@@ -282,6 +278,7 @@ function ListingCardInner({
   isSaved,
   className,
   mobileVariant = "default",
+  desktopVariant = "grid",
   priority = false,
   showTotalPrice = false,
   estimatedMonths = 1,
@@ -350,6 +347,7 @@ function ListingCardInner({
   const imageAlt = `${displayTitle} in ${formattedLocation}`;
   const listingHref = href ?? `/listings/${listing.id}`;
   const extraDateCount = Math.max((groupSummary?.members?.length ?? 0) - 1, 0);
+  const isDesktopRow = desktopVariant === "row";
 
   const displayRoomType = formatRoomType(listing.roomType);
   const displayMoveIn = formatMoveInDate(
@@ -445,10 +443,24 @@ function ListingCardInner({
       }}
       onBlur={() => setHovered(null)}
       className={cn(
-        "group relative flex flex-col rounded-2xl bg-surface-container-lowest mb-4 shadow-ambient-sm transition-all duration-500 overflow-hidden cursor-pointer",
-        !isActive && "hover:shadow-ambient-lg hover:-translate-y-1",
-        isActive && "ring-2 ring-primary ring-offset-2 -translate-y-0.5 shadow-ambient-lg",
-        isHovered && !isActive && "ring-2 ring-primary/50 shadow-ambient",
+        "group relative mb-4 flex cursor-pointer flex-col overflow-hidden rounded-2xl bg-surface-container-lowest shadow-ambient-sm transition-all duration-500",
+        isDesktopRow &&
+          "md:mb-2 md:overflow-visible md:bg-transparent md:p-2 md:shadow-none",
+        !isActive &&
+          !isDesktopRow &&
+          "hover:-translate-y-1 hover:shadow-ambient-lg",
+        !isActive &&
+          isDesktopRow &&
+          "md:hover:bg-surface-container-lowest md:hover:shadow-[inset_0_0_0_1px_rgba(220,193,185,0.38)]",
+        isActive &&
+          (isDesktopRow
+            ? "bg-surface-container-lowest shadow-[inset_0_0_0_1px_rgba(154,64,39,0.32)] md:-translate-y-0"
+            : "ring-2 ring-primary ring-offset-2 -translate-y-0.5 shadow-ambient-lg"),
+        isHovered &&
+          !isActive &&
+          (isDesktopRow
+            ? "md:bg-surface-container-lowest md:shadow-[inset_0_0_0_1px_rgba(154,64,39,0.24)]"
+            : "ring-2 ring-primary/50 shadow-ambient"),
         className
       )}
     >
@@ -478,10 +490,17 @@ function ListingCardInner({
         data-testid="listing-card-link"
         className={cn(
           "block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 flex flex-1 flex-col",
+          isDesktopRow &&
+            "md:grid md:grid-cols-[168px_minmax(0,1fr)] md:items-stretch md:gap-4",
           isDragging && "pointer-events-none"
         )}
       >
-        <div className="relative overflow-hidden aspect-[4/3] bg-surface-canvas">
+        <div
+          className={cn(
+            "relative aspect-[4/3] overflow-hidden bg-surface-canvas",
+            isDesktopRow && "md:h-full md:min-h-[132px] md:rounded-xl"
+          )}
+        >
           <ImageCarousel
             images={displayImages}
             alt={imageAlt}
@@ -495,7 +514,10 @@ function ListingCardInner({
 
           {showImagePlaceholder && (
             <div className="absolute inset-0 bg-surface-canvas flex flex-col items-center justify-center pointer-events-none">
-              <Home className="w-8 h-8 text-on-surface-variant mb-2" strokeWidth={1} />
+              <Home
+                className="w-8 h-8 text-on-surface-variant mb-2"
+                strokeWidth={1}
+              />
               <span className="text-xs text-on-surface-variant font-medium uppercase tracking-[0.2em]">
                 No Photos
               </span>
@@ -521,7 +543,12 @@ function ListingCardInner({
           </div>
         </div>
 
-        <div className="p-4 flex flex-col flex-1">
+        <div
+          className={cn(
+            "flex flex-1 flex-col p-4",
+            isDesktopRow && "md:min-w-0 md:p-1 md:py-1.5"
+          )}
+        >
           {displayRoomType ? (
             <span className="sr-only" data-testid="listing-title-text">
               {displayTitle}
@@ -533,7 +560,10 @@ function ListingCardInner({
             <div className="flex items-baseline gap-1">
               <span
                 data-testid="listing-price"
-                className="font-display italic text-xl font-medium text-on-surface"
+                className={cn(
+                  "font-display text-xl font-medium italic text-on-surface",
+                  isDesktopRow && "md:text-[1.45rem]"
+                )}
               >
                 {showTotalPrice && estimatedMonths > 1
                   ? formatPrice(listing.price * estimatedMonths)
@@ -559,7 +589,10 @@ function ListingCardInner({
 
           {/* Row 2: Room Type / Title + Location */}
           <h3
-            className="font-medium text-[0.95rem] leading-tight text-on-surface line-clamp-1 mb-0.5"
+            className={cn(
+              "mb-0.5 line-clamp-1 text-[0.95rem] font-medium leading-tight text-on-surface",
+              isDesktopRow && "md:text-base md:font-semibold"
+            )}
             title={displayTitle}
           >
             {displayRoomType
@@ -568,10 +601,13 @@ function ListingCardInner({
           </h3>
 
           {/* Row 3: Location (when no roomType) or Availability */}
-          <p className="text-on-surface-variant text-sm truncate font-medium">
+          <p className="truncate text-sm font-medium text-on-surface-variant">
             {displayRoomType
-              ? [displayMoveIn, displayLease].filter(Boolean).join(" · ") || formattedLocation
-              : [formattedLocation, displayMoveIn, displayLease].filter(Boolean).join(" · ")}
+              ? [displayMoveIn, displayLease].filter(Boolean).join(" · ") ||
+                formattedLocation
+              : [formattedLocation, displayMoveIn, displayLease]
+                  .filter(Boolean)
+                  .join(" · ")}
           </p>
           {availabilityPresentation.secondaryGroupLabel ? (
             <p className="mt-2 text-xs font-medium text-on-surface-variant">

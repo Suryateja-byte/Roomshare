@@ -29,9 +29,21 @@ export default async function VerificationsPage() {
     redirect("/");
   }
 
-  // Get all verification requests with user data
   const requests = await prisma.verificationRequest.findMany({
-    include: {
+    select: {
+      id: true,
+      userId: true,
+      documentType: true,
+      status: true,
+      adminNotes: true,
+      createdAt: true,
+      updatedAt: true,
+      reviewedAt: true,
+      reviewedBy: true,
+      documentPath: true,
+      selfiePath: true,
+      documentsExpireAt: true,
+      documentsDeletedAt: true,
       user: {
         select: {
           id: true,
@@ -46,6 +58,34 @@ export default async function VerificationsPage() {
       { createdAt: "asc" }, // Oldest first
     ],
   });
+  const now = new Date();
+  const safeRequests = requests.map((request) => ({
+    id: request.id,
+    userId: request.userId,
+    documentType: request.documentType,
+    status: request.status,
+    adminNotes: request.adminNotes,
+    createdAt: request.createdAt,
+    updatedAt: request.updatedAt,
+    reviewedAt: request.reviewedAt,
+    reviewedBy: request.reviewedBy,
+    hasDocument:
+      Boolean(request.documentPath) &&
+      !request.documentsDeletedAt &&
+      Boolean(request.documentsExpireAt) &&
+      request.documentsExpireAt! > now,
+    hasSelfie:
+      Boolean(request.selfiePath) &&
+      !request.documentsDeletedAt &&
+      Boolean(request.documentsExpireAt) &&
+      request.documentsExpireAt! > now,
+    canApprove:
+      Boolean(request.documentPath) &&
+      !request.documentsDeletedAt &&
+      Boolean(request.documentsExpireAt) &&
+      request.documentsExpireAt! > now,
+    user: request.user,
+  }));
 
   const pendingCount = requests.filter((r) => r.status === "PENDING").length;
 
@@ -79,7 +119,7 @@ export default async function VerificationsPage() {
         </div>
 
         {/* Verification List */}
-        <VerificationList initialRequests={requests} />
+        <VerificationList initialRequests={safeRequests} />
       </div>
     </div>
   );

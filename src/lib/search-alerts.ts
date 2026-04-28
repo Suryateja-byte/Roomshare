@@ -67,6 +67,7 @@ export interface NewListingForAlert {
   genderPreference?: string | null;
   householdGender?: string | null;
   moveInDate?: Date | string | null;
+  availableUntil?: Date | string | null;
 }
 
 interface ProcessResult {
@@ -140,6 +141,58 @@ function isSearchAlertsEnabled(notificationPreferences: unknown): boolean {
 
 function isDeliverableAlertListing(listing: AlertListing | null | undefined) {
   return resolvePublicListingVisibilityState(listing).isPubliclyVisible;
+}
+
+function appendListingAvailabilityWindowWhere(
+  whereClause: Prisma.ListingWhereInput,
+  filters: SearchFilters
+) {
+  const requestedCoverageDate = filters.endDate ?? filters.moveInDate;
+  if (!requestedCoverageDate) {
+    return;
+  }
+
+  const targetDate = parseDateOnly(requestedCoverageDate);
+  const existingAnd = Array.isArray(whereClause.AND)
+    ? whereClause.AND
+    : whereClause.AND
+      ? [whereClause.AND]
+      : [];
+
+  whereClause.AND = [
+    ...existingAnd,
+    {
+      OR: [{ availableUntil: null }, { availableUntil: { gte: targetDate } }],
+    },
+  ];
+}
+
+function parseListingDate(value: Date | string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const dateOnly =
+    value instanceof Date
+      ? value.toISOString().slice(0, 10)
+      : value.includes("T")
+        ? value.split("T")[0]
+        : value;
+  return parseDateOnly(dateOnly);
+}
+
+function coversRequestedAvailabilityWindow(
+  listing: Pick<NewListingForAlert, "availableUntil">,
+  filters: SearchFilters
+): boolean {
+  const requestedCoverageDate = filters.endDate ?? filters.moveInDate;
+  if (!requestedCoverageDate) {
+    return true;
+  }
+
+  const targetDate = parseDateOnly(requestedCoverageDate);
+  const availableUntil = parseListingDate(listing.availableUntil);
+  return !availableUntil || availableUntil >= targetDate;
 }
 
 async function findDeliverableAlertListings(
@@ -461,7 +514,9 @@ export async function deliverQueuedSearchAlert(
       newListingsCount === 1
         ? "a matching listing"
         : `${newListingsCount} matching listings`,
-    listingId: delivery.targetListingId ?? delivery.savedSearch.id,
+    listingId: delivery.targetListingId ?? undefined,
+    ctaHref: notificationLink,
+    ctaLabel: delivery.targetListingId ? "View Listing" : "View Matches",
   });
 
   if (!emailResult.success) {
@@ -691,6 +746,7 @@ export async function processSearchAlerts(): Promise<ProcessResult> {
               },
             ];
           }
+          appendListingAvailabilityWindowWhere(whereClause, filters);
           if (filters.amenities && filters.amenities.length > 0) {
             whereClause.amenities = { hasEvery: filters.amenities };
           }
@@ -854,12 +910,14 @@ function matchesFilters(
   // Move-in date filter (listing available by target date)
   if (filters.moveInDate) {
     const targetDate = parseDateOnly(filters.moveInDate);
-    const listingDate = listing.moveInDate
-      ? new Date(listing.moveInDate)
-      : null;
+    const listingDate = parseListingDate(listing.moveInDate);
     if (listingDate && listingDate > targetDate) {
       return false;
     }
+  }
+
+  if (!coversRequestedAvailabilityWindow(listing, filters)) {
+    return false;
   }
 
   // Amenities filter (all required amenities must be present - exact match)

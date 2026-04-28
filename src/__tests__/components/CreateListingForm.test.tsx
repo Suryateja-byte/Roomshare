@@ -12,6 +12,7 @@ import {
 } from "@testing-library/react";
 import CreateListingForm from "@/app/listings/create/CreateListingForm";
 import { toast } from "sonner";
+import { createListingClientSchema } from "@/lib/schemas";
 
 // Mock dependencies
 const mockPush = jest.fn();
@@ -174,6 +175,10 @@ describe("CreateListingForm", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (createListingClientSchema.safeParse as jest.Mock).mockReturnValue({
+      success: true,
+      data: {},
+    });
     fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ id: "listing-123" }),
@@ -243,6 +248,17 @@ describe("CreateListingForm", () => {
       expect(screen.getAllByText("Location").length).toBeGreaterThan(0);
       expect(screen.getAllByText("Photos").length).toBeGreaterThan(0);
       expect(screen.getAllByText("Finer Details").length).toBeGreaterThan(0);
+    });
+
+    it("marks move-in date as required", () => {
+      render(<CreateListingForm />);
+
+      const moveInDateControl = document.getElementById("moveInDate");
+      expect(moveInDateControl).toHaveAttribute("aria-required", "true");
+      expect(screen.getByText("When tenants can move in.")).toBeInTheDocument();
+      expect(
+        screen.queryByText("When can tenants move in? (Optional)")
+      ).not.toBeInTheDocument();
     });
 
     it("shows progress indicator", () => {
@@ -652,6 +668,34 @@ describe("CreateListingForm", () => {
       await waitFor(() => {
         expect(screen.getByText(/wait for all images/i)).toBeInTheDocument();
       });
+    });
+
+    it("blocks submit and shows inline error when move-in date is missing", async () => {
+      (createListingClientSchema.safeParse as jest.Mock).mockReturnValueOnce({
+        success: false,
+        error: {
+          issues: [
+            {
+              path: ["moveInDate"],
+              message: "Move-in date is required",
+            },
+          ],
+        },
+      });
+
+      render(<CreateListingForm />);
+      fillRequiredFields();
+      fireEvent.click(screen.getByTestId("add-success-image"));
+      await screen.findByRole("button", { name: /publish with 1 photo/i });
+
+      submitForm();
+
+      expect(await screen.findByText("Move-in date is required")).toBeInTheDocument();
+      expect(document.getElementById("moveInDate")).toHaveAttribute(
+        "aria-invalid",
+        "true"
+      );
+      expect(fetchSpy).not.toHaveBeenCalled();
     });
 
     it("prevents double submission", async () => {

@@ -107,7 +107,7 @@ describe("POST /api/nearby - Security Edge Cases", () => {
       expect([200, 400]).toContain(response.status);
     });
 
-    it("handles SQL injection in categories", async () => {
+    it("rejects SQL injection in categories", async () => {
       mockRadarSuccess();
 
       const response = await POST(
@@ -117,8 +117,7 @@ describe("POST /api/nearby - Security Edge Cases", () => {
         })
       );
 
-      // Should process normally, categories are just strings
-      expect(response.status).toBe(200);
+      expect(response.status).toBe(400);
     });
   });
 
@@ -435,7 +434,7 @@ describe("POST /api/nearby - Security Edge Cases", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
       const data = await response.json();
@@ -456,7 +455,7 @@ describe("POST /api/nearby - Security Edge Cases", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
 

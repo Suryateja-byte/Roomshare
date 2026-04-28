@@ -444,7 +444,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           executeSearchV2({
             rawParams: rawParamsForV2,
             limit: DEFAULT_PAGE_SIZE,
-            includeMap: false,
+            includeMap: features.searchSnapshotContract,
           }),
           DEFAULT_TIMEOUTS.DATABASE,
           "SSR-executeSearchV2"

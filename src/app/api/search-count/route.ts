@@ -34,6 +34,7 @@ import {
 } from "@/lib/constants";
 import { isPhase04ProjectionReadsEnabled } from "@/lib/flags/phase04";
 import { getProjectionSearchCount } from "@/lib/search/projection-search";
+import { getProjectionReadEligibility } from "@/lib/search/projection-read-eligibility";
 import { buildPublicCacheHeaders } from "@/lib/public-cache/headers";
 
 // Disable static caching - counts must be fresh
@@ -93,7 +94,10 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      if (isPhase04ProjectionReadsEnabled()) {
+      if (
+        isPhase04ProjectionReadsEnabled() &&
+        getProjectionReadEligibility(parsed).supported
+      ) {
         const projectionCount = await getProjectionSearchCount({
           parsed,
           rawParams,

@@ -173,7 +173,7 @@ export async function GET(request: Request) {
       productCode: payment.productCode,
       ...snapshot,
       requiresViewerStateRefresh:
-        purchaseContext === "CONTACT_HOST"
+        purchaseContext === "CONTACT_HOST" || purchaseContext === "PHONE_REVEAL"
           ? snapshot.requiresViewerStateRefresh
           : false,
     });

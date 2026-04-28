@@ -105,6 +105,7 @@ const SUPABASE_IMG =
 const validApi = {
   ...validBase,
   images: [SUPABASE_IMG],
+  moveInDate: daysFromNow(30),
 };
 
 // ===================================================================
@@ -814,13 +815,17 @@ describe("moveInDateSchema", () => {
     expect(r.success).toBe(false);
   });
 
-  it("rejects invalid calendar date (2026-02-30)", () => {
-    // 2026-02-30 passes regex but is not a real date -- however Date may
-    // roll over; the schema has a refine for isNaN check.
-    // February 30 rolls to March 2 in JS, so Date is valid -- this tests
-    // the regex pass + refine behavior. The schema validates with isNaN.
-    const r = moveInDateSchema.safeParse("2026-13-01");
-    expect(r.success).toBe(false);
+  it.each(["2026-02-30", "2026-02-31", "2026-02-29", "2026-00-10", "2026-01-00"])(
+    "rejects invalid calendar date %s",
+    (value) => {
+      const r = moveInDateSchema.safeParse(value);
+      expect(r.success).toBe(false);
+    }
+  );
+
+  it("accepts a valid leap day", () => {
+    const r = moveInDateSchema.safeParse("2028-02-29");
+    expect(r.success).toBe(true);
   });
 
   it("rejects empty string", () => {
@@ -846,6 +851,12 @@ describe("createListingApiSchema", () => {
 
   it("inherits base schema validation (e.g. rejects empty title)", () => {
     const r = createListingApiSchema.safeParse({ ...validApi, title: "" });
+    expect(r.success).toBe(false);
+  });
+
+  it("requires move-in date for publishable host-managed listings", () => {
+    const { moveInDate: _, ...rest } = validApi;
+    const r = createListingApiSchema.safeParse(rest);
     expect(r.success).toBe(false);
   });
 
@@ -1135,7 +1146,7 @@ describe("createListingApiSchema", () => {
   });
 
   // ------------------------------------------------------------------
-  // moveInDate (optional YYYY-MM-DD, not past, max 2y future, or null)
+  // moveInDate (required YYYY-MM-DD, not past, max 2y future)
   // ------------------------------------------------------------------
   describe("moveInDate", () => {
     it("accepts a future date", () => {
@@ -1154,17 +1165,18 @@ describe("createListingApiSchema", () => {
       expect(r.success).toBe(true);
     });
 
-    it("accepts null", () => {
+    it("rejects null", () => {
       const r = createListingApiSchema.safeParse({
         ...validApi,
         moveInDate: null,
       });
-      expect(r.success).toBe(true);
+      expect(r.success).toBe(false);
     });
 
-    it("accepts undefined (omitted)", () => {
-      const r = createListingApiSchema.safeParse(validApi);
-      expect(r.success).toBe(true);
+    it("rejects undefined (omitted)", () => {
+      const { moveInDate: _, ...rest } = validApi;
+      const r = createListingApiSchema.safeParse(rest);
+      expect(r.success).toBe(false);
     });
 
     it("rejects a past date", () => {
@@ -1190,6 +1202,14 @@ describe("createListingApiSchema", () => {
       });
       expect(r.success).toBe(false);
     });
+
+    it("rejects an overflow calendar date", () => {
+      const r = createListingApiSchema.safeParse({
+        ...validApi,
+        moveInDate: "2026-02-31",
+      });
+      expect(r.success).toBe(false);
+    });
   });
 
   // ------------------------------------------------------------------
@@ -1209,14 +1229,14 @@ describe("createListingApiSchema", () => {
       expect(r.success).toBe(true);
     });
 
-    it("accepts API listing with all optional fields as null", () => {
+    it("accepts API listing with optional fields as null and required move-in date", () => {
       const r = createListingApiSchema.safeParse({
         ...validApi,
         roomType: null,
         leaseDuration: null,
         genderPreference: null,
         householdGender: null,
-        moveInDate: null,
+        moveInDate: daysFromNow(14),
       });
       expect(r.success).toBe(true);
     });

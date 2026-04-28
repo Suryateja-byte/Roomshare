@@ -62,6 +62,11 @@ const PHASE02_MIGRATION_SQL_FILES = [
     "20260502030000_phase02_cache_invalidations_enqueued_idx",
     "migration.sql"
   ),
+  path.join(
+    MIGRATIONS_DIR,
+    "20260511000000_canonical_inventory_invariants",
+    "migration.sql"
+  ),
 ];
 
 // ---------------------------------------------------------------------------
@@ -508,7 +513,9 @@ export async function createPGlitePhase02Fixture(): Promise<Phase02Fixture> {
  * statement. Skips PostGIS-specific errors gracefully.
  */
 async function applyMigrationSqlStatementByStatement(
-  pg: { query: (sql: string, params?: unknown[]) => Promise<{ rows: unknown[] }> },
+  pg: {
+    query: (sql: string, params?: unknown[]) => Promise<{ rows: unknown[] }>;
+  },
   sql: string
 ): Promise<void> {
   const statements = splitSqlStatements(sql);

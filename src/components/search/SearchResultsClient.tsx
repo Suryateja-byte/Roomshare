@@ -26,6 +26,7 @@ import { ExpandSearchSuggestions } from "@/components/search/ExpandSearchSuggest
 import { findSplitStays } from "@/lib/search/split-stay";
 import { getFilterSuggestions } from "@/app/actions/filter-suggestions";
 import { useMobileSearch } from "@/contexts/MobileSearchContext";
+import { useSearchMapUI } from "@/contexts/SearchMapUIContext";
 import { useSearchTestScenario } from "@/contexts/SearchTestScenarioContext";
 import type { ListingData, FilterSuggestion } from "@/lib/data";
 import type { FilterParams } from "@/lib/search-types";
@@ -40,12 +41,17 @@ import {
   normalizeSearchQuery,
   serializeSearchQuery,
 } from "@/lib/search/search-query";
+import { parseSearchParams } from "@/lib/search-params";
 import { getScenarioHeaderValue } from "@/lib/search/testing/search-scenarios";
 import { emitSearchClientMetric } from "@/lib/search/search-telemetry-client";
 import { buildListingDetailHref } from "@/lib/search/listing-detail-link";
 import { PUBLIC_CACHE_INVALIDATED_EVENT } from "@/lib/public-cache/client";
-import { useSearchV2Setters, useV2MapDataSetter } from "@/contexts/SearchV2DataContext";
+import {
+  useSearchV2Setters,
+  useV2MapDataSetter,
+} from "@/contexts/SearchV2DataContext";
 import type { SearchV2Response } from "@/lib/search/types";
+import { cn } from "@/lib/utils";
 
 /**
  * Maximum accumulated listings before showing a "continue" link.
@@ -59,6 +65,25 @@ function getSeenGroupKeys(listings: ListingData[]): Set<string> {
       .map((listing) => listing.groupKey)
       .filter((groupKey): groupKey is string => Boolean(groupKey))
   );
+}
+
+function dedupeListingsForDisplay(listings: ListingData[]): ListingData[] {
+  const seenIds = new Set<string>();
+  const seenGroupKeys = new Set<string>();
+
+  return listings.filter((listing) => {
+    const hasSeenId = seenIds.has(listing.id);
+    const hasSeenGroupKey = Boolean(
+      listing.groupKey && seenGroupKeys.has(listing.groupKey)
+    );
+
+    seenIds.add(listing.id);
+    if (listing.groupKey) {
+      seenGroupKeys.add(listing.groupKey);
+    }
+
+    return !hasSeenId && !hasSeenGroupKey;
+  });
 }
 
 function formatMobileResultsLabel(
@@ -133,6 +158,7 @@ export function SearchResultsClient({
   const { setIsV2Enabled, setPendingQueryHash } = useSearchV2Setters();
   const { setV2MapData, dataVersion } = useV2MapDataSetter();
   const { setSearchResultsLabel } = useMobileSearch();
+  const { shouldShowMap } = useSearchMapUI();
   const testScenario = useSearchTestScenario();
   const [isHydrated, setIsHydrated] = useState(false);
   const [extraListings, setExtraListings] = useState<ListingData[]>([]);
@@ -142,7 +168,9 @@ export function SearchResultsClient({
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const isLoadingRef = useRef(false);
   // F2 FIX: Ref for total count avoids allListings in handleLoadMore deps
-  const totalCountRef = useRef(initialListings.length);
+  const totalCountRef = useRef(
+    dedupeListingsForDisplay(initialListings).length
+  );
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshNotice, setRefreshNotice] = useState<string | null>(null);
   const [isDegraded, setIsDegraded] = useState(false);
@@ -157,8 +185,9 @@ export function SearchResultsClient({
   const [resolvedFilterSuggestions, setResolvedFilterSuggestions] =
     useState(filterSuggestions);
   const [responseMeta, setResponseMeta] = useState(resolvedInitialResponseMeta);
-  const [searchStateKind, setSearchStateKind] =
-    useState<SearchListState["kind"]>(resolvedInitialStateKind);
+  const [searchStateKind, setSearchStateKind] = useState<
+    SearchListState["kind"]
+  >(resolvedInitialStateKind);
 
   // Hydrate showTotalPrice from sessionStorage after mount to avoid hydration mismatch
   useEffect(() => {
@@ -174,7 +203,9 @@ export function SearchResultsClient({
   const seenIdsRef = useRef<Set<string>>(
     new Set(initialListings.map((l) => l.id))
   );
-  const seenGroupKeysRef = useRef<Set<string>>(getSeenGroupKeys(initialListings));
+  const seenGroupKeysRef = useRef<Set<string>>(
+    getSeenGroupKeys(initialListings)
+  );
   // Track which listing IDs have already had favorites fetched (#16)
   // Prevents refetching favorites for all IDs on every "Load More"
   const fetchedFavIdsRef = useRef<Set<string>>(new Set());
@@ -250,7 +281,9 @@ export function SearchResultsClient({
       setLoadError(null);
       setExtraListings([]);
       setNextCursor(null);
-      setRefreshNotice("Results refreshed to keep public availability accurate.");
+      setRefreshNotice(
+        "Results refreshed to keep public availability accurate."
+      );
       setLoadMoreAnnouncement("Results refreshed.");
       router.refresh();
     };
@@ -435,7 +468,7 @@ export function SearchResultsClient({
           seenIdsRef.current = new Set(fullItems.map((listing) => listing.id));
           seenGroupKeysRef.current = getSeenGroupKeys(fullItems);
           fetchedFavIdsRef.current = new Set();
-          totalCountRef.current = fullItems.length;
+          totalCountRef.current = dedupeListingsForDisplay(fullItems).length;
           setIsV2Enabled(true);
           setV2MapData(
             {
@@ -506,7 +539,9 @@ export function SearchResultsClient({
         seenIdsRef.current = new Set(data.data.items.map((l) => l.id));
         seenGroupKeysRef.current = getSeenGroupKeys(data.data.items);
         fetchedFavIdsRef.current = new Set();
-        totalCountRef.current = data.data.items.length;
+        totalCountRef.current = dedupeListingsForDisplay(
+          data.data.items
+        ).length;
       } catch (err) {
         if ((err as Error).name === "AbortError") return;
         // Fetch failed: keep old listings visible, no crash
@@ -539,9 +574,14 @@ export function SearchResultsClient({
 
   // Use client-fetched data when available, otherwise fall back to SSR props
   const effectiveListings = clientFetchedListings ?? initialListings;
-  const effectiveTotal = clientFetchedListings !== null ? clientFetchedTotal : initialTotal;
-  const effectiveNearMatch = clientFetchedListings !== null ? clientFetchedNearMatch : nearMatchExpansion;
-  const effectiveVibeAdvisory = clientFetchedListings !== null ? clientFetchedVibeAdvisory : vibeAdvisory;
+  const effectiveTotal =
+    clientFetchedListings !== null ? clientFetchedTotal : initialTotal;
+  const effectiveNearMatch =
+    clientFetchedListings !== null
+      ? clientFetchedNearMatch
+      : nearMatchExpansion;
+  const effectiveVibeAdvisory =
+    clientFetchedListings !== null ? clientFetchedVibeAdvisory : vibeAdvisory;
 
   // Derive a stable fingerprint of the initial data to detect server-side changes
   const initialDataFingerprint = useMemo(
@@ -563,6 +603,7 @@ export function SearchResultsClient({
       seenIdsRef.current = new Set(initialListings.map((l) => l.id));
       seenGroupKeysRef.current = getSeenGroupKeys(initialListings);
       fetchedFavIdsRef.current = new Set(); // Reset favorites tracking on new search
+      totalCountRef.current = dedupeListingsForDisplay(initialListings).length;
     }
   }, [initialDataFingerprint, initialNextCursor, initialListings]);
 
@@ -572,9 +613,10 @@ export function SearchResultsClient({
   }, [resolvedInitialResponseMeta, resolvedInitialStateKind]);
 
   const allListings = useMemo(
-    () => [...effectiveListings, ...extraListings],
+    () => dedupeListingsForDisplay([...effectiveListings, ...extraListings]),
     [effectiveListings, extraListings]
   );
+  const useHorizontalDesktopCards = shouldShowMap;
   const effectiveListingsRef = useRef(effectiveListings);
   useEffect(() => {
     effectiveListingsRef.current = effectiveListings;
@@ -598,11 +640,11 @@ export function SearchResultsClient({
     [resolvedSavedListingIds]
   );
 
-  // Derive estimatedMonths from moveInDate/moveOutDate, falling back to leaseDuration
+  // Derive estimatedMonths from moveInDate/endDate, falling back to leaseDuration
   const estimatedMonths = useMemo(() => {
     const sp = new URLSearchParams(activeSearchParamsString);
     const moveIn = sp.get("moveInDate");
-    const moveOut = sp.get("moveOutDate");
+    const moveOut = sp.get("endDate") ?? sp.get("moveOutDate");
     if (moveIn && moveOut) {
       const start = new Date(moveIn);
       const end = new Date(moveOut);
@@ -644,6 +686,10 @@ export function SearchResultsClient({
     }
     return params;
   }, [activeSearchParamsString]);
+  const activeFilterParams = useMemo(
+    () => parseSearchParams(rawParams).filterParams,
+    [rawParams]
+  );
 
   const listingDetailDateParams = useMemo(() => {
     const params = new URLSearchParams(activeSearchParamsString);
@@ -685,8 +731,11 @@ export function SearchResultsClient({
         setIsDegraded(false);
         setExtraListings([]);
         setNextCursor(null);
-        totalCountRef.current = currentListings.length;
-        seenIdsRef.current = new Set(currentListings.map((listing) => listing.id));
+        totalCountRef.current =
+          dedupeListingsForDisplay(currentListings).length;
+        seenIdsRef.current = new Set(
+          currentListings.map((listing) => listing.id)
+        );
         seenGroupKeysRef.current = getSeenGroupKeys(currentListings);
         fetchedFavIdsRef.current = new Set();
         setRefreshNotice("Results refreshed to keep ordering accurate.");
@@ -772,8 +821,12 @@ export function SearchResultsClient({
 
       setExtraListings((prev) => {
         const next = [...prev, ...dedupedItems];
+        const currentEffectiveListings = effectiveListingsRef.current;
         // F2 FIX: Update ref inside setState for deterministic count
-        totalCountRef.current = effectiveListings.length + next.length;
+        totalCountRef.current = dedupeListingsForDisplay([
+          ...currentEffectiveListings,
+          ...next,
+        ]).length;
         return next;
       });
       setNextCursor(result.nextCursor);
@@ -781,7 +834,8 @@ export function SearchResultsClient({
       // Announce to screen readers (after state update)
       // F2 FIX: Use ref for count instead of stale allListings closure
       const newCount = totalCountRef.current;
-      const totalLabel = effectiveTotal !== null ? ` of ~${effectiveTotal}` : "";
+      const totalLabel =
+        effectiveTotal !== null ? ` of ~${effectiveTotal}` : "";
       setLoadMoreAnnouncement(
         `Loaded ${dedupedItems.length} more listing${dedupedItems.length === 1 ? "" : "s"}, showing ${newCount}${totalLabel}`
       );
@@ -806,20 +860,24 @@ export function SearchResultsClient({
     nextCursor,
     rawParams,
     effectiveTotal,
-    effectiveListings.length,
     router,
     testScenario,
   ]);
 
   const total = effectiveTotal;
+  const effectiveLocationRequired = searchStateKind === "location-required";
   // When client-fetched data is active, derive zero-results from effective total
   const effectiveZeroResults =
-    clientFetchedListings !== null
+    !effectiveLocationRequired &&
+    (clientFetchedListings !== null
       ? effectiveTotal !== null && effectiveTotal === 0
-      : hasConfirmedZeroResults;
+      : hasConfirmedZeroResults);
   const mobileResultsLabel = useMemo(
-    () => formatMobileResultsLabel(effectiveTotal, effectiveZeroResults, query),
-    [effectiveTotal, effectiveZeroResults, query]
+    () =>
+      effectiveLocationRequired
+        ? "Select an area"
+        : formatMobileResultsLabel(effectiveTotal, effectiveZeroResults, query),
+    [effectiveLocationRequired, effectiveTotal, effectiveZeroResults, query]
   );
 
   useEffect(() => {
@@ -890,7 +948,7 @@ export function SearchResultsClient({
   }, [allListingIdsKey]);
 
   useEffect(() => {
-    if (!hasConfirmedZeroResults) {
+    if (!effectiveZeroResults) {
       setResolvedFilterSuggestions([]);
       return;
     }
@@ -899,7 +957,7 @@ export function SearchResultsClient({
 
     void (async () => {
       try {
-        const suggestions = await getFilterSuggestions(filterParams);
+        const suggestions = await getFilterSuggestions(activeFilterParams);
         if (!cancelled) {
           setResolvedFilterSuggestions(suggestions);
         }
@@ -914,7 +972,7 @@ export function SearchResultsClient({
     return () => {
       cancelled = true;
     };
-  }, [filterParams, hasConfirmedZeroResults]);
+  }, [activeFilterParams, effectiveZeroResults]);
 
   return (
     <div
@@ -945,7 +1003,9 @@ export function SearchResultsClient({
         aria-atomic="true"
         className="sr-only"
       >
-        {effectiveZeroResults
+        {effectiveLocationRequired
+          ? "Select a location or move the map to search this area"
+          : effectiveZeroResults
           ? `No listings found${query ? ` for "${query}"` : ""}`
           : total === null
             ? `Found more than 100 listings${query ? ` for "${query}"` : ""}`
@@ -964,12 +1024,27 @@ export function SearchResultsClient({
         </div>
       )}
 
-      {effectiveZeroResults ? (
+      {effectiveLocationRequired ? (
+        <div
+          data-testid="location-required-state"
+          className="flex flex-col items-center justify-center rounded-[1.5rem] border border-dashed border-outline-variant/45 bg-surface-container-lowest/45 px-6 py-16 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] sm:rounded-[1.75rem] sm:py-24"
+        >
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-surface-container-lowest shadow-ambient-sm sm:h-16 sm:w-16">
+            <Search className="w-5 h-5 sm:w-6 sm:h-6 text-on-surface-variant" />
+          </div>
+          <h2 className="text-base sm:text-lg font-semibold text-on-surface mb-2">
+            Select a location
+          </h2>
+          <p className="text-on-surface-variant text-sm max-w-xs text-center px-4">
+            Choose a city or move the map to search listings in that area.
+          </p>
+        </div>
+      ) : effectiveZeroResults ? (
         <div
           data-testid="empty-state"
-          className="flex flex-col items-center justify-center py-16 sm:py-24 border-2 border-dashed border-outline-variant/20 rounded-2xl sm:rounded-3xl bg-surface-canvas/50"
+          className="flex flex-col items-center justify-center rounded-[1.5rem] border border-dashed border-outline-variant/45 bg-surface-container-lowest/45 px-6 py-16 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] sm:rounded-[1.75rem] sm:py-24"
         >
-          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-surface-container-lowest flex items-center justify-center shadow-ambient-sm mb-4">
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-surface-container-lowest shadow-ambient-sm sm:h-16 sm:w-16">
             <Search className="w-5 h-5 sm:w-6 sm:h-6 text-on-surface-variant" />
           </div>
           <h2 className="text-base sm:text-lg font-semibold text-on-surface mb-2">
@@ -996,7 +1071,7 @@ export function SearchResultsClient({
               {/* CFM-604: canonical-on-write guarantee — clearAllFilters() serializes canonically. */}
               <Link
                 href={`/search?${clearAllFilters(new URLSearchParams(activeSearchParamsString))}`}
-                className="mt-6 px-4 py-2.5 rounded-full border border-outline-variant/20 bg-transparent hover:bg-surface-canvas text-on-surface text-sm font-medium transition-colors touch-target"
+                className="touch-target mt-6 rounded-full border border-outline-variant/35 bg-surface-container-lowest px-4 py-2.5 text-sm font-medium text-on-surface transition-colors hover:border-on-surface-variant hover:bg-surface-canvas"
               >
                 Clear all filters
               </Link>
@@ -1009,7 +1084,7 @@ export function SearchResultsClient({
           {allListings.length > 0 && (
             <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
-                <p className="hidden text-sm text-on-surface-variant md:block">
+                <p className="hidden text-sm font-medium text-on-surface-variant md:block">
                   {isClientFetching
                     ? "Updating..."
                     : total !== null
@@ -1038,9 +1113,9 @@ export function SearchResultsClient({
 
           {/* Client-side fetch loading bar */}
           {isClientFetching && (
-            <div className="h-[3px] bg-surface-container-high rounded-full overflow-hidden mb-4">
+            <div className="mb-4 h-[3px] overflow-hidden rounded-full bg-surface-container-high">
               <div
-                className="h-full bg-primary rounded-full animate-[indeterminate_1.5s_ease-in-out_infinite] motion-reduce:animate-none"
+                className="h-full animate-[indeterminate_1.5s_ease-in-out_infinite] rounded-full bg-primary motion-reduce:animate-none"
                 style={{ width: "40%" }}
                 role="progressbar"
                 aria-label="Loading new search results"
@@ -1054,7 +1129,12 @@ export function SearchResultsClient({
             aria-label="Search results"
             aria-busy={isLoadingMore || isClientFetching}
             data-hydrated={isHydrated || undefined}
-            className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-x-6 sm:gap-y-9 transition-opacity duration-200 ease-out motion-reduce:transition-none"
+            className={cn(
+              "grid grid-cols-1 transition-opacity duration-200 ease-out motion-reduce:transition-none",
+              useHorizontalDesktopCards
+                ? "gap-2 sm:gap-3"
+                : "gap-5 sm:grid-cols-2 sm:gap-x-6 sm:gap-y-9"
+            )}
             style={isClientFetching ? { opacity: 0.6 } : undefined}
           >
             {allListings.map((listing, index) => {
@@ -1095,6 +1175,9 @@ export function SearchResultsClient({
                         showTotalPrice={effectiveShowTotalPrice}
                         estimatedMonths={estimatedMonths}
                         queryHashPrefix8={responseMeta.queryHash?.slice(0, 8)}
+                        desktopVariant={
+                          useHorizontalDesktopCards ? "row" : "grid"
+                        }
                       />
                     </div>
                   </ListingCardErrorBoundary>
@@ -1129,7 +1212,7 @@ export function SearchResultsClient({
 
           {/* Load more section with progress indicator */}
           {isHydrated && nextCursor && !reachedCap && !isDegraded && (
-            <div className="flex flex-col items-center mt-8 mb-4 gap-2">
+            <div className="mb-4 mt-8 flex flex-col items-center gap-2">
               <p className="text-xs text-on-surface-variant">
                 Showing {allListings.length} of{" "}
                 {total !== null ? `~${total}` : "100+"} listings
@@ -1143,7 +1226,7 @@ export function SearchResultsClient({
                     ? "Loading more results"
                     : `Show more places. Currently showing ${allListings.length}${total !== null ? ` of ${total}` : ""} listings`
                 }
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary hover:bg-primary/90 text-on-primary text-sm font-medium transition-colors disabled:opacity-50 touch-target"
+                className="touch-target inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-on-primary shadow-ambient-sm shadow-primary/20 transition-colors hover:bg-primary-container disabled:opacity-50"
               >
                 {isLoadingMore ? (
                   <>
@@ -1171,9 +1254,7 @@ export function SearchResultsClient({
           {/* Load error */}
           {refreshNotice && !loadError && (
             <div className="flex justify-center mt-4" role="status">
-              <p className="text-sm text-on-surface-variant">
-                {refreshNotice}
-              </p>
+              <p className="text-sm text-on-surface-variant">{refreshNotice}</p>
             </div>
           )}
 
@@ -1208,22 +1289,26 @@ export function SearchResultsClient({
             />
           )}
 
-          {allListings.length > 0 && !effectiveZeroResults && isHydrated && !isLoadingMore && (
-            <section
-              aria-label="Save search"
-              className="hidden md:flex mt-12 mb-4 relative overflow-hidden bg-surface-container-high/40 rounded-2xl p-8 flex-col sm:flex-row items-center justify-between gap-6 border border-outline-variant/20"
-            >
-              <div>
-                <h3 className="text-lg font-display font-semibold text-on-surface mb-1">
-                  Don&apos;t miss out
-                </h3>
-                <p className="text-sm text-on-surface-variant">
-                  We add new spaces daily. Save this search to get notified first.
-                </p>
-              </div>
-              <SaveSearchButton />
-            </section>
-          )}
+          {allListings.length > 0 &&
+            !effectiveZeroResults &&
+            isHydrated &&
+            !isLoadingMore && (
+              <section
+                aria-label="Save search"
+                className="relative mb-4 mt-12 hidden flex-col items-center justify-between gap-6 overflow-hidden rounded-[1.5rem] border border-outline-variant/25 bg-surface-container-high/35 p-8 md:flex sm:flex-row"
+              >
+                <div>
+                  <h3 className="text-lg font-display font-semibold text-on-surface mb-1">
+                    Don&apos;t miss out
+                  </h3>
+                  <p className="text-sm text-on-surface-variant">
+                    We add new spaces daily. Save this search to get notified
+                    first.
+                  </p>
+                </div>
+                <SaveSearchButton />
+              </section>
+            )}
         </>
       )}
     </div>

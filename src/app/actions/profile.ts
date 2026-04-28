@@ -6,7 +6,51 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { checkSuspension } from "./suspension";
 import { logger } from "@/lib/logger";
-import { supabaseImageUrlSchema } from "@/lib/schemas";
+import {
+  noHtmlTags,
+  sanitizeUnicode,
+  supabaseImageUrlSchema,
+} from "@/lib/schemas";
+import {
+  checkRateLimit,
+  getClientIPFromHeaders,
+  RATE_LIMITS,
+} from "@/lib/rate-limit";
+import { headers } from "next/headers";
+
+const CONTROL_CHARS_PATTERN = /[\u0000-\u001F\u007F-\u009F]/;
+
+const profileLanguagesSchema = z
+  .array(
+    z
+      .string()
+      .transform(sanitizeUnicode)
+      .pipe(
+        z
+          .string()
+          .min(1, "Language cannot be empty")
+          .max(40, "Each language must be 40 characters or less")
+          .refine(noHtmlTags, "Languages cannot contain HTML")
+          .refine(
+            (value) => !CONTROL_CHARS_PATTERN.test(value),
+            "Languages cannot contain control characters"
+          )
+      )
+  )
+  .max(20, "Maximum 20 languages allowed")
+  .transform((languages) => {
+    const seen = new Set<string>();
+    const deduped: string[] = [];
+
+    for (const language of languages) {
+      const key = language.toLocaleLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      deduped.push(language);
+    }
+
+    return deduped;
+  });
 
 const updateProfileSchema = z.object({
   name: z.string().min(1, "Name is required").max(100, "Name is too long"),
@@ -16,7 +60,7 @@ const updateProfileSchema = z.object({
     .optional()
     .nullable(),
   countryOfOrigin: z.string().max(100).optional().nullable(),
-  languages: z.array(z.string()).optional(),
+  languages: profileLanguagesSchema.optional(),
   image: supabaseImageUrlSchema.optional().nullable(),
 });
 
@@ -31,6 +75,17 @@ export async function updateProfile(data: UpdateProfileInput) {
   const suspension = await checkSuspension();
   if (suspension.suspended) {
     return { error: suspension.error || "Account suspended" };
+  }
+
+  const headersList = await headers();
+  const ip = getClientIPFromHeaders(headersList);
+  const rateLimit = await checkRateLimit(
+    `${ip}:${session.user.id}`,
+    "profileUpdate",
+    RATE_LIMITS.profileUpdate
+  );
+  if (!rateLimit.success) {
+    return { error: "Too many requests. Please try again later." };
   }
 
   try {

@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { checkSuspension, checkEmailVerified } from "@/app/actions/suspension";
-import { checkBlockBeforeAction } from "@/app/actions/block";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { captureApiError } from "@/lib/api-error-handler";
 import { validateCsrf } from "@/lib/csrf";
@@ -12,7 +11,7 @@ import {
   markConversationMessagesAsReadForUser,
   userCanAccessConversation,
 } from "@/lib/messages";
-import { evaluateListingContactable } from "@/lib/messaging/listing-contactable";
+import { sendConversationMessage } from "@/lib/messaging/send-conversation-message";
 import { getClientIP } from "@/lib/rate-limit";
 import {
   parsePaginationParams,
@@ -361,81 +360,24 @@ export async function POST(request: Request) {
     }
     const { conversationId, content: trimmedContent } = sendParsed.data;
 
-    const conversation = await prisma.conversation.findUnique({
-      where: { id: conversationId },
-      include: {
-        participants: { select: { id: true } },
-        listing: {
-          select: {
-            status: true,
-            statusReason: true,
-            availableSlots: true,
-            totalSlots: true,
-            openSlots: true,
-            moveInDate: true,
-            availableUntil: true,
-            minStayMonths: true,
-            lastConfirmedAt: true,
-          },
-        },
-      },
+    const sent = await sendConversationMessage({
+      conversationId,
+      senderId: userId,
+      senderName: session.user.name,
+      content: trimmedContent,
+      includeSenderInMessage: true,
+      missingConversationError: "Unauthorized",
+      missingConversationStatus: 403,
     });
 
-    if (
-      !conversation ||
-      conversation.deletedAt ||
-      !conversation.participants.some(
-        (participant) => participant.id === userId
-      )
-    ) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    if (!sent.ok) {
+      const body = sent.code
+        ? { error: sent.error, code: sent.code }
+        : { error: sent.error };
+      return NextResponse.json(body, { status: sent.status });
     }
 
-    const contactable = evaluateListingContactable(conversation.listing);
-    if (!contactable.ok) {
-      return NextResponse.json(
-        { error: contactable.message, code: contactable.code },
-        { status: 403 },
-      );
-    }
-
-    const otherParticipant = conversation.participants.find(
-      (participant) => participant.id !== userId
-    );
-    if (otherParticipant) {
-      const blockCheck = await checkBlockBeforeAction(otherParticipant.id);
-      if (!blockCheck.allowed) {
-        return NextResponse.json(
-          { error: blockCheck.message },
-          { status: 403 }
-        );
-      }
-    }
-
-    const message = await prisma.$transaction(async (tx) => {
-      const [createdMessage] = await Promise.all([
-        tx.message.create({
-          data: {
-            senderId: userId,
-            conversationId,
-            content: trimmedContent,
-          },
-          include: {
-            sender: { select: { id: true, name: true, image: true } },
-          },
-        }),
-        tx.conversation.update({
-          where: { id: conversationId },
-          data: { updatedAt: new Date() },
-        }),
-        tx.conversationDeletion.deleteMany({
-          where: { conversationId },
-        }),
-      ]);
-      return createdMessage;
-    });
-
-    const response = NextResponse.json(message, { status: 201 });
+    const response = NextResponse.json(sent.message, { status: 201 });
     response.headers.set("Cache-Control", "no-store");
     return response;
   } catch (error: unknown) {

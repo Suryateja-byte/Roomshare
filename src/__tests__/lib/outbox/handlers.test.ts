@@ -87,8 +87,12 @@ afterEach(() => {
   delete process.env.KILL_SWITCH_PAUSE_EMBED_PUBLISH;
 });
 
-async function withTx<T>(fn: (tx: TransactionClient) => Promise<T>): Promise<T> {
-  return fixture.client.$transaction((tx) => fn(tx as unknown as TransactionClient));
+async function withTx<T>(
+  fn: (tx: TransactionClient) => Promise<T>
+): Promise<T> {
+  return fixture.client.$transaction((tx) =>
+    fn(tx as unknown as TransactionClient)
+  );
 }
 
 function makeEvent(overrides: Partial<OutboxRow> = {}): OutboxRow {
@@ -110,7 +114,10 @@ function makeEvent(overrides: Partial<OutboxRow> = {}): OutboxRow {
 
 async function seedUnitAndInventory(unitId: string): Promise<string> {
   const canonHash = `hash-${unitId}`;
-  await fixture.insertPhysicalUnit({ id: unitId, canonicalAddressHash: canonHash });
+  await fixture.insertPhysicalUnit({
+    id: unitId,
+    canonicalAddressHash: canonHash,
+  });
   const invId = await fixture.insertListingInventory({
     unitId,
     canonicalAddressHash: canonHash,
@@ -163,10 +170,14 @@ describe("HANDLERS.INVENTORY_UPSERTED", () => {
     expect(result.outcome).toBe("completed");
 
     const ispRows = await fixture.getInventorySearchProjections();
-    expect(ispRows.find((row) => row.inventoryId === invId)?.unitId).toBe(unitId);
+    expect(ispRows.find((row) => row.inventoryId === invId)?.unitId).toBe(
+      unitId
+    );
 
     const ciRows = await fixture.getCacheInvalidations();
-    expect(ciRows.find((row) => row.unitId === unitId && row.reason === "REPUBLISH")).toBeDefined();
+    expect(
+      ciRows.find((row) => row.unitId === unitId && row.reason === "REPUBLISH")
+    ).toBeDefined();
   });
 
   it("falls back to the inventory row when payload unitId is missing", async () => {
@@ -208,7 +219,9 @@ describe("HANDLERS.INVENTORY_UPSERTED", () => {
       payload: { unitId },
       sourceVersion: BigInt(1),
     });
-    const result = await withTx((tx) => HANDLERS.INVENTORY_UPSERTED(tx, event1));
+    const result = await withTx((tx) =>
+      HANDLERS.INVENTORY_UPSERTED(tx, event1)
+    );
     expect(result.outcome).toBe("stale_skipped");
   });
 });
@@ -228,7 +241,10 @@ describe("HANDLERS.CACHE_INVALIDATE", () => {
     // Insert a cache_invalidation row
     const ciId = `ci-${Date.now()}`;
     const unitId = `unit-ci-${Date.now()}`;
-    await fixture.insertPhysicalUnit({ id: unitId, canonicalAddressHash: `hash-${unitId}` });
+    await fixture.insertPhysicalUnit({
+      id: unitId,
+      canonicalAddressHash: `hash-${unitId}`,
+    });
     await fixture.query(
       `INSERT INTO cache_invalidations (id, unit_id, projection_epoch, unit_identity_epoch, reason, enqueued_at)
        VALUES ($1,$2,$3,$4,$5,NOW())`,
@@ -251,7 +267,10 @@ describe("HANDLERS.CACHE_INVALIDATE", () => {
 describe("HANDLERS.UNIT_UPSERTED", () => {
   it("returns completed for a valid unit", async () => {
     const unitId = `unit-uu-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    await fixture.insertPhysicalUnit({ id: unitId, canonicalAddressHash: `hash-${unitId}` });
+    await fixture.insertPhysicalUnit({
+      id: unitId,
+      canonicalAddressHash: `hash-${unitId}`,
+    });
 
     const event = makeEvent({
       kind: "UNIT_UPSERTED",
@@ -264,13 +283,42 @@ describe("HANDLERS.UNIT_UPSERTED", () => {
 });
 
 describe("HANDLERS.IDENTITY_MUTATION", () => {
-  it("inserts a cache_invalidations row and enqueues CACHE_INVALIDATE event", async () => {
-    const unitId = `unit-idm-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    await fixture.insertPhysicalUnit({ id: unitId, canonicalAddressHash: `hash-${unitId}` });
+  it("fatal-errors mutation events that do not name affected units", async () => {
+    const event = makeEvent({
+      kind: "IDENTITY_MUTATION",
+      aggregateType: "IDENTITY_MUTATION",
+      aggregateId: "mutation-missing-units",
+      payload: {},
+    });
+
+    const result = await withTx((tx) => HANDLERS.IDENTITY_MUTATION(tx, event));
+    expect(result).toMatchObject({
+      outcome: "fatal_error",
+      dlqReason: "IDENTITY_MUTATION_NO_AFFECTED_UNITS",
+    });
+  });
+
+  it("fans out cache invalidations to every affected unit from the mutation payload", async () => {
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const fromUnitId = `unit-idm-from-${suffix}`;
+    const toUnitId = `unit-idm-to-${suffix}`;
+    await fixture.insertPhysicalUnit({
+      id: fromUnitId,
+      canonicalAddressHash: `hash-${fromUnitId}`,
+    });
+    await fixture.insertPhysicalUnit({
+      id: toUnitId,
+      canonicalAddressHash: `hash-${toUnitId}`,
+    });
 
     const event = makeEvent({
       kind: "IDENTITY_MUTATION",
-      aggregateId: unitId,
+      aggregateType: "IDENTITY_MUTATION",
+      aggregateId: `mutation-${suffix}`,
+      payload: {
+        fromUnitIds: [fromUnitId],
+        toUnitIds: [toUnitId],
+      },
       sourceVersion: BigInt(1),
       unitIdentityEpoch: 1,
     });
@@ -280,16 +328,27 @@ describe("HANDLERS.IDENTITY_MUTATION", () => {
 
     // Check cache_invalidations row was inserted
     const ciRows = await fixture.getCacheInvalidations();
-    const ci = ciRows.find((r) => r.unitId === unitId && r.reason === "IDENTITY_MUTATION");
-    expect(ci).toBeDefined();
+    expect(
+      ciRows.find(
+        (r) => r.unitId === fromUnitId && r.reason === "IDENTITY_MUTATION"
+      )
+    ).toBeDefined();
+    expect(
+      ciRows.find(
+        (r) => r.unitId === toUnitId && r.reason === "IDENTITY_MUTATION"
+      )
+    ).toBeDefined();
 
     // Check CACHE_INVALIDATE outbox event was enqueued
     const outbox = await fixture.getOutboxEvents();
-    const cacheEvent = outbox.find(
-      (e) => e.kind === "CACHE_INVALIDATE" && (e.payload.unitId as string) === unitId
-    );
-    expect(cacheEvent).toBeDefined();
-    expect(cacheEvent!.priority).toBe(10);
+    const cacheEvents = outbox.filter((e) => e.kind === "CACHE_INVALIDATE");
+    expect(
+      cacheEvents.find((e) => (e.payload.unitId as string) === fromUnitId)
+    ).toBeDefined();
+    expect(
+      cacheEvents.find((e) => (e.payload.unitId as string) === toUnitId)
+    ).toBeDefined();
+    expect(cacheEvents.every((event) => event.priority === 10)).toBe(true);
   });
 });
 
@@ -361,7 +420,10 @@ describe("HANDLERS error branches", () => {
       },
     } as unknown as import("@/lib/db/with-actor").TransactionClient;
 
-    const event = makeEvent({ kind: "TOMBSTONE", payload: { inventoryId: "inv-1" } });
+    const event = makeEvent({
+      kind: "TOMBSTONE",
+      payload: { inventoryId: "inv-1" },
+    });
     const result = await HANDLERS.TOMBSTONE(badTx, event);
     expect(result.outcome).toBe("transient_error");
   });
@@ -379,7 +441,10 @@ describe("HANDLERS error branches", () => {
       },
     } as unknown as import("@/lib/db/with-actor").TransactionClient;
 
-    const event = makeEvent({ kind: "SUPPRESSION", payload: { inventoryId: "inv-1" } });
+    const event = makeEvent({
+      kind: "SUPPRESSION",
+      payload: { inventoryId: "inv-1" },
+    });
     const result = await HANDLERS.SUPPRESSION(badTx, event);
     expect(result.outcome).toBe("transient_error");
   });
@@ -397,7 +462,10 @@ describe("HANDLERS error branches", () => {
       },
     } as unknown as import("@/lib/db/with-actor").TransactionClient;
 
-    const event = makeEvent({ kind: "PAUSE", payload: { inventoryId: "inv-1" } });
+    const event = makeEvent({
+      kind: "PAUSE",
+      payload: { inventoryId: "inv-1" },
+    });
     const result = await HANDLERS.PAUSE(badTx, event);
     expect(result.outcome).toBe("transient_error");
   });
@@ -408,7 +476,10 @@ describe("HANDLERS error branches", () => {
       $queryRaw: () => Promise.reject(new Error("DB error")),
     } as unknown as import("@/lib/db/with-actor").TransactionClient;
 
-    const event = makeEvent({ kind: "CACHE_INVALIDATE", payload: { cacheInvalidationId: "ci-123" } });
+    const event = makeEvent({
+      kind: "CACHE_INVALIDATE",
+      payload: { cacheInvalidationId: "ci-123" },
+    });
     const result = await HANDLERS.CACHE_INVALIDATE(badTx, event);
     expect(result.outcome).toBe("transient_error");
   });
@@ -422,7 +493,15 @@ describe("HANDLERS error branches", () => {
       },
     } as unknown as import("@/lib/db/with-actor").TransactionClient;
 
-    const event = makeEvent({ kind: "IDENTITY_MUTATION" });
+    const event = makeEvent({
+      kind: "IDENTITY_MUTATION",
+      aggregateType: "IDENTITY_MUTATION",
+      aggregateId: "mutation-db-error",
+      payload: {
+        fromUnitIds: ["unit-db-error-from"],
+        toUnitIds: ["unit-db-error-to"],
+      },
+    });
     const result = await HANDLERS.IDENTITY_MUTATION(badTx, event);
     expect(result.outcome).toBe("transient_error");
   });
@@ -431,7 +510,10 @@ describe("HANDLERS error branches", () => {
 describe("HANDLERS.TOMBSTONE / SUPPRESSION / PAUSE", () => {
   async function seedUnitWithIsp(unitId: string): Promise<string> {
     const canonHash = `hash-${unitId}`;
-    await fixture.insertPhysicalUnit({ id: unitId, canonicalAddressHash: canonHash });
+    await fixture.insertPhysicalUnit({
+      id: unitId,
+      canonicalAddressHash: canonHash,
+    });
     const invId = `inv-${unitId}`;
     await fixture.insertInventorySearchProjection({
       id: invId,
@@ -502,7 +584,9 @@ describe("HANDLERS Phase 03+ async integrations", () => {
     typeof processSearchAlerts
   >;
   const mockDeliverQueuedSearchAlert =
-    deliverQueuedSearchAlert as jest.MockedFunction<typeof deliverQueuedSearchAlert>;
+    deliverQueuedSearchAlert as jest.MockedFunction<
+      typeof deliverQueuedSearchAlert
+    >;
 
   it.each([
     ["success", { status: "success" }, "completed"],
@@ -512,7 +596,11 @@ describe("HANDLERS Phase 03+ async integrations", () => {
       { status: "transient_error", retryAfterMs: 12_345 },
       "transient_error",
     ],
-    ["exhausted", { status: "exhausted", dlqReason: "NO_GEOCODE" }, "fatal_error"],
+    [
+      "exhausted",
+      { status: "exhausted", dlqReason: "NO_GEOCODE" },
+      "fatal_error",
+    ],
   ] as const)(
     "maps GEOCODE_NEEDED %s outcome",
     async (_status, geocodeOutcome, expectedOutcome) => {
@@ -720,7 +808,9 @@ describe("HANDLERS Phase 03+ async integrations", () => {
   });
 
   it("returns transient_error when ALERT_DELIVER throws", async () => {
-    mockDeliverQueuedSearchAlert.mockRejectedValueOnce(new Error("delivery db down"));
+    mockDeliverQueuedSearchAlert.mockRejectedValueOnce(
+      new Error("delivery db down")
+    );
 
     await expect(
       HANDLERS.ALERT_DELIVER(tx, makeEvent({ kind: "ALERT_DELIVER" }))

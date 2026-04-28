@@ -86,6 +86,41 @@ describe("ContactHostButton", () => {
     });
   });
 
+  it("passes the observed unit identity epoch when provided", async () => {
+    mockStartConversation.mockResolvedValue({ conversationId: "conv-123" });
+
+    render(
+      <ContactHostButton
+        listingId="listing-123"
+        unitIdentityEpochObserved={7}
+      />
+    );
+    await userEvent.click(screen.getByText("Contact Host"));
+
+    await waitFor(() => {
+      expect(mockStartConversation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          listingId: "listing-123",
+          unitIdentityEpochObserved: 7,
+        })
+      );
+    });
+  });
+
+  it("omits the observed unit identity epoch when absent", async () => {
+    mockStartConversation.mockResolvedValue({ conversationId: "conv-123" });
+
+    render(<ContactHostButton listingId="listing-123" />);
+    await userEvent.click(screen.getByText("Contact Host"));
+
+    await waitFor(() => {
+      expect(mockStartConversation).toHaveBeenCalled();
+    });
+    expect(mockStartConversation.mock.calls[0][0]).not.toHaveProperty(
+      "unitIdentityEpochObserved"
+    );
+  });
+
   it("handles exceptions", async () => {
     mockStartConversation.mockRejectedValue(new Error("Network error"));
 

@@ -223,6 +223,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const isLoggedIn = !!auth?.user;
       const pathname = nextUrl.pathname;
       const isAdmin = !!auth?.user?.isAdmin;
+      const isSuspended = auth?.user?.isSuspended === true;
 
       const protectedPaths = [
         "/dashboard",
@@ -242,7 +243,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       if (isAdminRoute) {
         if (!isLoggedIn) return false;
-        if (!isAdmin) return Response.redirect(new URL("/", nextUrl));
+        if (!isAdmin || isSuspended)
+          return Response.redirect(new URL("/", nextUrl));
         return true;
       }
       if (isProtected) {

@@ -10,6 +10,35 @@ jest.mock("@/lib/prisma", () => ({
       update: jest.fn(),
       delete: jest.fn(),
     },
+    account: { deleteMany: jest.fn() },
+    session: { deleteMany: jest.fn() },
+    listing: {
+      update: jest.fn(),
+      deleteMany: jest.fn(),
+    },
+    report: {
+      groupBy: jest.fn(),
+      deleteMany: jest.fn(),
+    },
+    message: { deleteMany: jest.fn() },
+    conversationDeletion: { deleteMany: jest.fn() },
+    typingStatus: { deleteMany: jest.fn() },
+    blockedUser: { deleteMany: jest.fn() },
+    notification: { deleteMany: jest.fn() },
+    recentlyViewed: { deleteMany: jest.fn() },
+    savedListing: { deleteMany: jest.fn() },
+    alertDelivery: { deleteMany: jest.fn() },
+    alertSubscription: { deleteMany: jest.fn() },
+    savedSearch: { deleteMany: jest.fn() },
+    verificationUpload: { deleteMany: jest.fn() },
+    verificationRequest: { deleteMany: jest.fn() },
+    review: { deleteMany: jest.fn() },
+    hostContactChannel: { deleteMany: jest.fn() },
+    publicCachePushSubscription: { deleteMany: jest.fn() },
+    passwordResetToken: { deleteMany: jest.fn() },
+    verificationToken: { deleteMany: jest.fn() },
+    $queryRaw: jest.fn(),
+    $transaction: jest.fn(),
   },
 }));
 
@@ -49,6 +78,10 @@ jest.mock("@/lib/logger", () => ({
   logger: { sync: { error: jest.fn(), warn: jest.fn(), info: jest.fn() } },
 }));
 
+jest.mock("@/lib/search/search-doc-dirty", () => ({
+  markListingDirtyInTx: jest.fn().mockResolvedValue(undefined),
+}));
+
 import {
   getNotificationPreferences,
   updateNotificationPreferences,
@@ -60,6 +93,8 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
+import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
+import { Prisma } from "@prisma/client";
 
 describe("settings actions", () => {
   const mockSession = {
@@ -84,6 +119,45 @@ describe("settings actions", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (auth as jest.Mock).mockResolvedValue(mockSession);
+    (prisma.$transaction as jest.Mock).mockImplementation(
+      async (callback: (tx: typeof prisma) => Promise<unknown>) =>
+        callback(prisma)
+    );
+    (prisma.$queryRaw as jest.Mock)
+      .mockResolvedValueOnce([{ id: "user-123" }])
+      .mockResolvedValueOnce([]);
+    (prisma.report.groupBy as jest.Mock).mockResolvedValue([]);
+
+    for (const delegate of [
+      prisma.account,
+      prisma.session,
+      prisma.listing,
+      prisma.message,
+      prisma.conversationDeletion,
+      prisma.typingStatus,
+      prisma.blockedUser,
+      prisma.notification,
+      prisma.recentlyViewed,
+      prisma.savedListing,
+      prisma.alertDelivery,
+      prisma.alertSubscription,
+      prisma.savedSearch,
+      prisma.verificationUpload,
+      prisma.verificationRequest,
+      prisma.review,
+      prisma.hostContactChannel,
+      prisma.publicCachePushSubscription,
+      prisma.passwordResetToken,
+      prisma.verificationToken,
+    ]) {
+      for (const value of Object.values(delegate)) {
+        if (typeof value === "function") {
+          (value as jest.Mock).mockResolvedValue({ count: 0 });
+        }
+      }
+    }
+    (prisma.listing.update as jest.Mock).mockResolvedValue({});
+    (prisma.user.update as jest.Mock).mockResolvedValue({ id: "user-123" });
   });
 
   describe("getNotificationPreferences", () => {
@@ -306,32 +380,43 @@ describe("settings actions", () => {
       expect(result.error).toBe("Not authenticated");
     });
 
-    it("deletes user from database for OAuth user (no password)", async () => {
+    it("tombstones user instead of deleting row for OAuth user (no password)", async () => {
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        email: "test@example.com",
         password: null,
       });
-      (prisma.user.delete as jest.Mock).mockResolvedValue({ id: "user-123" });
 
       await deleteAccount();
 
-      expect(prisma.user.delete).toHaveBeenCalledWith({
+      expect(prisma.user.delete).not.toHaveBeenCalled();
+      expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: "user-123" },
+        data: expect.objectContaining({
+          name: "Deleted User",
+          email: null,
+          password: null,
+          isSuspended: true,
+          isAdmin: false,
+          isVerified: false,
+        }),
       });
     });
 
-    it("returns success: true on successful deletion for OAuth user", async () => {
+    it("returns success: true on successful tombstone for OAuth user", async () => {
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        email: "test@example.com",
         password: null,
       });
-      (prisma.user.delete as jest.Mock).mockResolvedValue({ id: "user-123" });
 
       const result = await deleteAccount();
 
       expect(result.success).toBe(true);
+      expect(result).toEqual({ success: true });
     });
 
     it("requires password for users with password set", async () => {
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        email: "test@example.com",
         password: "hashedpassword",
       });
 
@@ -343,6 +428,7 @@ describe("settings actions", () => {
 
     it("returns error when password is incorrect", async () => {
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        email: "test@example.com",
         password: "hashedpassword",
       });
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
@@ -353,12 +439,12 @@ describe("settings actions", () => {
       expect(result.error).toBe("Password is incorrect");
     });
 
-    it("deletes user when password is correct", async () => {
+    it("tombstones user when password is correct", async () => {
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        email: "test@example.com",
         password: "hashedpassword",
       });
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
-      (prisma.user.delete as jest.Mock).mockResolvedValue({ id: "user-123" });
 
       const result = await deleteAccount("correctpassword");
 
@@ -366,24 +452,173 @@ describe("settings actions", () => {
         "correctpassword",
         "hashedpassword"
       );
-      expect(prisma.user.delete).toHaveBeenCalledWith({
+      expect(prisma.user.delete).not.toHaveBeenCalled();
+      expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: "user-123" },
+        data: expect.objectContaining({
+          email: null,
+          password: null,
+          isAdmin: false,
+          isSuspended: true,
+        }),
       });
       expect(result.success).toBe(true);
     });
 
     it("returns error on database failure", async () => {
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        email: "test@example.com",
         password: null,
       });
-      (prisma.user.delete as jest.Mock).mockRejectedValue(
-        new Error("DB Error")
-      );
+      (prisma.$transaction as jest.Mock).mockRejectedValue(new Error("DB Error"));
 
       const result = await deleteAccount();
 
       expect(result.success).toBe(false);
       expect(result.error).toBe("Failed to delete account");
+    });
+
+    it("suppresses reported owner listings and preserves report evidence", async () => {
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        email: "test@example.com",
+        password: null,
+      });
+      (prisma.$queryRaw as jest.Mock)
+        .mockReset()
+        .mockResolvedValueOnce([{ id: "user-123" }])
+        .mockResolvedValueOnce([
+          { id: "reported-listing", version: 4 },
+          { id: "clean-listing", version: 2 },
+        ]);
+      (prisma.report.groupBy as jest.Mock).mockResolvedValue([
+        { listingId: "reported-listing", _count: { _all: 1 } },
+      ]);
+
+      const result = await deleteAccount();
+
+      expect(result).toEqual({ success: true });
+      expect(prisma.user.delete).not.toHaveBeenCalled();
+      expect(prisma.report.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.listing.update).toHaveBeenCalledWith({
+        where: { id: "reported-listing" },
+        data: {
+          status: "PAUSED",
+          statusReason: "SUPPRESSED",
+          version: 5,
+        },
+      });
+      expect(markListingDirtyInTx).toHaveBeenCalledWith(
+        prisma,
+        "reported-listing",
+        "status_changed"
+      );
+      expect(prisma.listing.deleteMany).toHaveBeenCalledWith({
+        where: { id: { in: ["clean-listing"] } },
+      });
+    });
+
+    it("hard-deletes unreported owner listings", async () => {
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        email: "test@example.com",
+        password: null,
+      });
+      (prisma.$queryRaw as jest.Mock)
+        .mockReset()
+        .mockResolvedValueOnce([{ id: "user-123" }])
+        .mockResolvedValueOnce([
+          { id: "clean-listing-1", version: 1 },
+          { id: "clean-listing-2", version: 3 },
+        ]);
+      (prisma.report.groupBy as jest.Mock).mockResolvedValue([]);
+
+      const result = await deleteAccount();
+
+      expect(result).toEqual({ success: true });
+      expect(prisma.listing.update).not.toHaveBeenCalled();
+      expect(markListingDirtyInTx).not.toHaveBeenCalled();
+      expect(prisma.listing.deleteMany).toHaveBeenCalledWith({
+        where: { id: { in: ["clean-listing-1", "clean-listing-2"] } },
+      });
+    });
+
+    it("does not delete listings when the user has no owned listings", async () => {
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        email: "test@example.com",
+        password: null,
+      });
+
+      await deleteAccount();
+
+      expect(prisma.report.groupBy).not.toHaveBeenCalled();
+      expect(prisma.listing.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.listing.update).not.toHaveBeenCalled();
+    });
+
+    it("preserves submitted reports by tombstoning reporter accounts", async () => {
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        email: "reporter@example.com",
+        password: null,
+      });
+
+      const result = await deleteAccount();
+
+      expect(result).toEqual({ success: true });
+      expect(prisma.user.delete).not.toHaveBeenCalled();
+      expect(prisma.report.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: "user-123" },
+        data: expect.objectContaining({
+          name: "Deleted User",
+          email: null,
+          isSuspended: true,
+        }),
+      });
+    });
+
+    it("clears credentials and non-evidence personal state during tombstone", async () => {
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        email: "test@example.com",
+        password: null,
+      });
+
+      await deleteAccount();
+
+      expect(prisma.account.deleteMany).toHaveBeenCalledWith({
+        where: { userId: "user-123" },
+      });
+      expect(prisma.session.deleteMany).toHaveBeenCalledWith({
+        where: { userId: "user-123" },
+      });
+      expect(prisma.passwordResetToken.deleteMany).toHaveBeenCalledWith({
+        where: { email: "test@example.com" },
+      });
+      expect(prisma.verificationToken.deleteMany).toHaveBeenCalledWith({
+        where: { identifier: "test@example.com" },
+      });
+      expect(prisma.savedListing.deleteMany).toHaveBeenCalledWith({
+        where: { userId: "user-123" },
+      });
+      expect(prisma.savedSearch.deleteMany).toHaveBeenCalledWith({
+        where: { userId: "user-123" },
+      });
+      expect(prisma.notification.deleteMany).toHaveBeenCalledWith({
+        where: { userId: "user-123" },
+      });
+      expect(prisma.message.deleteMany).toHaveBeenCalledWith({
+        where: { senderId: "user-123" },
+      });
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: "user-123" },
+        data: expect.objectContaining({
+          email: null,
+          emailVerified: null,
+          password: null,
+          image: null,
+          bio: null,
+          notificationPreferences: Prisma.DbNull,
+          conversations: { set: [] },
+        }),
+      });
     });
 
     it("requires re-authentication for OAuth user with stale session", async () => {
@@ -393,6 +628,7 @@ describe("settings actions", () => {
         authTime: Math.floor(Date.now() / 1000) - 600, // 10 minutes ago
       });
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        email: "test@example.com",
         password: null,
       });
 
@@ -410,6 +646,7 @@ describe("settings actions", () => {
         // No authTime field
       });
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        email: "test@example.com",
         password: null,
       });
 

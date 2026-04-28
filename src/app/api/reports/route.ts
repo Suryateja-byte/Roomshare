@@ -65,6 +65,44 @@ const createReportSchema = z
     }
   });
 
+function isPrismaUniqueConstraintError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "P2002"
+  );
+}
+
+function duplicateReportResponse({
+  isPrivateFeedback,
+  listingId,
+  reporterId,
+  targetUserId,
+}: {
+  isPrivateFeedback: boolean;
+  listingId: string;
+  reporterId: string;
+  targetUserId?: string;
+}) {
+  if (isPrivateFeedback) {
+    recordPrivateFeedbackDenied({
+      reason: "duplicate",
+      listingId,
+      reporterId,
+      targetUserId,
+    });
+  }
+
+  return NextResponse.json(
+    {
+      error:
+        "You have already reported this listing. Your report is being reviewed.",
+    },
+    { status: 409 }
+  );
+}
+
 export async function POST(request: Request) {
   let previewKind: "PRIVATE_FEEDBACK" | null = null;
   let previewListingId: string | undefined;
@@ -128,6 +166,25 @@ export async function POST(request: Request) {
     const { listingId, reason, details, kind, targetUserId } = parsed.data;
     const isPrivateFeedback = isPrivateFeedbackKind(kind);
 
+    const suspension = await checkSuspension(session.user.id);
+    if (suspension.suspended) {
+      if (isPrivateFeedback) {
+        recordPrivateFeedbackDenied({
+          reason: "suspended",
+          listingId,
+          reporterId: session.user.id,
+          targetUserId,
+        });
+      }
+      return NextResponse.json(
+        {
+          error: suspension.error || "Account suspended",
+          code: "ACCOUNT_SUSPENDED",
+        },
+        { status: 403 }
+      );
+    }
+
     // BIZ-05: Block self-reporting — look up listing owner
     const listing = await prisma.listing.findUnique({
       where: { id: listingId },
@@ -166,20 +223,6 @@ export async function POST(request: Request) {
             error: "Private feedback is not currently available",
             code: PRIVATE_FEEDBACK_DISABLED_CODE,
           },
-          { status: 403 }
-        );
-      }
-
-      const suspension = await checkSuspension();
-      if (suspension.suspended) {
-        recordPrivateFeedbackDenied({
-          reason: "suspended",
-          listingId,
-          reporterId: session.user.id,
-          targetUserId,
-        });
-        return NextResponse.json(
-          { error: suspension.error || "Account suspended" },
           { status: 403 }
         );
       }
@@ -265,33 +308,37 @@ export async function POST(request: Request) {
     });
 
     if (existingReport) {
-      if (isPrivateFeedback) {
-        recordPrivateFeedbackDenied({
-          reason: "duplicate",
+      return duplicateReportResponse({
+        isPrivateFeedback,
+        listingId,
+        reporterId: session.user.id,
+        targetUserId,
+      });
+    }
+
+    let report: unknown;
+    try {
+      report = await prisma.report.create({
+        data: {
+          listingId,
+          reporterId: session.user.id,
+          reason,
+          details: details?.trim() || undefined,
+          kind,
+          ...(isPrivateFeedback ? { targetUserId } : {}),
+        },
+      });
+    } catch (error) {
+      if (isPrismaUniqueConstraintError(error)) {
+        return duplicateReportResponse({
+          isPrivateFeedback,
           listingId,
           reporterId: session.user.id,
           targetUserId,
         });
       }
-      return NextResponse.json(
-        {
-          error:
-            "You have already reported this listing. Your report is being reviewed.",
-        },
-        { status: 409 }
-      );
+      throw error;
     }
-
-    const report = await prisma.report.create({
-      data: {
-        listingId,
-        reporterId: session.user.id,
-        reason,
-        details: details?.trim() || undefined,
-        kind,
-        ...(isPrivateFeedback ? { targetUserId } : {}),
-      },
-    });
 
     if (isPrivateFeedback && isPrivateFeedbackCategory(reason)) {
       recordPrivateFeedbackSubmission({

@@ -117,6 +117,49 @@ describe("Phase 06 monetization schema", () => {
         "fraud_audit_jobs",
       ])
     );
+
+    const refundQueueColumns = await fixture.query<{ column_name: string }>(
+      `SELECT column_name
+       FROM information_schema.columns
+       WHERE table_name = 'refund_queue_items'`
+    );
+    expect(refundQueueColumns.map((row) => row.column_name)).toEqual(
+      expect.arrayContaining([
+        "attempt_count",
+        "next_attempt_at",
+        "last_error",
+        "processed_at",
+      ])
+    );
+  });
+
+  it("keys entitlement state by contact kind", async () => {
+    const columns = await fixture.query<{ column_name: string }>(
+      `SELECT column_name
+       FROM information_schema.columns
+       WHERE table_name = 'entitlement_state'`
+    );
+    expect(columns.map((row) => row.column_name)).toContain("contact_kind");
+
+    await fixture.insertUser("state-user");
+    await fixture.query(
+      `INSERT INTO entitlement_state (
+         user_id, contact_kind, credits_free_remaining, credits_paid_remaining
+       ) VALUES
+         ('state-user', 'MESSAGE_START', 1, 0),
+         ('state-user', 'REVEAL_PHONE', 0, 1)`
+    );
+
+    const rows = await fixture.query<{ contact_kind: string }>(
+      `SELECT contact_kind
+       FROM entitlement_state
+       WHERE user_id = 'state-user'
+       ORDER BY contact_kind`
+    );
+    expect(rows.map((row) => row.contact_kind)).toEqual([
+      "MESSAGE_START",
+      "REVEAL_PHONE",
+    ]);
   });
 
   it("allows separate consumption records per unit epoch for message and reveal", async () => {

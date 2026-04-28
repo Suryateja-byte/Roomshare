@@ -129,6 +129,7 @@ interface ListingPageClientProps {
   } | null;
   holdEnabled?: boolean;
   coordinates: { lat: number; lng: number } | null;
+  nearbyCoordinates?: { lat: number; lng: number } | null;
   canViewExactLocation?: boolean;
   similarListings?: Listing[];
   viewToken?: string;
@@ -212,6 +213,7 @@ type CheckoutReturnPhase = "IDLE" | "POLLING" | "PENDING_TIMEOUT";
 function removeCheckoutQueryParams(searchParamsString: string) {
   const nextSearchParams = new URLSearchParams(searchParamsString);
   nextSearchParams.delete("contactCheckout");
+  nextSearchParams.delete("phoneRevealCheckout");
   nextSearchParams.delete("session_id");
   return nextSearchParams.toString();
 }
@@ -434,6 +436,7 @@ function StatCard({ label, value }: { label: string; value: number | string }) {
 
 function ContactFirstSidebarCard({
   listingId,
+  unitIdentityEpochObserved,
   price,
   status,
   bookingMode,
@@ -446,6 +449,7 @@ function ContactFirstSidebarCard({
   ctaDisabledLabel,
 }: {
   listingId: string;
+  unitIdentityEpochObserved?: number | null;
   price: number;
   status: string;
   bookingMode: string;
@@ -504,6 +508,7 @@ function ContactFirstSidebarCard({
         >
           <MessagingCta
             listingId={listingId}
+            unitIdentityEpochObserved={unitIdentityEpochObserved}
             primaryCta={primaryCta}
             canContact={canContact}
             contactDisabledReason={contactDisabledReason}
@@ -523,6 +528,7 @@ function ContactFirstSidebarCard({
 
 function MessagingCta({
   listingId,
+  unitIdentityEpochObserved,
   primaryCta,
   canContact,
   contactDisabledReason,
@@ -532,6 +538,7 @@ function MessagingCta({
   className,
 }: {
   listingId: string;
+  unitIdentityEpochObserved?: number | null;
   primaryCta: PrimaryCta;
   canContact: boolean;
   contactDisabledReason: ContactDisabledReason | null;
@@ -548,6 +555,7 @@ function MessagingCta({
     return (
       <ContactHostButton
         listingId={listingId}
+        unitIdentityEpochObserved={unitIdentityEpochObserved}
         paywallSummary={paywallSummary}
         requiresUnlock={requiresUnlock}
         disabled={disabled}
@@ -595,8 +603,7 @@ export default function ListingPageClient({
   isLoggedIn,
   userHasBooking,
   userExistingReview,
-  coordinates,
-  canViewExactLocation = false,
+  nearbyCoordinates,
   similarListings,
   viewToken,
   initialAvailability,
@@ -609,6 +616,7 @@ export default function ListingPageClient({
   const searchParams = useSearchParams();
   const searchParamsString = searchParams.toString();
   const contactCheckoutParam = searchParams.get("contactCheckout");
+  const phoneRevealCheckoutParam = searchParams.get("phoneRevealCheckout");
   const checkoutSessionIdParam = searchParams.get("session_id");
   const [hasHydrated, setHasHydrated] = useState(false);
   const [privateFeedbackOpen, setPrivateFeedbackOpen] = useState(false);
@@ -714,7 +722,10 @@ export default function ListingPageClient({
       return;
     }
 
-    const contactCheckout = contactCheckoutParam;
+    const purchaseContext = phoneRevealCheckoutParam
+      ? "PHONE_REVEAL"
+      : "CONTACT_HOST";
+    const contactCheckout = phoneRevealCheckoutParam ?? contactCheckoutParam;
     const checkoutSessionId = checkoutSessionIdParam;
     if (!contactCheckout) {
       return;
@@ -731,7 +742,10 @@ export default function ListingPageClient({
       setCheckoutReturnPhase("IDLE");
       setCheckoutNotice({
         tone: "info",
-        message: "Checkout cancelled. You can unlock contact anytime.",
+        message:
+          purchaseContext === "PHONE_REVEAL"
+            ? "Checkout cancelled. You can reveal the phone anytime."
+            : "Checkout cancelled. You can unlock contact anytime.",
       });
       replaceWithoutCheckoutParams();
       return;
@@ -769,7 +783,7 @@ export default function ListingPageClient({
 
       try {
         const response = await fetch(
-          `/api/payments/checkout-session?session_id=${encodeURIComponent(checkoutSessionId)}&listing_id=${encodeURIComponent(listing.id)}`,
+          `/api/payments/checkout-session?session_id=${encodeURIComponent(checkoutSessionId)}&listing_id=${encodeURIComponent(listing.id)}&context=${purchaseContext}`,
           {
             cache: "no-store",
             signal: controller.signal,
@@ -808,28 +822,36 @@ export default function ListingPageClient({
 
         switch (payload.fulfillmentStatus) {
           case "FULFILLED":
-            setViewerState((current) => ({
-              ...current,
-              canContact: true,
-              contactDisabledReason: null,
-              paywallSummary: current.paywallSummary
-                ? {
-                    ...current.paywallSummary,
-                    mode:
-                      current.paywallSummary.mode === "PAYWALL_REQUIRED"
-                        ? "METERED"
-                        : current.paywallSummary.mode,
-                    requiresPurchase: false,
-                  }
-                : current.paywallSummary,
-            }));
-            if (payload.requiresViewerStateRefresh) {
+            if (purchaseContext === "CONTACT_HOST") {
+              setViewerState((current) => ({
+                ...current,
+                canContact: true,
+                contactDisabledReason: null,
+                paywallSummary: current.paywallSummary
+                  ? {
+                      ...current.paywallSummary,
+                      mode:
+                        current.paywallSummary.mode === "PAYWALL_REQUIRED"
+                          ? "METERED"
+                          : current.paywallSummary.mode,
+                      requiresPurchase: false,
+                    }
+                  : current.paywallSummary,
+              }));
+            }
+            if (
+              payload.requiresViewerStateRefresh ||
+              purchaseContext === "PHONE_REVEAL"
+            ) {
               setViewerStateRefreshNonce((value) => value + 1);
             }
             setCheckoutReturnPhase("IDLE");
             setCheckoutNotice({
               tone: "success",
-              message: "Contact unlocked. You can message the host now.",
+              message:
+                purchaseContext === "PHONE_REVEAL"
+                  ? "Phone reveal unlocked. Try revealing the host phone again."
+                  : "Contact unlocked. You can message the host now.",
             });
             replaceWithoutCheckoutParams();
             return;
@@ -847,8 +869,12 @@ export default function ListingPageClient({
               tone: "info",
               message:
                 payload.checkoutStatus === "EXPIRED"
-                  ? "Checkout expired. Try again to unlock contact."
-                  : "Checkout cancelled. You can unlock contact anytime.",
+                  ? purchaseContext === "PHONE_REVEAL"
+                    ? "Checkout expired. Try again to reveal the phone."
+                    : "Checkout expired. Try again to unlock contact."
+                  : purchaseContext === "PHONE_REVEAL"
+                    ? "Checkout cancelled. You can reveal the phone anytime."
+                    : "Checkout cancelled. You can unlock contact anytime.",
             });
             replaceWithoutCheckoutParams();
             return;
@@ -898,6 +924,7 @@ export default function ListingPageClient({
     router,
     searchParamsString,
     contactCheckoutParam,
+    phoneRevealCheckoutParam,
     checkoutSessionIdParam,
   ]);
 
@@ -1217,12 +1244,11 @@ export default function ListingPageClient({
               )}
 
               {/* Nearby Places Section (Radar + MapLibre) */}
-              {canViewExactLocation &&
-                process.env.NEXT_PUBLIC_NEARBY_ENABLED === "true" &&
-                coordinates && (
+              {process.env.NEXT_PUBLIC_NEARBY_ENABLED === "true" &&
+                nearbyCoordinates && (
                   <NearbyPlacesSection
-                    listingLat={coordinates.lat}
-                    listingLng={coordinates.lng}
+                    listingLat={nearbyCoordinates.lat}
+                    listingLng={nearbyCoordinates.lng}
                   />
                 )}
 
@@ -1332,6 +1358,9 @@ export default function ListingPageClient({
                       >
                         <MessagingCta
                           listingId={listing.id}
+                          unitIdentityEpochObserved={
+                            publicCacheMetadata?.unitIdentityEpoch ?? null
+                          }
                           primaryCta={viewerState.primaryCta}
                           canContact={viewerState.canContact}
                           contactDisabledReason={viewerState.contactDisabledReason}
@@ -1510,6 +1539,9 @@ export default function ListingPageClient({
                 {canRenderGuestControls && (
                   <ContactFirstSidebarCard
                     listingId={listing.id}
+                    unitIdentityEpochObserved={
+                      publicCacheMetadata?.unitIdentityEpoch ?? null
+                    }
                     price={listing.price}
                     status={listing.status}
                     bookingMode={listing.bookingMode}

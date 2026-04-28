@@ -152,10 +152,8 @@ describe("SignUpPage", () => {
   it("submits form successfully", async () => {
     mockFetch.mockResolvedValue({
       ok: true,
-      json: async () => ({ id: "user-123", name: "Test User" }),
+      json: async () => ({ success: true, verificationEmailSent: true }),
     });
-    // After successful registration, the component auto-signs-in via signIn("credentials")
-    mockSignIn.mockResolvedValue({ error: null });
 
     render(<SignUpPage />);
 
@@ -179,14 +177,10 @@ describe("SignUpPage", () => {
       });
     });
 
-    // Component auto-signs-in after successful registration
     await waitFor(() => {
-      expect(mockSignIn).toHaveBeenCalledWith("credentials", {
-        email: "test@example.com",
-        password: validPassword,
-        redirect: false,
-      });
+      expect(mockPush).toHaveBeenCalledWith("/login?registered=true");
     });
+    expect(mockSignIn).not.toHaveBeenCalled();
   });
 
   it("shows error on registration failure", async () => {

@@ -71,8 +71,11 @@ function getAuthConfig() {
  */
 function buildArgs(
   pathname: string,
-  user?: { isAdmin?: boolean } | null
-): { auth: { user: { isAdmin?: boolean } } | null; request: { nextUrl: URL } } {
+  user?: { isAdmin?: boolean; isSuspended?: boolean } | null
+): {
+  auth: { user: { isAdmin?: boolean; isSuspended?: boolean } } | null;
+  request: { nextUrl: URL };
+} {
   return {
     auth: user !== undefined && user !== null ? { user } : null,
     request: { nextUrl: new URL(`http://localhost:3000${pathname}`) },
@@ -89,7 +92,7 @@ function buildArgs(
 function expectRedirectToRoot(
   authorized: Function,
   pathname: string,
-  user?: { isAdmin?: boolean } | null
+  user?: { isAdmin?: boolean; isSuspended?: boolean } | null
 ): void {
   try {
     const result = authorized(buildArgs(pathname, user));
@@ -154,6 +157,13 @@ describe("authorized callback — route protection", () => {
       expect(
         authorized(buildArgs("/admin/reports/123", { isAdmin: true }))
       ).toBe(true);
+    });
+
+    it("redirects suspended admin user to / on /admin/reports", () => {
+      expectRedirectToRoot(authorized, "/admin/reports", {
+        isAdmin: true,
+        isSuspended: true,
+      });
     });
   });
 

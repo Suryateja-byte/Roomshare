@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * PrivacyCircle — renders a translucent ~200m radius circle around listing
- * locations instead of showing exact pin placement. The circle radius scales
- * with zoom level to maintain a consistent real-world size.
+ * PrivacyCircle — renders a subtle approximate-location halo around public
+ * listing coordinates. Public search coordinates are already server-coarsened;
+ * this layer communicates that the marker is approximate.
  *
  * Uses a Mapbox `circle` layer on top of GeoJSON point features.
  */
@@ -22,9 +22,10 @@ interface PrivacyCircleProps {
   isDarkMode: boolean;
 }
 
-// Keep the layer mounted for existing map logic/tests, but make the privacy
-// halo visually transparent so price pills read cleanly on the basemap.
-function getCircleLayer(_isDarkMode: boolean): LayerProps {
+function getCircleLayer(isDarkMode: boolean): LayerProps {
+  const fillColor = isDarkMode ? "#93c5fd" : "#2563eb";
+  const strokeColor = isDarkMode ? "#bfdbfe" : "#1d4ed8";
+
   return {
     id: "privacy-circles",
     type: "circle",
@@ -48,7 +49,7 @@ function getCircleLayer(_isDarkMode: boolean): LayerProps {
         18,
         48,
       ],
-      "circle-color": "rgba(0, 0, 0, 0)",
+      "circle-color": fillColor,
       "circle-opacity": [
         "interpolate",
         ["linear"],
@@ -65,7 +66,7 @@ function getCircleLayer(_isDarkMode: boolean): LayerProps {
         0.05,
       ],
       "circle-stroke-width": 1,
-      "circle-stroke-color": "rgba(0, 0, 0, 0)",
+      "circle-stroke-color": strokeColor,
       "circle-stroke-opacity": [
         "interpolate",
         ["linear"],

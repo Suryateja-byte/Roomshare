@@ -180,7 +180,11 @@ beforeAll(() => {
   })) as jest.Mock;
 });
 
-const createMockListing = (id: string, title?: string): ListingData => ({
+const createMockListing = (
+  id: string,
+  title?: string,
+  overrides: Partial<ListingData> = {}
+): ListingData => ({
   id,
   title: title || `Listing ${id}`,
   price: 1000,
@@ -196,6 +200,7 @@ const createMockListing = (id: string, title?: string): ListingData => ({
     availableSlots: 1,
     totalSlots: 2,
   }),
+  ...overrides,
 });
 
 const defaultProps = {
@@ -345,6 +350,63 @@ describe("SearchResultsClient", () => {
       expect(screen.getByText("No matches found")).toBeInTheDocument();
     });
 
+    it("renders location-required state instead of zero-results copy", () => {
+      render(
+        <SearchResultsClient
+          {...defaultProps}
+          initialListings={[]}
+          initialNextCursor={null}
+          initialTotal={0}
+          hasConfirmedZeroResults={false}
+          initialStateKind="location-required"
+        />
+      );
+
+      expect(screen.getByTestId("location-required-state")).toBeInTheDocument();
+      expect(screen.getByText("Select a location")).toBeInTheDocument();
+      expect(screen.queryByText("No matches found")).not.toBeInTheDocument();
+    });
+
+    it("uses effective zero-result params for filter suggestions", async () => {
+      render(
+        <SearchResultsClient
+          {...defaultProps}
+          initialListings={[]}
+          initialNextCursor={null}
+          initialTotal={0}
+          hasConfirmedZeroResults={true}
+          searchParamsString="q=test&bookingMode=WHOLE_UNIT&moveInDate=2026-05-01&endDate=2026-08-01"
+          filterParams={{}}
+        />
+      );
+
+      await waitFor(() => {
+        expect(getFilterSuggestions).toHaveBeenCalledWith(
+          expect.objectContaining({
+            query: "test",
+            bookingMode: "WHOLE_UNIT",
+            moveInDate: "2026-05-01",
+            endDate: "2026-08-01",
+          })
+        );
+      });
+    });
+
+    it("derives estimated months from canonical endDate", () => {
+      render(
+        <SearchResultsClient
+          {...defaultProps}
+          searchParamsString="q=test&moveInDate=2026-05-01&endDate=2026-08-01"
+        />
+      );
+
+      expect(mockListingCard).toHaveBeenCalledWith(
+        expect.objectContaining({
+          estimatedMonths: 3,
+        })
+      );
+    });
+
     it("renders Show more button when there is a next cursor", () => {
       render(<SearchResultsClient {...defaultProps} />);
 
@@ -365,6 +427,55 @@ describe("SearchResultsClient", () => {
   });
 
   describe("deduplication via seenIdsRef", () => {
+    it("deduplicates duplicate initial listing IDs before rendering", () => {
+      render(
+        <SearchResultsClient
+          {...defaultProps}
+          initialListings={[
+            createMockListing("1", "First listing"),
+            createMockListing("1", "Duplicate listing"),
+            createMockListing("2", "Second listing"),
+          ]}
+        />
+      );
+
+      expect(screen.getAllByTestId("listing-1")).toHaveLength(1);
+      expect(screen.getByTestId("listing-1")).toHaveTextContent(
+        "First listing"
+      );
+      expect(screen.queryByText("Duplicate listing")).not.toBeInTheDocument();
+      expect(screen.getAllByTestId(/^listing-/)).toHaveLength(2);
+    });
+
+    it("deduplicates duplicate initial group keys before rendering", () => {
+      render(
+        <SearchResultsClient
+          {...defaultProps}
+          initialListings={[
+            createMockListing("1", "Canonical listing", {
+              groupKey: "unit-1:1",
+            }),
+            createMockListing("2", "Duplicate group listing", {
+              groupKey: "unit-1:1",
+            }),
+            createMockListing("3", "Other listing", {
+              groupKey: "unit-2:1",
+            }),
+          ]}
+        />
+      );
+
+      expect(screen.getByTestId("listing-1")).toHaveTextContent(
+        "Canonical listing"
+      );
+      expect(screen.queryByTestId("listing-2")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Duplicate group listing")
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("listing-3")).toBeInTheDocument();
+      expect(screen.getAllByTestId(/^listing-/)).toHaveLength(2);
+    });
+
     it("prevents duplicate listings from being added on load more", async () => {
       const mockFetch = fetchMoreListings as jest.Mock;
       mockFetch.mockResolvedValueOnce({

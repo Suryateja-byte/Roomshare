@@ -2,13 +2,11 @@ import { test, expect } from "../helpers";
 import {
   buildCollisionFormData,
   deleteListings,
-  expectCreatedListingId,
-  getListingCollisionState,
   openPreparedCreateListingPage,
   seedCollisionListings,
 } from "./create-collision-helpers";
 
-test("T-19: the fourth acknowledged collision records telemetry and creates a listing", async ({
+test("T-19: the fourth acknowledged collision is blocked", async ({
   page,
 }) => {
   const cleanupIds = await seedCollisionListings(page, {
@@ -38,13 +36,9 @@ test("T-19: the fourth acknowledged collision records telemetry and creates a li
     await page.getByTestId("collision-continue").click();
 
     const ackResponse = await ackResponsePromise;
-    expect(ackResponse.status()).toBe(201);
-
-    const createdListingId = await expectCreatedListingId(page);
-    cleanupIds.push(createdListingId);
-
-    const listingState = await getListingCollisionState(page, createdListingId);
-    expect(listingState.normalizedAddress).toBeTruthy();
+    expect(ackResponse.status()).toBe(429);
+    const payload = await ackResponse.json();
+    expect(payload.code).toBe("LISTING_CREATE_COLLISION_RATE_LIMITED");
   } finally {
     await deleteListings(page, cleanupIds);
   }

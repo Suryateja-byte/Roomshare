@@ -362,8 +362,25 @@ describe("listing-status actions", () => {
         expect(mockTx.listing.update).not.toHaveBeenCalled();
       });
 
+      it("keeps admin-paused host updates feature-gated when locks are disabled", async () => {
+        (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
+          makeLockedListingRow({
+            availabilitySource: "HOST_MANAGED",
+            status: "PAUSED",
+            statusReason: "ADMIN_PAUSED",
+          }),
+        ]);
+
+        const result = await updateListingStatus("listing-123", "ACTIVE", 3);
+
+        expect(result.success).toBe(true);
+        expect(mockTx.listing.update).toHaveBeenCalledWith({
+          where: { id: "listing-123" },
+          data: { status: "ACTIVE", version: 4 },
+        });
+      });
+
       it("returns LISTING_LOCKED for suppressed legacy rows before version checks", async () => {
-        process.env.FEATURE_MODERATION_WRITE_LOCKS = "true";
         (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
           makeLockedListingRow({
             availabilitySource: "LEGACY_BOOKING",
@@ -620,12 +637,12 @@ describe("listing-status actions", () => {
     });
 
     it("blocks recover when a host-managed listing is suppressed", async () => {
-      process.env.FEATURE_MODERATION_WRITE_LOCKS = "true";
       (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
         makeLockedListingRow({
           availabilitySource: "HOST_MANAGED",
           status: "PAUSED",
           statusReason: "SUPPRESSED",
+          version: 9,
         }),
       ]);
 

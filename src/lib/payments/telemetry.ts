@@ -1,7 +1,12 @@
 import "server-only";
 
 import { logger } from "@/lib/logger";
-import type { ContactConsumptionSource, ProductCode } from "@prisma/client";
+import { hashIdForLog } from "@/lib/messaging/cfm-messaging-telemetry";
+import type {
+  ContactConsumptionSource,
+  ContactKind,
+  ProductCode,
+} from "@prisma/client";
 
 type PurchaseContext = "CONTACT_HOST" | "PHONE_REVEAL" | "SEARCH_ALERTS";
 
@@ -9,6 +14,10 @@ export const PAYWALL_MISSING_PHYSICAL_UNIT_ID_REASON =
   "missing_physical_unit_id";
 export const PAYWALL_MISSING_PHYSICAL_UNIT_ROW_REASON =
   "missing_physical_unit_row";
+
+function hashNullableId(id: string | null | undefined): string | null {
+  return id ? hashIdForLog(id) : null;
+}
 
 export function recordCheckoutSessionCreated(input: {
   userId: string;
@@ -18,9 +27,9 @@ export function recordCheckoutSessionCreated(input: {
 }) {
   logger.sync.info("cfm.paywall.checkout_session_created_count", {
     metric: "checkout_session_created",
-    userId: input.userId,
+    userIdHash: hashIdForLog(input.userId),
     purchaseContext: input.purchaseContext,
-    listingId: input.listingId ?? null,
+    listingIdHash: hashNullableId(input.listingId),
     productCode: input.productCode,
   });
 }
@@ -55,8 +64,8 @@ export function recordContactConsumptionCreated(input: {
 }) {
   logger.sync.info("cfm.paywall.contact_consumption_created_count", {
     metric: "contact_consumption_created",
-    userId: input.userId,
-    unitId: input.unitId,
+    userIdHash: hashIdForLog(input.userId),
+    unitIdHash: hashIdForLog(input.unitId),
     unitIdentityEpoch: input.unitIdentityEpoch,
     source: input.source,
   });
@@ -69,9 +78,9 @@ export function recordStartConversationBlockedPaywall(input: {
 }) {
   logger.sync.info("cfm.paywall.start_conversation_blocked_count", {
     metric: "start_conversation_blocked_paywall",
-    userId: input.userId,
-    listingId: input.listingId,
-    unitId: input.unitId,
+    userIdHash: hashIdForLog(input.userId),
+    listingIdHash: hashIdForLog(input.listingId),
+    unitIdHash: hashNullableId(input.unitId),
   });
 }
 
@@ -84,8 +93,8 @@ export function recordPaywallBypassMissingUnitId(input: {
 }) {
   logger.sync.info("cfm.paywall.bypass_missing_unit_id_count", {
     metric: "paywall_bypass_missing_unit_id",
-    userId: input.userId,
-    listingId: input.listingId,
+    userIdHash: hashIdForLog(input.userId),
+    listingIdHash: hashIdForLog(input.listingId),
     reason: input.reason,
   });
 }
@@ -98,9 +107,9 @@ export function recordCheckoutStatusForeignSession(input: {
 }) {
   logger.sync.warn("cfm.paywall.checkout_status_foreign_session_count", {
     metric: "checkout_status_foreign_session",
-    userId: input.userId,
+    userIdHash: hashIdForLog(input.userId),
     purchaseContext: input.purchaseContext,
-    listingId: input.listingId ?? null,
+    listingIdHash: hashNullableId(input.listingId),
     sessionId: input.sessionId,
   });
 }
@@ -213,6 +222,7 @@ export function recordPaymentAdjustmentMissingLink(input: {
 
 export function recordEntitlementStateShadowMismatch(input: {
   userId: string;
+  contactKind?: ContactKind;
   existingFreeRemaining: number | null;
   nextFreeRemaining: number;
   existingPaidRemaining: number | null;
@@ -220,7 +230,8 @@ export function recordEntitlementStateShadowMismatch(input: {
 }) {
   logger.sync.warn("cfm.paywall.entitlement_state_shadow_mismatch_count", {
     metric: "entitlement_state_shadow_mismatch",
-    userId: input.userId,
+    userIdHash: hashIdForLog(input.userId),
+    contactKind: input.contactKind ?? "MESSAGE_START",
     existingFreeRemaining: input.existingFreeRemaining,
     nextFreeRemaining: input.nextFreeRemaining,
     existingPaidRemaining: input.existingPaidRemaining,
@@ -230,13 +241,15 @@ export function recordEntitlementStateShadowMismatch(input: {
 
 export function recordEntitlementStateRebuild(input: {
   userId: string;
+  contactKind?: ContactKind;
   durationMs: number;
   rebuilt: boolean;
   success: boolean;
 }) {
   logger.sync.info("cfm.paywall.entitlement_state_rebuild_ms", {
     metric: "entitlement_state_rebuild_ms",
-    userId: input.userId,
+    userIdHash: hashIdForLog(input.userId),
+    contactKind: input.contactKind ?? "MESSAGE_START",
     durationMs: input.durationMs,
     rebuilt: input.rebuilt,
     success: input.success,
@@ -255,8 +268,8 @@ export function recordContactRestorationApplied(input: {
 }) {
   logger.sync.info("cfm.paywall.contact_restoration_applied_count", {
     metric: "contact_restoration_applied",
-    userId: input.userId,
-    contactConsumptionId: input.contactConsumptionId,
+    userIdHash: hashIdForLog(input.userId),
+    contactConsumptionIdHash: hashIdForLog(input.contactConsumptionId),
     reason: input.reason,
   });
 }
@@ -273,8 +286,8 @@ export function recordContactRestorationReplayIgnored(input: {
 }) {
   logger.sync.info("cfm.paywall.contact_restoration_replay_ignored_count", {
     metric: "contact_restoration_replay_ignored",
-    userId: input.userId,
-    contactConsumptionId: input.contactConsumptionId,
+    userIdHash: hashIdForLog(input.userId),
+    contactConsumptionIdHash: hashIdForLog(input.contactConsumptionId),
     reason: input.reason,
   });
 }
@@ -285,8 +298,8 @@ export function recordHostBounceRestoreApplied(input: {
 }) {
   logger.sync.info("cfm.paywall.host_bounce_restore_applied_count", {
     metric: "host_bounce_restore_applied",
-    userId: input.userId,
-    contactConsumptionId: input.contactConsumptionId,
+    userIdHash: hashIdForLog(input.userId),
+    contactConsumptionIdHash: hashIdForLog(input.contactConsumptionId),
   });
 }
 
@@ -296,8 +309,8 @@ export function recordGhostSlaRestoreApplied(input: {
 }) {
   logger.sync.info("cfm.paywall.ghost_sla_restore_applied_count", {
     metric: "ghost_sla_restore_applied",
-    userId: input.userId,
-    contactConsumptionId: input.contactConsumptionId,
+    userIdHash: hashIdForLog(input.userId),
+    contactConsumptionIdHash: hashIdForLog(input.contactConsumptionId),
   });
 }
 
@@ -307,8 +320,8 @@ export function recordMassDeactivationRestoreApplied(input: {
 }) {
   logger.sync.info("cfm.paywall.mass_deactivation_restore_applied_count", {
     metric: "mass_deactivation_restore_applied",
-    userId: input.userId,
-    contactConsumptionId: input.contactConsumptionId,
+    userIdHash: hashIdForLog(input.userId),
+    contactConsumptionIdHash: hashIdForLog(input.contactConsumptionId),
   });
 }
 
@@ -318,8 +331,8 @@ export function recordBanRestoreApplied(input: {
 }) {
   logger.sync.info("cfm.paywall.ban_restore_applied_count", {
     metric: "ban_restore_applied",
-    userId: input.userId,
-    contactConsumptionId: input.contactConsumptionId,
+    userIdHash: hashIdForLog(input.userId),
+    contactConsumptionIdHash: hashIdForLog(input.contactConsumptionId),
   });
 }
 
@@ -329,7 +342,7 @@ export function recordStartConversationPaywallUnavailable(input: {
 }) {
   logger.sync.warn("cfm.paywall.start_conversation_paywall_unavailable_count", {
     metric: "start_conversation_paywall_unavailable",
-    userId: input.userId,
-    listingId: input.listingId,
+    userIdHash: hashIdForLog(input.userId),
+    listingIdHash: hashIdForLog(input.listingId),
   });
 }

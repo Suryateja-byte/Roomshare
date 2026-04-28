@@ -7,18 +7,20 @@ import {
   useEffect,
   type ReactNode,
 } from "react";
-import { LazyMotion, domAnimation, m, AnimatePresence, useReducedMotion } from "framer-motion";
+import {
+  LazyMotion,
+  domAnimation,
+  m,
+  AnimatePresence,
+  useReducedMotion,
+} from "framer-motion";
 import { X } from "lucide-react";
 import PullToRefresh from "./PullToRefresh";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 // P2-18 FIX: Import snap points from shared constants so FloatingMapButton
 // and MobileBottomSheet stay in sync. Previously hardcoded locally.
-import {
-  SNAP_COLLAPSED,
-  SNAP_EXPANDED,
-  SNAP_PEEK,
-} from "@/lib/mobile-layout";
+import { SNAP_COLLAPSED, SNAP_EXPANDED, SNAP_PEEK } from "@/lib/mobile-layout";
 
 const SNAP_POINTS = [SNAP_COLLAPSED, SNAP_PEEK, SNAP_EXPANDED] as const;
 
@@ -399,14 +401,16 @@ export default function MobileBottomSheet({
         data-testid="results-bottom-sheet"
         role="region"
         aria-label="Search results"
-        className="fixed bottom-0 left-0 right-0 flex flex-col bg-surface-container-lowest rounded-t-2xl shadow-[0_-4px_24px_rgba(0,0,0,0.12)]"
+        className="fixed bottom-0 left-0 right-0 flex flex-col rounded-t-[1.5rem] border-t border-outline-variant/25 bg-surface-container-lowest shadow-[0_-18px_48px_-28px_rgba(27,28,25,0.36),0_-4px_18px_rgba(27,28,25,0.08)]"
         animate={
           isDragging
             ? { height: displayHeightPx }
             : { height: `${displayHeightVh}dvh` }
         }
         transition={
-          isDragging || reducedMotion ? { duration: 0 } : { type: "spring", ...SPRING_CONFIG }
+          isDragging || reducedMotion
+            ? { duration: 0 }
+            : { type: "spring", ...SPRING_CONFIG }
         }
         style={
           {
@@ -437,7 +441,7 @@ export default function MobileBottomSheet({
         {/* Drag handle area */}
         <div
           className={`group flex-shrink-0 px-4 cursor-grab active:cursor-grabbing select-none ${
-            isCollapsed ? "pt-3 pb-2.5" : "py-5"
+            isCollapsed ? "pt-3 pb-2.5" : "py-4"
           }`}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
@@ -466,11 +470,7 @@ export default function MobileBottomSheet({
             aria-valuemax={2}
             aria-valuenow={snapIndex}
             aria-valuetext={
-              snapIndex === 0
-                ? "map"
-                : snapIndex === 1
-                  ? "peek"
-                  : "list"
+              snapIndex === 0 ? "map" : snapIndex === 1 ? "peek" : "list"
             }
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
@@ -499,8 +499,8 @@ export default function MobileBottomSheet({
                 setSnapIndex(SNAP_POINTS.length - 1);
               }
             }}
-            className={`rounded-full bg-on-surface-variant/40 group-active:scale-x-110 group-active:bg-on-surface-variant/80 transition-all duration-300 mx-auto cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 ${
-              isCollapsed ? "mb-1.5 h-1.5 w-14" : "mb-2 h-2 w-16"
+            className={`mx-auto cursor-pointer rounded-full bg-on-surface-variant/35 transition-all duration-300 group-active:scale-x-110 group-active:bg-on-surface-variant/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 ${
+              isCollapsed ? "mb-1.5 h-1.5 w-14" : "mb-2 h-1.5 w-16"
             }`}
           />
 
@@ -513,7 +513,9 @@ export default function MobileBottomSheet({
             <span
               data-testid="sheet-header-text"
               className={`font-semibold tracking-tight text-on-surface ${
-                isCollapsed ? "max-w-full truncate text-[15px] leading-none" : "text-sm"
+                isCollapsed
+                  ? "max-w-full truncate text-[15px] leading-none"
+                  : "text-sm"
               }`}
             >
               {resolvedHeaderText}
@@ -523,7 +525,7 @@ export default function MobileBottomSheet({
                 {/* P2-FIX (#123): Visible close button to dismiss sheet */}
                 <button
                   onClick={() => setSnapIndex(0)}
-                  className="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:text-on-surface-variant rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-canvas text-on-surface-variant shadow-[inset_0_0_0_1px_rgba(220,193,185,0.45)] transition-colors hover:text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
                   aria-label="Minimize results panel"
                 >
                   <X className="w-4 h-4" />

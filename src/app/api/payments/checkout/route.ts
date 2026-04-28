@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import type Stripe from "stripe";
 import { z } from "zod";
 import { auth } from "@/auth";
@@ -13,7 +14,11 @@ import {
   evaluateContactPaywall,
   evaluateMessageStartPaywall,
 } from "@/lib/payments/contact-paywall";
-import { centsToDecimal } from "@/lib/payments/checkout-session-status";
+import {
+  centsToDecimal,
+  matchesCheckoutMetadata,
+  parsePaywallMetadata,
+} from "@/lib/payments/checkout-session-status";
 import {
   getProductCatalogEntry,
   isProductCode,
@@ -29,6 +34,78 @@ import {
 import { evaluateCheckoutAbuse } from "@/lib/payments/abuse-controls";
 
 export const runtime = "nodejs";
+
+type CheckoutMetadata = NonNullable<
+  Stripe.Checkout.SessionCreateParams["metadata"]
+>;
+
+function isUniqueConstraintError(error: unknown): boolean {
+  return (
+    (error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002") ||
+    (!!error &&
+      typeof error === "object" &&
+      (error as { code?: unknown }).code === "P2002")
+  );
+}
+
+async function persistCheckoutPayment(input: {
+  checkoutSession: Stripe.Checkout.Session;
+  userId: string;
+  productCode: "CONTACT_PACK_3" | "MOVERS_PASS_30D";
+  amountCents: number;
+  metadata: CheckoutMetadata;
+}) {
+  try {
+    await prisma.payment.create({
+      data: {
+        userId: input.userId,
+        productCode: input.productCode,
+        status: "CHECKOUT_CREATED",
+        stripeCheckoutSessionId: input.checkoutSession.id,
+        stripePaymentIntentId:
+          typeof input.checkoutSession.payment_intent === "string"
+            ? input.checkoutSession.payment_intent
+            : null,
+        livemode: input.checkoutSession.livemode === true,
+        stripeCustomerId:
+          typeof input.checkoutSession.customer === "string"
+            ? input.checkoutSession.customer
+            : null,
+        amount: centsToDecimal(input.amountCents),
+        currency: "usd",
+        metadata: input.metadata,
+      },
+    });
+    return;
+  } catch (error) {
+    if (!isUniqueConstraintError(error)) {
+      throw error;
+    }
+  }
+
+  const existing = await prisma.payment.findUnique({
+    where: { stripeCheckoutSessionId: input.checkoutSession.id },
+    select: {
+      userId: true,
+      productCode: true,
+      metadata: true,
+    },
+  });
+  const expectedMetadata = parsePaywallMetadata(input.metadata);
+  const existingMetadata = parsePaywallMetadata(existing?.metadata);
+
+  if (
+    !existing ||
+    !expectedMetadata ||
+    !existingMetadata ||
+    existing.userId !== input.userId ||
+    existing.productCode !== input.productCode ||
+    !matchesCheckoutMetadata(existingMetadata, expectedMetadata)
+  ) {
+    throw new Error("Stripe checkout session already exists with mismatched metadata");
+  }
+}
 
 const checkoutSchema = z.object({
   purchaseContext: z
@@ -360,25 +437,12 @@ export async function POST(request: Request) {
       throw new Error("Stripe checkout session did not return a URL");
     }
 
-    await prisma.payment.create({
-      data: {
-        userId: session.user.id,
-        productCode,
-        status: "CHECKOUT_CREATED",
-        stripeCheckoutSessionId: checkoutSession.id,
-        stripePaymentIntentId:
-          typeof checkoutSession.payment_intent === "string"
-            ? checkoutSession.payment_intent
-            : null,
-        livemode: checkoutSession.livemode === true,
-        stripeCustomerId:
-          typeof checkoutSession.customer === "string"
-            ? checkoutSession.customer
-            : null,
-        amount: centsToDecimal(product.amountCents),
-        currency: "usd",
-        metadata,
-      },
+    await persistCheckoutPayment({
+      checkoutSession,
+      userId: session.user.id,
+      productCode,
+      amountCents: product.amountCents,
+      metadata,
     });
 
     recordCheckoutSessionCreated({

@@ -243,6 +243,7 @@ describe("ListingPageClient", () => {
   afterEach(() => {
     jest.clearAllTimers();
     jest.useRealTimers();
+    delete process.env.NEXT_PUBLIC_NEARBY_ENABLED;
   });
 
   it("renders a mobile-safe header structure for long visitor titles", async () => {
@@ -467,17 +468,36 @@ describe("ListingPageClient", () => {
     );
   });
 
-  it("hides nearby places for public viewers under the D1 flag even if coordinates are present", async () => {
+  it("does not use exact coordinates for public nearby places", async () => {
+    process.env.NEXT_PUBLIC_NEARBY_ENABLED = "true";
+
     render(
-        <ListingPageClient
-          {...makeProps({
-            coordinates: { lat: 37.77, lng: -122.41 },
-            canViewExactLocation: false,
-          })}
-        />
+      <ListingPageClient
+        {...makeProps({
+          coordinates: { lat: 37.77, lng: -122.41 },
+          nearbyCoordinates: null,
+          canViewExactLocation: false,
+        })}
+      />
     );
 
     expect(screen.queryByTestId("dynamic-component")).not.toBeInTheDocument();
+  });
+
+  it("renders nearby places for public viewers when public coordinates are provided", async () => {
+    process.env.NEXT_PUBLIC_NEARBY_ENABLED = "true";
+
+    render(
+      <ListingPageClient
+        {...makeProps({
+          coordinates: null,
+          nearbyCoordinates: { lat: 37.77, lng: -122.41 },
+          canViewExactLocation: false,
+        })}
+      />
+    );
+
+    expect(screen.getByTestId("dynamic-component")).toBeInTheDocument();
   });
 
   it("renders an unlock CTA when viewer-state requires purchase", async () => {

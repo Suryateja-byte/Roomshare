@@ -7,6 +7,7 @@ import { PUBLIC_CACHE_INVALIDATED_EVENT } from "@/lib/public-cache/client";
 const mockUseSession = jest.fn();
 const mockRouterReplace = jest.fn();
 const mockRouterRefresh = jest.fn();
+const mockContactHostButton = jest.fn();
 
 jest.mock("next/dynamic", () => ({
   __esModule: true,
@@ -65,7 +66,10 @@ jest.mock("@/components/ReviewList", () => ({
 
 jest.mock("@/components/ContactHostButton", () => ({
   __esModule: true,
-  default: () => <button data-testid="contact-host">Contact Host</button>,
+  default: (props: { unitIdentityEpochObserved?: number | null }) => {
+    mockContactHostButton(props);
+    return <button data-testid="contact-host">Contact Host</button>;
+  },
 }));
 
 jest.mock("@/components/DeleteListingButton", () => ({
@@ -250,5 +254,25 @@ describe("ListingPageClient public cache invalidation", () => {
     });
 
     expect(mockRouterRefresh).not.toHaveBeenCalled();
+  });
+
+  it("passes public cache unit identity epoch to contact CTAs", () => {
+    render(
+      <ListingPageClient
+        {...makeProps({
+          publicCacheMetadata: {
+            unitCacheKey: "unit-cache-1",
+            unitIdentityEpoch: 42,
+            projectionEpoch: "projection-1",
+          },
+        })}
+      />
+    );
+
+    expect(mockContactHostButton).toHaveBeenCalledWith(
+      expect.objectContaining({
+        unitIdentityEpochObserved: 42,
+      })
+    );
   });
 });

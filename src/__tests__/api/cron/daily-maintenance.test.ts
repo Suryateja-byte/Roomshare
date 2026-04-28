@@ -100,6 +100,9 @@ describe("GET /api/cron/daily-maintenance", () => {
     expect(calledUrls).toContain(
       "http://localhost:3000/api/cron/freshness-reminders"
     );
+    expect(calledUrls).toContain(
+      "http://localhost:3000/api/cron/payments-refund-queue"
+    );
     expect(payload.tasks).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

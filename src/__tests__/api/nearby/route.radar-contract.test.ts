@@ -82,7 +82,7 @@ describe("POST /api/nearby - Radar API Contract Tests", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -103,7 +103,7 @@ describe("POST /api/nearby - Radar API Contract Tests", () => {
               // No _id
               name: "Test Place",
               formattedAddress: "123 Test St",
-              categories: ["test"],
+              categories: ["food-beverage"],
               location: { type: "Point", coordinates: [-122.4194, 37.7749] },
             },
           ],
@@ -113,7 +113,7 @@ describe("POST /api/nearby - Radar API Contract Tests", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -135,7 +135,7 @@ describe("POST /api/nearby - Radar API Contract Tests", () => {
               _id: "place-123",
               // No name
               formattedAddress: "123 Test St",
-              categories: ["test"],
+              categories: ["food-beverage"],
               location: { type: "Point", coordinates: [-122.4194, 37.7749] },
             },
           ],
@@ -145,7 +145,7 @@ describe("POST /api/nearby - Radar API Contract Tests", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -165,7 +165,7 @@ describe("POST /api/nearby - Radar API Contract Tests", () => {
               _id: "place-123",
               name: "Test Place",
               // No formattedAddress
-              categories: ["test"],
+              categories: ["food-beverage"],
               location: { type: "Point", coordinates: [-122.4194, 37.7749] },
             },
           ],
@@ -175,7 +175,7 @@ describe("POST /api/nearby - Radar API Contract Tests", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -205,7 +205,7 @@ describe("POST /api/nearby - Radar API Contract Tests", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -225,7 +225,7 @@ describe("POST /api/nearby - Radar API Contract Tests", () => {
               _id: "place-123",
               name: "Test Place",
               formattedAddress: "123 Test St",
-              categories: ["test"],
+              categories: ["food-beverage"],
               // No location
             },
           ],
@@ -235,7 +235,7 @@ describe("POST /api/nearby - Radar API Contract Tests", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -256,7 +256,7 @@ describe("POST /api/nearby - Radar API Contract Tests", () => {
               _id: "place-123",
               name: "Test Place",
               formattedAddress: "123 Test St",
-              categories: ["test"],
+              categories: ["food-beverage"],
               location: { type: "Point", coordinates: [] },
             },
           ],
@@ -266,7 +266,7 @@ describe("POST /api/nearby - Radar API Contract Tests", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -402,7 +402,7 @@ describe("POST /api/nearby - Radar API Contract Tests", () => {
               _id: "place-123",
               name: "Test Place",
               formattedAddress: "123 Test St",
-              categories: ["test"],
+              categories: ["food-beverage"],
               location: { type: "Point", coordinates: [-122.4194, 37.7749] },
               unknownField: "should be ignored",
               anotherUnknown: { nested: "value" },
@@ -415,7 +415,7 @@ describe("POST /api/nearby - Radar API Contract Tests", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -440,7 +440,7 @@ describe("POST /api/nearby - Radar API Contract Tests", () => {
               _id: "place-123",
               name: "Valid Place",
               formattedAddress: "123 Test St",
-              categories: ["test"],
+              categories: ["food-beverage"],
               location: { type: "Point", coordinates: [-122.4194, 37.7749] },
             },
           ],
@@ -450,7 +450,7 @@ describe("POST /api/nearby - Radar API Contract Tests", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -472,7 +472,7 @@ describe("POST /api/nearby - Radar API Contract Tests", () => {
               _id: "place-123",
               name: null,
               formattedAddress: "123 Test St",
-              categories: ["test"],
+              categories: ["food-beverage"],
               location: { type: "Point", coordinates: [-122.4194, 37.7749] },
             },
           ],
@@ -482,7 +482,7 @@ describe("POST /api/nearby - Radar API Contract Tests", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -504,7 +504,7 @@ describe("POST /api/nearby - Radar API Contract Tests", () => {
               _id: "place-123",
               name: "Starbucks",
               formattedAddress: "123 Test St",
-              categories: ["coffee-shop"],
+              categories: ["cafe"],
               location: { type: "Point", coordinates: [-122.4194, 37.7749] },
               chain: { name: "Starbucks", slug: "starbucks" },
             },
@@ -515,7 +515,7 @@ describe("POST /api/nearby - Radar API Contract Tests", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -535,7 +535,7 @@ describe("POST /api/nearby - Radar API Contract Tests", () => {
               _id: "place-123",
               name: "Local Coffee Shop",
               formattedAddress: "123 Test St",
-              categories: ["coffee-shop"],
+              categories: ["cafe"],
               location: { type: "Point", coordinates: [-122.4194, 37.7749] },
               // No chain
             },
@@ -546,7 +546,7 @@ describe("POST /api/nearby - Radar API Contract Tests", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -567,7 +567,7 @@ describe("POST /api/nearby - Radar API Contract Tests", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -587,7 +587,7 @@ describe("POST /api/nearby - Radar API Contract Tests", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -607,7 +607,7 @@ describe("POST /api/nearby - Radar API Contract Tests", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
 

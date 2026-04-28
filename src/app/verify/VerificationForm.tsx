@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   submitVerificationRequest,
   DocumentType,
@@ -38,38 +39,89 @@ const documentTypes: {
 ];
 
 export default function VerificationForm() {
+  const router = useRouter();
   const [documentType, setDocumentType] = useState<DocumentType>("passport");
-  const [documentUrl, setDocumentUrl] = useState("");
-  const [selfieUrl, setSelfieUrl] = useState("");
+  const [documentUpload, setDocumentUpload] = useState<{
+    id: string;
+    fileName: string;
+  } | null>(null);
+  const [selfieUpload, setSelfieUpload] = useState<{
+    id: string;
+    fileName: string;
+  } | null>(null);
+  const [uploadingKind, setUploadingKind] = useState<
+    "document" | "selfie" | null
+  >(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // In a real implementation, these would handle file uploads to a storage service
+  const uploadVerificationFile = async (
+    file: File,
+    kind: "document" | "selfie"
+  ) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("kind", kind);
+
+    const response = await fetch("/api/verification/upload", {
+      method: "POST",
+      body: formData,
+    });
+    const result = (await response.json()) as {
+      uploadId?: string;
+      error?: string;
+    };
+
+    if (!response.ok || !result.uploadId) {
+      throw new Error(result.error || "Upload failed");
+    }
+
+    return result.uploadId;
+  };
+
   const handleDocumentUpload = async (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // For demo purposes, we'll create a mock URL
-    // In production, upload to Supabase Storage, S3, Cloudinary, etc.
-    const mockUrl = `https://storage.example.com/documents/${Date.now()}-${file.name}`;
-    setDocumentUrl(mockUrl);
+    setError(null);
+    setUploadingKind("document");
+    try {
+      const uploadId = await uploadVerificationFile(file, "document");
+      setDocumentUpload({ id: uploadId, fileName: file.name });
+    } catch (err) {
+      setDocumentUpload(null);
+      setError(err instanceof Error ? err.message : "Document upload failed");
+    } finally {
+      setUploadingKind(null);
+      e.target.value = "";
+    }
   };
 
   const handleSelfieUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const mockUrl = `https://storage.example.com/selfies/${Date.now()}-${file.name}`;
-    setSelfieUrl(mockUrl);
+    setError(null);
+    setUploadingKind("selfie");
+    try {
+      const uploadId = await uploadVerificationFile(file, "selfie");
+      setSelfieUpload({ id: uploadId, fileName: file.name });
+    } catch (err) {
+      setSelfieUpload(null);
+      setError(err instanceof Error ? err.message : "Selfie upload failed");
+    } finally {
+      setUploadingKind(null);
+      e.target.value = "";
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    if (!documentUrl) {
+    if (!documentUpload) {
       setError("Please upload a document");
       return;
     }
@@ -79,12 +131,14 @@ export default function VerificationForm() {
     try {
       const result = await submitVerificationRequest({
         documentType,
-        documentUrl,
-        selfieUrl: selfieUrl || undefined,
+        documentUploadId: documentUpload.id,
+        selfieUploadId: selfieUpload?.id,
       });
 
       if (result.error) {
         setError(result.error);
+      } else {
+        router.refresh();
       }
     } catch (_err) {
       setError("Something went wrong. Please try again.");
@@ -143,7 +197,7 @@ export default function VerificationForm() {
         <div className="relative">
           <input
             type="file"
-            accept="image/*,.pdf"
+            accept="image/jpeg,image/png,image/webp"
             onChange={handleDocumentUpload}
             className="hidden"
             id="document-upload"
@@ -153,12 +207,19 @@ export default function VerificationForm() {
           <label
             htmlFor="document-upload"
             className={`flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-lg cursor-pointer transition-all ${
-              documentUrl
+              documentUpload
                 ? "border-green-500 bg-green-50"
                 : "border-outline-variant/30 hover:border-outline-variant/50 bg-surface-container-high"
             }`}
           >
-            {documentUrl ? (
+            {uploadingKind === "document" ? (
+              <>
+                <Loader2 className="w-8 h-8 text-on-surface-variant mb-2 animate-spin" />
+                <span className="text-sm text-on-surface-variant">
+                  Uploading...
+                </span>
+              </>
+            ) : documentUpload ? (
               <>
                 <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-2">
                   <FileText className="w-6 h-6 text-green-600" />
@@ -167,7 +228,7 @@ export default function VerificationForm() {
                   Document uploaded
                 </span>
                 <span className="text-xs text-on-surface-variant mt-1">
-                  Click to replace
+                  {documentUpload.fileName}
                 </span>
               </>
             ) : (
@@ -177,7 +238,7 @@ export default function VerificationForm() {
                   Click to upload
                 </span>
                 <span className="text-xs text-on-surface-variant mt-1">
-                  PNG, JPG or PDF up to 10MB
+                  PNG, JPG, or WebP up to 10MB
                 </span>
               </>
             )}
@@ -199,7 +260,7 @@ export default function VerificationForm() {
         <div className="relative">
           <input
             type="file"
-            accept="image/*"
+            accept="image/jpeg,image/png,image/webp"
             onChange={handleSelfieUpload}
             className="hidden"
             id="selfie-upload"
@@ -207,28 +268,42 @@ export default function VerificationForm() {
           <label
             htmlFor="selfie-upload"
             className={`flex items-center gap-4 w-full p-4 border-2 border-dashed rounded-lg cursor-pointer transition-all ${
-              selfieUrl
+              selfieUpload
                 ? "border-green-500 bg-green-50"
                 : "border-outline-variant/30 hover:border-outline-variant/50 bg-surface-container-high"
             }`}
           >
             <div
               className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                selfieUrl ? "bg-green-100" : "bg-surface-container-high"
+                selfieUpload ? "bg-green-100" : "bg-surface-container-high"
               }`}
             >
-              <Camera
-                className={`w-6 h-6 ${selfieUrl ? "text-green-600" : "text-on-surface-variant"}`}
-              />
+              {uploadingKind === "selfie" ? (
+                <Loader2 className="w-6 h-6 text-on-surface-variant animate-spin" />
+              ) : (
+                <Camera
+                  className={`w-6 h-6 ${
+                    selfieUpload ? "text-green-600" : "text-on-surface-variant"
+                  }`}
+                />
+              )}
             </div>
             <div>
               <span
-                className={`text-sm font-medium ${selfieUrl ? "text-green-600" : "text-on-surface-variant"}`}
+                className={`text-sm font-medium ${
+                  selfieUpload ? "text-green-600" : "text-on-surface-variant"
+                }`}
               >
-                {selfieUrl ? "Selfie uploaded" : "Upload a selfie"}
+                {uploadingKind === "selfie"
+                  ? "Uploading..."
+                  : selfieUpload
+                    ? "Selfie uploaded"
+                    : "Upload a selfie"}
               </span>
               <span className="text-xs text-on-surface-variant block">
-                {selfieUrl ? "Click to replace" : "Clear photo of your face"}
+                {selfieUpload
+                  ? selfieUpload.fileName
+                  : "Clear photo of your face"}
               </span>
             </div>
           </label>
@@ -259,7 +334,7 @@ export default function VerificationForm() {
       <Button
         type="submit"
         className="w-full"
-        disabled={isSubmitting || !documentUrl}
+        disabled={isSubmitting || uploadingKind !== null || !documentUpload}
       >
         {isSubmitting ? (
           <>

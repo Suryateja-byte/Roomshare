@@ -130,14 +130,15 @@ describe("POST /api/nearby - Env/Deployment Edge Cases", () => {
 
   // A4: RADAR_SECRET_KEY with whitespace rejected
   describe("A4: Whitespace-Only Key", () => {
-    it("logs error for whitespace RADAR_SECRET_KEY", async () => {
+    it("returns 503 for whitespace RADAR_SECRET_KEY", async () => {
       process.env.RADAR_SECRET_KEY = "   ";
 
       const response = await POST(createRequest(validRequestBody));
+      const data = await response.json();
 
-      // Whitespace-only key will fail at Radar API level
-      // The route passes it through but API will reject
-      expect(mockFetch).toHaveBeenCalled();
+      expect(response.status).toBe(503);
+      expect(data.error).toBe("Nearby search is not configured");
+      expect(mockFetch).not.toHaveBeenCalled();
     });
   });
 
@@ -392,13 +393,13 @@ describe("POST /api/nearby - Env/Deployment Edge Cases", () => {
         createRequest({
           listingLat: 37.7749,
           listingLng: -122.4194,
-          categories: ["custom-category"],
+          categories: ["food-grocery"],
           radiusMeters: 1609,
         })
       );
 
       const fetchUrl = mockFetch.mock.calls[0][0];
-      expect(fetchUrl).toContain("custom-category");
+      expect(fetchUrl).toContain("food-grocery");
     });
   });
 

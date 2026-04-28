@@ -347,6 +347,18 @@ describe("saved-listings actions", () => {
       });
     });
 
+    it("blocks suspended users from removing saved listings", async () => {
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        id: "user-123",
+        isSuspended: true,
+      });
+
+      const result = await removeSavedListing("listing-456");
+
+      expect(result).toEqual({ error: "Account suspended" });
+      expect(prisma.savedListing.delete).not.toHaveBeenCalled();
+    });
+
     it("revalidates /saved path", async () => {
       (prisma.savedListing.delete as jest.Mock).mockResolvedValue(
         mockSavedListing

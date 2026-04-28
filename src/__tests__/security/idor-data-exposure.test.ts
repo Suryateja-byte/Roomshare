@@ -120,11 +120,17 @@ describe("IDOR & Data Exposure Prevention — Phase 2", () => {
       const result = await toggleSearchAlert("bob-search-id", true);
       expect(result).toEqual({ error: expect.stringContaining("alert") });
 
-      expect(mockPrisma.savedSearch.update).toHaveBeenCalledWith({
-        where: { id: "bob-search-id", userId: "alice-id" },
-        data: { alertEnabled: true },
-        select: { alertEnabled: true },
-      });
+      expect(mockPrisma.savedSearch.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "bob-search-id", userId: "alice-id" },
+          data: { alertEnabled: true },
+          select: expect.objectContaining({
+            id: true,
+            alertEnabled: true,
+            alertFrequency: true,
+          }),
+        })
+      );
     });
 
     it("updateSavedSearchName rejects when userId does not match", async () => {

@@ -54,6 +54,11 @@ jest.mock("@/lib/api-error-handler", () => ({
   ),
 }));
 
+const mockCheckSuspension = jest.fn();
+jest.mock("@/app/actions/suspension", () => ({
+  checkSuspension: (...args: unknown[]) => mockCheckSuspension(...args),
+}));
+
 import { POST } from "@/app/api/favorites/route";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
@@ -70,6 +75,7 @@ describe("POST /api/favorites", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (auth as jest.Mock).mockResolvedValue(mockSession);
+    mockCheckSuspension.mockResolvedValue({ suspended: false });
   });
 
   const createRequest = (body: any): Request => {
@@ -95,6 +101,22 @@ describe("POST /api/favorites", () => {
       const response = await POST(createRequest({ listingId: "listing-123" }));
 
       expect(response.status).toBe(401);
+    });
+
+    it("returns 403 and does not mutate when account is suspended", async () => {
+      mockCheckSuspension.mockResolvedValue({
+        suspended: true,
+        error: "Account suspended",
+      });
+
+      const response = await POST(createRequest({ listingId: "listing-123" }));
+      const data = await response.json();
+
+      expect(response.status).toBe(403);
+      expect(data.error).toBe("Account suspended");
+      expect(prisma.savedListing.findUnique).not.toHaveBeenCalled();
+      expect(prisma.savedListing.create).not.toHaveBeenCalled();
+      expect(prisma.savedListing.delete).not.toHaveBeenCalled();
     });
   });
 

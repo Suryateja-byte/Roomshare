@@ -411,10 +411,6 @@ export default function CreateListingForm({
       }
 
       const result = await res.json();
-      const needsMigrationReview =
-        typeof result?.id === "string"
-          ? await fetchNeedsMigrationReview(result.id, abortController.signal)
-          : false;
 
       if (abortController.signal.aborted) return;
 
@@ -424,19 +420,11 @@ export default function CreateListingForm({
       navGuard.disable();
       idempotencyKeyRef.current = crypto.randomUUID();
       setCollisionBody(null);
-      if (needsMigrationReview) {
-        toast("We'll review this listing before it's published.", {
-          description:
-            "You've added several listings at this address recently. Our team will take a quick look, usually within a day. You'll get an email when it's live.",
-          duration: 8000,
-        });
-      } else {
-        toast.success("Listing published successfully!", {
-          description:
-            "Your listing is now live and visible to potential roommates.",
-          duration: 5000,
-        });
-      }
+      toast.success("Listing published successfully!", {
+        description:
+          "Your listing is now live and visible to potential roommates.",
+        duration: 5000,
+      });
       redirectTimeoutRef.current = setTimeout(() => {
         if (!abortController.signal.aborted) {
           router.push(`/listings/${result.id}`);
@@ -465,27 +453,6 @@ export default function CreateListingForm({
     setSelectedLanguages((prev) =>
       prev.includes(lang) ? prev.filter((l) => l !== lang) : [...prev, lang]
     );
-  };
-
-  const fetchNeedsMigrationReview = async (
-    listingId: string,
-    signal?: AbortSignal
-  ): Promise<boolean> => {
-    try {
-      const response = await fetch(`/api/listings/${listingId}/viewer-state`, {
-        method: "GET",
-        headers: { Accept: "application/json" },
-        signal,
-      });
-      if (!response.ok) return false;
-
-      const payload = (await response.json()) as {
-        needsMigrationReview?: boolean;
-      };
-      return payload.needsMigrationReview === true;
-    } catch {
-      return false;
-    }
   };
 
   // Show a non-field error in the banner and focus it for screen readers
@@ -1202,16 +1169,26 @@ export default function CreateListingForm({
           </div>
 
           <div>
-            <Label htmlFor="moveInDate">Move-In Date</Label>
+            <Label htmlFor="moveInDate">
+              Move-In Date <span className="text-red-500" aria-hidden="true">*</span>
+              <span className="sr-only"> required</span>
+            </Label>
             <DatePicker
               id="moveInDate"
               value={moveInDate}
               onChange={setMoveInDate}
               placeholder="Select move-in date"
               minDate={new Date().toISOString().split("T")[0]}
+              aria-invalid={!!fieldErrors.moveInDate}
+              aria-describedby={
+                fieldErrors.moveInDate ? "moveInDate-error" : undefined
+              }
+              aria-required
+              className={fieldErrors.moveInDate ? "border-red-500" : ""}
             />
+            <FieldError field="moveInDate" fieldErrors={fieldErrors} />
             <p className="text-xs text-on-surface-variant mt-2">
-              When can tenants move in? (Optional)
+              When tenants can move in.
             </p>
           </div>
 

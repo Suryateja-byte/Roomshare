@@ -32,7 +32,15 @@ export type PaymentDisputeLifecycleStatus = "OPEN" | "WON" | "LOST";
 
 type PaymentLookup = Pick<
   Payment,
-  "id" | "userId" | "productCode" | "amount" | "currency" | "metadata" | "status"
+  | "id"
+  | "userId"
+  | "productCode"
+  | "amount"
+  | "currency"
+  | "metadata"
+  | "status"
+  | "fraudFlag"
+  | "autoRefundStatus"
 >;
 
 type LinkedGrant = Pick<
@@ -196,6 +204,8 @@ async function findPaymentForStripeAdjustment(
         currency: true,
         metadata: true,
         status: true,
+        fraudFlag: true,
+        autoRefundStatus: true,
       },
     });
 
@@ -224,8 +234,14 @@ async function findPaymentForStripeAdjustment(
       currency: true,
       metadata: true,
       status: true,
+      fraudFlag: true,
+      autoRefundStatus: true,
     },
   });
+}
+
+function isExpectedAutoRefundWithoutGrant(payment: PaymentLookup) {
+  return payment.autoRefundStatus?.includes("BANNED_USER") === true;
 }
 
 async function getLinkedGrant(tx: TransactionClient, paymentId: string) {
@@ -351,7 +367,11 @@ async function applyRefundAdjustment(tx: TransactionClient, input: {
     });
 
     if (features.entitlementState) {
-      await recomputeEntitlementState(tx, input.payment.userId);
+      await recomputeEntitlementState(
+        tx,
+        input.payment.userId,
+        input.grant.contactKind
+      );
     }
 
     recordRefundEntitlementAdjustmentApplied({
@@ -411,7 +431,11 @@ async function applyRefundAdjustment(tx: TransactionClient, input: {
   });
 
   if (features.entitlementState) {
-    await recomputeEntitlementState(tx, input.payment.userId);
+    await recomputeEntitlementState(
+      tx,
+      input.payment.userId,
+      input.grant.contactKind
+    );
   }
 
   recordRefundEntitlementAdjustmentApplied({
@@ -532,6 +556,10 @@ export async function handleRefundEvent(
 
   const grant = await getLinkedGrant(tx, payment.id);
   if (!grant) {
+    if (isExpectedAutoRefundWithoutGrant(payment)) {
+      return { ok: true };
+    }
+
     recordPaymentAdjustmentMissingLink({
       adjustmentType: "refund_grant",
       stripeObjectId: refund.id,
@@ -699,7 +727,7 @@ export async function handleDisputeEvent(
       });
 
       if (features.entitlementState) {
-        await recomputeEntitlementState(tx, payment.userId);
+        await recomputeEntitlementState(tx, payment.userId, grant.contactKind);
       }
 
       await recordSystemAudit(tx, {
@@ -736,7 +764,7 @@ export async function handleDisputeEvent(
       data: { status: nextStatus },
     });
     if (features.entitlementState) {
-      await recomputeEntitlementState(tx, payment.userId);
+      await recomputeEntitlementState(tx, payment.userId, grant.contactKind);
     }
     recordFrozenGrantRestored({
       paymentId: payment.id,
@@ -769,7 +797,7 @@ export async function handleDisputeEvent(
     data: { status: "REVOKED" },
   });
   if (features.entitlementState) {
-    await recomputeEntitlementState(tx, payment.userId);
+    await recomputeEntitlementState(tx, payment.userId, grant.contactKind);
   }
   await recordSystemAudit(tx, {
     kind: "ENTITLEMENT_REVOKED",
