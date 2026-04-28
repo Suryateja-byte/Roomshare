@@ -1,5 +1,7 @@
 jest.mock("@/lib/embeddings/version", () => ({
-  getCurrentEmbeddingVersion: jest.fn(() => "gemini-embedding-2-preview"),
+  getReadEmbeddingVersion: jest.fn(
+    () => "gemini-embedding-2.search-result.nosensitive-v1.d768"
+  ),
 }));
 
 import { getSearchV2VersionMeta } from "@/lib/search/meta";
@@ -25,7 +27,7 @@ describe("getSearchV2VersionMeta", () => {
       })
     ).toEqual({
       projectionVersion: SEARCH_DOC_PROJECTION_VERSION,
-      embeddingVersion: "gemini-embedding-2-preview",
+      embeddingVersion: "gemini-embedding-2.search-result.nosensitive-v1.d768",
     });
   });
 });

@@ -1,4 +1,4 @@
-import { getCurrentEmbeddingVersion } from "@/lib/embeddings/version";
+import { getReadEmbeddingVersion } from "@/lib/embeddings/version";
 import { SEARCH_DOC_PROJECTION_VERSION } from "./search-doc-sync";
 import type { SearchV2Meta } from "./types";
 import { RANKING_VERSION } from "./ranking";
@@ -16,7 +16,7 @@ export function getSearchV2VersionMeta(options: {
       ? SEARCH_DOC_PROJECTION_VERSION
       : undefined;
   const embeddingVersion = options.usedSemanticSearch
-    ? getCurrentEmbeddingVersion()
+    ? getReadEmbeddingVersion()
     : undefined;
   const rankerProfileVersion = options.rankerEnabled
     ? RANKING_VERSION

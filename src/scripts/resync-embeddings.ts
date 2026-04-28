@@ -7,6 +7,7 @@
  */
 import { PrismaClient } from "@prisma/client";
 import { syncListingEmbedding } from "../lib/embeddings/sync";
+import { EMBEDDING_MODEL } from "../lib/embeddings/gemini";
 
 const prisma = new PrismaClient();
 const CONCURRENCY = 3; // Respect Gemini rate limits
@@ -14,7 +15,9 @@ const CONCURRENCY = 3; // Respect Gemini rate limits
 async function main() {
   const rows = await prisma.$queryRaw<{ id: string }[]>`
     SELECT id FROM listing_search_docs
-    WHERE embedding_status = 'PENDING'
+    WHERE embedding IS NULL
+       OR embedding_status IN ('PENDING', 'FAILED')
+       OR embedding_model IS DISTINCT FROM ${EMBEDDING_MODEL}
     ORDER BY listing_created_at ASC
   `;
 

@@ -54,18 +54,6 @@ export function composeListingText(listing: {
     parts.push(`Lease: ${listing.leaseDuration}.`);
   }
 
-  if (listing.genderPreference) {
-    parts.push(`Gender preference: ${listing.genderPreference}.`);
-  }
-
-  if (listing.householdGender) {
-    parts.push(`Household gender: ${listing.householdGender}.`);
-  }
-
-  if (listing.householdLanguages?.length) {
-    parts.push(`Languages spoken: ${listing.householdLanguages.join(", ")}.`);
-  }
-
   if (listing.bookingMode) {
     parts.push(`Booking mode: ${listing.bookingMode}.`);
   }
