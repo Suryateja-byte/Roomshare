@@ -61,7 +61,8 @@ import {
 import { toPublicCoordinates } from "./public-coordinates";
 import pgvector from "pgvector";
 import { getCachedQueryEmbedding } from "@/lib/embeddings/query-cache";
-import { getCurrentEmbeddingVersion } from "@/lib/embeddings/version";
+import { getReadEmbeddingVersion } from "@/lib/embeddings/version";
+import { PUBLISHED_EMBEDDING_STATUSES } from "@/lib/embeddings/status";
 import { logger } from "@/lib/logger";
 import { joinWhereClauseWithSecurityInvariant } from "@/lib/sql-safety";
 import { buildAvailabilitySqlFragments } from "@/lib/availability";
@@ -76,8 +77,6 @@ import {
 // Statement timeout for search queries (5 seconds)
 const SEARCH_QUERY_TIMEOUT_MS = 5000;
 const SEARCH_DEDUP_LOOK_AHEAD = 16;
-const PUBLISHED_EMBEDDING_STATUSES = ["COMPLETED", "PARTIAL"] as const;
-
 function isPresent<T>(value: T | null | undefined): value is T {
   return value != null;
 }
@@ -2256,8 +2255,11 @@ export async function semanticSearchQuery(
   const cappedQuery = queryText.slice(0, MAX_QUERY_LENGTH);
 
   try {
-    const embedding = await getCachedQueryEmbedding(cappedQuery);
-    const embeddingVersion = getCurrentEmbeddingVersion();
+    const embeddingVersion = getReadEmbeddingVersion();
+    const embedding = await getCachedQueryEmbedding(
+      cappedQuery,
+      embeddingVersion
+    );
     const vecSql = pgvector.toSql(embedding);
 
     // Lowercase array filters to match _lower columns
@@ -2275,18 +2277,20 @@ export async function semanticSearchQuery(
       `SELECT * FROM search_listings_semantic(
         $1::text::vector,
         $2,
-        $3::float, $4::float, $5::float, $6::float,
-        $7::numeric, $8::numeric,
-        $9::text[], $10::text[],
-        $11::text, $12::text, $13::text, $14::text,
-        $15::int, $16::text, $17::timestamptz, $18::text[],
-        $19::float,
-        $20::int,
-        $21::int
+        $3::text,
+        $4::float, $5::float, $6::float, $7::float,
+        $8::numeric, $9::numeric,
+        $10::text[], $11::text[],
+        $12::text, $13::text, $14::text, $15::text,
+        $16::int, $17::text, $18::timestamptz, $19::text[],
+        $20::float,
+        $21::int,
+        $22::int
       )`,
       [
         vecSql,
         cappedQuery,
+        embeddingVersion,
         filterParams.bounds?.minLat ?? null,
         filterParams.bounds?.minLng ?? null,
         filterParams.bounds?.maxLat ?? null,
