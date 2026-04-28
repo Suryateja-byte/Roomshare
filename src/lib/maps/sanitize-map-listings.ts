@@ -5,6 +5,7 @@ import type {
 } from "@/lib/search-types";
 import { buildPublicAvailability } from "@/lib/search/public-availability";
 import type { PublicAvailabilitySource } from "@/lib/search/public-availability";
+import { toPublicCoordinates } from "@/lib/search/public-coordinates";
 
 type MapListingInput = {
   id: string;
@@ -92,6 +93,7 @@ export function sanitizeMapListing(
   if (!hasValidCoordinateRange(lat, lng)) {
     return null;
   }
+  const publicCoordinates = toPublicCoordinates({ lat, lng });
 
   const publicAvailability =
     listing.publicAvailability ??
@@ -139,8 +141,8 @@ export function sanitizeMapListing(
     location: {
       city: toOptionalTrimmedString(listing.location?.city),
       state: toOptionalTrimmedString(listing.location?.state),
-      lat,
-      lng,
+      lat: publicCoordinates.lat,
+      lng: publicCoordinates.lng,
     },
     publicAvailability,
     tier: listing.tier,

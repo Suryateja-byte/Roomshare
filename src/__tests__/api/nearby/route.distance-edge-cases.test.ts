@@ -62,7 +62,7 @@ describe("POST /api/nearby - Distance Calculation Edge Cases", () => {
       _id: `place-${lat}-${lng}`,
       name,
       formattedAddress: `${lat}, ${lng}`,
-      categories: ["test"],
+      categories: ["food-beverage"],
       location: {
         type: "Point",
         coordinates: [lng, lat], // Radar returns [lng, lat]
@@ -99,7 +99,7 @@ describe("POST /api/nearby - Distance Calculation Edge Cases", () => {
           listingLat: lat,
           listingLng: lng,
           radiusMeters: 1609,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -121,7 +121,7 @@ describe("POST /api/nearby - Distance Calculation Edge Cases", () => {
           listingLat,
           listingLng,
           radiusMeters: 1609,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -143,7 +143,7 @@ describe("POST /api/nearby - Distance Calculation Edge Cases", () => {
           listingLat,
           listingLng,
           radiusMeters: 8046, // 5 miles
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -164,7 +164,7 @@ describe("POST /api/nearby - Distance Calculation Edge Cases", () => {
           listingLat,
           listingLng,
           radiusMeters: 8046, // 5 miles
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -184,7 +184,7 @@ describe("POST /api/nearby - Distance Calculation Edge Cases", () => {
           listingLat,
           listingLng,
           radiusMeters: 8046, // 5 miles
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -207,7 +207,7 @@ describe("POST /api/nearby - Distance Calculation Edge Cases", () => {
           listingLat,
           listingLng,
           radiusMeters: 8046, // 5 miles
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -232,7 +232,7 @@ describe("POST /api/nearby - Distance Calculation Edge Cases", () => {
           listingLat,
           listingLng,
           radiusMeters: 8046, // 5 miles
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -254,7 +254,7 @@ describe("POST /api/nearby - Distance Calculation Edge Cases", () => {
           listingLat,
           listingLng,
           radiusMeters: 1609,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
 
@@ -281,7 +281,7 @@ describe("POST /api/nearby - Distance Calculation Edge Cases", () => {
           listingLat,
           listingLng,
           radiusMeters: 1609,
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -302,7 +302,7 @@ describe("POST /api/nearby - Distance Calculation Edge Cases", () => {
           listingLat,
           listingLng,
           radiusMeters: 8046, // 5 miles
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -328,7 +328,7 @@ describe("POST /api/nearby - Distance Calculation Edge Cases", () => {
           listingLat,
           listingLng,
           radiusMeters: 8046, // 5 miles
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();
@@ -360,7 +360,7 @@ describe("POST /api/nearby - Distance Calculation Edge Cases", () => {
           listingLat,
           listingLng,
           radiusMeters: 1609, // 1 mile
-          categories: ["test"],
+          categories: ["food-beverage"],
         })
       );
       const data = await response.json();

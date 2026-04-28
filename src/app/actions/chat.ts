@@ -5,8 +5,6 @@ import { auth } from "@/auth";
 import { checkSuspension, checkEmailVerified } from "./suspension";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { z } from "zod";
-import { createInternalNotification } from "@/lib/notifications";
-import { sendNotificationEmailWithPreference } from "@/lib/email";
 import { headers } from "next/headers";
 import {
   checkRateLimit,
@@ -34,13 +32,13 @@ import {
   recordContactAttempt,
 } from "@/lib/contact/contact-attempts";
 import {
-  recordOutboundContentSoftFlag,
-  scanOutboundMessageContent,
-} from "@/lib/messaging/outbound-content-guard";
-import {
   recordStartConversationBlockedPaywall,
   recordStartConversationPaywallUnavailable,
 } from "@/lib/payments/telemetry";
+import {
+  sendConversationMessage,
+  type SentConversationMessage,
+} from "@/lib/messaging/send-conversation-message";
 
 const sendMessageSchema = z.object({
   conversationId: z.string().trim().min(1).max(100),
@@ -122,6 +120,11 @@ export async function startConversation(
         minStayMonths: true,
         lastConfirmedAt: true,
         physicalUnitId: true,
+        owner: {
+          select: {
+            isSuspended: true,
+          },
+        },
       },
     });
 
@@ -132,6 +135,13 @@ export async function startConversation(
     const listing = contactable.listing;
     if (listing.ownerId === userId)
       return { error: "Cannot chat with yourself" };
+
+    if (listing.owner?.isSuspended) {
+      return {
+        error: HOST_NOT_ACCEPTING_CONTACT_MESSAGE,
+        code: "HOST_NOT_ACCEPTING_CONTACT",
+      };
+    }
 
     let resolvedUnitIdentityEpoch: number | null = null;
     if (unitIdentityEpochObserved && listing.physicalUnitId) {
@@ -351,7 +361,14 @@ export async function startConversation(
   }
 }
 
-export async function sendMessage(conversationId: string, content: string) {
+type SendMessageActionResult =
+  | SentConversationMessage
+  | { error: string; code?: string };
+
+export async function sendMessage(
+  conversationId: string,
+  content: string
+): Promise<SendMessageActionResult> {
   const session = await auth();
   if (!session?.user?.id) {
     return { error: "Unauthorized", code: "SESSION_EXPIRED" };
@@ -380,142 +397,28 @@ export async function sendMessage(conversationId: string, content: string) {
     const { conversationId: safeConversationId, content: safeContent } =
       parsed.data;
 
-    // Check if email is verified (soft enforcement - only block unverified users)
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { emailVerified: true },
-    });
-
-    if (!user?.emailVerified) {
-      return { error: "Please verify your email to send messages" };
+    const emailCheck = await checkEmailVerified(session.user.id);
+    if (!emailCheck.verified) {
+      return {
+        error:
+          emailCheck.error || "Please verify your email to send messages",
+      };
     }
 
-    // Get conversation with participants for notification
-    const conversation = await prisma.conversation.findUnique({
-      where: { id: safeConversationId },
-      include: {
-        participants: {
-          select: { id: true, name: true },
-        },
-        listing: {
-          select: {
-            status: true,
-            statusReason: true,
-            availableSlots: true,
-            totalSlots: true,
-            openSlots: true,
-            moveInDate: true,
-            availableUntil: true,
-            minStayMonths: true,
-            lastConfirmedAt: true,
-          },
-        },
-      },
-    });
-
-    if (!conversation || conversation.deletedAt) {
-      return { error: "Conversation not found" };
-    }
-
-    const contactable = evaluateListingContactable(conversation.listing);
-    if (!contactable.ok) {
-      return { error: contactable.message, code: contactable.code };
-    }
-
-    // P1-17 FIX: Verify user is a participant in the conversation (IDOR protection)
-    const isParticipant = conversation.participants.some(
-      (p) => p.id === session.user.id
-    );
-    if (!isParticipant) {
-      return { error: "Unauthorized" };
-    }
-
-    // Check for blocks between participants
-    const { checkBlockBeforeAction } = await import("./block");
-    const otherParticipant = conversation.participants.find(
-      (p) => p.id !== session.user.id
-    );
-    if (otherParticipant) {
-      const blockCheck = await checkBlockBeforeAction(otherParticipant.id);
-      if (!blockCheck.allowed) {
-        return { error: blockCheck.message };
-      }
-    }
-
-    const outboundContentFlags = scanOutboundMessageContent(safeContent);
-    recordOutboundContentSoftFlag({
+    const sent = await sendConversationMessage({
       conversationId: safeConversationId,
-      userId: session.user.id,
-      flagKinds: outboundContentFlags,
+      senderId: session.user.id,
+      senderName: session.user.name,
+      content: safeContent,
     });
 
-    // Wrap dependent writes in a transaction to prevent partial failures
-    const message = await prisma.$transaction(async (tx) => {
-      const msg = await tx.message.create({
-        data: {
-          content: safeContent,
-          conversationId: safeConversationId,
-          senderId: session.user.id,
-        },
-      });
-      await Promise.all([
-        tx.conversation.update({
-          where: { id: safeConversationId },
-          data: { updatedAt: new Date() },
-        }),
-        // New message resurrects conversation for everyone
-        tx.conversationDeletion.deleteMany({
-          where: { conversationId: safeConversationId },
-        }),
-      ]);
-      return msg;
-    });
+    if (!sent.ok) {
+      return sent.code
+        ? { error: sent.error, code: sent.code }
+        : { error: sent.error };
+    }
 
-    // Use session.user.name (already available) instead of an extra DB query
-    const senderName = session.user.name || "Someone";
-
-    // Send notifications to other participants in parallel
-    const otherParticipants = conversation.participants.filter(
-      (p) => p.id !== session.user.id
-    );
-
-    // Fetch emails separately — keep PII out of the hot-path participant select
-    const otherParticipantIds = otherParticipants.map((p) => p.id);
-    const participantEmails = await prisma.user.findMany({
-      where: { id: { in: otherParticipantIds } },
-      select: { id: true, email: true },
-    });
-    const emailMap = new Map(participantEmails.map((p) => [p.id, p.email]));
-
-    await Promise.all(
-      otherParticipants.map(async (participant) => {
-        // Create in-app notification
-        await createInternalNotification({
-          userId: participant.id,
-          type: "NEW_MESSAGE",
-          title: "New Message",
-          message: `${senderName}: ${safeContent.substring(0, 50)}${safeContent.length > 50 ? "..." : ""}`,
-          link: `/messages/${safeConversationId}`,
-        });
-
-        // Send email (respecting user preferences)
-        const email = emailMap.get(participant.id);
-        if (email) {
-          await sendNotificationEmailWithPreference(
-            "newMessage",
-            participant.id,
-            email,
-            {
-              recipientName: participant.name || "User",
-              senderName,
-              conversationId: safeConversationId,
-            }
-          );
-        }
-      })
-    );
-
-    return message;
+    return sent.message;
   } catch (error: unknown) {
     logger.sync.error("Failed to send message", {
       action: "sendMessage",

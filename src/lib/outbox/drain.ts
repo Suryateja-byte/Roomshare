@@ -28,6 +28,8 @@ import {
 } from "@/lib/metrics/projection-lag";
 import { MAX_ATTEMPTS } from "@/lib/projections/alert-thresholds";
 
+const STALE_IN_FLIGHT_MS = 5 * 60 * 1000;
+
 export interface DrainOptions {
   /** Max rows to claim per tick (default: 50) */
   maxBatch?: number;
@@ -37,6 +39,8 @@ export interface DrainOptions {
   priorityMax?: number;
   /** Clock override for testing */
   now?: () => Date;
+  /** Reset IN_FLIGHT rows older than this age before claiming (default: 5 minutes) */
+  staleInFlightMs?: number;
 }
 
 export interface DrainResult {
@@ -67,12 +71,15 @@ function retryDelayMs(attemptCount: number): number {
  * Safe to call from multiple contexts (cron route, tests); the FOR UPDATE SKIP
  * LOCKED claim ensures only one worker processes each row at a time.
  */
-export async function drainOutboxOnce(opts: DrainOptions = {}): Promise<DrainResult> {
+export async function drainOutboxOnce(
+  opts: DrainOptions = {}
+): Promise<DrainResult> {
   const {
     maxBatch = 50,
     maxTickMs = 9000,
     priorityMax = 100,
     now = () => new Date(),
+    staleInFlightMs = STALE_IN_FLIGHT_MS,
   } = opts;
 
   const tickStart = Date.now();
@@ -84,6 +91,16 @@ export async function drainOutboxOnce(opts: DrainOptions = {}): Promise<DrainRes
 
   // ── Step 1: Claim batch in a single transaction ──────────────────────────
   const claimedRows = await prisma.$transaction(async (tx) => {
+    const staleCutoff = new Date(now().getTime() - staleInFlightMs);
+    await tx.$executeRaw`
+      UPDATE outbox_events
+      SET status          = 'PENDING',
+          next_attempt_at = LEAST(next_attempt_at, NOW()),
+          updated_at      = NOW()
+      WHERE status = 'IN_FLIGHT'
+        AND updated_at < ${staleCutoff}
+    `;
+
     const rows = await tx.$queryRaw<OutboxRow[]>`
       SELECT
         id, aggregate_type AS "aggregateType", aggregate_id AS "aggregateId",
@@ -115,8 +132,15 @@ export async function drainOutboxOnce(opts: DrainOptions = {}): Promise<DrainRes
   });
 
   // ── Step 2: Process each claimed row outside the claim tx ─────────────────
-  for (const event of claimedRows) {
-    if (Date.now() - tickStart >= maxTickMs) break;
+  const unprocessedClaimedIds: string[] = [];
+  for (let index = 0; index < claimedRows.length; index += 1) {
+    const event = claimedRows[index];
+    if (Date.now() - tickStart >= maxTickMs) {
+      unprocessedClaimedIds.push(
+        ...claimedRows.slice(index).map((row) => row.id)
+      );
+      break;
+    }
 
     processed += 1;
 
@@ -124,7 +148,12 @@ export async function drainOutboxOnce(opts: DrainOptions = {}): Promise<DrainRes
     if (!handler) {
       // Unknown kind — DLQ immediately
       await prisma.$transaction(async (tx) => {
-        await routeToDlq(tx, event.id, "UNKNOWN_KIND", `Unknown kind: ${event.kind}`);
+        await routeToDlq(
+          tx,
+          event.id,
+          "UNKNOWN_KIND",
+          `Unknown kind: ${event.kind}`
+        );
       });
       recordDlqRouting(event.kind, "UNKNOWN_KIND");
       dlq += 1;
@@ -169,7 +198,12 @@ export async function drainOutboxOnce(opts: DrainOptions = {}): Promise<DrainRes
         const nextAttempt = new Date(Date.now() + result.retryAfterMs);
         if (event.attemptCount >= MAX_ATTEMPTS) {
           await prisma.$transaction(async (tx) => {
-            await routeToDlq(tx, event.id, "MAX_ATTEMPTS_EXHAUSTED", result.lastError);
+            await routeToDlq(
+              tx,
+              event.id,
+              "MAX_ATTEMPTS_EXHAUSTED",
+              result.lastError
+            );
           });
           recordDlqRouting(event.kind, "MAX_ATTEMPTS_EXHAUSTED");
           dlq += 1;
@@ -197,8 +231,21 @@ export async function drainOutboxOnce(opts: DrainOptions = {}): Promise<DrainRes
     }
   }
 
+  if (unprocessedClaimedIds.length > 0) {
+    await prisma.$executeRaw`
+      UPDATE outbox_events
+      SET status        = 'PENDING',
+          attempt_count = GREATEST(attempt_count - 1, 0),
+          updated_at    = NOW()
+      WHERE id = ANY(${unprocessedClaimedIds}::TEXT[])
+        AND status = 'IN_FLIGHT'
+    `;
+  }
+
   // ── Step 4: Count remaining backlog per priority lane ─────────────────────
-  const backlogRows = await prisma.$queryRaw<{ priority: number; depth: bigint }[]>`
+  const backlogRows = await prisma.$queryRaw<
+    { priority: number; depth: bigint }[]
+  >`
     SELECT priority, COUNT(*) AS depth
     FROM outbox_events
     WHERE status = 'PENDING'

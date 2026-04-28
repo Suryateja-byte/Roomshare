@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SlidersHorizontal, X } from "lucide-react";
 import FilterModal from "@/components/search/FilterModal";
@@ -136,7 +142,7 @@ function PrimaryFilterButton({
       disabled={disabled}
       data-testid={testId}
       className={cn(
-        "flex items-center gap-1 px-4 py-2.5 min-h-[44px] rounded-full text-sm whitespace-nowrap transition-colors shrink-0 border",
+        "flex min-h-[42px] shrink-0 items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium whitespace-nowrap transition-all duration-200 active:scale-[0.98]",
         active
           ? cn(QUICK_FILTER_ACTIVE_CLASSNAME, "font-medium")
           : QUICK_FILTER_INACTIVE_CLASSNAME
@@ -182,16 +188,10 @@ export function InlineFilterStrip({
   const isFacetsOpen = showFilterDrawer || openQuickFilter !== null;
   const isCountPreviewOpen = showFilterDrawer || openQuickFilter === "price";
 
-  const {
-    pending,
-    committed,
-    isDirty,
-    setPending,
-    reset,
-    commit,
-  } = useBatchedFilters({
-    isDrawerOpen: isFacetsOpen,
-  });
+  const { pending, committed, isDirty, setPending, reset, commit } =
+    useBatchedFilters({
+      isDrawerOpen: isFacetsOpen,
+    });
 
   const {
     minPrice,
@@ -250,7 +250,8 @@ export function InlineFilterStrip({
     !showDesktopQuickFilters && mobileResultsView === "list";
   const chips = useMemo(() => urlToFilterChips(searchParams), [searchParams]);
   const hasActiveFilters = activeCount > 0;
-  const showAppliedChips = chips.length > 0 && (showDesktopQuickFilters || showMobileInlineFilters);
+  const showAppliedChips =
+    chips.length > 0 && (showDesktopQuickFilters || showMobileInlineFilters);
   const showInlineFilterStrip =
     showDesktopQuickFilters || showMobileInlineFilters || showAppliedChips;
   const pendingActiveCount = useMemo(
@@ -266,7 +267,8 @@ export function InlineFilterStrip({
     return LANGUAGE_CODES.filter((code) => {
       const name = getLanguageName(code);
       return (
-        name.toLowerCase().includes(search) || code.toLowerCase().includes(search)
+        name.toLowerCase().includes(search) ||
+        code.toLowerCase().includes(search)
       );
     }).map(String);
   }, [languageSearch]);
@@ -466,14 +468,14 @@ export function InlineFilterStrip({
           onClick={() => handleRemoveChip(chip)}
           disabled={isPending}
           aria-label={`Remove filter: ${chip.label}`}
-          className="flex min-h-[36px] shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-primary/20 bg-primary/10 px-3 py-2 text-sm text-on-surface transition-colors hover:bg-primary/15"
+          className="flex min-h-[36px] shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-on-surface bg-on-surface px-3 py-2 text-sm font-medium text-on-primary shadow-ambient-sm transition-colors hover:bg-on-surface/90"
         >
           <span className="max-w-[150px] truncate">{chip.label}</span>
-          <X className="h-3 w-3 shrink-0 text-on-surface-variant" />
+          <X className="h-3 w-3 shrink-0 text-on-primary/80" />
         </button>
       ))}
       {hiddenAppliedChipCount > 0 ? (
-        <span className="flex min-h-[36px] shrink-0 items-center whitespace-nowrap rounded-full border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface-variant">
+        <span className="flex min-h-[36px] shrink-0 items-center whitespace-nowrap rounded-full border border-outline-variant/35 bg-surface-container-lowest px-3 py-2 text-sm text-on-surface-variant">
           +{hiddenAppliedChipCount} more
         </span>
       ) : null}
@@ -483,7 +485,7 @@ export function InlineFilterStrip({
           onClick={handleClearAll}
           disabled={isPending}
           aria-label="Clear all filters"
-          className="flex min-h-[44px] shrink-0 items-center whitespace-nowrap px-3 py-1.5 text-xs text-on-surface-variant transition-colors hover:text-on-surface"
+          className="flex min-h-[42px] shrink-0 items-center whitespace-nowrap px-3 py-1.5 text-xs font-medium text-on-surface-variant underline decoration-outline-variant underline-offset-4 transition-colors hover:text-on-surface"
         >
           Clear all
         </button>
@@ -504,10 +506,10 @@ export function InlineFilterStrip({
   return (
     <>
       {showDesktopQuickFilters && (desktopSummaryHeading || toolbarSlot) ? (
-        <div className="py-3">
+        <div className="border-b border-outline-variant/25 px-1 py-4">
           <div
             data-testid="desktop-results-heading-section"
-            className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between px-1"
+            className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between"
           >
             <div className="min-w-0">
               {desktopSummaryHeading ? (
@@ -515,7 +517,7 @@ export function InlineFilterStrip({
                   <h1
                     id="search-results-heading"
                     tabIndex={-1}
-                    className="truncate text-[1.35rem] font-semibold tracking-tight text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:rounded-lg"
+                    className="truncate font-display text-[1.7rem] font-normal leading-tight tracking-normal text-on-surface focus:outline-none focus-visible:rounded-lg focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
                   >
                     {desktopSummaryHeading}
                   </h1>
@@ -546,50 +548,62 @@ export function InlineFilterStrip({
       ) : null}
 
       {showInlineFilterStrip ? (
-        <div className="hide-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto px-1 py-2">
+        <div className="hide-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto border-b border-outline-variant/20 px-1 py-3">
           {showDesktopQuickFilters ? (
-            <DesktopQuickFilters
-              disabled={isPending}
-              hasMounted={hasMounted}
-              activeCount={activeCount}
-              isAdvancedFiltersOpen={showFilterDrawer}
-              openQuickFilter={openQuickFilter}
-              onQuickFilterOpenChange={handleQuickFilterOpenChange}
-              onOpenAdvancedFilters={handleOpenFilters}
-              priceLabel={formatPriceQuickLabel(
-                committedMinPrice,
-                committedMaxPrice
-              )}
-              moveInLabel={formatMoveInQuickLabel(committed.moveInDate)}
-              roomTypeLabel={committed.roomType || "Room Type"}
-              leaseDurationLabel={committed.leaseDuration || "Duration"}
-              isPriceActive={
-                committed.minPrice.length > 0 || committed.maxPrice.length > 0
-              }
-              isMoveInActive={committed.moveInDate.length > 0}
-              isRoomTypeActive={committed.roomType.length > 0}
-              isLeaseDurationActive={committed.leaseDuration.length > 0}
-              draftMinPrice={numericMinPrice}
-              draftMaxPrice={numericMaxPrice}
-              priceAbsoluteMin={priceAbsoluteMin}
-              priceAbsoluteMax={priceAbsoluteMax}
-              priceHistogram={facets?.priceHistogram?.buckets ?? null}
-              priceApplyLabel={formattedCount || "Show results"}
-              isPriceApplyLoading={isCountLoading}
-              isPriceApplyDisabled={boundsRequired}
-              onPriceDraftChange={handlePriceDraftChange}
-              onPriceDraftClear={handlePriceDraftClear}
-              onPriceApply={handlePriceApply}
-              moveInDateValue={committed.moveInDate}
-              minMoveInDate={minMoveInDate}
-              onMoveInSelect={handleMoveInSelect}
-              onMoveInClear={handleMoveInClear}
-              roomTypeValue={committed.roomType}
-              roomTypeCounts={facets?.roomTypes}
-              onRoomTypeSelect={handleRoomTypeSelect}
-              leaseDurationValue={committed.leaseDuration}
-              onLeaseDurationSelect={handleLeaseDurationSelect}
-            />
+            <>
+              <div className="flex min-h-[42px] shrink-0 items-center pr-1">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
+                  Refine
+                </span>
+                {activeCount > 0 ? (
+                  <span className="ml-1.5 font-display text-sm italic text-primary">
+                    {activeCount}
+                  </span>
+                ) : null}
+              </div>
+              <DesktopQuickFilters
+                disabled={isPending}
+                hasMounted={hasMounted}
+                activeCount={activeCount}
+                isAdvancedFiltersOpen={showFilterDrawer}
+                openQuickFilter={openQuickFilter}
+                onQuickFilterOpenChange={handleQuickFilterOpenChange}
+                onOpenAdvancedFilters={handleOpenFilters}
+                priceLabel={formatPriceQuickLabel(
+                  committedMinPrice,
+                  committedMaxPrice
+                )}
+                moveInLabel={formatMoveInQuickLabel(committed.moveInDate)}
+                roomTypeLabel={committed.roomType || "Room Type"}
+                leaseDurationLabel={committed.leaseDuration || "Duration"}
+                isPriceActive={
+                  committed.minPrice.length > 0 || committed.maxPrice.length > 0
+                }
+                isMoveInActive={committed.moveInDate.length > 0}
+                isRoomTypeActive={committed.roomType.length > 0}
+                isLeaseDurationActive={committed.leaseDuration.length > 0}
+                draftMinPrice={numericMinPrice}
+                draftMaxPrice={numericMaxPrice}
+                priceAbsoluteMin={priceAbsoluteMin}
+                priceAbsoluteMax={priceAbsoluteMax}
+                priceHistogram={facets?.priceHistogram?.buckets ?? null}
+                priceApplyLabel={formattedCount || "Show results"}
+                isPriceApplyLoading={isCountLoading}
+                isPriceApplyDisabled={boundsRequired}
+                onPriceDraftChange={handlePriceDraftChange}
+                onPriceDraftClear={handlePriceDraftClear}
+                onPriceApply={handlePriceApply}
+                moveInDateValue={committed.moveInDate}
+                minMoveInDate={minMoveInDate}
+                onMoveInSelect={handleMoveInSelect}
+                onMoveInClear={handleMoveInClear}
+                roomTypeValue={committed.roomType}
+                roomTypeCounts={facets?.roomTypes}
+                onRoomTypeSelect={handleRoomTypeSelect}
+                leaseDurationValue={committed.leaseDuration}
+                onLeaseDurationSelect={handleLeaseDurationSelect}
+              />
+            </>
           ) : showMobileInlineFilters ? (
             <>
               <PrimaryFilterButton
@@ -619,7 +633,7 @@ export function InlineFilterStrip({
                 testId="mobile-filter-room-type"
               />
 
-              <div className="h-6 w-px shrink-0 bg-outline-variant/40" />
+              <div className="h-6 w-px shrink-0 bg-outline-variant/35" />
 
               <button
                 type="button"
@@ -632,10 +646,10 @@ export function InlineFilterStrip({
                 aria-haspopup="dialog"
                 data-testid="mobile-filter-button"
                 className={cn(
-                  "flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] rounded-full text-sm font-medium whitespace-nowrap transition-colors shrink-0 border",
+                  "flex min-h-[42px] shrink-0 items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-semibold whitespace-nowrap transition-all duration-200 active:scale-[0.98]",
                   activeCount > 0
-                    ? "bg-on-surface text-on-primary border-on-surface"
-                    : "bg-surface-container-lowest text-on-surface border-outline-variant hover:border-on-surface-variant"
+                    ? "border-on-surface bg-on-surface text-on-primary"
+                    : "border-outline-variant/45 bg-surface-container-lowest text-on-surface hover:border-on-surface-variant"
                 )}
               >
                 <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
@@ -665,7 +679,9 @@ export function InlineFilterStrip({
           setShowFilterDrawer(false);
         }}
         onClearAll={handleClearAll}
-        hasActiveFilters={showFilterDrawer ? drawerHasActiveFilters : hasActiveFilters}
+        hasActiveFilters={
+          showFilterDrawer ? drawerHasActiveFilters : hasActiveFilters
+        }
         activeFilterCount={showFilterDrawer ? pendingActiveCount : activeCount}
         moveInDate={moveInDate}
         leaseDuration={leaseDuration}
@@ -679,7 +695,9 @@ export function InlineFilterStrip({
         onMinSlotsChange={(value) =>
           setPending({ minSlots: value !== undefined ? String(value) : "" })
         }
-        onMoveInDateChange={(value: string) => setPending({ moveInDate: value })}
+        onMoveInDateChange={(value: string) =>
+          setPending({ moveInDate: value })
+        }
         onLeaseDurationChange={(value: string) =>
           setPending({ leaseDuration: value === "any" ? "" : value })
         }

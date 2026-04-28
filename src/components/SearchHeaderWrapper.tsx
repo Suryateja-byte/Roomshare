@@ -13,14 +13,9 @@
  * - Shows compact search pill when scrolled down
  */
 
-import {
-  useCallback,
-  useState,
-  useRef,
-  useEffect,
-  useId,
-} from "react";
+import { useCallback, useState, useRef, useEffect, useId } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import {
   Menu,
@@ -29,6 +24,8 @@ import {
   Heart,
   Settings,
   LogOut,
+  Bookmark,
+  MessageSquare,
   SlidersHorizontal,
 } from "lucide-react";
 import { useScrollHeader } from "@/hooks/useScrollHeader";
@@ -44,8 +41,6 @@ import { useSession, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import UserAvatar from "@/components/UserAvatar";
 import { countActiveFilters } from "@/components/filters/filter-chip-utils";
-
-
 
 const MenuItem = ({
   icon,
@@ -349,24 +344,27 @@ export default function SearchHeaderWrapper() {
   return (
     <>
       {/* Full search form - hidden on mobile always, hidden on desktop when collapsed */}
-      <div
-        className={`transition-all duration-300 ease-out hidden md:block`}
-      >
-        <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4">
-          <div className="flex items-center gap-2 sm:gap-3">
+      <div className="hidden transition-all duration-300 ease-out md:block">
+        <div className="mx-auto w-full max-w-[1920px] px-4 py-3 lg:px-6">
+          <div className="grid grid-cols-[auto_minmax(420px,1fr)_auto] items-center gap-4">
             {/* Logo — always visible */}
             <Link
               href="/"
-              className="flex items-center cursor-pointer group flex-shrink-0 mr-1 sm:mr-2 md:mr-4"
+              className="group flex h-12 w-14 flex-shrink-0 items-center justify-start"
               aria-label="RoomShare Home"
             >
-              <div className="w-9 h-9 bg-on-surface rounded-lg flex items-center justify-center text-surface-container-lowest font-bold text-xl transition-all duration-500 group-hover:rotate-[10deg] group-hover:scale-110 shadow-ambient shadow-on-surface/10">
-                R
-              </div>
+              <Image
+                src="/images/home/rs-logo.svg"
+                alt=""
+                width={47}
+                height={38}
+                priority
+                className="h-9 w-auto transition-transform duration-300 group-hover:scale-[1.04]"
+              />
             </Link>
 
             {/* Desktop header search — mobile keeps the full-screen overlay flow */}
-            <div className="flex-1 min-w-0 relative hidden md:flex justify-center">
+            <div className="relative hidden min-w-0 justify-center md:flex">
               <DesktopHeaderSearch
                 ref={desktopSearchRef}
                 collapsed={isCollapsed}
@@ -374,8 +372,34 @@ export default function SearchHeaderWrapper() {
             </div>
 
             {/* Right Actions - User Profile / Auth */}
-            <div className="hidden lg:flex items-center gap-2 flex-shrink-0 ml-2">
-              <div className="flex items-center gap-1 pr-2">
+            <div className="hidden min-w-max items-center justify-end gap-2 lg:flex">
+              {user ? (
+                <>
+                  <Link
+                    href="/listings/create"
+                    className="inline-flex h-11 items-center gap-2 rounded-full bg-on-surface px-4 text-sm font-semibold text-surface-container-lowest shadow-ambient-sm transition-all duration-200 hover:bg-on-surface/90 active:scale-[0.98]"
+                    aria-label="List a room"
+                  >
+                    <Plus size={15} aria-hidden />
+                    <span>List a room</span>
+                  </Link>
+                  <Link
+                    href="/saved"
+                    className="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-outline-variant/30 bg-surface-container-lowest text-on-surface-variant shadow-ambient-sm transition-colors hover:border-on-surface-variant hover:bg-surface-container-high/60 hover:text-on-surface focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
+                    aria-label="Shortlist"
+                  >
+                    <Bookmark size={17} aria-hidden />
+                  </Link>
+                  <Link
+                    href="/messages"
+                    className="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-outline-variant/30 bg-surface-container-lowest text-on-surface-variant shadow-ambient-sm transition-colors hover:border-on-surface-variant hover:bg-surface-container-high/60 hover:text-on-surface focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
+                    aria-label="Messages"
+                  >
+                    <MessageSquare size={17} aria-hidden />
+                  </Link>
+                </>
+              ) : null}
+              <div className="flex items-center">
                 <button
                   type="button"
                   onClick={openFilters}
@@ -383,10 +407,10 @@ export default function SearchHeaderWrapper() {
                   aria-expanded="false"
                   aria-controls="search-filters"
                   aria-haspopup="dialog"
-                  className={`flex items-center gap-2 px-4 py-2 min-h-[40px] rounded-full text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 border ${
+                  className={`inline-flex h-11 items-center gap-2 rounded-full border px-4 text-sm font-semibold shadow-ambient-sm transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 ${
                     activeCount > 0
-                      ? "bg-primary/10 text-primary border-primary/20 hover:bg-primary/15"
-                      : "bg-surface-container-lowest text-on-surface border-outline-variant/50 hover:border-on-surface-variant hover:bg-surface-container-high/50"
+                      ? "border-on-surface bg-on-surface text-surface-container-lowest hover:bg-on-surface/90"
+                      : "border-outline-variant/30 bg-surface-container-lowest text-on-surface hover:border-on-surface-variant hover:bg-surface-container-high/60"
                   }`}
                 >
                   <SlidersHorizontal size={16} />
@@ -407,10 +431,10 @@ export default function SearchHeaderWrapper() {
                     id={menuButtonId}
                     onClick={() => setIsProfileOpen(!isProfileOpen)}
                     onKeyDown={handleTriggerKeyDown}
-                    className={`group flex items-center gap-2 p-1 pl-1.5 pr-1 min-h-[40px] rounded-full transition-all duration-300 ${
+                    className={`group flex h-11 items-center gap-2 rounded-full border border-outline-variant/30 bg-surface-container-lowest p-1 pl-2 pr-1 shadow-ambient-sm transition-all duration-300 ${
                       isProfileOpen
-                        ? "bg-surface-container-high"
-                        : "hover:bg-surface-canvas"
+                        ? "border-on-surface-variant bg-surface-container-high"
+                        : "hover:border-on-surface-variant hover:bg-surface-canvas"
                     }`}
                     aria-expanded={isProfileOpen}
                     aria-haspopup="menu"
@@ -541,8 +565,6 @@ export default function SearchHeaderWrapper() {
         onClose={handleCloseMobileSearch}
         onOpenFilters={openFilters}
       />
-
-
     </>
   );
 }

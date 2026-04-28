@@ -82,7 +82,7 @@ describe("POST /api/nearby - Coordinates Boundary Edge Cases", () => {
           listingLat: 90,
           listingLng: 0,
           radiusMeters: 1609,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
 
@@ -97,7 +97,7 @@ describe("POST /api/nearby - Coordinates Boundary Edge Cases", () => {
           listingLat: -90,
           listingLng: 0,
           radiusMeters: 1609,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
 
@@ -112,7 +112,7 @@ describe("POST /api/nearby - Coordinates Boundary Edge Cases", () => {
           listingLat: 0,
           listingLng: 0,
           radiusMeters: 1609,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
 
@@ -125,7 +125,7 @@ describe("POST /api/nearby - Coordinates Boundary Edge Cases", () => {
           listingLat: 90.0001,
           listingLng: 0,
           radiusMeters: 1609,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
 
@@ -138,7 +138,7 @@ describe("POST /api/nearby - Coordinates Boundary Edge Cases", () => {
           listingLat: -90.0001,
           listingLng: 0,
           radiusMeters: 1609,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
 
@@ -151,7 +151,7 @@ describe("POST /api/nearby - Coordinates Boundary Edge Cases", () => {
           listingLat: 91,
           listingLng: 0,
           radiusMeters: 1609,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
 
@@ -168,7 +168,7 @@ describe("POST /api/nearby - Coordinates Boundary Edge Cases", () => {
           listingLat: 0,
           listingLng: 180,
           radiusMeters: 1609,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
 
@@ -183,7 +183,7 @@ describe("POST /api/nearby - Coordinates Boundary Edge Cases", () => {
           listingLat: 0,
           listingLng: -180,
           radiusMeters: 1609,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
 
@@ -198,7 +198,7 @@ describe("POST /api/nearby - Coordinates Boundary Edge Cases", () => {
           listingLat: 0,
           listingLng: 0,
           radiusMeters: 1609,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
 
@@ -211,7 +211,7 @@ describe("POST /api/nearby - Coordinates Boundary Edge Cases", () => {
           listingLat: 0,
           listingLng: 180.0001,
           radiusMeters: 1609,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
 
@@ -224,7 +224,7 @@ describe("POST /api/nearby - Coordinates Boundary Edge Cases", () => {
           listingLat: 0,
           listingLng: -180.0001,
           radiusMeters: 1609,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
 
@@ -237,7 +237,7 @@ describe("POST /api/nearby - Coordinates Boundary Edge Cases", () => {
           listingLat: 0,
           listingLng: 181,
           radiusMeters: 1609,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
 
@@ -254,7 +254,7 @@ describe("POST /api/nearby - Coordinates Boundary Edge Cases", () => {
           listingLat: -0,
           listingLng: -0,
           radiusMeters: 1609,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
 
@@ -268,7 +268,7 @@ describe("POST /api/nearby - Coordinates Boundary Edge Cases", () => {
           listingLat: NaN,
           listingLng: 0,
           radiusMeters: 1609,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
 
@@ -281,7 +281,7 @@ describe("POST /api/nearby - Coordinates Boundary Edge Cases", () => {
           listingLat: Infinity,
           listingLng: 0,
           radiusMeters: 1609,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
 
@@ -294,7 +294,7 @@ describe("POST /api/nearby - Coordinates Boundary Edge Cases", () => {
           listingLat: 0,
           listingLng: -Infinity,
           radiusMeters: 1609,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
 
@@ -311,7 +311,7 @@ describe("POST /api/nearby - Coordinates Boundary Edge Cases", () => {
           listingLat: 37.77777777777777777777,
           listingLng: -122.41941941941941941,
           radiusMeters: 1609,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
 
@@ -326,7 +326,7 @@ describe("POST /api/nearby - Coordinates Boundary Edge Cases", () => {
           listingLat: 3.7e1, // 37
           listingLng: -1.22e2, // -122
           radiusMeters: 1609,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
 
@@ -341,7 +341,7 @@ describe("POST /api/nearby - Coordinates Boundary Edge Cases", () => {
           listingLat: 37.7749000000001,
           listingLng: -122.4194000000001,
           radiusMeters: 1609,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
 
@@ -359,7 +359,7 @@ describe("POST /api/nearby - Coordinates Boundary Edge Cases", () => {
           listingLat: 90,
           listingLng: -180,
           radiusMeters: 1609,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
       expect(nw.status).toBe(200);
@@ -370,7 +370,7 @@ describe("POST /api/nearby - Coordinates Boundary Edge Cases", () => {
           listingLat: 90,
           listingLng: 180,
           radiusMeters: 1609,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
       expect(ne.status).toBe(200);
@@ -381,7 +381,7 @@ describe("POST /api/nearby - Coordinates Boundary Edge Cases", () => {
           listingLat: -90,
           listingLng: -180,
           radiusMeters: 1609,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
       expect(sw.status).toBe(200);
@@ -392,7 +392,7 @@ describe("POST /api/nearby - Coordinates Boundary Edge Cases", () => {
           listingLat: -90,
           listingLng: 180,
           radiusMeters: 1609,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
       expect(se.status).toBe(200);
@@ -406,7 +406,7 @@ describe("POST /api/nearby - Coordinates Boundary Edge Cases", () => {
           listingLat: 0,
           listingLng: 0,
           radiusMeters: 1609,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
 
@@ -425,7 +425,7 @@ describe("POST /api/nearby - Coordinates Boundary Edge Cases", () => {
             listingLat: 37.7749,
             listingLng: -122.4194,
             radiusMeters: radius,
-            categories: ["test"],
+            categories: ["food-grocery"],
           })
         );
         expect(response.status).toBe(200);
@@ -440,7 +440,7 @@ describe("POST /api/nearby - Coordinates Boundary Edge Cases", () => {
             listingLat: 37.7749,
             listingLng: -122.4194,
             radiusMeters: radius,
-            categories: ["test"],
+            categories: ["food-grocery"],
           })
         );
         expect(response.status).toBe(400);

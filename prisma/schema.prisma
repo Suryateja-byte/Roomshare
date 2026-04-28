@@ -70,6 +70,7 @@ model User {
   recentlyViewed          RecentlyViewed[]
   notifications           Notification[]
   verificationRequests    VerificationRequest[]
+  verificationUploads     VerificationUpload[]
   savedSearches           SavedSearch[]
   alertSubscriptions       AlertSubscription[]
   alertDeliveries          AlertDelivery[]
@@ -340,21 +341,48 @@ enum VerificationStatus {
 }
 
 model VerificationRequest {
-  id           String             @id @default(cuid())
-  userId       String
-  documentType String // "passport", "driver_license", "national_id"
-  documentUrl  String // URL to uploaded document image
-  selfieUrl    String? // URL to selfie for matching
-  status       VerificationStatus @default(PENDING)
-  adminNotes   String? // Notes from admin on rejection
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-  reviewedAt   DateTime?
-  reviewedBy   String? // Admin user ID who reviewed
-  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                 String               @id @default(cuid())
+  userId             String
+  documentType       String // "passport", "driver_license", "national_id"
+  documentUrl        String? // Legacy public URL; migrated to private documentPath.
+  selfieUrl          String? // Legacy public URL; migrated to private selfiePath.
+  documentPath       String? // Private Supabase Storage path in verification-documents.
+  selfiePath         String? // Private Supabase Storage path in verification-documents.
+  documentMimeType   String?
+  selfieMimeType     String?
+  documentsExpireAt  DateTime?
+  documentsDeletedAt DateTime?
+  status             VerificationStatus   @default(PENDING)
+  adminNotes         String? // Notes from admin on rejection
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  reviewedAt         DateTime?
+  reviewedBy         String? // Admin user ID who reviewed
+  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  uploads            VerificationUpload[]
 
   @@index([userId])
   @@index([status])
+  @@index([documentsExpireAt])
+}
+
+model VerificationUpload {
+  id          String               @id @default(cuid())
+  userId      String
+  requestId   String?
+  kind        String // "document" | "selfie"
+  storagePath String               @unique
+  mimeType    String
+  sizeBytes   Int
+  createdAt   DateTime             @default(now())
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  request     VerificationRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
+
+  @@index([userId, kind, consumedAt, expiresAt])
+  @@index([requestId])
+  @@index([expiresAt])
 }
 
 enum AlertFrequency {
@@ -783,11 +811,16 @@ model RefundQueueItem {
   reason         String
   status         String   @default("PENDING")
   stripeRefundId String?  @map("stripe_refund_id")
+  attemptCount   Int      @default(0) @map("attempt_count")
+  nextAttemptAt  DateTime @default(now()) @map("next_attempt_at")
+  lastError      String?  @map("last_error")
+  processedAt    DateTime? @map("processed_at")
   metadata       Json?
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
   @@index([status, createdAt], map: "refund_queue_items_status_created_at_idx")
+  @@index([status, nextAttemptAt, createdAt], map: "refund_queue_items_status_next_attempt_idx")
   @@index([paymentId], map: "refund_queue_items_payment_id_idx")
   @@map("refund_queue_items")
 }
@@ -807,7 +840,8 @@ model FraudAuditJob {
 }
 
 model EntitlementState {
-  userId                String                  @id @map("user_id")
+  userId                String                  @map("user_id")
+  contactKind           ContactKind             @default(MESSAGE_START) @map("contact_kind")
   creditsFreeRemaining  Int                     @default(0) @map("credits_free_remaining")
   creditsPaidRemaining  Int                     @default(0) @map("credits_paid_remaining")
   activePassWindowStart DateTime?               @map("active_pass_window_start")
@@ -818,6 +852,7 @@ model EntitlementState {
   lastRecomputedAt      DateTime                @default(now()) @map("last_recomputed_at")
   updatedAt             DateTime                @updatedAt @map("updated_at")
 
+  @@id([userId, contactKind], map: "entitlement_state_pkey")
   @@index([freezeReason, lastRecomputedAt], map: "entitlement_state_freeze_recomputed_idx")
   @@map("entitlement_state")
 }

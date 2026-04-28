@@ -32,6 +32,12 @@ const PHASE06_MIGRATION = path.join(
   "migration.sql"
 );
 
+const PAYMENTS_FIX_MIGRATION = path.join(
+  MIGRATIONS_DIR,
+  "20260512000000_payments_entitlement_refund_queue_fix",
+  "migration.sql"
+);
+
 export interface Phase06Fixture extends Phase05Fixture {}
 
 export async function createPGlitePhase06Fixture(): Promise<Phase06Fixture> {
@@ -44,6 +50,7 @@ export async function createPGlitePhase06Fixture(): Promise<Phase06Fixture> {
     await pgExec(fs.readFileSync(migration, "utf8"));
   }
   await pgExec(fs.readFileSync(PHASE06_MIGRATION, "utf8"));
+  await pgExec(fs.readFileSync(PAYMENTS_FIX_MIGRATION, "utf8"));
 
   return base;
 }

@@ -13,8 +13,12 @@ import { evaluateListingContactable } from "@/lib/messaging/listing-contactable"
 import { HOST_NOT_ACCEPTING_CONTACT_MESSAGE } from "@/lib/contact/contact-attempts";
 import { consumeContactEntitlement } from "@/lib/payments/contact-paywall";
 
-type PhoneRevealClient = Pick<
-  typeof prisma,
+type TransactionClient = Parameters<
+  Parameters<typeof prisma.$transaction>[0]
+>[0];
+
+type PhoneRevealTransactionClient = Pick<
+  TransactionClient,
   | "listing"
   | "physicalUnit"
   | "blockedUser"
@@ -24,6 +28,9 @@ type PhoneRevealClient = Pick<
   | "$queryRaw"
   | "$executeRaw"
 >;
+
+type PhoneRevealClient = PhoneRevealTransactionClient &
+  Pick<typeof prisma, "$transaction">;
 
 type PhoneRevealOutcome = "REVEALED" | "DENIED" | "UNAVAILABLE" | "ERROR";
 
@@ -107,7 +114,7 @@ export function decryptPhoneForReveal(ciphertextValue: string): string | null {
 }
 
 async function recordPhoneRevealAudit(
-  client: Pick<typeof prisma, "$executeRaw">,
+  client: Pick<PhoneRevealTransactionClient, "$executeRaw">,
   input: {
     userId: string;
     listingId: string;
@@ -150,7 +157,7 @@ async function recordPhoneRevealAudit(
 }
 
 async function loadRevealablePhone(
-  client: PhoneRevealClient,
+  client: Pick<PhoneRevealTransactionClient, "$queryRaw">,
   hostUserId: string
 ) {
   const rows = await client.$queryRaw<HostContactChannelRow[]>`
@@ -185,6 +192,47 @@ export async function revealHostPhoneForListing(
     };
   }
 
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      return await client.$transaction(
+        (tx) => revealHostPhoneForListingInTransaction(input, tx),
+        { isolationLevel: "Serializable" }
+      );
+    } catch (error) {
+      if (attempt === 1 && isSerializationFailure(error)) {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  return {
+    ok: false as const,
+    status: 503,
+    code: "PHONE_REVEAL_UNAVAILABLE",
+    error: PHONE_REVEAL_UNAVAILABLE_MESSAGE,
+  };
+}
+
+function isSerializationFailure(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const err = error as { code?: string; message?: string };
+  return (
+    err.code === "P2034" ||
+    err.code === "P40001" ||
+    err.message?.includes("40001") === true
+  );
+}
+
+async function revealHostPhoneForListingInTransaction(
+  input: {
+    viewerUserId: string;
+    listingId: string;
+    clientIdempotencyKey?: string | null;
+    unitIdentityEpochObserved?: number | null;
+  },
+  client: PhoneRevealTransactionClient
+) {
   const listing = await client.listing.findUnique({
     where: { id: input.listingId },
     select: {
@@ -311,33 +359,6 @@ export async function revealHostPhoneForListing(
     };
   }
 
-  const consumption = await consumeContactEntitlement(client as never, {
-    userId: input.viewerUserId,
-    listingId: input.listingId,
-    physicalUnitId: revealListing.physicalUnitId,
-    clientIdempotencyKey: input.clientIdempotencyKey,
-    contactKind: "REVEAL_PHONE",
-  });
-
-  if (!consumption.ok) {
-    await recordPhoneRevealAudit(client, {
-      userId: input.viewerUserId,
-      listingId: input.listingId,
-      unitId: consumption.unitId,
-      unitIdentityEpoch: consumption.unitIdentityEpoch,
-      hostUserId: revealListing.ownerId,
-      outcome: "DENIED",
-      reasonCode: consumption.code,
-      clientIdempotencyKey: input.clientIdempotencyKey,
-    });
-    return {
-      ok: false as const,
-      status: consumption.code === "PAYWALL_REQUIRED" ? 402 : 503,
-      code: consumption.code,
-      error: consumption.message,
-    };
-  }
-
   const channel = await loadRevealablePhone(client, revealListing.ownerId);
   if (!channel?.phoneE164Ciphertext) {
     await recordPhoneRevealAudit(client, {
@@ -378,11 +399,38 @@ export async function revealHostPhoneForListing(
     };
   }
 
+  const consumption = await consumeContactEntitlement(client as never, {
+    userId: input.viewerUserId,
+    listingId: input.listingId,
+    physicalUnitId: revealListing.physicalUnitId,
+    clientIdempotencyKey: input.clientIdempotencyKey,
+    contactKind: "REVEAL_PHONE",
+  });
+
+  if (!consumption.ok) {
+    await recordPhoneRevealAudit(client, {
+      userId: input.viewerUserId,
+      listingId: input.listingId,
+      unitId: consumption.unitId,
+      unitIdentityEpoch: consumption.unitIdentityEpoch,
+      hostUserId: revealListing.ownerId,
+      outcome: "DENIED",
+      reasonCode: consumption.code,
+      clientIdempotencyKey: input.clientIdempotencyKey,
+    });
+    return {
+      ok: false as const,
+      status: consumption.code === "PAYWALL_REQUIRED" ? 402 : 503,
+      code: consumption.code,
+      error: consumption.message,
+    };
+  }
+
   await recordPhoneRevealAudit(client, {
     userId: input.viewerUserId,
     listingId: input.listingId,
-    unitId: revealListing.physicalUnitId,
-    unitIdentityEpoch,
+    unitId: consumption.unitId,
+    unitIdentityEpoch: consumption.unitIdentityEpoch,
     hostUserId: revealListing.ownerId,
     outcome: "REVEALED",
     clientIdempotencyKey: input.clientIdempotencyKey,

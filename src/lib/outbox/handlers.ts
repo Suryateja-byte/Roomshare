@@ -9,9 +9,7 @@
 import type { TransactionClient } from "@/lib/db/with-actor";
 import { features } from "@/lib/env";
 import type { OutboxKind } from "@/lib/outbox/append";
-import {
-  rebuildInventorySearchProjection,
-} from "@/lib/projections/inventory-projection";
+import { rebuildInventorySearchProjection } from "@/lib/projections/inventory-projection";
 import { rebuildUnitPublicProjection } from "@/lib/projections/unit-projection";
 import { handleTombstone } from "@/lib/projections/tombstone";
 import { handleGeocodeNeeded } from "@/lib/projections/geocode-worker";
@@ -71,6 +69,30 @@ function getPayloadString(
   return typeof value === "string" && value.trim().length > 0
     ? value.trim()
     : null;
+}
+
+function getPayloadStringArray(
+  payload: Record<string, unknown>,
+  key: string
+): string[] {
+  const value = payload[key];
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function getIdentityMutationAffectedUnitIds(event: OutboxRow): string[] {
+  const fromUnitIds = getPayloadStringArray(event.payload, "fromUnitIds");
+  const toUnitIds = getPayloadStringArray(event.payload, "toUnitIds");
+  const affected = Array.from(new Set([...fromUnitIds, ...toUnitIds])).sort();
+
+  if (affected.length > 0) {
+    return affected;
+  }
+
+  return event.aggregateType === "PHYSICAL_UNIT" ? [event.aggregateId] : [];
 }
 
 async function resolveInventoryEventUnitId(
@@ -141,7 +163,11 @@ async function handleUnitUpserted(
   // (inventory-level rebuild is triggered by INVENTORY_UPSERTED events).
   // Stale detection: if the unit projection is already newer, no-op.
   try {
-    await rebuildUnitPublicProjection(tx, event.aggregateId, event.unitIdentityEpoch);
+    await rebuildUnitPublicProjection(
+      tx,
+      event.aggregateId,
+      event.unitIdentityEpoch
+    );
     recordProjectionLag(event.kind, Date.now() - event.createdAt.getTime());
     return { outcome: "completed" };
   } catch (err) {
@@ -168,7 +194,10 @@ async function handleTombstoneEvent(
       sourceVersion: event.sourceVersion,
     });
 
-    recordTombstoneHideLatency(event.aggregateId, Date.now() - event.createdAt.getTime());
+    recordTombstoneHideLatency(
+      event.aggregateId,
+      Date.now() - event.createdAt.getTime()
+    );
     return { outcome: "completed" };
   } catch (err) {
     return {
@@ -194,7 +223,10 @@ async function handleSuppressionEvent(
       sourceVersion: event.sourceVersion,
     });
 
-    recordTombstoneHideLatency(event.aggregateId, Date.now() - event.createdAt.getTime());
+    recordTombstoneHideLatency(
+      event.aggregateId,
+      Date.now() - event.createdAt.getTime()
+    );
     return { outcome: "completed" };
   } catch (err) {
     return {
@@ -220,7 +252,10 @@ async function handlePauseEvent(
       sourceVersion: event.sourceVersion,
     });
 
-    recordTombstoneHideLatency(event.aggregateId, Date.now() - event.createdAt.getTime());
+    recordTombstoneHideLatency(
+      event.aggregateId,
+      Date.now() - event.createdAt.getTime()
+    );
     return { outcome: "completed" };
   } catch (err) {
     return {
@@ -237,7 +272,9 @@ async function handleCacheInvalidate(
 ): Promise<HandlerResult> {
   // Mark the cache_invalidations row as consumed
   try {
-    const cacheInvalidationId = event.payload.cacheInvalidationId as string | undefined;
+    const cacheInvalidationId = event.payload.cacheInvalidationId as
+      | string
+      | undefined;
     if (cacheInvalidationId) {
       await tx.$executeRaw`
         UPDATE cache_invalidations
@@ -262,30 +299,43 @@ async function handleIdentityMutation(
   tx: TransactionClient,
   event: OutboxRow
 ): Promise<HandlerResult> {
-  // Phase 02: Identity mutations trigger a cache invalidation
+  // Phase 02: Identity mutations fan out cache invalidations to every affected unit.
   try {
-    const projectionEpoch = currentProjectionEpoch();
-    const ciId = randomUUID();
-    await tx.$executeRaw`
-      INSERT INTO cache_invalidations (id, unit_id, projection_epoch, unit_identity_epoch, reason, enqueued_at)
-      VALUES (${ciId}, ${event.aggregateId}, ${projectionEpoch}::BIGINT, ${event.unitIdentityEpoch}, 'IDENTITY_MUTATION', NOW())
-    `;
+    const affectedUnitIds = getIdentityMutationAffectedUnitIds(event);
+    if (affectedUnitIds.length === 0) {
+      return {
+        outcome: "fatal_error",
+        dlqReason: "IDENTITY_MUTATION_NO_AFFECTED_UNITS",
+        lastError: "IDENTITY_MUTATION event missing fromUnitIds/toUnitIds",
+      };
+    }
 
-    // Enqueue CACHE_INVALIDATE at priority=10
-    await appendOutboxEvent(tx, {
-      aggregateType: "PHYSICAL_UNIT",
-      aggregateId: event.aggregateId,
-      kind: "CACHE_INVALIDATE",
-      payload: {
-        unitId: event.aggregateId,
-        cacheInvalidationId: ciId,
-        reason: "IDENTITY_MUTATION",
+    const projectionEpoch = currentProjectionEpoch();
+
+    for (const unitId of affectedUnitIds) {
+      const ciId = randomUUID();
+      await tx.$executeRaw`
+        INSERT INTO cache_invalidations (id, unit_id, projection_epoch, unit_identity_epoch, reason, enqueued_at)
+        VALUES (${ciId}, ${unitId}, ${projectionEpoch}::BIGINT, ${event.unitIdentityEpoch}, 'IDENTITY_MUTATION', NOW())
+      `;
+
+      // Enqueue CACHE_INVALIDATE at priority=10
+      await appendOutboxEvent(tx, {
+        aggregateType: "PHYSICAL_UNIT",
+        aggregateId: unitId,
+        kind: "CACHE_INVALIDATE",
+        payload: {
+          unitId,
+          cacheInvalidationId: ciId,
+          reason: "IDENTITY_MUTATION",
+          unitIdentityEpoch: event.unitIdentityEpoch,
+          mutationId: event.aggregateId,
+        },
+        sourceVersion: event.sourceVersion,
         unitIdentityEpoch: event.unitIdentityEpoch,
-      },
-      sourceVersion: event.sourceVersion,
-      unitIdentityEpoch: event.unitIdentityEpoch,
-      priority: 10,
-    });
+        priority: 10,
+      });
+    }
 
     recordProjectionLag(event.kind, Date.now() - event.createdAt.getTime());
     return { outcome: "completed" };
@@ -369,9 +419,7 @@ async function handleEmbedNeededEvent(
     return {
       outcome: "transient_error",
       retryAfterMs:
-        err instanceof EmbeddingBudgetExceededError
-          ? err.retryAfterMs
-          : 30_000,
+        err instanceof EmbeddingBudgetExceededError ? err.retryAfterMs : 30_000,
       lastError: err instanceof Error ? err.message : String(err),
     };
   }
@@ -389,9 +437,7 @@ async function handlePaymentWebhookEvent(
     return {
       outcome: "transient_error",
       retryAfterMs:
-        err instanceof PaymentWebhookRetryableError
-          ? err.retryAfterMs
-          : 30_000,
+        err instanceof PaymentWebhookRetryableError ? err.retryAfterMs : 30_000,
       lastError: err instanceof Error ? err.message : String(err),
     };
   }

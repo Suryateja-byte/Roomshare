@@ -17,10 +17,20 @@ export default async function ProfilePage() {
     redirect("/login");
   }
 
-  // Fetch user data with their listings
+  // Fetch only fields that are safe to serialize to the client.
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    include: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      emailVerified: true,
+      image: true,
+      bio: true,
+      countryOfOrigin: true,
+      languages: true,
+      isVerified: true,
+      createdAt: true,
       listings: {
         select: {
           id: true,

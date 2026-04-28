@@ -25,6 +25,9 @@ jest.mock("@/lib/prisma", () => ({
     user: {
       findUnique: jest.fn(),
     },
+    report: {
+      count: jest.fn(),
+    },
     $transaction: jest.fn(),
     $executeRaw: jest.fn(),
   },
@@ -94,14 +97,25 @@ jest.mock("@/lib/with-rate-limit", () => ({
   withRateLimit: jest.fn().mockResolvedValue(null),
 }));
 
+jest.mock("bcryptjs", () => ({
+  compare: jest.fn(),
+}));
+
 jest.mock("@/lib/logger", () => ({
   logger: {
     info: jest.fn().mockResolvedValue(undefined),
     warn: jest.fn().mockResolvedValue(undefined),
     sync: {
       error: jest.fn(),
+      warn: jest.fn(),
     },
   },
+}));
+
+jest.mock("@/lib/listings/canonical-inventory", () => ({
+  syncCanonicalListingInventory: jest
+    .fn()
+    .mockResolvedValue({ unitId: "unit-123" }),
 }));
 
 jest.mock("next/server", () => ({
@@ -127,6 +141,10 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "test-key";
 import { PATCH, DELETE } from "@/app/api/listings/[id]/route";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import bcrypt from "bcryptjs";
+import { createClient } from "@supabase/supabase-js";
+import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
+import { logger } from "@/lib/logger";
 import {
   getAvailability,
   getFuturePeakReservedLoad,
@@ -169,7 +187,14 @@ function makeLockedListing(
   }> = {}
 ) {
   return {
+    id: "listing-abc",
     ownerId: "owner-123",
+    version: 3,
+    status: "ACTIVE",
+    statusReason: null,
+    normalizedAddress: "123 main st san francisco ca 94102",
+    physicalUnitId: null,
+    openSlots: 2,
     totalSlots: 2,
     availableSlots: 2,
     bookingMode: "SHARED",
@@ -184,6 +209,7 @@ function makeLockedListing(
 describe("Listings API IDOR Protection", () => {
   const ownerSession = {
     user: { id: "owner-123", email: "owner@example.com", isSuspended: false },
+    authTime: Math.floor(Date.now() / 1000),
   };
 
   const attackerSession = {
@@ -192,6 +218,7 @@ describe("Listings API IDOR Protection", () => {
       email: "attacker@example.com",
       isSuspended: false,
     },
+    authTime: Math.floor(Date.now() / 1000),
   };
 
   const mockListing = {
@@ -219,15 +246,21 @@ describe("Listings API IDOR Protection", () => {
     title: "Updated Title",
     description: "Updated description",
     price: "1200",
-    totalSlots: "2",
     address: "123 Main St",
     city: "San Francisco",
     state: "CA",
     zip: "94102",
+    expectedVersion: 3,
+    leaseDuration: null,
+    roomType: null,
+    householdLanguages: [],
+    genderPreference: null,
+    householdGender: null,
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue({ password: null });
     (getAvailability as jest.Mock).mockResolvedValue(makeAvailabilitySnapshot());
     (getFuturePeakReservedLoad as jest.Mock).mockResolvedValue(0);
     (syncFutureInventoryTotalSlots as jest.Mock).mockResolvedValue(undefined);
@@ -267,9 +300,7 @@ describe("Listings API IDOR Protection", () => {
       (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
       const queryRawMock = jest
         .fn()
-        .mockResolvedValue([
-          { ownerId: "owner-123", totalSlots: 2, availableSlots: 2 },
-        ]);
+        .mockResolvedValue([makeLockedListing()]);
       const updateMock = jest
         .fn()
         .mockResolvedValue({ ...mockListing, title: "Updated Title" });
@@ -877,6 +908,7 @@ describe("Listings API IDOR Protection", () => {
               findMany: jest.fn().mockResolvedValue([]),
             },
             notification: { create: jest.fn() },
+            report: { count: jest.fn().mockResolvedValue(0) },
             listing: { delete: jest.fn().mockResolvedValue({}) },
           };
           return callback(tx);
@@ -896,6 +928,299 @@ describe("Listings API IDOR Protection", () => {
       expect(body.success).toBe(true);
     });
 
+    it("suppresses reported owner listings without exposing report state", async () => {
+      (auth as jest.Mock).mockResolvedValue(ownerSession);
+      const reportCount = jest.fn().mockResolvedValue(2);
+      const listingUpdate = jest.fn().mockResolvedValue({});
+      const listingDelete = jest.fn().mockResolvedValue({});
+      (prisma.$transaction as jest.Mock).mockImplementation(
+        async (callback: (tx: unknown) => Promise<unknown>) => {
+          const tx = {
+            $queryRaw: jest.fn().mockResolvedValue([
+              {
+                ownerId: "owner-123",
+                images: [
+                  "https://test.supabase.co/storage/v1/object/public/images/listings/reported.jpg",
+                ],
+                version: 7,
+              },
+            ]),
+            report: { count: reportCount },
+            listing: {
+              update: listingUpdate,
+              delete: listingDelete,
+            },
+          };
+          return callback(tx);
+        }
+      );
+
+      const request = new Request("http://localhost/api/listings/listing-abc", {
+        method: "DELETE",
+      });
+
+      const response = await DELETE(request, {
+        params: Promise.resolve({ id: "listing-abc" }),
+      });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        success: true,
+        notifiedTenants: 0,
+      });
+      expect(reportCount).toHaveBeenCalledWith({
+        where: { listingId: "listing-abc" },
+      });
+      expect(listingUpdate).toHaveBeenCalledWith({
+        where: { id: "listing-abc" },
+        data: {
+          status: "PAUSED",
+          statusReason: "SUPPRESSED",
+          version: 8,
+        },
+      });
+      expect(listingDelete).not.toHaveBeenCalled();
+      expect(markListingDirtyInTx).toHaveBeenCalledWith(
+        expect.any(Object),
+        "listing-abc",
+        "status_changed"
+      );
+      expect(createClient).not.toHaveBeenCalled();
+      expect(logger.info).toHaveBeenCalledWith(
+        "Owner listing delete suppressed",
+        expect.objectContaining({
+          action: "ownerDeleteListingSuppressed",
+          listingId: "listing-abc",
+          ownerId: "owner-123",
+          reportCount: 2,
+        })
+      );
+      const logMeta = (logger.info as jest.Mock).mock.calls[0][1];
+      expect(logMeta.reason).toBeUndefined();
+      expect(logMeta.details).toBeUndefined();
+      expect(logMeta.reporterId).toBeUndefined();
+      expect(logMeta.title).toBeUndefined();
+    });
+
+    it("hard-deletes unreported listings and runs storage cleanup", async () => {
+      (auth as jest.Mock).mockResolvedValue(ownerSession);
+      const reportCount = jest.fn().mockResolvedValue(0);
+      const listingDelete = jest.fn().mockResolvedValue({});
+      (prisma.$transaction as jest.Mock).mockImplementation(
+        async (callback: (tx: unknown) => Promise<unknown>) => {
+          const tx = {
+            $queryRaw: jest.fn().mockResolvedValue([
+              {
+                ownerId: "owner-123",
+                images: [
+                  "https://test.supabase.co/storage/v1/object/public/images/listings/clean.jpg",
+                ],
+                version: 3,
+              },
+            ]),
+            report: { count: reportCount },
+            listing: { delete: listingDelete },
+          };
+          return callback(tx);
+        }
+      );
+
+      const request = new Request("http://localhost/api/listings/listing-abc", {
+        method: "DELETE",
+      });
+
+      const response = await DELETE(request, {
+        params: Promise.resolve({ id: "listing-abc" }),
+      });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        success: true,
+        notifiedTenants: 0,
+      });
+      expect(reportCount).toHaveBeenCalledWith({
+        where: { listingId: "listing-abc" },
+      });
+      expect(listingDelete).toHaveBeenCalledWith({
+        where: { id: "listing-abc" },
+      });
+      expect(markListingDirtyInTx).not.toHaveBeenCalled();
+      expect(createClient).toHaveBeenCalled();
+    });
+
+    it("requires password proof for password-backed listing deletion", async () => {
+      (auth as jest.Mock).mockResolvedValue(ownerSession);
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        password: "hashed-password",
+      });
+
+      const request = new Request("http://localhost/api/listings/listing-abc", {
+        method: "DELETE",
+      });
+
+      const response = await DELETE(request, {
+        params: Promise.resolve({ id: "listing-abc" }),
+      });
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        code: "PASSWORD_REQUIRED",
+      });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("rejects password-backed listing deletion with an invalid password", async () => {
+      (auth as jest.Mock).mockResolvedValue(ownerSession);
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        password: "hashed-password",
+      });
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+      const request = new Request("http://localhost/api/listings/listing-abc", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: "wrong-password" }),
+      });
+
+      const response = await DELETE(request, {
+        params: Promise.resolve({ id: "listing-abc" }),
+      });
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        code: "PASSWORD_INVALID",
+      });
+      expect(bcrypt.compare).toHaveBeenCalledWith(
+        "wrong-password",
+        "hashed-password"
+      );
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("allows password-backed listing deletion with a valid password", async () => {
+      (auth as jest.Mock).mockResolvedValue(ownerSession);
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        password: "hashed-password",
+      });
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      (prisma.$transaction as jest.Mock).mockImplementation(
+        async (callback: (tx: unknown) => Promise<unknown>) => {
+          const tx = {
+            $queryRaw: jest.fn().mockResolvedValue([
+              {
+                ownerId: "owner-123",
+                title: "Test Listing",
+                images: [],
+                version: 3,
+              },
+            ]),
+            report: { count: jest.fn().mockResolvedValue(0) },
+            listing: { delete: jest.fn().mockResolvedValue({}) },
+          };
+          return callback(tx);
+        }
+      );
+
+      const request = new Request("http://localhost/api/listings/listing-abc", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: "secret" }),
+      });
+
+      const response = await DELETE(request, {
+        params: Promise.resolve({ id: "listing-abc" }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(bcrypt.compare).toHaveBeenCalledWith("secret", "hashed-password");
+    });
+
+    it("allows OAuth-only listing deletion with fresh authTime", async () => {
+      (auth as jest.Mock).mockResolvedValue({
+        ...ownerSession,
+        authTime: Math.floor(Date.now() / 1000),
+      });
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        password: null,
+      });
+      (prisma.$transaction as jest.Mock).mockImplementation(
+        async (callback: (tx: unknown) => Promise<unknown>) => {
+          const tx = {
+            $queryRaw: jest.fn().mockResolvedValue([
+              {
+                ownerId: "owner-123",
+                title: "Test Listing",
+                images: [],
+                version: 3,
+              },
+            ]),
+            report: { count: jest.fn().mockResolvedValue(0) },
+            listing: { delete: jest.fn().mockResolvedValue({}) },
+          };
+          return callback(tx);
+        }
+      );
+
+      const request = new Request("http://localhost/api/listings/listing-abc", {
+        method: "DELETE",
+      });
+
+      const response = await DELETE(request, {
+        params: Promise.resolve({ id: "listing-abc" }),
+      });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ success: true });
+      expect(prisma.$transaction).toHaveBeenCalled();
+    });
+
+    it("rejects OAuth-only listing deletion with stale authTime", async () => {
+      (auth as jest.Mock).mockResolvedValue({
+        ...ownerSession,
+        authTime: Math.floor(Date.now() / 1000) - 301,
+      });
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        password: null,
+      });
+
+      const request = new Request("http://localhost/api/listings/listing-abc", {
+        method: "DELETE",
+      });
+
+      const response = await DELETE(request, {
+        params: Promise.resolve({ id: "listing-abc" }),
+      });
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        code: "SESSION_FRESHNESS_REQUIRED",
+      });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("rejects OAuth-only listing deletion without authTime", async () => {
+      (auth as jest.Mock).mockResolvedValue({
+        user: ownerSession.user,
+      });
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        password: null,
+      });
+
+      const request = new Request("http://localhost/api/listings/listing-abc", {
+        method: "DELETE",
+      });
+
+      const response = await DELETE(request, {
+        params: Promise.resolve({ id: "listing-abc" }),
+      });
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        code: "SESSION_FRESHNESS_REQUIRED",
+      });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
     it("returns 404 when listing does not exist", async () => {
       (auth as jest.Mock).mockResolvedValue(attackerSession);
       // Transaction callback: $queryRaw returns empty array (no listing found),
@@ -906,6 +1231,7 @@ describe("Listings API IDOR Protection", () => {
             $queryRaw: jest.fn().mockResolvedValue([]), // No listing found
             booking: { count: jest.fn(), findMany: jest.fn() },
             notification: { create: jest.fn() },
+            report: { count: jest.fn().mockResolvedValue(0) },
             listing: { delete: jest.fn() },
           };
           return callback(tx);
@@ -957,6 +1283,7 @@ describe("Listings API IDOR Protection", () => {
               findMany: jest.fn(),
             },
             notification: { create: jest.fn() },
+            report: { count: jest.fn().mockResolvedValue(0) },
             listing: { delete: jest.fn() },
           };
           return callback(tx);

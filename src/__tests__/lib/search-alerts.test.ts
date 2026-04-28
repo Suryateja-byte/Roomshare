@@ -310,6 +310,42 @@ describe("search-alerts", () => {
         });
       });
 
+      it("adds requested endDate coverage to scheduled alert matching", async () => {
+        const dateRangeSearch = {
+          ...mockSavedSearch,
+          filters: {
+            moveInDate: "2026-05-01",
+            endDate: "2026-06-01",
+          },
+        };
+        (prisma.savedSearch.findMany as jest.Mock).mockResolvedValue([
+          dateRangeSearch,
+        ]);
+        (prisma.listing.count as jest.Mock).mockResolvedValue(0);
+        (prisma.savedSearch.update as jest.Mock).mockResolvedValue({});
+
+        await processSearchAlerts();
+
+        const countWhere = (prisma.listing.count as jest.Mock).mock.calls[0][0]
+          .where;
+        expect(countWhere.AND).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              OR: expect.arrayContaining([
+                { moveInDate: null },
+                { moveInDate: { lte: expect.any(Date) } },
+              ]),
+            }),
+            expect.objectContaining({
+              OR: expect.arrayContaining([
+                { availableUntil: null },
+                { availableUntil: { gte: expect.any(Date) } },
+              ]),
+            }),
+          ])
+        );
+      });
+
       it("does not send alert when no matching listings", async () => {
         (prisma.savedSearch.findMany as jest.Mock).mockResolvedValue([
           mockSavedSearch,
@@ -523,6 +559,8 @@ describe("search-alerts", () => {
           searchName: "NYC Rooms",
           listingTitle: "a matching listing",
           listingId: "listing-123",
+          ctaHref: "/listings/listing-123",
+          ctaLabel: "View Listing",
         })
       );
       expect(prisma.notification.create).toHaveBeenCalledWith({
@@ -537,6 +575,68 @@ describe("search-alerts", () => {
         data: expect.objectContaining({
           status: "DELIVERED",
           deliveredAt: expect.any(Date),
+        }),
+      });
+      });
+
+    it("uses the saved-search URL for scheduled digest email CTAs", async () => {
+      (prisma.alertDelivery.findUnique as jest.Mock).mockResolvedValue(
+        buildDelivery({
+          deliveryKind: "SCHEDULED",
+          targetListingId: null,
+          targetUnitId: null,
+          newListingsCount: 3,
+          payload: {
+            targetListingIds: ["listing-1", "listing-2", "listing-3"],
+          },
+          savedSearch: {
+            id: "search-123",
+            name: "NYC Rooms",
+            filters: {
+              query: "New York",
+              moveInDate: "2026-05-01",
+              endDate: "2026-06-01",
+            },
+            active: true,
+            alertEnabled: true,
+            user: mockUser,
+          },
+        })
+      );
+      (prisma.listing.findMany as jest.Mock).mockResolvedValue([
+        buildPublicListing("listing-1"),
+        buildPublicListing("listing-2"),
+        buildPublicListing("listing-3"),
+      ]);
+      (prisma.notification.create as jest.Mock).mockResolvedValue({});
+      (prisma.savedSearch.update as jest.Mock).mockResolvedValue({});
+
+      const result = await deliverQueuedSearchAlert(
+        prisma as Parameters<typeof deliverQueuedSearchAlert>[0],
+        "delivery-123"
+      );
+
+      expect(result).toEqual({ status: "delivered" });
+      expect(sendNotificationEmail).toHaveBeenCalledWith(
+        "searchAlert",
+        mockUser.email,
+        expect.objectContaining({
+          listingTitle: "3 matching listings",
+          listingId: undefined,
+          ctaHref: expect.stringContaining("/search"),
+          ctaLabel: "View Matches",
+        })
+      );
+      expect(sendNotificationEmail).toHaveBeenCalledWith(
+        "searchAlert",
+        mockUser.email,
+        expect.objectContaining({
+          ctaHref: expect.stringContaining("endDate=2026-06-01"),
+        })
+      );
+      expect(prisma.notification.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          link: expect.stringContaining("/search"),
         }),
       });
     });
@@ -748,6 +848,57 @@ describe("search-alerts", () => {
         const result = await triggerInstantAlerts(newListing);
 
         expect(result.sent).toBe(0);
+      });
+
+      it("does not send instant alert when listing expires before saved endDate", async () => {
+        const dateRangeSearch = {
+          ...instantSearch,
+          filters: {
+            moveInDate: "2026-05-01",
+            endDate: "2026-06-01",
+          },
+        };
+        (prisma.savedSearch.findMany as jest.Mock).mockResolvedValue([
+          dateRangeSearch,
+        ]);
+
+        const result = await triggerInstantAlerts({
+          ...newListing,
+          availableUntil: "2026-05-15",
+        });
+
+        expect(result.sent).toBe(0);
+        expect(prisma.alertDelivery.create).not.toHaveBeenCalled();
+      });
+
+      it("treats Date availableUntil as date-only when it covers saved endDate", async () => {
+        const dateRangeSearch = {
+          ...instantSearch,
+          filters: {
+            moveInDate: "2026-05-01",
+            endDate: "2026-06-01",
+          },
+        };
+        (prisma.savedSearch.findMany as jest.Mock).mockResolvedValue([
+          dateRangeSearch,
+        ]);
+        (prisma.notification.create as jest.Mock).mockResolvedValue({});
+        (prisma.savedSearch.update as jest.Mock).mockResolvedValue({});
+
+        const result = await triggerInstantAlerts({
+          ...newListing,
+          moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+          availableUntil: new Date("2026-06-01T00:00:00.000Z"),
+        });
+
+        expect(result.sent).toBe(1);
+        expect(prisma.alertDelivery.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({
+            savedSearchId: instantSearch.id,
+            targetListingId: newListing.id,
+          }),
+          select: { id: true },
+        });
       });
 
       it("matches city case-insensitively", async () => {

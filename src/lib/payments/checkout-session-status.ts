@@ -71,12 +71,8 @@ export function parsePaywallMetadata(metadata: unknown): PaywallMetadata | null 
     return null;
   }
 
-  if (contactKind !== "MESSAGE_START") {
-    return null;
-  }
-
   if (purchaseContext === "SEARCH_ALERTS") {
-    if (productCode !== "MOVERS_PASS_30D") {
+    if (productCode !== "MOVERS_PASS_30D" || contactKind !== "MESSAGE_START") {
       return null;
     }
 
@@ -118,7 +114,7 @@ export function parsePaywallMetadata(metadata: unknown): PaywallMetadata | null 
     unitId,
     unitIdentityEpoch,
     productCode,
-    contactKind: "MESSAGE_START",
+    contactKind: expectedContactKind,
   };
 }
 

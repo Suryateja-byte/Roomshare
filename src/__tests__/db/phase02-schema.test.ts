@@ -15,7 +15,10 @@
  * are TEXT NULL in this environment, not GEOGRAPHY — that's expected.
  */
 
-import { createPGlitePhase02Fixture, type Phase02Fixture } from "@/__tests__/utils/pglite-phase02";
+import {
+  createPGlitePhase02Fixture,
+  type Phase02Fixture,
+} from "@/__tests__/utils/pglite-phase02";
 
 let fixture: Phase02Fixture;
 
@@ -40,7 +43,9 @@ describe("inventory_search_projection table", () => {
       ORDER BY ordinal_position
     `);
 
-    const names = rows.map((r: Record<string, unknown>) => r.column_name as string);
+    const names = rows.map(
+      (r: Record<string, unknown>) => r.column_name as string
+    );
     expect(names).toContain("id");
     expect(names).toContain("inventory_id");
     expect(names).toContain("unit_id");
@@ -149,7 +154,9 @@ describe("unit_public_projection table", () => {
       ORDER BY ordinal_position
     `);
 
-    const names = rows.map((r: Record<string, unknown>) => r.column_name as string);
+    const names = rows.map(
+      (r: Record<string, unknown>) => r.column_name as string
+    );
     expect(names).toContain("unit_id");
     expect(names).toContain("unit_identity_epoch");
     expect(names).toContain("from_price");
@@ -203,7 +210,9 @@ describe("physical_units Phase 02 geocode columns", () => {
       ORDER BY column_name
     `);
 
-    const names = rows.map((r: Record<string, unknown>) => r.column_name as string);
+    const names = rows.map(
+      (r: Record<string, unknown>) => r.column_name as string
+    );
     expect(names).toContain("exact_point");
     expect(names).toContain("public_point");
     expect(names).toContain("public_cell_id");
@@ -299,6 +308,98 @@ describe("listing_inventories publish_status CHECK constraint", () => {
         `)
       ).resolves.not.toThrow();
     }
+  });
+});
+
+describe("listing_inventories canonical invariant CHECK constraints", () => {
+  async function insertInvalidInventory(
+    suffix: string,
+    overrides: Partial<{
+      price: number;
+      capacityGuests: number | null;
+      totalBeds: number | null;
+      openBeds: number | null;
+      availableFrom: string;
+      availableUntil: string | null;
+      sourceVersion: number;
+      rowVersion: number;
+      unitIdentityEpoch: number;
+      roomCategory: string;
+    }>
+  ) {
+    const unitId = await fixture.insertPhysicalUnit({
+      canonicalAddressHash: `hash-invariant-${suffix}`,
+    });
+    const availableFrom = overrides.availableFrom ?? "2026-05-01";
+    const availableUntilSql =
+      overrides.availableUntil === undefined
+        ? "NULL"
+        : overrides.availableUntil === null
+          ? "NULL"
+          : `'${overrides.availableUntil}'`;
+
+    return fixture.query(`
+      INSERT INTO listing_inventories (
+        id, unit_id, unit_identity_epoch_written_at, inventory_key,
+        room_category, capacity_guests, total_beds, open_beds,
+        available_from, available_until, availability_range, price,
+        source_version, row_version, canonicalizer_version, canonical_address_hash
+      ) VALUES (
+        'inv-invariant-${suffix}',
+        '${unitId}',
+        ${overrides.unitIdentityEpoch ?? 1},
+        'listing:inv-invariant-${suffix}',
+        '${overrides.roomCategory ?? "PRIVATE_ROOM"}',
+        ${overrides.capacityGuests === undefined ? 1 : overrides.capacityGuests},
+        ${overrides.totalBeds ?? "NULL"},
+        ${overrides.openBeds ?? "NULL"},
+        '${availableFrom}',
+        ${availableUntilSql},
+        '[2026-05-01T00:00:00Z,2026-06-01T00:00:00Z)',
+        ${overrides.price ?? 1000},
+        ${overrides.sourceVersion ?? 1},
+        ${overrides.rowVersion ?? 1},
+        'v1',
+        'hash-invariant-${suffix}'
+      )
+    `);
+  }
+
+  it.each([
+    ["non-positive price", { price: 0 }],
+    ["non-positive capacity", { capacityGuests: 0 }],
+    [
+      "non-positive total beds",
+      {
+        roomCategory: "SHARED_ROOM",
+        capacityGuests: null,
+        totalBeds: 0,
+        openBeds: 0,
+      },
+    ],
+    [
+      "negative open beds",
+      {
+        roomCategory: "SHARED_ROOM",
+        capacityGuests: null,
+        totalBeds: 2,
+        openBeds: -1,
+      },
+    ],
+    [
+      "available_until before available_from",
+      { availableFrom: "2026-05-10", availableUntil: "2026-05-01" },
+    ],
+    ["non-positive source_version", { sourceVersion: 0 }],
+    ["non-positive row_version", { rowVersion: 0 }],
+    ["non-positive unit epoch", { unitIdentityEpoch: 0 }],
+  ])("rejects %s", async (_label, overrides) => {
+    await expect(
+      insertInvalidInventory(
+        `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        overrides
+      )
+    ).rejects.toThrow();
   });
 });
 

@@ -14,6 +14,10 @@ jest.mock("@/auth", () => ({
   auth: jest.fn(),
 }));
 
+jest.mock("@/app/actions/suspension", () => ({
+  checkSuspension: jest.fn().mockResolvedValue({ suspended: false }),
+}));
+
 jest.mock("@/lib/with-rate-limit", () => ({
   withRateLimit: jest.fn().mockResolvedValue(null),
 }));
@@ -93,6 +97,7 @@ process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
 
 import { auth } from "@/auth";
+import { checkSuspension } from "@/app/actions/suspension";
 import { createClient } from "@supabase/supabase-js";
 
 // ---------------------------------------------------------------------------
@@ -175,6 +180,7 @@ describe("POST /api/upload", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (auth as jest.Mock).mockResolvedValue(mockSession);
+    (checkSuspension as jest.Mock).mockResolvedValue({ suspended: false });
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -187,6 +193,23 @@ describe("POST /api/upload", () => {
     expect(response.status).toBe(401);
     const body = await response.json();
     expect(body.error).toBe("Unauthorized");
+  });
+
+  it("returns 403 when authenticated user is suspended", async () => {
+    (checkSuspension as jest.Mock).mockResolvedValue({
+      suspended: true,
+      error: "Account suspended",
+    });
+
+    const file = createFakeFile(JPEG_MAGIC, "photo.jpg", "image/jpeg");
+    const request = makeUploadRequest(file);
+    const response = await POST(request as any);
+
+    expect(checkSuspension).toHaveBeenCalledWith("user-123");
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.error).toBe("Account suspended");
+    expect(createClient).not.toHaveBeenCalled();
   });
 
   it("returns 400 when no file is provided", async () => {
@@ -427,6 +450,7 @@ describe("DELETE /api/upload", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (auth as jest.Mock).mockResolvedValue(mockSession);
+    (checkSuspension as jest.Mock).mockResolvedValue({ suspended: false });
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -438,6 +462,22 @@ describe("DELETE /api/upload", () => {
     expect(response.status).toBe(401);
     const body = await response.json();
     expect(body.error).toBe("Unauthorized");
+  });
+
+  it("returns 403 when suspended user tries to delete an upload", async () => {
+    (checkSuspension as jest.Mock).mockResolvedValue({
+      suspended: true,
+      error: "Account suspended",
+    });
+
+    const request = makeDeleteRequest({ path: "listings/user-123/photo.jpg" });
+    const response = await DELETE(request as any);
+
+    expect(checkSuspension).toHaveBeenCalledWith("user-123");
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.error).toBe("Account suspended");
+    expect(createClient).not.toHaveBeenCalled();
   });
 
   it("returns 403 for path traversal attempt (../../etc/passwd)", async () => {

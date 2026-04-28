@@ -36,10 +36,12 @@ import {
 } from "@/lib/listings/collision-detector";
 import {
   getOwnerHashPrefix8,
+  recordListingCreateCollisionBlocked,
   recordListingCreateCollisionDetected,
   recordListingCreateCollisionModerationGated,
   recordListingCreateCollisionResolved,
 } from "@/lib/search/search-telemetry";
+import { syncCanonicalListingInventory } from "@/lib/listings/canonical-inventory";
 
 class ListingCollisionCandidatesError extends Error {
   readonly siblings: CollisionSibling[];
@@ -48,6 +50,16 @@ class ListingCollisionCandidatesError extends Error {
     super("COLLISION_CANDIDATES");
     this.name = "ListingCollisionCandidatesError";
     this.siblings = siblings;
+  }
+}
+
+class ListingCollisionRateLimitedError extends Error {
+  readonly windowCount24h: number;
+
+  constructor(windowCount24h: number) {
+    super("LISTING_CREATE_COLLISION_RATE_LIMITED");
+    this.name = "ListingCollisionRateLimitedError";
+    this.windowCount24h = windowCount24h;
   }
 }
 
@@ -292,6 +304,7 @@ export async function POST(request: Request) {
       householdLanguages,
       primaryHomeLanguage,
       moveInDate,
+      bookingMode,
     } = validatedFields.data;
 
     // 8. Language compliance check on title AND description (2G)
@@ -388,6 +401,15 @@ export async function POST(request: Request) {
       }
     }
 
+    const normalizedAddressForCreate = normalizeAddress({
+      address,
+      city,
+      state,
+      zip,
+    });
+    const listingMoveInDate = new Date(`${moveInDate}T00:00:00.000Z`);
+    const listingConfirmedAt = new Date();
+
     // Build listing create data from validated fields
     const listingCreateData = {
       title,
@@ -406,7 +428,14 @@ export async function POST(request: Request) {
       roomType: roomType || null,
       totalSlots,
       availableSlots: totalSlots,
-      moveInDate: moveInDate ? new Date(moveInDate) : null,
+      openSlots: totalSlots,
+      moveInDate: listingMoveInDate,
+      availableUntil: null,
+      minStayMonths: 1,
+      lastConfirmedAt: listingConfirmedAt,
+      status: "ACTIVE" as const,
+      statusReason: null,
+      normalizedAddress: normalizedAddressForCreate,
       ownerId: userId,
     };
 
@@ -426,16 +455,7 @@ export async function POST(request: Request) {
         throw new Error("MAX_LISTINGS_EXCEEDED");
       }
 
-      let normalizedAddressForCreate: string | undefined;
-
       if (features.listingCreateCollisionWarn) {
-        normalizedAddressForCreate = normalizeAddress({
-          address,
-          city,
-          state,
-          zip,
-        });
-
         const collisionAckHeader = request.headers.get("x-collision-ack");
         const ownerHashPrefix8 = getOwnerHashPrefix8(userId);
 
@@ -467,22 +487,22 @@ export async function POST(request: Request) {
               ownerHashPrefix8,
               windowCount24h: rateLimit.windowCount,
             });
+            recordListingCreateCollisionBlocked({
+              ownerHashPrefix8,
+              windowCount24h: rateLimit.windowCount,
+            });
+            throw new ListingCollisionRateLimitedError(rateLimit.windowCount);
           }
 
           recordListingCreateCollisionResolved({
             ownerHashPrefix8,
-            action: rateLimit.needsModeration ? "moderation_gated" : "proceed",
+            action: "proceed",
           });
         }
       }
 
       const listing = await tx.listing.create({
-        data: {
-          ...listingCreateData,
-          ...(normalizedAddressForCreate !== undefined
-            ? { normalizedAddress: normalizedAddressForCreate }
-            : {}),
-        },
+        data: listingCreateData,
       });
 
       const location = await tx.location.create({
@@ -502,6 +522,12 @@ export async function POST(request: Request) {
                 WHERE id = ${location.id}
             `;
 
+      await syncCanonicalListingInventory(tx, {
+        listing: { ...listing, bookingMode },
+        address: { address, city, state, zip },
+        actor: { role: "host", id: userId },
+      });
+
       await markListingDirtyInTx(tx, listing.id, "listing_created");
 
       return listing;
@@ -517,6 +543,8 @@ export async function POST(request: Request) {
       leaseDuration: string | null;
       amenities: string[];
       houseRules: string[];
+      moveInDate: Date | string | null;
+      availableUntil: Date | string | null;
     }) => {
       // 15. Synchronous upsert search doc for immediate visibility (1D)
       // Isolated: sync failure must not bubble up and mask a successful listing creation
@@ -556,6 +584,8 @@ export async function POST(request: Request) {
         leaseDuration: listing.leaseDuration || null,
         amenities: listing.amenities,
         houseRules: listing.houseRules,
+        moveInDate: listing.moveInDate,
+        availableUntil: listing.availableUntil,
       }).catch((err) => {
         logger.sync.warn("Instant alerts trigger failed", {
           route: "/api/listings",
@@ -625,6 +655,17 @@ export async function POST(request: Request) {
             siblings: txError.siblings,
           },
           { status: 409 }
+        );
+      }
+      if (txError instanceof ListingCollisionRateLimitedError) {
+        return NextResponse.json(
+          {
+            error:
+              "Too many similar listings were created at this address recently. Please try again later or contact support.",
+            code: "LISTING_CREATE_COLLISION_RATE_LIMITED",
+            windowCount24h: txError.windowCount24h,
+          },
+          { status: 429 }
         );
       }
       if (

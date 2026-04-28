@@ -148,6 +148,30 @@ describe("POST /api/reports", () => {
     });
   });
 
+  it("rejects suspended users on the abuse-report path before report writes", async () => {
+    (checkSuspension as jest.Mock).mockResolvedValue({
+      suspended: true,
+      error: "Account suspended",
+    });
+
+    const response = await POST(
+      createRequest({
+        listingId: "listing-1",
+        reason: "spam",
+        details: "Existing abuse report path",
+      })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toEqual({
+      error: "Account suspended",
+      code: "ACCOUNT_SUSPENDED",
+    });
+    expect(prisma.listing.findUnique).not.toHaveBeenCalled();
+    expect(prisma.report.create).not.toHaveBeenCalled();
+  });
+
   it("blocks reporting your own listing on the existing abuse-report path", async () => {
     (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
       ownerId: "user-123",
@@ -222,6 +246,10 @@ describe("POST /api/reports", () => {
     );
 
     expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      error: "Account suspended",
+      code: "ACCOUNT_SUSPENDED",
+    });
     expect(recordPrivateFeedbackDenied).toHaveBeenCalledWith({
       reason: "suspended",
       listingId: "listing-1",
@@ -368,6 +396,28 @@ describe("POST /api/reports", () => {
         status: { in: ["OPEN", "RESOLVED"] },
       },
     });
+  });
+
+  it("maps active-report unique constraint races to the duplicate response", async () => {
+    (prisma.report.findFirst as jest.Mock).mockResolvedValue(null);
+    (prisma.report.create as jest.Mock).mockRejectedValue(
+      Object.assign(new Error("Unique constraint failed"), {
+        code: "P2002",
+        meta: { target: "Report_active_reporter_listing_kind_unique_idx" },
+      })
+    );
+
+    const response = await POST(
+      createRequest({
+        listingId: "listing-1",
+        reason: "spam",
+        details: "Race duplicate",
+      })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.error).toMatch(/already reported/i);
   });
 
   it("creates a private feedback report when every gate passes", async () => {

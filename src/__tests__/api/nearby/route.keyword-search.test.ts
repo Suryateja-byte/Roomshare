@@ -111,7 +111,7 @@ describe("POST /api/nearby - Keyword Search Feature", () => {
       const fetchCall = mockFetch.mock.calls[0];
       const url = fetchCall[0];
       expect(url).toContain("api.radar.io/v1/search/places");
-      expect(url).toContain("categories=gym%2Cfitness-recreation");
+      expect(url).toContain("categories=gym");
     });
 
     it('routes "fitness" keyword to Places Search', async () => {
@@ -127,7 +127,7 @@ describe("POST /api/nearby - Keyword Search Feature", () => {
       const fetchCall = mockFetch.mock.calls[0];
       const url = fetchCall[0];
       expect(url).toContain("api.radar.io/v1/search/places");
-      expect(url).toContain("categories=gym%2Cfitness-recreation");
+      expect(url).toContain("categories=gym");
     });
 
     it('routes "workout" keyword to Places Search', async () => {
@@ -143,7 +143,7 @@ describe("POST /api/nearby - Keyword Search Feature", () => {
       const fetchCall = mockFetch.mock.calls[0];
       const url = fetchCall[0];
       expect(url).toContain("api.radar.io/v1/search/places");
-      expect(url).toContain("categories=gym%2Cfitness-recreation");
+      expect(url).toContain("categories=gym");
     });
   });
 
@@ -188,7 +188,7 @@ describe("POST /api/nearby - Keyword Search Feature", () => {
 
       const fetchCall = mockFetch.mock.calls[0];
       const url = fetchCall[0];
-      expect(url).toContain("categories=pizza%2Crestaurant");
+      expect(url).toContain("categories=pizza-place%2Crestaurant");
     });
 
     it('routes "sushi" keyword to Places Search', async () => {
@@ -214,7 +214,7 @@ describe("POST /api/nearby - Keyword Search Feature", () => {
           _id: "place-1",
           name: "Starbucks",
           formattedAddress: "789 Coffee Lane",
-          categories: ["coffee-shop"],
+          categories: ["cafe"],
           location: { type: "Point", coordinates: [-122.4194, 37.7749] },
           chain: { name: "Starbucks" },
         },
@@ -234,7 +234,7 @@ describe("POST /api/nearby - Keyword Search Feature", () => {
 
       const fetchCall = mockFetch.mock.calls[0];
       const url = fetchCall[0];
-      expect(url).toContain("categories=coffee-shop%2Ccafe");
+      expect(url).toContain("categories=cafe");
     });
 
     it('routes "cafe" keyword to Places Search', async () => {
@@ -249,7 +249,7 @@ describe("POST /api/nearby - Keyword Search Feature", () => {
 
       const fetchCall = mockFetch.mock.calls[0];
       const url = fetchCall[0];
-      expect(url).toContain("categories=cafe%2Ccoffee-shop");
+      expect(url).toContain("categories=cafe");
     });
   });
 
@@ -281,7 +281,7 @@ describe("POST /api/nearby - Keyword Search Feature", () => {
 
       const fetchCall = mockFetch.mock.calls[0];
       const url = fetchCall[0];
-      expect(url).toContain("categories=hospital%2Chealth-medicine");
+      expect(url).toContain("categories=hospital%2Cmedical-health");
     });
   });
 
@@ -315,7 +315,7 @@ describe("POST /api/nearby - Keyword Search Feature", () => {
 
       const fetchCall = mockFetch.mock.calls[0];
       const url = fetchCall[0];
-      expect(url).toContain("categories=bank%2Cfinancial-service");
+      expect(url).toContain("categories=bank%2Cfinance");
     });
 
     it('routes "gas" keyword to Places Search', async () => {
@@ -363,7 +363,7 @@ describe("POST /api/nearby - Keyword Search Feature", () => {
       const fetchCall = mockFetch.mock.calls[0];
       const url = fetchCall[0];
       expect(url).toContain("api.radar.io/v1/search/places");
-      expect(url).toContain("categories=gym%2Cfitness-recreation");
+      expect(url).toContain("categories=gym");
     });
 
     it('handles mixed case keyword "Coffee"', async () => {
@@ -378,7 +378,7 @@ describe("POST /api/nearby - Keyword Search Feature", () => {
 
       const fetchCall = mockFetch.mock.calls[0];
       const url = fetchCall[0];
-      expect(url).toContain("categories=coffee-shop%2Ccafe");
+      expect(url).toContain("categories=cafe");
     });
   });
 

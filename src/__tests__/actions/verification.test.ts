@@ -1,21 +1,27 @@
 /**
- * Tests for verification server actions
+ * Tests for verification server actions.
  */
 
 jest.mock("@/lib/prisma", () => ({
   prisma: {
     verificationRequest: {
       findFirst: jest.fn(),
-      findUnique: jest.fn(),
       findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
+      deleteMany: jest.fn(),
+    },
+    verificationUpload: {
+      findMany: jest.fn(),
+      updateMany: jest.fn(),
       deleteMany: jest.fn(),
     },
     user: {
       findUnique: jest.fn(),
       update: jest.fn(),
     },
+    $queryRaw: jest.fn(),
     $transaction: jest.fn(),
   },
 }));
@@ -26,6 +32,29 @@ jest.mock("@/auth", () => ({
 
 jest.mock("next/cache", () => ({
   revalidatePath: jest.fn(),
+}));
+
+jest.mock("next/headers", () => ({
+  headers: jest.fn().mockResolvedValue(new Headers()),
+}));
+
+jest.mock("@/lib/rate-limit", () => ({
+  RATE_LIMITS: {
+    verificationSubmit: { limit: 5, windowMs: 86_400_000 },
+    verificationCancel: { limit: 10, windowMs: 3_600_000 },
+    adminWrite: { limit: 20, windowMs: 60_000 },
+  },
+  checkRateLimit: jest.fn().mockResolvedValue({ success: true }),
+  getClientIPFromHeaders: jest.fn().mockReturnValue("127.0.0.1"),
+}));
+
+jest.mock("@/app/actions/suspension", () => ({
+  checkSuspension: jest.fn().mockResolvedValue({ suspended: false }),
+}));
+
+jest.mock("@/lib/verification/storage", () => ({
+  VERIFICATION_DOCUMENT_RETENTION_MS: 30 * 24 * 60 * 60 * 1000,
+  deleteVerificationObjects: jest.fn().mockResolvedValue(0),
 }));
 
 jest.mock("@/lib/email", () => ({
@@ -41,605 +70,435 @@ jest.mock("@/lib/logger", () => ({
 }));
 
 import {
-  submitVerificationRequest,
-  getMyVerificationStatus,
-  getPendingVerifications,
   approveVerification,
-  rejectVerification,
   cancelVerificationRequest,
+  rejectVerification,
+  submitVerificationRequest,
 } from "@/app/actions/verification";
-import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
-import { revalidatePath } from "next/cache";
-import { sendNotificationEmail } from "@/lib/email";
 import { logAdminAction } from "@/lib/audit";
+import { sendNotificationEmail } from "@/lib/email";
+import { prisma } from "@/lib/prisma";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { deleteVerificationObjects } from "@/lib/verification/storage";
+import { revalidatePath } from "next/cache";
 
 describe("Verification Actions", () => {
   const mockSession = {
     user: { id: "user-123", name: "Test User", email: "test@example.com" },
   };
 
-  const SUPABASE_BASE =
-    "https://qolpgfdmkqvxraafucvu.supabase.co/storage/v1/object/public";
-  const validDocUrl = `${SUPABASE_BASE}/verification/docs/doc.jpg`;
-  const validSelfieUrl = `${SUPABASE_BASE}/verification/selfies/selfie.jpg`;
-  const validLicenseUrl = `${SUPABASE_BASE}/verification/docs/license.jpg`;
-
   beforeEach(() => {
     jest.clearAllMocks();
-    process.env.NEXT_PUBLIC_SUPABASE_URL =
-      "https://qolpgfdmkqvxraafucvu.supabase.co";
     (auth as jest.Mock).mockResolvedValue(mockSession);
+    (checkRateLimit as jest.Mock).mockResolvedValue({ success: true });
+    (deleteVerificationObjects as jest.Mock).mockResolvedValue(0);
+    (prisma.$transaction as jest.Mock).mockImplementation(
+      async (arg: unknown) => {
+        if (Array.isArray(arg)) {
+          return Promise.all(arg);
+        }
+        return (arg as (tx: typeof prisma) => Promise<unknown>)(prisma);
+      }
+    );
   });
 
   describe("submitVerificationRequest", () => {
-    it("returns error when not authenticated", async () => {
-      (auth as jest.Mock).mockResolvedValue(null);
-
+    it("rejects the legacy client-chosen URL contract", async () => {
       const result = await submitVerificationRequest({
         documentType: "passport",
-        documentUrl: validDocUrl,
-      });
+        documentUrl:
+          "https://qolpgfdmkqvxraafucvu.supabase.co/storage/v1/object/public/verification/doc.jpg",
+      } as never);
 
-      expect(result).toEqual({
-        error: "Unauthorized",
-        code: "SESSION_EXPIRED",
-      });
+      expect(result).toEqual({ error: "Invalid verification input" });
+      expect(prisma.verificationRequest.create).not.toHaveBeenCalled();
     });
 
-    it("returns error if pending request exists", async () => {
-      (prisma.verificationRequest.findFirst as jest.Mock).mockResolvedValue({
-        id: "request-123",
-        status: "PENDING",
-      });
-
-      const result = await submitVerificationRequest({
-        documentType: "passport",
-        documentUrl: validDocUrl,
-      });
-
-      expect(result).toEqual({
-        error: "You already have a pending verification request",
-      });
-    });
-
-    it("returns error if user is already verified", async () => {
-      (prisma.verificationRequest.findFirst as jest.Mock).mockResolvedValue(
-        null
-      );
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-        isVerified: true,
-      });
-
-      const result = await submitVerificationRequest({
-        documentType: "passport",
-        documentUrl: validDocUrl,
-      });
-
-      expect(result).toEqual({ error: "You are already verified" });
-    });
-
-    it("creates verification request successfully", async () => {
-      (prisma.verificationRequest.findFirst as jest.Mock).mockResolvedValue(
-        null
-      );
+    it("creates a request from owned, unconsumed upload ids only", async () => {
+      (prisma.verificationRequest.findFirst as jest.Mock)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         isVerified: false,
       });
+      const future = new Date(Date.now() + 60_000);
+      (prisma.verificationUpload.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: "upload-doc",
+          userId: "user-123",
+          kind: "document",
+          storagePath: "user-123/document/doc.jpg",
+          mimeType: "image/jpeg",
+          expiresAt: future,
+          consumedAt: null,
+          requestId: null,
+        },
+        {
+          id: "upload-selfie",
+          userId: "user-123",
+          kind: "selfie",
+          storagePath: "user-123/selfie/selfie.jpg",
+          mimeType: "image/png",
+          expiresAt: future,
+          consumedAt: null,
+          requestId: null,
+        },
+      ]);
       (prisma.verificationRequest.create as jest.Mock).mockResolvedValue({
         id: "request-new",
+      });
+      (prisma.verificationUpload.updateMany as jest.Mock).mockResolvedValue({
+        count: 2,
       });
 
       const result = await submitVerificationRequest({
         documentType: "driver_license",
-        documentUrl: validLicenseUrl,
-        selfieUrl: validSelfieUrl,
+        documentUploadId: "upload-doc",
+        selfieUploadId: "upload-selfie",
       });
 
       expect(prisma.verificationRequest.create).toHaveBeenCalledWith({
         data: {
           userId: "user-123",
           documentType: "driver_license",
-          documentUrl: validLicenseUrl,
-          selfieUrl: validSelfieUrl,
+          documentUrl: null,
+          selfieUrl: null,
+          documentPath: "user-123/document/doc.jpg",
+          selfiePath: "user-123/selfie/selfie.jpg",
+          documentMimeType: "image/jpeg",
+          selfieMimeType: "image/png",
+          documentsExpireAt: expect.any(Date),
+          documentsDeletedAt: null,
+        },
+        select: { id: true },
+      });
+      expect(prisma.verificationUpload.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: { in: ["upload-doc", "upload-selfie"] },
+          userId: "user-123",
+          consumedAt: null,
+          requestId: null,
+          expiresAt: { gt: expect.any(Date) },
+        },
+        data: {
+          consumedAt: expect.any(Date),
+          requestId: "request-new",
         },
       });
       expect(result).toEqual({ success: true, requestId: "request-new" });
-      expect(revalidatePath).toHaveBeenCalledWith("/profile");
       expect(revalidatePath).toHaveBeenCalledWith("/verify");
     });
 
-    describe("24h cooldown after rejection (G3.1)", () => {
-      it("blocks resubmission within 24h cooldown", async () => {
-        (prisma.verificationRequest.findFirst as jest.Mock)
-          .mockResolvedValueOnce(null) // 1st call: no PENDING
-          .mockResolvedValueOnce({
-            // 2nd call: REJECTED within cooldown (12h ago)
-            status: "REJECTED",
-            updatedAt: new Date(Date.now() - 12 * 60 * 60 * 1000),
-          });
-        (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-          isVerified: false,
-        });
-
-        const result = await submitVerificationRequest({
-          documentType: "passport",
-          documentUrl: validDocUrl,
-        });
-
-        expect(result.error).toContain("Please wait");
-        expect(result.cooldownRemaining).toBeGreaterThan(0);
-        expect(prisma.verificationRequest.create).not.toHaveBeenCalled();
-      });
-
-      it("allows resubmission after cooldown expires", async () => {
-        (prisma.verificationRequest.findFirst as jest.Mock)
-          .mockResolvedValueOnce(null) // no PENDING
-          .mockResolvedValueOnce(null); // no REJECTED within cooldown (48h > 24h)
-        (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-          isVerified: false,
-        });
-        (prisma.verificationRequest.create as jest.Mock).mockResolvedValue({
-          id: "new-req",
-        });
-
-        const result = await submitVerificationRequest({
-          documentType: "passport",
-          documentUrl: validDocUrl,
-        });
-
-        expect(result.success).toBe(true);
-        expect(prisma.verificationRequest.create).toHaveBeenCalled();
-      });
-
-      it("blocks resubmission at exactly 24h boundary", async () => {
-        // Rejection exactly 23h59m ago — still within cooldown
-        (prisma.verificationRequest.findFirst as jest.Mock)
-          .mockResolvedValueOnce(null)
-          .mockResolvedValueOnce({
-            status: "REJECTED",
-            updatedAt: new Date(Date.now() - (24 * 60 * 60 * 1000 - 60000)), // 23h59m ago
-          });
-        (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-          isVerified: false,
-        });
-
-        const result = await submitVerificationRequest({
-          documentType: "passport",
-          documentUrl: validDocUrl,
-        });
-
-        expect(result.error).toContain("Please wait");
-        expect(result.cooldownRemaining).toBe(1); // 1 hour remaining (ceiling)
-        expect(prisma.verificationRequest.create).not.toHaveBeenCalled();
-      });
-    });
-
-    it("handles database errors", async () => {
-      (prisma.verificationRequest.findFirst as jest.Mock).mockRejectedValue(
-        new Error("DB Error")
-      );
-
-      const result = await submitVerificationRequest({
-        documentType: "passport",
-        documentUrl: validDocUrl,
-      });
-
-      expect(result).toEqual({
-        error: "Failed to submit verification request",
-      });
-    });
-  });
-
-  describe("getMyVerificationStatus", () => {
-    it("returns not_logged_in when not authenticated", async () => {
-      (auth as jest.Mock).mockResolvedValue(null);
-
-      const result = await getMyVerificationStatus();
-
-      expect(result).toEqual({ status: "not_logged_in" });
-    });
-
-    it("returns verified if user is verified", async () => {
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-        isVerified: true,
-      });
-
-      const result = await getMyVerificationStatus();
-
-      expect(result).toEqual({ status: "verified" });
-    });
-
-    it("returns pending with requestId", async () => {
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-        isVerified: false,
-      });
-      (prisma.verificationRequest.findFirst as jest.Mock).mockResolvedValueOnce(
-        { id: "pending-123", status: "PENDING" }
-      );
-
-      const result = await getMyVerificationStatus();
-
-      expect(result).toEqual({ status: "pending", requestId: "pending-123" });
-    });
-
-    it("returns rejected with reason", async () => {
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-        isVerified: false,
-      });
-      (prisma.verificationRequest.findFirst as jest.Mock)
-        .mockResolvedValueOnce(null) // No pending
-        .mockResolvedValueOnce({
-          id: "rejected-123",
-          status: "REJECTED",
-          adminNotes: "Document not clear",
-          updatedAt: new Date(Date.now() - 48 * 60 * 60 * 1000), // 48 hours ago - outside cooldown
-        });
-
-      const result = await getMyVerificationStatus();
-
-      expect(result).toEqual(
-        expect.objectContaining({
-          status: "rejected",
-          reason: "Document not clear",
-          requestId: "rejected-123",
-          canResubmit: true,
-        })
-      );
-    });
-
-    it("returns not_started when no requests exist", async () => {
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-        isVerified: false,
-      });
+    it("rejects an upload id owned by another user", async () => {
       (prisma.verificationRequest.findFirst as jest.Mock)
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(null);
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        isVerified: false,
+      });
+      (prisma.verificationUpload.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: "upload-doc",
+          userId: "other-user",
+          kind: "document",
+          storagePath: "other-user/document/doc.jpg",
+          mimeType: "image/jpeg",
+          expiresAt: new Date(Date.now() + 60_000),
+          consumedAt: null,
+          requestId: null,
+        },
+      ]);
 
-      const result = await getMyVerificationStatus();
-
-      expect(result).toEqual({ status: "not_started" });
-    });
-
-    it("returns error on database failure", async () => {
-      (prisma.user.findUnique as jest.Mock).mockRejectedValue(
-        new Error("DB Error")
-      );
-
-      const result = await getMyVerificationStatus();
-
-      expect(result).toEqual({ status: "error" });
-    });
-  });
-
-  describe("getPendingVerifications", () => {
-    it("returns error when not authenticated", async () => {
-      (auth as jest.Mock).mockResolvedValue(null);
-
-      const result = await getPendingVerifications();
+      const result = await submitVerificationRequest({
+        documentType: "passport",
+        documentUploadId: "upload-doc",
+      });
 
       expect(result).toEqual({
-        error: "Unauthorized",
-        code: "SESSION_EXPIRED",
-        requests: [],
+        error: "Document upload is invalid or expired",
       });
+      expect(prisma.verificationRequest.create).not.toHaveBeenCalled();
     });
 
-    it("returns error when not admin", async () => {
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-        isAdmin: false,
+    it("returns a clean conflict when a pending request already exists", async () => {
+      (prisma.verificationRequest.findFirst as jest.Mock).mockResolvedValue({
+        id: "existing",
       });
 
-      const result = await getPendingVerifications();
+      const result = await submitVerificationRequest({
+        documentType: "passport",
+        documentUploadId: "upload-doc",
+      });
 
       expect(result).toEqual({
-        error: "Unauthorized",
-        code: "NOT_ADMIN",
-        requests: [],
+        error: "You already have a pending verification request",
+        code: "PENDING_REQUEST_EXISTS",
       });
     });
 
-    it("returns pending verifications for admin", async () => {
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-        isAdmin: true,
+    it("applies the verification submit rate limit", async () => {
+      (checkRateLimit as jest.Mock).mockResolvedValueOnce({ success: false });
+
+      const result = await submitVerificationRequest({
+        documentType: "passport",
+        documentUploadId: "upload-doc",
       });
-      const mockRequests = [
-        { id: "req-1", user: { id: "u1", name: "User 1" } },
-        { id: "req-2", user: { id: "u2", name: "User 2" } },
-      ];
-      (prisma.verificationRequest.findMany as jest.Mock).mockResolvedValue(
-        mockRequests
-      );
-
-      const result = await getPendingVerifications();
-
-      expect(result).toEqual({ requests: mockRequests });
-    });
-
-    it("handles database errors", async () => {
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-        isAdmin: true,
-      });
-      (prisma.verificationRequest.findMany as jest.Mock).mockRejectedValue(
-        new Error("DB Error")
-      );
-
-      const result = await getPendingVerifications();
 
       expect(result).toEqual({
-        error: "Failed to fetch verifications",
-        requests: [],
+        error: "Too many requests. Please try again later.",
       });
     });
   });
 
   describe("approveVerification", () => {
-    it("returns error when not authenticated", async () => {
-      (auth as jest.Mock).mockResolvedValue(null);
+    it("does not transition an already reviewed request", async () => {
+      (prisma.user.findUnique as jest.Mock).mockResolvedValueOnce({
+        isAdmin: true,
+      });
+      (prisma.$queryRaw as jest.Mock).mockResolvedValueOnce([
+        {
+          id: "request-123",
+          userId: "user-456",
+          documentType: "passport",
+          status: "REJECTED",
+        },
+      ]);
 
       const result = await approveVerification("request-123");
 
       expect(result).toEqual({
-        error: "Unauthorized",
-        code: "SESSION_EXPIRED",
+        error: "This verification request has already been reviewed.",
+        code: "STATE_CONFLICT",
       });
+      expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(prisma.verificationRequest.update).not.toHaveBeenCalled();
     });
 
-    it("returns error when not admin", async () => {
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-        isAdmin: false,
-      });
+    it("approves a pending request inside the guarded transaction", async () => {
+      (prisma.user.findUnique as jest.Mock)
+        .mockResolvedValueOnce({ isAdmin: true })
+        .mockResolvedValueOnce({
+          id: "user-456",
+          name: "Target User",
+          email: "target@example.com",
+        });
+      (prisma.$queryRaw as jest.Mock).mockResolvedValueOnce([
+        {
+          id: "request-123",
+          userId: "user-456",
+          documentType: "passport",
+          status: "PENDING",
+          documentPath: "user-456/document/doc.jpg",
+          documentsExpireAt: new Date(Date.now() + 60_000),
+          documentsDeletedAt: null,
+        },
+      ]);
 
       const result = await approveVerification("request-123");
 
-      expect(result).toEqual({ error: "Unauthorized", code: "NOT_ADMIN" });
-    });
-
-    it("returns error when request not found", async () => {
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-        isAdmin: true,
-      });
-      (prisma.verificationRequest.findUnique as jest.Mock).mockResolvedValue(
-        null
-      );
-
-      const result = await approveVerification("request-123");
-
-      expect(result).toEqual({ error: "Request not found" });
-    });
-
-    it("approves verification successfully", async () => {
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-        isAdmin: true,
-      });
-      (prisma.verificationRequest.findUnique as jest.Mock).mockResolvedValue({
-        id: "request-123",
-        userId: "user-456",
-        documentType: "passport",
-        user: { id: "user-456", name: "Test User", email: "test@test.com" },
-      });
-      // Mock $transaction to execute the callback with a mock tx
-      const mockTxVerificationUpdate = jest.fn().mockResolvedValue({});
-      const mockTxUserUpdate = jest.fn().mockResolvedValue({});
-      (prisma.$transaction as jest.Mock).mockImplementation(
-        async (cb: (tx: any) => Promise<any>) => {
-          const tx = {
-            verificationRequest: { update: mockTxVerificationUpdate },
-            user: { update: mockTxUserUpdate },
-          };
-          return cb(tx);
-        }
-      );
-
-      const result = await approveVerification("request-123");
-
-      expect(mockTxVerificationUpdate).toHaveBeenCalledWith({
+      expect(prisma.verificationRequest.update).toHaveBeenCalledWith({
         where: { id: "request-123" },
         data: {
           status: "APPROVED",
           reviewedAt: expect.any(Date),
           reviewedBy: "user-123",
+          documentsExpireAt: expect.any(Date),
         },
       });
-      expect(mockTxUserUpdate).toHaveBeenCalledWith({
+      expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: "user-456" },
         data: { isVerified: true },
       });
       expect(sendNotificationEmail).toHaveBeenCalled();
+      expect(logAdminAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "VERIFICATION_APPROVED",
+          targetId: "request-123",
+        })
+      );
       expect(result).toEqual({ success: true });
     });
 
-    describe("audit log on approval (G3.2)", () => {
-      it("creates audit log entry on approval", async () => {
-        (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-          isAdmin: true,
-        });
-        (prisma.verificationRequest.findUnique as jest.Mock).mockResolvedValue({
-          id: "request-123",
-          userId: "user-456",
-          documentType: "passport",
-          user: { id: "user-456", name: "Test User", email: "test@test.com" },
-        });
-        const mockTxVerificationUpdate = jest.fn().mockResolvedValue({});
-        const mockTxUserUpdate = jest.fn().mockResolvedValue({});
-        (prisma.$transaction as jest.Mock).mockImplementation(
-          async (cb: (tx: any) => Promise<any>) => {
-            return cb({
-              verificationRequest: { update: mockTxVerificationUpdate },
-              user: { update: mockTxUserUpdate },
-            });
-          }
-        );
-
-        await approveVerification("request-123");
-
-        expect(logAdminAction).toHaveBeenCalledWith(
-          expect.objectContaining({
-            adminId: "user-123",
-            action: "VERIFICATION_APPROVED",
-            targetType: "VerificationRequest",
-            targetId: "request-123",
-          })
-        );
-      });
-
-      it("rolls back on transaction failure", async () => {
-        (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-          isAdmin: true,
-        });
-        (prisma.verificationRequest.findUnique as jest.Mock).mockResolvedValue({
-          id: "request-123",
-          userId: "user-456",
-          documentType: "passport",
-          user: { id: "user-456", name: "Test User", email: "test@test.com" },
-        });
-        (prisma.$transaction as jest.Mock).mockRejectedValue(
-          new Error("Transaction failed")
-        );
-
-        const result = await approveVerification("request-123");
-
-        expect(result).toEqual({ error: "Failed to approve verification" });
-        expect(sendNotificationEmail).not.toHaveBeenCalled();
-        expect(logAdminAction).not.toHaveBeenCalled();
-      });
-    });
-
-    it("handles database errors", async () => {
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+    it.each([
+      [
+        "missing document path",
+        {
+          documentPath: null,
+          documentsExpireAt: new Date(Date.now() + 60_000),
+          documentsDeletedAt: null,
+        },
+      ],
+      [
+        "expired document",
+        {
+          documentPath: "user-456/document/doc.jpg",
+          documentsExpireAt: new Date(Date.now() - 60_000),
+          documentsDeletedAt: null,
+        },
+      ],
+      [
+        "deleted document",
+        {
+          documentPath: "user-456/document/doc.jpg",
+          documentsExpireAt: new Date(Date.now() + 60_000),
+          documentsDeletedAt: new Date(),
+        },
+      ],
+    ])("does not approve a request with %s", async (_label, documentState) => {
+      (prisma.user.findUnique as jest.Mock).mockResolvedValueOnce({
         isAdmin: true,
       });
-      (prisma.verificationRequest.findUnique as jest.Mock).mockRejectedValue(
-        new Error("DB Error")
-      );
+      (prisma.$queryRaw as jest.Mock).mockResolvedValueOnce([
+        {
+          id: "request-123",
+          userId: "user-456",
+          documentType: "passport",
+          status: "PENDING",
+          ...documentState,
+        },
+      ]);
 
       const result = await approveVerification("request-123");
 
-      expect(result).toEqual({ error: "Failed to approve verification" });
+      expect(result).toEqual({
+        error: "Verification document is unavailable or expired.",
+        code: "DOCUMENT_UNAVAILABLE",
+      });
+      expect(prisma.verificationRequest.update).not.toHaveBeenCalled();
+      expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(logAdminAction).not.toHaveBeenCalled();
+    });
+
+    it("applies the admin write rate limit", async () => {
+      (prisma.user.findUnique as jest.Mock).mockResolvedValueOnce({
+        isAdmin: true,
+      });
+      (checkRateLimit as jest.Mock).mockResolvedValueOnce({ success: false });
+
+      const result = await approveVerification("request-123");
+
+      expect(result).toEqual({ error: "Too many requests. Please slow down." });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
     });
   });
 
   describe("rejectVerification", () => {
-    it("returns error when not authenticated", async () => {
-      (auth as jest.Mock).mockResolvedValue(null);
-
-      const result = await rejectVerification(
-        "request-123",
-        "Invalid document"
-      );
-
-      expect(result).toEqual({
-        error: "Unauthorized",
-        code: "SESSION_EXPIRED",
-      });
-    });
-
-    it("returns error when not admin", async () => {
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-        isAdmin: false,
-      });
-
-      const result = await rejectVerification(
-        "request-123",
-        "Invalid document"
-      );
-
-      expect(result).toEqual({ error: "Unauthorized", code: "NOT_ADMIN" });
-    });
-
-    it("returns error when request not found", async () => {
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+    it("validates rejection reasons", async () => {
+      (prisma.user.findUnique as jest.Mock).mockResolvedValueOnce({
         isAdmin: true,
       });
-      (prisma.verificationRequest.findUnique as jest.Mock).mockResolvedValue(
-        null
-      );
 
-      const result = await rejectVerification(
-        "request-123",
-        "Invalid document"
-      );
+      const result = await rejectVerification("request-123", "<b>No</b>");
 
-      expect(result).toEqual({ error: "Request not found" });
+      expect(result).toEqual({ error: "Reason cannot contain HTML" });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 
-    it("rejects verification successfully", async () => {
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-        isAdmin: true,
-      });
-      (prisma.verificationRequest.findUnique as jest.Mock).mockResolvedValue({
-        id: "request-123",
-        userId: "user-456",
-        user: { id: "user-456", name: "Test User", email: "test@test.com" },
-      });
-      (prisma.verificationRequest.update as jest.Mock).mockResolvedValue({});
+    it("rejects only pending requests", async () => {
+      (prisma.user.findUnique as jest.Mock)
+        .mockResolvedValueOnce({ isAdmin: true })
+        .mockResolvedValueOnce({
+          id: "user-456",
+          name: "Target User",
+          email: "target@example.com",
+        });
+      (prisma.$queryRaw as jest.Mock).mockResolvedValueOnce([
+        {
+          id: "request-123",
+          userId: "user-456",
+          documentType: "passport",
+          status: "PENDING",
+        },
+      ]);
 
-      const result = await rejectVerification(
-        "request-123",
-        "Document not clear"
-      );
+      const result = await rejectVerification("request-123", "Blurry image");
 
       expect(prisma.verificationRequest.update).toHaveBeenCalledWith({
         where: { id: "request-123" },
         data: {
           status: "REJECTED",
-          adminNotes: "Document not clear",
+          adminNotes: "Blurry image",
           reviewedAt: expect.any(Date),
           reviewedBy: "user-123",
+          documentsExpireAt: expect.any(Date),
         },
       });
-      expect(revalidatePath).toHaveBeenCalledWith("/admin/verifications");
-      expect(revalidatePath).toHaveBeenCalledWith("/verify");
       expect(result).toEqual({ success: true });
-    });
-
-    it("handles database errors", async () => {
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-        isAdmin: true,
-      });
-      (prisma.verificationRequest.findUnique as jest.Mock).mockRejectedValue(
-        new Error("DB Error")
-      );
-
-      const result = await rejectVerification("request-123", "reason");
-
-      expect(result).toEqual({ error: "Failed to reject verification" });
     });
   });
 
   describe("cancelVerificationRequest", () => {
-    it("returns error when not authenticated", async () => {
-      (auth as jest.Mock).mockResolvedValue(null);
-
-      const result = await cancelVerificationRequest();
-
-      expect(result).toEqual({
-        error: "Unauthorized",
-        code: "SESSION_EXPIRED",
+    it("deletes only transaction-confirmed pending request objects", async () => {
+      (prisma.$queryRaw as jest.Mock)
+        .mockResolvedValueOnce([
+          {
+            id: "request-123",
+            documentPath: "user-123/document/doc.jpg",
+            selfiePath: "user-123/selfie/selfie.jpg",
+          },
+        ])
+        .mockResolvedValueOnce([
+          { id: "upload-1", storagePath: "user-123/document/doc.jpg" },
+        ]);
+      (prisma.verificationUpload.deleteMany as jest.Mock).mockResolvedValue({
+        count: 1,
       });
-    });
-
-    it("cancels pending request successfully", async () => {
       (prisma.verificationRequest.deleteMany as jest.Mock).mockResolvedValue({
         count: 1,
       });
 
       const result = await cancelVerificationRequest();
 
+      expect(prisma.verificationUpload.deleteMany).toHaveBeenCalledWith({
+        where: {
+          id: { in: ["upload-1"] },
+          userId: "user-123",
+        },
+      });
       expect(prisma.verificationRequest.deleteMany).toHaveBeenCalledWith({
         where: {
+          id: { in: ["request-123"] },
           userId: "user-123",
           status: "PENDING",
         },
       });
-      expect(revalidatePath).toHaveBeenCalledWith("/verify");
-      expect(revalidatePath).toHaveBeenCalledWith("/profile");
+      expect(prisma.verificationRequest.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ["request-123"] }, userId: "user-123" },
+        data: { documentsDeletedAt: expect.any(Date) },
+      });
+      expect(deleteVerificationObjects).toHaveBeenCalledWith([
+        "user-123/document/doc.jpg",
+        "user-123/selfie/selfie.jpg",
+        "user-123/document/doc.jpg",
+      ]);
+      expect(
+        (prisma.verificationRequest.updateMany as jest.Mock).mock
+          .invocationCallOrder[0]
+      ).toBeLessThan(
+        (deleteVerificationObjects as jest.Mock).mock.invocationCallOrder[0]
+      );
+      expect(
+        (deleteVerificationObjects as jest.Mock).mock.invocationCallOrder[0]
+      ).toBeLessThan(
+        (prisma.verificationRequest.deleteMany as jest.Mock).mock
+          .invocationCallOrder[0]
+      );
       expect(result).toEqual({ success: true });
     });
 
-    it("handles database errors", async () => {
-      (prisma.verificationRequest.deleteMany as jest.Mock).mockRejectedValue(
-        new Error("DB Error")
+    it("keeps tombstoned rows retryable when storage deletion fails", async () => {
+      (prisma.$queryRaw as jest.Mock)
+        .mockResolvedValueOnce([
+          {
+            id: "request-123",
+            documentPath: "user-123/document/doc.jpg",
+            selfiePath: null,
+          },
+        ])
+        .mockResolvedValueOnce([]);
+      (deleteVerificationObjects as jest.Mock).mockRejectedValueOnce(
+        new Error("storage unavailable")
       );
 
       const result = await cancelVerificationRequest();
@@ -647,6 +506,24 @@ describe("Verification Actions", () => {
       expect(result).toEqual({
         error: "Failed to cancel verification request",
       });
+      expect(prisma.verificationRequest.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ["request-123"] }, userId: "user-123" },
+        data: { documentsDeletedAt: expect.any(Date) },
+      });
+      expect(prisma.verificationRequest.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.verificationUpload.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it("does not delete request storage when no pending row is locked", async () => {
+      (prisma.$queryRaw as jest.Mock)
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      const result = await cancelVerificationRequest();
+
+      expect(prisma.verificationRequest.deleteMany).not.toHaveBeenCalled();
+      expect(deleteVerificationObjects).toHaveBeenCalledWith([]);
+      expect(result).toEqual({ success: true });
     });
   });
 });

@@ -56,7 +56,14 @@ export function PlaceDetailsPanel({
         const detailsElement = document.createElement(
           "gmp-place-details-compact"
         );
-        detailsElement.setAttribute("place", poi.placeId);
+        const requestElement = document.createElement(
+          "gmp-place-details-place-request"
+        ) as HTMLElement & { place?: string };
+        requestElement.place = poi.placeId;
+        requestElement.setAttribute("place", poi.placeId);
+
+        const contentElement = document.createElement("gmp-place-all-content");
+        detailsElement.append(requestElement, contentElement);
 
         // Style the web component container
         detailsElement.style.display = "block";
@@ -81,6 +88,9 @@ export function PlaceDetailsPanel({
 
     return () => {
       mounted = false;
+      if (detailsContainerRef.current) {
+        detailsContainerRef.current.innerHTML = "";
+      }
     };
   }, [poi]);
 
@@ -137,8 +147,12 @@ export function PlaceDetailsPanel({
 
   const googleMapsUrl =
     poi.googleMapsURI ||
-    `https://www.google.com/maps/place/?q=place_id:${poi.placeId}`;
-  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination_place_id=${poi.placeId}`;
+    `https://www.google.com/maps/place/?q=place_id:${encodeURIComponent(
+      poi.placeId
+    )}`;
+  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination_place_id=${encodeURIComponent(
+    poi.placeId
+  )}`;
 
   return (
     <>
@@ -264,6 +278,10 @@ declare global {
   namespace JSX {
     interface IntrinsicElements {
       "gmp-place-details-compact": React.DetailedHTMLProps<
+        React.HTMLAttributes<HTMLElement>,
+        HTMLElement
+      >;
+      "gmp-place-details-place-request": React.DetailedHTMLProps<
         React.HTMLAttributes<HTMLElement> & { place?: string },
         HTMLElement
       >;

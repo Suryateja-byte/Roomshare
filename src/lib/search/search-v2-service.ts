@@ -7,7 +7,7 @@
 
 import {
   getListingsPaginated,
-  getMapListings,
+  getMapListingsResult,
   sanitizeSearchQuery,
 } from "@/lib/data";
 import { parseSearchParams } from "@/lib/search-params";
@@ -81,6 +81,10 @@ import {
 import type { FilterParams } from "@/lib/search-types";
 import { isPhase04ProjectionReadsEnabled } from "@/lib/flags/phase04";
 import { executeProjectionSearchV2 } from "@/lib/search/projection-search";
+import {
+  getProjectionReadEligibility,
+  type ProjectionReadEligibility,
+} from "@/lib/search/projection-read-eligibility";
 import type { SearchAdmissionError } from "@/lib/search/search-spec";
 
 const VIBE_SOFT_FALLBACK_WARNING = "VIBE_SOFT_FALLBACK";
@@ -539,6 +543,8 @@ export interface SearchV2Result {
    * geographic bounds. UI should prompt user to select a location.
    */
   unboundedSearch?: boolean;
+  /** Present when a direct projection search was rejected before querying. */
+  projectionReadUnsupported?: ProjectionReadEligibility;
 }
 
 /**
@@ -569,18 +575,6 @@ export async function executeSearchV2(
       };
     }
 
-    if (isPhase04ProjectionReadsEnabled()) {
-      return executeProjectionSearchV2({ params, parsed });
-    }
-
-    // Check if features are enabled
-    const useSearchDoc = isSearchDocEnabled(
-      getFirstValue(params.rawParams.searchDoc)
-    );
-    const useKeyset = features.searchKeyset && useSearchDoc;
-    const snapshotContractEnabled = features.searchSnapshotContract;
-    const shouldIncludeMap = params.includeMap !== false;
-
     const queryHash = generateQueryHash({
       query: parsed.filterParams.query,
       vibeQuery: parsed.filterParams.vibeQuery,
@@ -600,6 +594,36 @@ export async function executeSearchV2(
     // Get sort option from parsed params (default to recommended)
     const sortOption: SortOption =
       (parsed.filterParams.sort as SortOption) || "recommended";
+
+    if (isPhase04ProjectionReadsEnabled()) {
+      const projectionEligibility = getProjectionReadEligibility(parsed);
+      if (projectionEligibility.supported) {
+        return executeProjectionSearchV2({ params, parsed });
+      }
+
+      const cursorStr = getFirstValue(params.rawParams.cursor);
+      if (cursorStr) {
+        const decoded = decodeCursorAny(cursorStr, sortOption);
+        if (decoded?.type === "snapshot" && decoded.cursor.v === 4) {
+          return {
+            response: null,
+            paginatedResult: null,
+            snapshotExpired: buildSnapshotExpired(
+              queryHash,
+              "search_contract_changed"
+            ),
+          };
+        }
+      }
+    }
+
+    // Check if features are enabled
+    const useSearchDoc = isSearchDocEnabled(
+      getFirstValue(params.rawParams.searchDoc)
+    );
+    const useKeyset = features.searchKeyset && useSearchDoc;
+    const snapshotContractEnabled = features.searchSnapshotContract;
+    const shouldIncludeMap = params.includeMap !== false;
     const vibeQuery = parsed.filterParams.vibeQuery?.trim();
     const shouldUseRecommendedVibeRanking =
       Boolean(vibeQuery) && sortOption === "recommended";
@@ -815,7 +839,7 @@ export async function executeSearchV2(
       shouldIncludeMap
         ? useSearchDoc
           ? getSearchDocMapListings(mapFilterParams)
-          : getMapListings(mapFilterParams)
+          : getMapListingsResult(mapFilterParams)
         : null;
 
     // Execute list query and, when requested, map query with partial failure tolerance.

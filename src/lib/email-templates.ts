@@ -138,17 +138,27 @@ export const emailTemplates = {
     userName: string;
     searchName: string;
     listingTitle: string;
-    listingId: string;
-  }) => ({
-    subject: sanitizeSubject(`New match for ${data.searchName}`),
-    html: simpleTemplate({
-      title: "New Saved Search Match",
-      greeting: data.userName,
-      body: `We found a new match for <strong>${escapeHtml(data.searchName)}</strong>: <strong>"${escapeHtml(data.listingTitle)}"</strong>.`,
-      ctaLabel: "View Listing",
-      ctaHref: `/listings/${encodeURIComponent(data.listingId)}`,
-    }),
-  }),
+    listingId?: string;
+    ctaHref?: string;
+    ctaLabel?: string;
+  }) => {
+    const ctaHref = data.ctaHref
+      ? data.ctaHref
+      : data.listingId
+        ? `/listings/${encodeURIComponent(data.listingId)}`
+        : "/search";
+
+    return {
+      subject: sanitizeSubject(`New match for ${data.searchName}`),
+      html: simpleTemplate({
+        title: "New Saved Search Match",
+        greeting: data.userName,
+        body: `We found a new match for <strong>${escapeHtml(data.searchName)}</strong>: <strong>"${escapeHtml(data.listingTitle)}"</strong>.`,
+        ctaLabel: data.ctaLabel ?? "View Listing",
+        ctaHref,
+      }),
+    };
+  },
 
   listingFreshnessReminder: (data: {
     hostName: string;

@@ -58,6 +58,7 @@ import {
   isListingEligibleForPublicSearch,
   resolvePublicAvailability,
 } from "./public-availability";
+import { toPublicCoordinates } from "./public-coordinates";
 import pgvector from "pgvector";
 import { getCachedQueryEmbedding } from "@/lib/embeddings/query-cache";
 import { getCurrentEmbeddingVersion } from "@/lib/embeddings/version";
@@ -1166,8 +1167,10 @@ export function mapRawListingsToPublic(listings: ListingRaw[]): ListingData[] {
         location: {
           city: l.city,
           state: l.state,
-          lat: Number(l.lat),
-          lng: Number(l.lng),
+          ...toPublicCoordinates({
+            lat: Number(l.lat),
+            lng: Number(l.lng),
+          }),
         },
       };
     })
@@ -2369,8 +2372,10 @@ export function mapSemanticRowsToListingData(
         // address and zip intentionally omitted — "only included in listing detail, not search" (search-types.ts:37)
         city: row.city,
         state: row.state,
-        lat: row.lat!,
-        lng: row.lng!,
+        ...toPublicCoordinates({
+          lat: row.lat!,
+          lng: row.lng!,
+        }),
       },
     }));
 }

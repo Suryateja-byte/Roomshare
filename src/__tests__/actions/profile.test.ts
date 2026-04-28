@@ -19,10 +19,31 @@ jest.mock("next/cache", () => ({
   revalidatePath: jest.fn(),
 }));
 
+jest.mock("next/headers", () => ({
+  headers: jest.fn().mockResolvedValue(new Headers()),
+}));
+
+jest.mock("@/app/actions/suspension", () => ({
+  checkSuspension: jest.fn().mockResolvedValue({ suspended: false }),
+}));
+
+jest.mock("@/lib/rate-limit", () => ({
+  RATE_LIMITS: {
+    profileUpdate: { limit: 20, windowMs: 3_600_000 },
+  },
+  checkRateLimit: jest.fn().mockResolvedValue({ success: true }),
+  getClientIPFromHeaders: jest.fn().mockReturnValue("127.0.0.1"),
+}));
+
+jest.mock("@/lib/logger", () => ({
+  logger: { sync: { error: jest.fn(), warn: jest.fn(), info: jest.fn() } },
+}));
+
 import { updateProfile, getProfile } from "@/app/actions/profile";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 describe("Profile Actions", () => {
   const mockSession = {
@@ -32,6 +53,7 @@ describe("Profile Actions", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (auth as jest.Mock).mockResolvedValue(mockSession);
+    (checkRateLimit as jest.Mock).mockResolvedValue({ success: true });
   });
 
   describe("updateProfile", () => {
@@ -67,6 +89,55 @@ describe("Profile Actions", () => {
         },
       });
       expect(result).toEqual({ success: true });
+    });
+
+    it("normalizes, trims, and dedupes languages", async () => {
+      (prisma.user.update as jest.Mock).mockResolvedValue({});
+
+      const result = await updateProfile({
+        name: "Updated Name",
+        languages: [" English ", "english", "Español", "SPANISH"],
+      });
+
+      expect(prisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            languages: ["English", "Español", "SPANISH"],
+          }),
+        })
+      );
+      expect(result).toEqual({ success: true });
+    });
+
+    it("rejects too many languages", async () => {
+      const result = await updateProfile({
+        name: "Test",
+        languages: Array.from({ length: 21 }, (_, index) => `Lang ${index}`),
+      });
+
+      expect(result.error).toBe("Maximum 20 languages allowed");
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it("rejects HTML in languages", async () => {
+      const result = await updateProfile({
+        name: "Test",
+        languages: ["<b>English</b>"],
+      });
+
+      expect(result.error).toBe("Languages cannot contain HTML");
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it("applies the profile update rate limit", async () => {
+      (checkRateLimit as jest.Mock).mockResolvedValueOnce({ success: false });
+
+      const result = await updateProfile({ name: "Test" });
+
+      expect(result).toEqual({
+        error: "Too many requests. Please try again later.",
+      });
+      expect(prisma.user.update).not.toHaveBeenCalled();
     });
 
     it("revalidates paths after update", async () => {

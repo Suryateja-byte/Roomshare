@@ -327,7 +327,7 @@ describe("POST /api/nearby - Server Edge Cases", () => {
   });
 
   describe("Categories Edge Cases", () => {
-    it("accepts invalid category values - still processes", async () => {
+    it("rejects invalid category values before calling Radar", async () => {
       const response = await POST(
         createRequest({
           ...validRequestBody,
@@ -335,11 +335,10 @@ describe("POST /api/nearby - Server Edge Cases", () => {
         })
       );
 
-      // Should process and pass to Radar - Radar will handle validation
-      expect(response.status).toBe(200);
+      expect(response.status).toBe(400);
     });
 
-    it("accepts mixed valid/invalid category values", async () => {
+    it("rejects mixed valid/invalid category values", async () => {
       const response = await POST(
         createRequest({
           ...validRequestBody,
@@ -347,7 +346,7 @@ describe("POST /api/nearby - Server Edge Cases", () => {
         })
       );
 
-      expect(response.status).toBe(200);
+      expect(response.status).toBe(400);
     });
 
     it("uses default categories when empty array provided", async () => {

@@ -138,6 +138,14 @@ declare module "react" {
        * Displays detailed information about a place.
        */
       "gmp-place-details-compact": React.DetailedHTMLProps<
+        React.HTMLAttributes<HTMLElement>,
+        HTMLElement
+      >;
+
+      /**
+       * Selects the place rendered by place details elements.
+       */
+      "gmp-place-details-place-request": React.DetailedHTMLProps<
         React.HTMLAttributes<HTMLElement> & {
           place?: string;
         },

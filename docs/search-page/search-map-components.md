@@ -83,7 +83,7 @@ page.tsx (re-renders on navigation)
 | `src/components/Map.tsx` | Core map with markers, clusters, popups, controls | Yes (full map) |
 | `src/components/map/MapClient.tsx` | Legacy standalone map (server-action based) | Yes (full map) |
 | `src/components/map/BoundaryLayer.tsx` | Neighborhood boundary polygon overlay | Mapbox layers |
-| `src/components/map/PrivacyCircle.tsx` | ~200m translucent radius around listings | Mapbox layer |
+| `src/components/map/PrivacyCircle.tsx` | Approximate-location halo around coarsened public coordinates | Mapbox layer |
 | `src/components/map/POILayer.tsx` | Toggle transit/POI/park layer visibility | Control buttons |
 | `src/components/map/UserMarker.tsx` | Drop-a-pin with reverse geocode + distance | Marker + label |
 | `src/components/map/MapMovedBanner.tsx` | "Search this area" / "Map moved" banner | Banner UI |
@@ -445,7 +445,7 @@ Includes `AbortController` for cancelling previous fetches and deduplication via
 
 **File:** `src/components/map/PrivacyCircle.tsx`
 
-**Purpose:** Renders translucent ~200m radius circles around listing locations to obscure exact pin placement for privacy.
+**Purpose:** Renders a subtle halo around approximate public listing coordinates. Exact listing coordinates are coarsened server-side before public search/list/map payloads are emitted; this layer communicates approximate location and is not the privacy boundary itself.
 
 ```ts
 interface PrivacyCircleProps {
@@ -454,7 +454,7 @@ interface PrivacyCircleProps {
 }
 ```
 
-The circle radius scales with zoom using exponential interpolation to maintain consistent real-world size:
+The circle radius scales with zoom using exponential interpolation to keep the approximate-location halo visible:
 
 | Zoom | Pixel radius |
 |------|-------------|
@@ -469,10 +469,10 @@ Rendered as a single Mapbox `circle` layer on top of GeoJSON point features.
 **Circle paint configuration:**
 ```ts
 {
-  'circle-color': isDarkMode ? 'rgba(161, 161, 170, 0.15)' : 'rgba(113, 113, 122, 0.12)',
+  'circle-color': isDarkMode ? '#93c5fd' : '#2563eb',
   'circle-stroke-width': 1,
-  'circle-stroke-color': isDarkMode ? 'rgba(161, 161, 170, 0.25)' : 'rgba(113, 113, 122, 0.2)',
-  'circle-stroke-opacity': 0.6,
+  'circle-stroke-color': isDarkMode ? '#bfdbfe' : '#1d4ed8',
+  'circle-stroke-opacity': 0.35,
 }
 ```
 

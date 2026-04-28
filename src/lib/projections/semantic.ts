@@ -361,7 +361,7 @@ export async function getSemanticInventoryCandidates(
 
 export async function tombstoneSemanticProjectionRows(
   tx: TransactionClient,
-  input: { unitId: string; inventoryId: string | null }
+  input: { unitId: string; inventoryId: string | null; sourceVersion?: bigint }
 ): Promise<number> {
   const semanticTable = await tx.$queryRaw<{ exists: boolean }[]>`
     SELECT EXISTS (
@@ -376,10 +376,16 @@ export async function tombstoneSemanticProjectionRows(
   }
 
   if (input.inventoryId) {
-    return tx.$executeRaw`
-      DELETE FROM semantic_inventory_projection
-      WHERE inventory_id = ${input.inventoryId}
-    `;
+    return input.sourceVersion === undefined
+      ? tx.$executeRaw`
+          DELETE FROM semantic_inventory_projection
+          WHERE inventory_id = ${input.inventoryId}
+        `
+      : tx.$executeRaw`
+          DELETE FROM semantic_inventory_projection
+          WHERE inventory_id = ${input.inventoryId}
+            AND source_version <= ${input.sourceVersion}::BIGINT
+        `;
   }
 
   return tx.$executeRaw`

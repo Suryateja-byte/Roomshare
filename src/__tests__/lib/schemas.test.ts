@@ -1,4 +1,4 @@
-import { createListingSchema, supabaseStorageUrlSchema } from "@/lib/schemas";
+import { createListingSchema } from "@/lib/schemas";
 
 describe("createListingSchema", () => {
   const validListing = {
@@ -199,101 +199,6 @@ describe("createListingSchema", () => {
     it("should reject non-numeric price", () => {
       const listing = { ...validListing, price: "invalid" };
       const result = createListingSchema.safeParse(listing);
-      expect(result.success).toBe(false);
-    });
-  });
-});
-
-describe("supabaseStorageUrlSchema", () => {
-  const PROJECT_REF = "qolpgfdmkqvxraafucvu";
-  const BASE = `https://${PROJECT_REF}.supabase.co/storage/v1/object/public`;
-
-  beforeAll(() => {
-    process.env.NEXT_PUBLIC_SUPABASE_URL = `https://${PROJECT_REF}.supabase.co`;
-  });
-
-  describe("valid URLs", () => {
-    it("accepts a Supabase storage JPEG URL", () => {
-      const url = `${BASE}/verification/docs/abc123.jpg`;
-      const result = supabaseStorageUrlSchema.safeParse(url);
-      expect(result.success).toBe(true);
-    });
-
-    it("accepts a Supabase storage PNG URL", () => {
-      const url = `${BASE}/verification/selfies/photo.png`;
-      const result = supabaseStorageUrlSchema.safeParse(url);
-      expect(result.success).toBe(true);
-    });
-
-    it("accepts a Supabase storage PDF URL", () => {
-      const url = `${BASE}/verification/docs/document.pdf`;
-      const result = supabaseStorageUrlSchema.safeParse(url);
-      expect(result.success).toBe(true);
-    });
-
-    it("accepts a Supabase storage WebP URL", () => {
-      const url = `${BASE}/images/listings/room.webp`;
-      const result = supabaseStorageUrlSchema.safeParse(url);
-      expect(result.success).toBe(true);
-    });
-
-    it("accepts nested paths within a bucket", () => {
-      const url = `${BASE}/verification/user-123/docs/id-front.jpeg`;
-      const result = supabaseStorageUrlSchema.safeParse(url);
-      expect(result.success).toBe(true);
-    });
-  });
-
-  describe("rejects malicious/invalid URLs", () => {
-    it("rejects external URLs (SSRF)", () => {
-      const result = supabaseStorageUrlSchema.safeParse(
-        "https://evil.com/doc.pdf"
-      );
-      expect(result.success).toBe(false);
-    });
-
-    it("rejects AWS metadata URL (SSRF)", () => {
-      const result = supabaseStorageUrlSchema.safeParse(
-        "http://169.254.169.254/latest/meta-data/"
-      );
-      expect(result.success).toBe(false);
-    });
-
-    it("rejects wrong Supabase project", () => {
-      const result = supabaseStorageUrlSchema.safeParse(
-        "https://other-project.supabase.co/storage/v1/object/public/bucket/file.jpg"
-      );
-      expect(result.success).toBe(false);
-    });
-
-    it("rejects non-storage Supabase paths", () => {
-      const result = supabaseStorageUrlSchema.safeParse(
-        `https://${PROJECT_REF}.supabase.co/rest/v1/users`
-      );
-      expect(result.success).toBe(false);
-    });
-
-    it("rejects disallowed file extensions", () => {
-      const result = supabaseStorageUrlSchema.safeParse(
-        `${BASE}/verification/docs/script.exe`
-      );
-      expect(result.success).toBe(false);
-    });
-
-    it("rejects URLs over 2048 characters", () => {
-      const result = supabaseStorageUrlSchema.safeParse(
-        `${BASE}/verification/docs/${"a".repeat(2048)}.jpg`
-      );
-      expect(result.success).toBe(false);
-    });
-
-    it("rejects empty string", () => {
-      const result = supabaseStorageUrlSchema.safeParse("");
-      expect(result.success).toBe(false);
-    });
-
-    it("rejects non-URL string", () => {
-      const result = supabaseStorageUrlSchema.safeParse("not-a-url");
       expect(result.success).toBe(false);
     });
   });

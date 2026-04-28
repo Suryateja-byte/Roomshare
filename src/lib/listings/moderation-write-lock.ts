@@ -46,3 +46,24 @@ export function getModerationWriteLockResult(options: {
     lockReason,
   };
 }
+
+export function getHostModerationWriteLockResult(options: {
+  statusReason: string | null | undefined;
+  moderationWriteLocksEnabled: boolean;
+}): ModerationWriteLockResult | null {
+  if (options.statusReason === "SUPPRESSED") {
+    return getModerationWriteLockResult({
+      actor: "host",
+      statusReason: options.statusReason,
+    });
+  }
+
+  if (!options.moderationWriteLocksEnabled) {
+    return null;
+  }
+
+  return getModerationWriteLockResult({
+    actor: "host",
+    statusReason: options.statusReason,
+  });
+}

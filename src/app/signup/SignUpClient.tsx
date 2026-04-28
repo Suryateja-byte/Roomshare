@@ -118,21 +118,7 @@ function SignUpForm() {
         throw new Error(json.error || "Failed to register");
       }
 
-      // Auto-sign-in after successful registration — eliminates re-login friction.
-      // The user just entered these credentials; no reason to make them type again.
-      const signInResult = await signIn("credentials", {
-        email: data.email as string,
-        password: data.password as string,
-        redirect: false,
-      });
-
-      if (signInResult?.error) {
-        // Fallback: if auto-sign-in fails (e.g., rate limit), redirect to login
-        router.push("/login?registered=true");
-      } else {
-        // Success — go to homepage with fresh session
-        window.location.href = "/";
-      }
+      router.push("/login?registered=true");
     } catch (err: unknown) {
       setError(
         err instanceof Error

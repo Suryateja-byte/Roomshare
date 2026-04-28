@@ -53,6 +53,10 @@ jest.mock("@/lib/flags/phase04", () => ({
   isPhase04ProjectionReadsEnabled: jest.fn().mockReturnValue(false),
 }));
 
+jest.mock("@/lib/search/projection-search", () => ({
+  getProjectionSearchCount: jest.fn(),
+}));
+
 jest.mock("@/lib/public-cache/headers", () => ({
   buildPublicCacheHeaders: jest.fn().mockReturnValue({}),
 }));
@@ -77,6 +81,8 @@ import { GET } from "@/app/api/search-count/route";
 import { withRateLimitRedis } from "@/lib/with-rate-limit-redis";
 import { parseSearchParams, hasActiveFilters } from "@/lib/search-params";
 import { getLimitedCount } from "@/lib/data";
+import { isPhase04ProjectionReadsEnabled } from "@/lib/flags/phase04";
+import { getProjectionSearchCount } from "@/lib/search/projection-search";
 import * as Sentry from "@sentry/nextjs";
 import { NextRequest } from "next/server";
 
@@ -94,6 +100,9 @@ const mockParseSearchParams = parseSearchParams as jest.Mock;
 const mockHasActiveFilters = hasActiveFilters as jest.Mock;
 const mockGetLimitedCount = getLimitedCount as jest.Mock;
 const mockWithRateLimitRedis = withRateLimitRedis as jest.Mock;
+const mockIsPhase04ProjectionReadsEnabled =
+  isPhase04ProjectionReadsEnabled as jest.Mock;
+const mockGetProjectionSearchCount = getProjectionSearchCount as jest.Mock;
 
 // --- Test suite ---
 
@@ -102,6 +111,8 @@ describe("GET /api/search-count", () => {
     jest.clearAllMocks();
     // Default: rate limit passes
     mockWithRateLimitRedis.mockResolvedValue(null);
+    mockIsPhase04ProjectionReadsEnabled.mockReturnValue(false);
+    mockGetProjectionSearchCount.mockResolvedValue({ ok: true, count: 0 });
     // Default: no active filters, no query, no bounds
     mockParseSearchParams.mockReturnValue({ filterParams: {} });
     mockHasActiveFilters.mockReturnValue(false);
@@ -221,6 +232,58 @@ describe("GET /api/search-count", () => {
     expect(response.status).toBe(200);
     const data = await response.json();
     expect(data).toEqual({ count: 18 });
+  });
+
+  it("uses projection count for supported Phase04 count specs", async () => {
+    mockIsPhase04ProjectionReadsEnabled.mockReturnValue(true);
+    mockParseSearchParams.mockReturnValue({
+      filterParams: {
+        bounds: { minLat: 37.7, maxLat: 37.8, minLng: -122.5, maxLng: -122.4 },
+        minPrice: 500,
+      },
+    });
+    mockGetProjectionSearchCount.mockResolvedValueOnce({ ok: true, count: 9 });
+
+    const request = createRequest({
+      minLat: "37.7",
+      maxLat: "37.8",
+      minLng: "-122.5",
+      maxLng: "-122.4",
+      minPrice: "500",
+    });
+    const response = await GET(request);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ count: 9 });
+    expect(mockGetProjectionSearchCount).toHaveBeenCalled();
+    expect(mockGetLimitedCount).not.toHaveBeenCalled();
+  });
+
+  it("falls back to limited counts for unsupported Phase04 count specs", async () => {
+    mockIsPhase04ProjectionReadsEnabled.mockReturnValue(true);
+    mockParseSearchParams.mockReturnValue({
+      filterParams: {
+        query: "sunny room",
+        bounds: { minLat: 37.7, maxLat: 37.8, minLng: -122.5, maxLng: -122.4 },
+      },
+    });
+    mockGetLimitedCount.mockResolvedValue(11);
+
+    const request = createRequest({
+      q: "sunny room",
+      minLat: "37.7",
+      maxLat: "37.8",
+      minLng: "-122.5",
+      maxLng: "-122.4",
+    });
+    const response = await GET(request);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ count: 11 });
+    expect(mockGetProjectionSearchCount).not.toHaveBeenCalled();
+    expect(mockGetLimitedCount).toHaveBeenCalledWith(
+      expect.objectContaining({ query: "sunny room" })
+    );
   });
 
   // 7. Rate limit exceeded → 429

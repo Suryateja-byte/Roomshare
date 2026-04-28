@@ -92,6 +92,7 @@ describe("entitlement-state", () => {
     const snapshot = await buildEntitlementStateSnapshot(
       prisma as any,
       "user-123",
+      "MESSAGE_START",
       now
     );
 
@@ -104,6 +105,54 @@ describe("entitlement-state", () => {
       "2026-05-31T00:00:00.000Z"
     );
     expect(snapshot.freezeReason).toBe("NONE");
+    expect(snapshot.contactKind).toBe("MESSAGE_START");
+    expect(prisma.contactConsumption.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        userId: "user-123",
+        contactKind: "MESSAGE_START",
+      }),
+    });
+  });
+
+  it("builds reveal-phone state from the reveal ledger only", async () => {
+    const now = new Date("2026-04-22T00:00:00.000Z");
+    (prisma.entitlementGrant.findMany as jest.Mock).mockReset();
+    (prisma.entitlementGrant.findMany as jest.Mock)
+      .mockResolvedValueOnce([{ id: "grant-reveal", creditCount: 1 }])
+      .mockResolvedValueOnce([]);
+    (prisma.contactConsumption.count as jest.Mock).mockResolvedValue(2);
+    (prisma.contactConsumption.groupBy as jest.Mock).mockResolvedValue([]);
+
+    const snapshot = await buildEntitlementStateSnapshot(
+      prisma as any,
+      "user-123",
+      "REVEAL_PHONE",
+      now
+    );
+
+    expect(snapshot.contactKind).toBe("REVEAL_PHONE");
+    expect(prisma.contactConsumption.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        userId: "user-123",
+        contactKind: "REVEAL_PHONE",
+      }),
+    });
+    expect(prisma.entitlementGrant.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          userId: "user-123",
+          contactKind: "REVEAL_PHONE",
+          grantType: "PACK",
+        }),
+      })
+    );
+    expect(prisma.contactConsumption.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          contactKind: "REVEAL_PHONE",
+        }),
+      })
+    );
   });
 
   it("rebuilds missing state and increments sourceVersion", async () => {
@@ -116,6 +165,8 @@ describe("entitlement-state", () => {
         activePassWindowEnd: null,
         freezeReason: "NONE",
         fraudFlag: false,
+        userId: "user-123",
+        contactKind: "MESSAGE_START",
         sourceVersion: BigInt(7),
       });
     (prisma.entitlementGrant.findMany as jest.Mock)
@@ -154,25 +205,40 @@ describe("entitlement-state", () => {
       creditsFreeRemaining: 2,
       creditsPaidRemaining: 0,
       activePassWindowStart: null,
-      activePassWindowEnd: null,
-      freezeReason: "NONE",
-      fraudFlag: false,
-      sourceVersion: BigInt(3),
-    });
+        activePassWindowEnd: null,
+        freezeReason: "NONE",
+        fraudFlag: false,
+        userId: "user-123",
+        contactKind: "MESSAGE_START",
+        sourceVersion: BigInt(3),
+      });
     (prisma.entitlementGrant.findMany as jest.Mock)
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
     (prisma.contactConsumption.count as jest.Mock).mockResolvedValue(0);
     (prisma.contactConsumption.groupBy as jest.Mock).mockResolvedValue([]);
 
-    const snapshot = await recomputeEntitlementState(prisma as any, "user-123");
+    const snapshot = await recomputeEntitlementState(
+      prisma as any,
+      "user-123",
+      "MESSAGE_START"
+    );
 
     expect(snapshot.sourceVersion).toBe(BigInt(4));
     expect(prisma.entitlementState.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { userId: "user-123" },
+        where: {
+          userId_contactKind: {
+            userId: "user-123",
+            contactKind: "MESSAGE_START",
+          },
+        },
         update: expect.objectContaining({
           sourceVersion: BigInt(4),
+        }),
+        create: expect.objectContaining({
+          userId: "user-123",
+          contactKind: "MESSAGE_START",
         }),
       })
     );

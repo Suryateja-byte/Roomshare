@@ -41,6 +41,9 @@ jest.mock("@/lib/prisma", () => {
       findUnique: jest.fn(),
       findMany: jest.fn(),
     },
+    blockedUser: {
+      findFirst: jest.fn(),
+    },
     physicalUnit: {
       findUnique: jest.fn(),
     },
@@ -139,6 +142,9 @@ describe("Chat Actions", () => {
       availableUntil: null,
       minStayMonths: 1,
       lastConfirmedAt: null,
+      owner: {
+        isSuspended: false,
+      },
     };
 
     beforeEach(() => {
@@ -316,6 +322,24 @@ describe("Chat Actions", () => {
       ).toBe(false);
     });
 
+    it("returns a neutral contact response when the host is suspended", async () => {
+      (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
+        ...mockListing,
+        owner: {
+          isSuspended: true,
+        },
+      });
+
+      const result = await startConversation("listing-123");
+
+      expect(result).toEqual({
+        error: "This host is not accepting contact right now.",
+        code: "HOST_NOT_ACCEPTING_CONTACT",
+      });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(mockConsumeMessageStartEntitlement).not.toHaveBeenCalled();
+    });
+
     it("rejects a stale observed unit epoch before consuming contact entitlement", async () => {
       (prisma.physicalUnit.findUnique as jest.Mock).mockResolvedValueOnce({
         unitIdentityEpoch: 2,
@@ -446,6 +470,7 @@ describe("Chat Actions", () => {
       (prisma.user.findMany as jest.Mock).mockResolvedValue([
         { id: "other-456", email: "other@example.com" },
       ]);
+      (prisma.blockedUser.findFirst as jest.Mock).mockResolvedValue(null);
       (prisma.conversationDeletion.deleteMany as jest.Mock).mockResolvedValue({
         count: 0,
       });

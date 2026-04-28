@@ -39,6 +39,7 @@ interface SearchTelemetryStore {
   listingCreateCollisionDetectedTotal: number;
   listingCreateCollisionResolvedTotal: number;
   listingCreateCollisionModerationGatedTotal: number;
+  listingCreateCollisionBlockedTotal: number;
   dedupOpenPanelClickTotal: number;
   dedupMemberClickTotal: number;
   listingCreateCollisionActionSelectedTotal: number;
@@ -91,6 +92,7 @@ const telemetryStore: SearchTelemetryStore = {
   listingCreateCollisionDetectedTotal: 0,
   listingCreateCollisionResolvedTotal: 0,
   listingCreateCollisionModerationGatedTotal: 0,
+  listingCreateCollisionBlockedTotal: 0,
   dedupOpenPanelClickTotal: 0,
   dedupMemberClickTotal: 0,
   listingCreateCollisionActionSelectedTotal: 0,
@@ -388,6 +390,21 @@ export function recordListingCreateCollisionModerationGated({
   });
 }
 
+export function recordListingCreateCollisionBlocked({
+  ownerHashPrefix8,
+  windowCount24h,
+}: {
+  ownerHashPrefix8: string;
+  windowCount24h: number;
+}): void {
+  telemetryStore.listingCreateCollisionBlockedTotal += 1;
+  logger.sync.warn("listing_create_collision_blocked_total", {
+    ownerHashPrefix8,
+    windowCount24h,
+    total: telemetryStore.listingCreateCollisionBlockedTotal,
+  });
+}
+
 export function recordSearchDedupOpenPanelClick({
   groupSize,
   queryHashPrefix8,
@@ -492,6 +509,8 @@ export function getSearchTelemetrySnapshot() {
       telemetryStore.listingCreateCollisionResolvedTotal,
     listingCreateCollisionModerationGatedTotal:
       telemetryStore.listingCreateCollisionModerationGatedTotal,
+    listingCreateCollisionBlockedTotal:
+      telemetryStore.listingCreateCollisionBlockedTotal,
     listingCreateCollisionActionSelectedTotal:
       telemetryStore.listingCreateCollisionActionSelectedTotal,
     legacyUrlCounts,
@@ -523,6 +542,7 @@ export function resetSearchTelemetryForTests(): void {
   telemetryStore.listingCreateCollisionDetectedTotal = 0;
   telemetryStore.listingCreateCollisionResolvedTotal = 0;
   telemetryStore.listingCreateCollisionModerationGatedTotal = 0;
+  telemetryStore.listingCreateCollisionBlockedTotal = 0;
   telemetryStore.dedupOpenPanelClickTotal = 0;
   telemetryStore.dedupMemberClickTotal = 0;
   telemetryStore.listingCreateCollisionActionSelectedTotal = 0;

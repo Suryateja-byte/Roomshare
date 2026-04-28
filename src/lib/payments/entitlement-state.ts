@@ -1,6 +1,7 @@
 import "server-only";
 
 import type {
+  ContactKind,
   EntitlementFreezeReason,
   EntitlementGrant,
 } from "@prisma/client";
@@ -28,6 +29,7 @@ const ENTITLEMENT_STATE_STALE_MS = 5 * 60 * 1000;
 
 export type EntitlementStateSnapshot = {
   userId: string;
+  contactKind: ContactKind;
   creditsFreeRemaining: number;
   creditsPaidRemaining: number;
   activePassWindowStart: Date | null;
@@ -100,7 +102,8 @@ function buildActivePassWindow(
 
 async function getActivePackUsage(
   client: ClientLike,
-  grants: PackGrant[]
+  grants: PackGrant[],
+  contactKind: ContactKind
 ): Promise<Map<string, number>> {
   const usage = new Map<string, number>();
 
@@ -112,7 +115,7 @@ async function getActivePackUsage(
     by: ["entitlementGrantId"],
     where: {
       entitlementGrantId: { in: grants.map((grant) => grant.id) },
-      contactKind: "MESSAGE_START",
+      contactKind,
       source: "PACK",
       restorationState: "NONE",
     },
@@ -131,6 +134,7 @@ async function getActivePackUsage(
 export async function buildEntitlementStateSnapshot(
   client: ClientLike,
   userId: string,
+  contactKind: ContactKind = "MESSAGE_START",
   now: Date = new Date()
 ): Promise<Omit<EntitlementStateSnapshot, "sourceVersion" | "lastRecomputedAt">> {
   const [freeUsedCount, activePackGrants, activePassGrants, frozenGrant] =
@@ -138,7 +142,7 @@ export async function buildEntitlementStateSnapshot(
       client.contactConsumption.count({
         where: {
           userId,
-          contactKind: "MESSAGE_START",
+          contactKind,
           source: "FREE",
           restorationState: "NONE",
         },
@@ -146,7 +150,7 @@ export async function buildEntitlementStateSnapshot(
       client.entitlementGrant.findMany({
         where: {
           userId,
-          contactKind: "MESSAGE_START",
+          contactKind,
           grantType: "PACK",
           status: "ACTIVE",
         },
@@ -159,7 +163,7 @@ export async function buildEntitlementStateSnapshot(
       client.entitlementGrant.findMany({
         where: {
           userId,
-          contactKind: "MESSAGE_START",
+          contactKind,
           grantType: "PASS",
           status: "ACTIVE",
           activeUntil: { gt: now },
@@ -173,14 +177,14 @@ export async function buildEntitlementStateSnapshot(
       client.entitlementGrant.findFirst({
         where: {
           userId,
-          contactKind: "MESSAGE_START",
+          contactKind,
           status: "FROZEN",
         },
         select: { id: true },
       }),
     ]);
 
-  const packUsage = await getActivePackUsage(client, activePackGrants);
+  const packUsage = await getActivePackUsage(client, activePackGrants, contactKind);
   const creditsPaidRemaining = activePackGrants.reduce((total, grant) => {
     const totalCredits = grant.creditCount ?? 0;
     const usedCredits = packUsage.get(grant.id) ?? 0;
@@ -194,6 +198,7 @@ export async function buildEntitlementStateSnapshot(
 
   return {
     userId,
+    contactKind,
     creditsFreeRemaining,
     creditsPaidRemaining,
     activePassWindowStart: passWindow.activePassWindowStart,
@@ -236,6 +241,7 @@ function hasStateMismatch(
 export async function recomputeEntitlementState(
   client: ClientLike,
   userId: string,
+  contactKind: ContactKind = "MESSAGE_START",
   now: Date = new Date()
 ): Promise<EntitlementStateSnapshot> {
   const startedAt = Date.now();
@@ -243,8 +249,10 @@ export async function recomputeEntitlementState(
   try {
     const [existing, nextSnapshot] = await Promise.all([
       client.entitlementState.findUnique({
-        where: { userId },
+        where: { userId_contactKind: { userId, contactKind } },
         select: {
+          userId: true,
+          contactKind: true,
           creditsFreeRemaining: true,
           creditsPaidRemaining: true,
           activePassWindowStart: true,
@@ -254,12 +262,13 @@ export async function recomputeEntitlementState(
           sourceVersion: true,
         },
       }),
-      buildEntitlementStateSnapshot(client, userId, now),
+      buildEntitlementStateSnapshot(client, userId, contactKind, now),
     ]);
 
     if (hasStateMismatch(existing, nextSnapshot)) {
       recordEntitlementStateShadowMismatch({
         userId,
+        contactKind,
         existingFreeRemaining: existing?.creditsFreeRemaining ?? null,
         nextFreeRemaining: nextSnapshot.creditsFreeRemaining,
         existingPaidRemaining: existing?.creditsPaidRemaining ?? null,
@@ -271,7 +280,7 @@ export async function recomputeEntitlementState(
     const lastRecomputedAt = now;
 
     await client.entitlementState.upsert({
-      where: { userId },
+      where: { userId_contactKind: { userId, contactKind } },
       update: {
         creditsFreeRemaining: nextSnapshot.creditsFreeRemaining,
         creditsPaidRemaining: nextSnapshot.creditsPaidRemaining,
@@ -284,6 +293,7 @@ export async function recomputeEntitlementState(
       },
       create: {
         userId,
+        contactKind,
         creditsFreeRemaining: nextSnapshot.creditsFreeRemaining,
         creditsPaidRemaining: nextSnapshot.creditsPaidRemaining,
         activePassWindowStart: nextSnapshot.activePassWindowStart,
@@ -297,6 +307,7 @@ export async function recomputeEntitlementState(
 
     recordEntitlementStateRebuild({
       userId,
+      contactKind,
       durationMs: Date.now() - startedAt,
       rebuilt: true,
       success: true,
@@ -310,6 +321,7 @@ export async function recomputeEntitlementState(
   } catch (error) {
     recordEntitlementStateRebuild({
       userId,
+      contactKind,
       durationMs: Date.now() - startedAt,
       rebuilt: true,
       success: false,
@@ -324,7 +336,8 @@ function isStateFresh(state: Pick<EntitlementStateSnapshot, "lastRecomputedAt">)
 
 export async function getFreshEntitlementState(
   client: ClientLike,
-  userId: string
+  userId: string,
+  contactKind: ContactKind = "MESSAGE_START"
 ): Promise<
   | { ok: true; state: EntitlementStateSnapshot; rebuilt: boolean }
   | { ok: false; code: "PAYWALL_UNAVAILABLE" }
@@ -334,9 +347,10 @@ export async function getFreshEntitlementState(
   }
 
   const existing = await client.entitlementState.findUnique({
-    where: { userId },
+    where: { userId_contactKind: { userId, contactKind } },
     select: {
       userId: true,
+      contactKind: true,
       creditsFreeRemaining: true,
       creditsPaidRemaining: true,
       activePassWindowStart: true,
@@ -359,7 +373,7 @@ export async function getFreshEntitlementState(
   try {
     return {
       ok: true,
-      state: await recomputeEntitlementState(client, userId),
+      state: await recomputeEntitlementState(client, userId, contactKind),
       rebuilt: true,
     };
   } catch (error) {

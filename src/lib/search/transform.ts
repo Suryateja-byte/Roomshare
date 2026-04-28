@@ -27,6 +27,7 @@ import {
   buildPublicAvailability,
   type PublicAvailability,
 } from "./public-availability";
+import { toPublicCoordinates } from "./public-coordinates";
 
 type AvailabilityLike = Pick<
   ListingData | MapListingData,
@@ -98,6 +99,7 @@ export function shouldIncludePins(mapListingsCount: number): boolean {
 export function transformToListItem(listing: ListingData): SearchV2ListItem {
   const badges: string[] = [];
   const publicAvailability = getNormalizedPublicAvailability(listing);
+  const publicCoordinates = toPublicCoordinates(listing.location);
 
   // Add near-match badge if applicable
   if (listing.isNearMatch) {
@@ -114,8 +116,8 @@ export function transformToListItem(listing: ListingData): SearchV2ListItem {
     title: listing.title,
     price: listing.price,
     image: listing.images[0] ?? null,
-    lat: listing.location.lat,
-    lng: listing.location.lng,
+    lat: publicCoordinates.lat,
+    lng: publicCoordinates.lng,
     badges: badges.length > 0 ? badges : undefined,
     availableSlots: publicAvailability.openSlots,
     totalSlots: publicAvailability.totalSlots,
@@ -154,12 +156,13 @@ export function transformToGeoJSON(
 ): SearchV2GeoJSON {
   const features = listings.map((listing) => {
     const publicAvailability = getNormalizedPublicAvailability(listing);
+    const publicCoordinates = toPublicCoordinates(listing.location);
 
     return {
       type: "Feature" as const,
       geometry: {
         type: "Point" as const,
-        coordinates: [listing.location.lng, listing.location.lat] as [
+        coordinates: [publicCoordinates.lng, publicCoordinates.lat] as [
           number,
           number,
         ],
@@ -251,10 +254,14 @@ export function transformToPins(
       : buildPublicAvailability({
           availableSlots: bestListing.availableSlots,
         });
-    return {
-      id: bestListing.id,
+    const publicCoordinates = toPublicCoordinates({
       lat: group.lat,
       lng: group.lng,
+    });
+    return {
+      id: bestListing.id,
+      lat: publicCoordinates.lat,
+      lng: publicCoordinates.lng,
       price: bestListing.price,
       publicAvailability,
       tier: group.tier,

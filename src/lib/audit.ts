@@ -25,6 +25,7 @@ export type AdminAction =
   // Verification management
   | "VERIFICATION_APPROVED"
   | "VERIFICATION_REJECTED"
+  | "VERIFICATION_DOCUMENT_VIEWED"
   // Other admin actions
   | "ADMIN_GRANTED"
   | "ADMIN_REVOKED";
