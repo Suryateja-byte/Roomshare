@@ -28,9 +28,11 @@ jest.mock("@sentry/nextjs", () => ({ addBreadcrumb: jest.fn() }), {
 
 import {
   generateEmbedding,
+  generateBatchEmbeddings,
   generateQueryEmbedding,
   generateMultimodalEmbedding,
   EMBEDDING_MODEL,
+  EMBEDDING_PROVIDER_MODEL,
 } from "@/lib/embeddings/gemini";
 
 describe("generateEmbedding", () => {
@@ -54,7 +56,29 @@ describe("generateEmbedding", () => {
     await expect(generateEmbedding("test")).rejects.toThrow("No embedding");
   });
 
-  it("truncates input longer than MAX_INPUT_LENGTH", async () => {
+  it("formats document input with Embedding 2 retrieval document prefix", async () => {
+    mockEmbedContent.mockResolvedValueOnce({
+      embeddings: [{ values: [1] }],
+    });
+
+    await generateEmbedding("test text");
+
+    const calledWith = mockEmbedContent.mock.calls[0][0];
+    expect(calledWith.contents).toBe("title: none | text: test text");
+  });
+
+  it("does not send taskType for Embedding 2", async () => {
+    mockEmbedContent.mockResolvedValueOnce({
+      embeddings: [{ values: [1] }],
+    });
+
+    await generateEmbedding("test text");
+
+    const calledWith = mockEmbedContent.mock.calls[0][0];
+    expect(calledWith.config).toEqual({ outputDimensionality: 768 });
+  });
+
+  it("truncates formatted input longer than MAX_INPUT_LENGTH", async () => {
     const longText = "a".repeat(5000);
     mockEmbedContent.mockResolvedValueOnce({
       embeddings: [{ values: [1] }],
@@ -72,18 +96,18 @@ describe("generateQueryEmbedding", () => {
     jest.clearAllMocks();
   });
 
-  it("uses RETRIEVAL_QUERY task type", async () => {
+  it("formats query input with Embedding 2 search-result prefix", async () => {
     mockEmbedContent.mockResolvedValueOnce({
       embeddings: [{ values: [1, 0] }],
     });
 
     await generateQueryEmbedding("search query");
 
-    expect(mockEmbedContent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        config: expect.objectContaining({ taskType: "RETRIEVAL_QUERY" }),
-      })
+    const calledWith = mockEmbedContent.mock.calls[0][0];
+    expect(calledWith.contents).toBe(
+      "task: search result | query: search query"
     );
+    expect(calledWith.config).toEqual({ outputDimensionality: 768 });
   });
 });
 
@@ -104,7 +128,7 @@ describe("generateMultimodalEmbedding", () => {
     const calledWith = mockEmbedContent.mock.calls[0][0];
     expect(calledWith.contents).toEqual({
       parts: [
-        { text: "hello" },
+        { text: "title: none | text: hello" },
         { inlineData: { mimeType: "image/jpeg", data: "abc123" } },
       ],
     });
@@ -162,7 +186,7 @@ describe("generateMultimodalEmbedding", () => {
     expect(calledWith.contents.parts[0].text.length).toBeLessThanOrEqual(8000);
   });
 
-  it("uses RETRIEVAL_DOCUMENT as default taskType", async () => {
+  it("does not send taskType for default document multimodal embedding", async () => {
     mockEmbedContent.mockResolvedValueOnce({
       embeddings: [{ values: [1, 0] }],
     });
@@ -170,10 +194,10 @@ describe("generateMultimodalEmbedding", () => {
     await generateMultimodalEmbedding("text", []);
 
     const calledWith = mockEmbedContent.mock.calls[0][0];
-    expect(calledWith.config.taskType).toBe("RETRIEVAL_DOCUMENT");
+    expect(calledWith.config).toEqual({ outputDimensionality: 768 });
   });
 
-  it("passes RETRIEVAL_QUERY when specified", async () => {
+  it("formats multimodal query text when specified", async () => {
     mockEmbedContent.mockResolvedValueOnce({
       embeddings: [{ values: [1, 0] }],
     });
@@ -181,7 +205,9 @@ describe("generateMultimodalEmbedding", () => {
     await generateMultimodalEmbedding("text", [], "RETRIEVAL_QUERY");
 
     const calledWith = mockEmbedContent.mock.calls[0][0];
-    expect(calledWith.config.taskType).toBe("RETRIEVAL_QUERY");
+    expect(calledWith.contents.parts[0]).toEqual({
+      text: "task: search result | query: text",
+    });
   });
 
   it("throws on empty embeddings response", async () => {
@@ -211,7 +237,36 @@ describe("generateMultimodalEmbedding", () => {
 
     const calledWith = mockEmbedContent.mock.calls[0][0];
     expect(calledWith.contents.parts).toHaveLength(1);
-    expect(calledWith.contents.parts[0]).toHaveProperty("text", "text only");
+    expect(calledWith.contents.parts[0]).toHaveProperty(
+      "text",
+      "title: none | text: text only"
+    );
+  });
+});
+
+describe("generateBatchEmbeddings", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("embeds each text as a separate Embedding 2 request", async () => {
+    mockEmbedContent
+      .mockResolvedValueOnce({ embeddings: [{ values: [1, 0] }] })
+      .mockResolvedValueOnce({ embeddings: [{ values: [0, 1] }] });
+
+    const result = await generateBatchEmbeddings(["one", "two"]);
+
+    expect(result).toHaveLength(2);
+    expect(mockEmbedContent).toHaveBeenCalledTimes(2);
+    expect(mockEmbedContent.mock.calls[0][0].contents).toBe(
+      "title: none | text: one"
+    );
+    expect(mockEmbedContent.mock.calls[1][0].contents).toBe(
+      "title: none | text: two"
+    );
+    expect(Array.isArray(mockEmbedContent.mock.calls[0][0].contents)).toBe(
+      false
+    );
   });
 });
 
@@ -220,11 +275,17 @@ describe("EMBEDDING_MODEL", () => {
     expect(typeof EMBEDDING_MODEL).toBe("string");
   });
 
-  it("equals gemini-embedding-2-preview", () => {
-    expect(EMBEDDING_MODEL).toBe("gemini-embedding-2-preview");
+  it("exports the stored embedding version", () => {
+    expect(EMBEDDING_MODEL).toBe(
+      "gemini-embedding-2.search-result.nosensitive-v1.d768"
+    );
   });
 
-  it("uses MODEL constant in embedContent calls", async () => {
+  it("exports the provider model separately", () => {
+    expect(EMBEDDING_PROVIDER_MODEL).toBe("gemini-embedding-2");
+  });
+
+  it("uses provider model in embedContent calls", async () => {
     mockEmbedContent.mockResolvedValueOnce({
       embeddings: [{ values: [1, 0] }],
     });
@@ -232,6 +293,6 @@ describe("EMBEDDING_MODEL", () => {
     await generateEmbedding("test");
 
     const calledWith = mockEmbedContent.mock.calls[0][0];
-    expect(calledWith.model).toContain(EMBEDDING_MODEL);
+    expect(calledWith.model).toBe(EMBEDDING_PROVIDER_MODEL);
   });
 });

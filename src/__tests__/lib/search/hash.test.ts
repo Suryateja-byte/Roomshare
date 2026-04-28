@@ -231,7 +231,7 @@ describe("search/hash", () => {
         },
       };
 
-      expect(generateQueryHash(params)).toBe("41d26badfeb46b49");
+      expect(generateQueryHash(params)).toBe("73fe121fbc8fff6b");
     });
   });
 

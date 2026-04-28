@@ -23,7 +23,7 @@ describe("composeListingText", () => {
     expect(text).toContain("0 of 3 slots available");
   });
 
-  it("includes all optional fields when present", () => {
+  it("includes non-sensitive optional fields when present", () => {
     const text = composeListingText({
       title: "Room",
       description: "Desc",
@@ -46,8 +46,25 @@ describe("composeListingText", () => {
     expect(text).toContain("Lease: MONTH_TO_MONTH");
     expect(text).toContain("Located in Austin, TX");
     expect(text).toContain("Available from 2026-04-01");
-    expect(text).toContain("Languages spoken: English, Spanish");
     expect(text).toContain("Booking mode: SHARED");
+  });
+
+  it("does not include sensitive housing attributes in embedding text", () => {
+    const text = composeListingText({
+      title: "Room",
+      description: "Desc",
+      price: 600,
+      genderPreference: "ANY",
+      householdGender: "MIXED",
+      householdLanguages: ["English", "Spanish"],
+      primaryHomeLanguage: "English",
+    });
+
+    expect(text).not.toContain("Gender preference");
+    expect(text).not.toContain("Household gender");
+    expect(text).not.toContain("Languages spoken");
+    expect(text).not.toContain("English");
+    expect(text).not.toContain("Spanish");
   });
 
   it("omits null/undefined optional fields", () => {

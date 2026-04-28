@@ -162,12 +162,6 @@ export function buildSemanticProjectionText(row: SemanticSourceRow): string {
   if (row.lease_negotiable) {
     parts.push("Lease is negotiable.");
   }
-  if (row.gender_preference) {
-    parts.push(`Gender preference: ${row.gender_preference}.`);
-  }
-  if (row.household_gender) {
-    parts.push(`Household gender: ${row.household_gender}.`);
-  }
   if (row.public_area_name) {
     parts.push(`Area: ${row.public_area_name}.`);
   } else if (row.public_cell_id) {
@@ -252,7 +246,8 @@ export async function rebuildSemanticInventoryProjection(
 
   const embedding = await (deps?.generateEmbedding ?? generateEmbedding)(
     text,
-    "RETRIEVAL_DOCUMENT"
+    "RETRIEVAL_DOCUMENT",
+    { embeddingVersion }
   );
   const vectorLiteral = pgvector.toSql(embedding);
   const sanitizedContentHash = hashSemanticContent(text);

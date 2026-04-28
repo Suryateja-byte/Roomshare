@@ -21,7 +21,7 @@ jest.mock("@/lib/embeddings/gemini", () => ({
   generateEmbedding: (...args: unknown[]) => mockGenerateEmbedding(...args),
   generateMultimodalEmbedding: (...args: unknown[]) =>
     mockGenerateMultimodalEmbedding(...args),
-  EMBEDDING_MODEL: "gemini-embedding-2-preview",
+  EMBEDDING_MODEL: "gemini-embedding-2.search-result.nosensitive-v1.d768",
 }));
 
 const mockComposeListingText = jest.fn();
@@ -93,12 +93,18 @@ const makeDoc = (overrides: Partial<Record<string, unknown>> = {}) => ({
   embedding_text: null,
   embedding_status: "PENDING",
   embedding_image_hash: null,
+  embedding_model: null,
   ...overrides,
 });
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockQueryRaw.mockReset();
+  mockExecuteRaw.mockReset();
+  mockGenerateEmbedding.mockReset();
+  mockGenerateEmbedding.mockResolvedValue([0.1, 0.2, 0.3]);
   // Default: composeListingText returns a stable string
+  mockComposeListingText.mockReset();
   mockComposeListingText.mockReturnValue("composed text");
   mockFetchAndProcessListingImages.mockReset();
   mockFetchAndProcessListingImages.mockResolvedValue([]);
@@ -127,6 +133,7 @@ describe("syncListingEmbedding", () => {
         embedding_text: existingText,
         embedding_status: "COMPLETED",
         embedding_image_hash: null,
+        embedding_model: "gemini-embedding-2.search-result.nosensitive-v1.d768",
       }),
     ]);
 
@@ -135,6 +142,43 @@ describe("syncListingEmbedding", () => {
     // No PROCESSING claim, no Gemini call
     expect(mockExecuteRaw).not.toHaveBeenCalled();
     expect(mockGenerateEmbedding).not.toHaveBeenCalled();
+  });
+
+  it("re-embeds when text and images are unchanged but embedding version changed", async () => {
+    mockQueryRaw.mockResolvedValueOnce([
+      makeDoc({
+        embedding_text: "composed text",
+        embedding_status: "COMPLETED",
+        embedding_image_hash: null,
+        embedding_model: "gemini-embedding-2-preview",
+      }),
+    ]);
+    mockExecuteRaw.mockResolvedValueOnce(1);
+    mockGenerateEmbedding.mockResolvedValueOnce([0.1, 0.2]);
+    mockExecuteRaw.mockResolvedValueOnce(1);
+
+    await syncListingEmbedding(LISTING_ID);
+
+    expect(mockGenerateEmbedding).toHaveBeenCalledTimes(1);
+    expect(mockExecuteRaw).toHaveBeenCalledTimes(2);
+  });
+
+  it("re-embeds unchanged failed rows even when version is current", async () => {
+    mockQueryRaw.mockResolvedValueOnce([
+      makeDoc({
+        embedding_text: "composed text",
+        embedding_status: "FAILED",
+        embedding_image_hash: null,
+        embedding_model: "gemini-embedding-2.search-result.nosensitive-v1.d768",
+      }),
+    ]);
+    mockExecuteRaw.mockResolvedValueOnce(1);
+    mockGenerateEmbedding.mockResolvedValueOnce([0.1, 0.2]);
+    mockExecuteRaw.mockResolvedValueOnce(1);
+
+    await syncListingEmbedding(LISTING_ID);
+
+    expect(mockGenerateEmbedding).toHaveBeenCalledTimes(1);
   });
 
   it("claims row atomically before calling Gemini (PROCESSING guard)", async () => {
@@ -268,6 +312,7 @@ describe("image hash change detection", () => {
         embedding_text: "composed text", // matches mockComposeListingText return
         embedding_image_hash: "hash-abc", // matches mockComputeImageHash return
         embedding_status: "COMPLETED",
+        embedding_model: "gemini-embedding-2.search-result.nosensitive-v1.d768",
       }),
     ]);
 
@@ -415,7 +460,9 @@ describe("multimodal vs text-only embedding", () => {
 
     expect(mockGenerateMultimodalEmbedding).toHaveBeenCalledWith(
       "composed text",
-      imageParts
+      imageParts,
+      "RETRIEVAL_DOCUMENT",
+      { title: "Sunny Room" }
     );
     expect(mockGenerateEmbedding).not.toHaveBeenCalled();
   });
@@ -432,7 +479,8 @@ describe("multimodal vs text-only embedding", () => {
 
     expect(mockGenerateEmbedding).toHaveBeenCalledWith(
       "composed text",
-      "RETRIEVAL_DOCUMENT"
+      "RETRIEVAL_DOCUMENT",
+      { title: "Sunny Room" }
     );
     expect(mockGenerateMultimodalEmbedding).not.toHaveBeenCalled();
   });
@@ -450,9 +498,11 @@ describe("multimodal vs text-only embedding", () => {
       mockExecuteRaw.mock.calls[1][0] as TemplateStringsArray
     ).join("?");
     expect(updateSqlParts).toContain("embedding_model");
-    // The EMBEDDING_MODEL value "gemini-embedding-2-preview" is passed as a param
+    // The stored embedding profile version is passed as a param
     const updateParams = mockExecuteRaw.mock.calls[1].slice(1);
-    expect(updateParams).toContain("gemini-embedding-2-preview");
+    expect(updateParams).toContain(
+      "gemini-embedding-2.search-result.nosensitive-v1.d768"
+    );
   });
 });
 

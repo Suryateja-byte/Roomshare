@@ -40,7 +40,8 @@ describe("Query Embedding Cache", () => {
     const result = await getCachedQueryEmbedding("sunny room downtown");
     expect(mocks.generateQueryEmbedding).toHaveBeenCalledTimes(1);
     expect(mocks.generateQueryEmbedding).toHaveBeenCalledWith(
-      "sunny room downtown"
+      "sunny room downtown",
+      { embeddingVersion: "gemini-embedding-2-preview" }
     );
     expect(result).toBe(FAKE_EMBEDDING);
   });
@@ -122,6 +123,14 @@ describe("Query Embedding Cache", () => {
     it("different queries produce separate cache entries", async () => {
       await getCachedQueryEmbedding("bright studio");
       await getCachedQueryEmbedding("cozy apartment");
+      expect(mocks.generateQueryEmbedding).toHaveBeenCalledTimes(2);
+      expect(queryCacheStats().size).toBe(2);
+    });
+
+    it("different requested embedding versions produce separate cache entries", async () => {
+      await getCachedQueryEmbedding("bright studio", "embed-v1");
+      await getCachedQueryEmbedding("bright studio", "embed-v2");
+
       expect(mocks.generateQueryEmbedding).toHaveBeenCalledTimes(2);
       expect(queryCacheStats().size).toBe(2);
     });

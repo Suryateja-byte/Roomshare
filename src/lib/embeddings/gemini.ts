@@ -1,14 +1,44 @@
 /**
  * Gemini Embedding API wrapper.
  * Uses lazy-initialized singleton (same pattern as prisma.ts).
- * L2 normalizes truncated 768-dim embeddings per Google's guidance.
+ * Stores a Roomshare embedding profile version separately from the provider
+ * model so persisted vectors never mix across prompt/schema revisions.
  */
 import { GoogleGenAI } from "@google/genai";
 
-const MODEL = "gemini-embedding-2-preview";
+const PROVIDER_MODEL = "gemini-embedding-2";
+const MODEL = "gemini-embedding-2.search-result.nosensitive-v1.d768";
+const LEGACY_PREVIEW_MODEL = "gemini-embedding-2-preview";
 const DIMENSIONS = 768;
 const MAX_RETRIES = 3;
 const MAX_INPUT_LENGTH = 8000; // ~2000 tokens, well within 8192 token limit
+
+type EmbeddingTaskType = "RETRIEVAL_QUERY" | "RETRIEVAL_DOCUMENT";
+type DocumentEmbeddingOptions = {
+  title?: string | null;
+  embeddingVersion?: string;
+};
+
+type EmbeddingProfile = {
+  version: string;
+  providerModel: string;
+  usesPromptFormatting: boolean;
+};
+
+const CURRENT_PROFILE: EmbeddingProfile = {
+  version: MODEL,
+  providerModel: PROVIDER_MODEL,
+  usesPromptFormatting: true,
+};
+
+const EMBEDDING_PROFILES: Record<string, EmbeddingProfile> = {
+  [CURRENT_PROFILE.version]: CURRENT_PROFILE,
+  [LEGACY_PREVIEW_MODEL]: {
+    version: LEGACY_PREVIEW_MODEL,
+    providerModel: LEGACY_PREVIEW_MODEL,
+    usesPromptFormatting: false,
+  },
+};
 
 // --- Lazy singleton (survives HMR in dev, fresh in production) ---
 const globalForGemini = globalThis as unknown as {
@@ -32,6 +62,45 @@ function getClient(): GoogleGenAI {
 function normalizeL2(vec: number[]): number[] {
   const mag = Math.sqrt(vec.reduce((s, v) => s + v * v, 0));
   return mag === 0 ? vec : vec.map((v) => v / mag);
+}
+
+function truncateFormattedContent(value: string): string {
+  return value.slice(0, MAX_INPUT_LENGTH);
+}
+
+function formatEmbeddingInput(
+  text: string,
+  taskType: EmbeddingTaskType,
+  profile: EmbeddingProfile,
+  options: DocumentEmbeddingOptions = {}
+): string {
+  if (!profile.usesPromptFormatting) {
+    return truncateFormattedContent(text);
+  }
+
+  if (taskType === "RETRIEVAL_QUERY") {
+    return truncateFormattedContent(`task: search result | query: ${text}`);
+  }
+
+  const title = options.title?.trim() || "none";
+  return truncateFormattedContent(`title: ${title} | text: ${text}`);
+}
+
+function getEmbeddingProfile(version = MODEL): EmbeddingProfile {
+  const profile = EMBEDDING_PROFILES[version];
+  if (!profile) {
+    throw new Error(`[embedding] Unsupported embedding version: ${version}`);
+  }
+  return profile;
+}
+
+function buildEmbedConfig(
+  taskType: EmbeddingTaskType,
+  profile: EmbeddingProfile
+) {
+  return profile.usesPromptFormatting
+    ? { outputDimensionality: DIMENSIONS }
+    : { taskType, outputDimensionality: DIMENSIONS };
 }
 
 // --- Retry with exponential backoff + jitter ---
@@ -60,15 +129,17 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
 /** Generate embedding for a single text (document indexing) */
 export async function generateEmbedding(
   text: string,
-  taskType: "RETRIEVAL_QUERY" | "RETRIEVAL_DOCUMENT" = "RETRIEVAL_DOCUMENT"
+  taskType: EmbeddingTaskType = "RETRIEVAL_DOCUMENT",
+  options: DocumentEmbeddingOptions = {}
 ): Promise<number[]> {
-  const truncated = text.slice(0, MAX_INPUT_LENGTH);
+  const profile = getEmbeddingProfile(options.embeddingVersion);
+  const formatted = formatEmbeddingInput(text, taskType, profile, options);
   try {
     const Sentry = await import("@sentry/nextjs");
     Sentry.addBreadcrumb({
       category: "embedding",
       message: `Generating embedding (${taskType})`,
-      data: { textLength: truncated.length, taskType },
+      data: { textLength: formatted.length, taskType },
       level: "info",
     });
   } catch {
@@ -76,9 +147,9 @@ export async function generateEmbedding(
   }
   const res = await withRetry(() =>
     getClient().models.embedContent({
-      model: MODEL,
-      contents: truncated,
-      config: { taskType, outputDimensionality: DIMENSIONS },
+      model: profile.providerModel,
+      contents: formatted,
+      config: buildEmbedConfig(taskType, profile),
     })
   );
   const values = res.embeddings?.[0]?.values;
@@ -99,21 +170,26 @@ export async function generateEmbedding(
 }
 
 /** Generate embedding optimized for search queries */
-export async function generateQueryEmbedding(query: string): Promise<number[]> {
-  return generateEmbedding(query, "RETRIEVAL_QUERY");
+export async function generateQueryEmbedding(
+  query: string,
+  options: Pick<DocumentEmbeddingOptions, "embeddingVersion"> = {}
+): Promise<number[]> {
+  return generateEmbedding(query, "RETRIEVAL_QUERY", options);
 }
 
 /** Generate embedding from text + images (multimodal fused vector) */
 export async function generateMultimodalEmbedding(
   text: string,
   images: { base64: string; mimeType: string }[],
-  taskType: "RETRIEVAL_QUERY" | "RETRIEVAL_DOCUMENT" = "RETRIEVAL_DOCUMENT"
+  taskType: EmbeddingTaskType = "RETRIEVAL_DOCUMENT",
+  options: DocumentEmbeddingOptions = {}
 ): Promise<number[]> {
-  const truncated = text.slice(0, MAX_INPUT_LENGTH);
+  const profile = getEmbeddingProfile(options.embeddingVersion);
+  const formatted = formatEmbeddingInput(text, taskType, profile, options);
   const parts: Array<
     { text: string } | { inlineData: { mimeType: string; data: string } }
   > = [
-    { text: truncated },
+    { text: formatted },
     ...images.map((img) => ({
       inlineData: { mimeType: img.mimeType, data: img.base64 },
     })),
@@ -125,7 +201,7 @@ export async function generateMultimodalEmbedding(
       category: "embedding",
       message: `Generating multimodal embedding (${taskType})`,
       data: {
-        textLength: truncated.length,
+        textLength: formatted.length,
         imageCount: images.length,
         taskType,
       },
@@ -137,9 +213,9 @@ export async function generateMultimodalEmbedding(
 
   const res = await withRetry(() =>
     getClient().models.embedContent({
-      model: MODEL,
+      model: profile.providerModel,
       contents: { parts },
-      config: { taskType, outputDimensionality: DIMENSIONS },
+      config: buildEmbedConfig(taskType, profile),
     })
   );
   const values = res.embeddings?.[0]?.values;
@@ -153,25 +229,16 @@ export async function generateBatchEmbeddings(
   texts: string[]
 ): Promise<number[][]> {
   if (!texts.length) return [];
-  const truncated = texts.map((t) => t.slice(0, MAX_INPUT_LENGTH));
-  // embedContent accepts string[] via contents parameter
-  const res = await withRetry(() =>
-    getClient().models.embedContent({
-      model: MODEL,
-      contents: truncated,
-      config: {
-        taskType: "RETRIEVAL_DOCUMENT",
-        outputDimensionality: DIMENSIONS,
-      },
-    })
-  );
-  if (!res.embeddings) throw new Error("[embedding] No embeddings returned");
-  return res.embeddings.map((e) => {
-    if (!e?.values?.length)
-      throw new Error("[embedding] Empty embedding in batch");
-    return normalizeL2(e.values);
-  });
+  const embeddings: number[][] = [];
+  for (const text of texts) {
+    embeddings.push(await generateEmbedding(text, "RETRIEVAL_DOCUMENT"));
+  }
+  return embeddings;
 }
 
 /** Export model name for cache key namespacing */
-export { MODEL as EMBEDDING_MODEL };
+export {
+  MODEL as EMBEDDING_MODEL,
+  PROVIDER_MODEL as EMBEDDING_PROVIDER_MODEL,
+  DIMENSIONS as EMBEDDING_DIMENSIONS,
+};

@@ -31,7 +31,7 @@ export interface HashableSearchQuery {
 }
 
 export const SEARCH_QUERY_HASH_VERSION =
-  "2026-04-15.cfm-search-contract-v1";
+  "2026-04-28.semantic-embedding-version-v2";
 
 function quantizeBound(value: number): number {
   return Math.round(value / BOUNDS_EPSILON) * BOUNDS_EPSILON;

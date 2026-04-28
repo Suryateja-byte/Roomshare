@@ -61,7 +61,12 @@ jest.mock("@/lib/availability", () => ({
 }));
 
 jest.mock("@/lib/embeddings/version", () => ({
-  getCurrentEmbeddingVersion: jest.fn(() => "gemini-embedding-2-preview"),
+  getCurrentEmbeddingVersion: jest.fn(
+    () => "gemini-embedding-2.search-result.nosensitive-v1.d768"
+  ),
+  getReadEmbeddingVersion: jest.fn(
+    () => "gemini-embedding-2.search-result.nosensitive-v1.d768"
+  ),
 }));
 
 // Mock search-doc-queries
@@ -191,7 +196,10 @@ import { buildPublicAvailability } from "@/lib/search/public-availability";
 import { SEARCH_DOC_PROJECTION_VERSION } from "@/lib/search/search-doc-sync";
 import { prisma } from "@/lib/prisma";
 import { getAvailabilityForListings } from "@/lib/availability";
-import { getCurrentEmbeddingVersion } from "@/lib/embeddings/version";
+import {
+  getCurrentEmbeddingVersion,
+  getReadEmbeddingVersion,
+} from "@/lib/embeddings/version";
 import { isPhase04ProjectionReadsEnabled } from "@/lib/flags/phase04";
 import { executeProjectionSearchV2 } from "@/lib/search/projection-search";
 
@@ -286,6 +294,10 @@ const mockGetAvailabilityForListings =
 const mockGetCurrentEmbeddingVersion =
   getCurrentEmbeddingVersion as jest.MockedFunction<
     typeof getCurrentEmbeddingVersion
+  >;
+const mockGetReadEmbeddingVersion =
+  getReadEmbeddingVersion as jest.MockedFunction<
+    typeof getReadEmbeddingVersion
   >;
 const mockIsPhase04ProjectionReadsEnabled =
   isPhase04ProjectionReadsEnabled as jest.MockedFunction<
@@ -464,7 +476,7 @@ function setupDefaultMocks({
   );
   mockGetAvailabilityForListings.mockResolvedValue(new Map());
   mockGetCurrentEmbeddingVersion.mockReturnValue(
-    "gemini-embedding-2-preview"
+    "gemini-embedding-2.search-result.nosensitive-v1.d768"
   );
   mockTransformToListItems.mockImplementation((items) =>
     items.map((l) => ({
@@ -506,6 +518,12 @@ describe("search-v2-service", () => {
     (features as Record<string, unknown>).semanticSearch = false;
     mockIsPhase04ProjectionReadsEnabled.mockReturnValue(false);
     mockDecodeCursorAny.mockReturnValue(null);
+    mockGetCurrentEmbeddingVersion.mockReturnValue(
+      "gemini-embedding-2.search-result.nosensitive-v1.d768"
+    );
+    mockGetReadEmbeddingVersion.mockReturnValue(
+      "gemini-embedding-2.search-result.nosensitive-v1.d768"
+    );
   });
 
   describe("executeSearchV2", () => {
@@ -842,11 +860,73 @@ describe("search-v2-service", () => {
         SEARCH_DOC_PROJECTION_VERSION
       );
       expect(result.response?.meta.embeddingVersion).toBe(
-        "gemini-embedding-2-preview"
+        "gemini-embedding-2.search-result.nosensitive-v1.d768"
       );
       expect(result.response?.list.items[0]?.id).toBe("semantic-1");
       expect(mockGetListingsPaginated).not.toHaveBeenCalled();
-      expect(mockGetCurrentEmbeddingVersion).toHaveBeenCalled();
+      expect(mockGetReadEmbeddingVersion).toHaveBeenCalled();
+      expect(mockGenerateQueryHash).toHaveBeenCalledWith(
+        expect.objectContaining({
+          embeddingVersion:
+            "gemini-embedding-2.search-result.nosensitive-v1.d768",
+        })
+      );
+    });
+
+    it("does not include embeddingVersion in nonsemantic query hashes", async () => {
+      setupDefaultMocks();
+
+      await executeSearchV2({
+        rawParams: {
+          minLat: "37.7",
+          maxLat: "37.85",
+          minLng: "-122.52",
+          maxLng: "-122.35",
+        },
+      });
+
+      expect(mockGenerateQueryHash).toHaveBeenCalledWith(
+        expect.not.objectContaining({
+          embeddingVersion: expect.any(String),
+        })
+      );
+    });
+
+    it("includes explicit housing filters in query hashes", async () => {
+      setupDefaultMocks();
+      mockParseSearchParams.mockReturnValue(
+        defaultParsedSearchParams({
+          filterParams: {
+            bounds: BOUNDS,
+            genderPreference: "NO_PREFERENCE",
+            householdGender: "MIXED",
+            bookingMode: "PER_SLOT",
+            minAvailableSlots: 2,
+          },
+        })
+      );
+
+      await executeSearchV2({
+        rawParams: {
+          minLat: "37.7",
+          maxLat: "37.85",
+          minLng: "-122.52",
+          maxLng: "-122.35",
+          genderPreference: "NO_PREFERENCE",
+          householdGender: "MIXED",
+          bookingMode: "PER_SLOT",
+          minSlots: "2",
+        },
+      });
+
+      expect(mockGenerateQueryHash).toHaveBeenCalledWith(
+        expect.objectContaining({
+          genderPreference: "NO_PREFERENCE",
+          householdGender: "MIXED",
+          bookingMode: "PER_SLOT",
+          minAvailableSlots: 2,
+        })
+      );
     });
 
     it("uses vibeQuery for semantic ranking while preserving the location query", async () => {
