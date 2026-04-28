@@ -49,6 +49,7 @@ jest.mock("@/lib/prisma", () => ({
     },
     payment: {
       create: jest.fn(),
+      findUnique: jest.fn(),
     },
     paymentAbuseSignal: {
       count: jest.fn(),
@@ -62,9 +63,12 @@ jest.mock("@/lib/with-rate-limit", () => ({
 }));
 
 const mockEvaluateMessageStartPaywall = jest.fn();
+const mockEvaluateContactPaywall = jest.fn();
 jest.mock("@/lib/payments/contact-paywall", () => ({
   evaluateMessageStartPaywall: (...args: unknown[]) =>
     mockEvaluateMessageStartPaywall(...args),
+  evaluateContactPaywall: (...args: unknown[]) =>
+    mockEvaluateContactPaywall(...args),
 }));
 
 const mockEvaluateSavedSearchAlertPaywall = jest.fn();
@@ -144,6 +148,19 @@ describe("POST /api/payments/checkout", () => {
       unitId: "unit-123",
       unitIdentityEpoch: 3,
     });
+    mockEvaluateContactPaywall.mockResolvedValue({
+      summary: {
+        enabled: true,
+        mode: "PAYWALL_REQUIRED",
+        freeContactsRemaining: 0,
+        packContactsRemaining: 0,
+        activePassExpiresAt: null,
+        requiresPurchase: true,
+        offers: [],
+      },
+      unitId: "unit-123",
+      unitIdentityEpoch: 3,
+    });
     mockCreateCheckoutSession.mockResolvedValue({
       id: "cs_test_123",
       payment_intent: null,
@@ -159,6 +176,7 @@ describe("POST /api/payments/checkout", () => {
     (prisma.payment.create as jest.Mock).mockResolvedValue({
       id: "payment-123",
     });
+    (prisma.payment.findUnique as jest.Mock).mockResolvedValue(null);
     (prisma.paymentAbuseSignal.count as jest.Mock).mockResolvedValue(0);
     (prisma.paymentAbuseSignal.create as jest.Mock).mockResolvedValue({
       id: "signal-123",
@@ -306,6 +324,119 @@ describe("POST /api/payments/checkout", () => {
         idempotencyKey:
           "checkout:user-123:CONTACT_HOST:listing-123:CONTACT_PACK_3:idem-123",
       }
+    );
+  });
+
+  it("returns the checkout session when local payment persistence sees a duplicate Stripe session", async () => {
+    (prisma.payment.create as jest.Mock).mockRejectedValue({ code: "P2002" });
+    (prisma.payment.findUnique as jest.Mock).mockResolvedValue({
+      userId: "user-123",
+      productCode: "CONTACT_PACK_3",
+      metadata: {
+        purchaseContext: "CONTACT_HOST",
+        userId: "user-123",
+        listingId: "listing-123",
+        unitId: "unit-123",
+        unitIdentityEpoch: "3",
+        productCode: "CONTACT_PACK_3",
+        contactKind: "MESSAGE_START",
+      },
+    });
+
+    const response = await POST(
+      new Request("http://localhost/api/payments/checkout", {
+        method: "POST",
+        headers: {
+          origin: "http://localhost",
+          host: "localhost",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          listingId: "listing-123",
+          productCode: "CONTACT_PACK_3",
+          clientIdempotencyKey: "idem-123",
+        }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      checkoutUrl: "https://checkout.stripe.com/pay/cs_test_123",
+      sessionId: "cs_test_123",
+    });
+  });
+
+  it("fails closed when duplicate Stripe session metadata belongs to another checkout", async () => {
+    (prisma.payment.create as jest.Mock).mockRejectedValue({ code: "P2002" });
+    (prisma.payment.findUnique as jest.Mock).mockResolvedValue({
+      userId: "other-user",
+      productCode: "CONTACT_PACK_3",
+      metadata: {
+        purchaseContext: "CONTACT_HOST",
+        userId: "other-user",
+        listingId: "listing-999",
+        unitId: "unit-999",
+        unitIdentityEpoch: "1",
+        productCode: "CONTACT_PACK_3",
+        contactKind: "MESSAGE_START",
+      },
+    });
+
+    await expect(
+      POST(
+        new Request("http://localhost/api/payments/checkout", {
+          method: "POST",
+          headers: {
+            origin: "http://localhost",
+            host: "localhost",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            listingId: "listing-123",
+            productCode: "CONTACT_PACK_3",
+            clientIdempotencyKey: "idem-123",
+          }),
+        })
+      )
+    ).rejects.toThrow(
+      "Stripe checkout session already exists with mismatched metadata"
+    );
+  });
+
+  it("creates phone reveal checkout metadata with the phone reveal return param", async () => {
+    const response = await POST(
+      new Request("http://localhost/api/payments/checkout", {
+        method: "POST",
+        headers: {
+          origin: "http://localhost",
+          host: "localhost",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          purchaseContext: "PHONE_REVEAL",
+          listingId: "listing-123",
+          productCode: "CONTACT_PACK_3",
+        }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockEvaluateContactPaywall).toHaveBeenCalledWith({
+      userId: "user-123",
+      physicalUnitId: "unit-123",
+      contactKind: "REVEAL_PHONE",
+    });
+    expect(mockCreateCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success_url:
+          "http://localhost/listings/listing-123?phoneRevealCheckout=success&session_id={CHECKOUT_SESSION_ID}",
+        cancel_url:
+          "http://localhost/listings/listing-123?phoneRevealCheckout=cancelled",
+        metadata: expect.objectContaining({
+          purchaseContext: "PHONE_REVEAL",
+          contactKind: "REVEAL_PHONE",
+        }),
+      })
     );
   });
 

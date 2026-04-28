@@ -12,6 +12,8 @@ import {
   RATE_LIMITS,
 } from "@/lib/rate-limit";
 import { headers } from "next/headers";
+import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
+import { Prisma } from "@prisma/client";
 
 export interface NotificationPreferences {
   emailBookingRequests: boolean;
@@ -268,7 +270,7 @@ export async function deleteAccount(
     // Verify password for accounts that have one
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { password: true },
+      select: { email: true, password: true },
     });
 
     if (user?.password) {
@@ -299,9 +301,148 @@ export async function deleteAccount(
       }
     }
 
-    // Delete user and all related data (cascading delete is set up in schema)
-    await prisma.user.delete({
-      where: { id: session.user.id },
+    const deleteResult = await prisma.$transaction(async (tx) => {
+      const [lockedUser] = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id
+        FROM "User"
+        WHERE id = ${session.user.id}
+        FOR UPDATE
+      `;
+
+      if (!lockedUser) {
+        throw new Error("USER_NOT_FOUND");
+      }
+
+      const ownedListings = await tx.$queryRaw<
+        Array<{ id: string; version: number }>
+      >`
+        SELECT id, version
+        FROM "Listing"
+        WHERE "ownerId" = ${session.user.id}
+        FOR UPDATE
+      `;
+
+      const listingIds = ownedListings.map((listing) => listing.id);
+      const reportCounts =
+        listingIds.length > 0
+          ? await tx.report.groupBy({
+              by: ["listingId"],
+              where: { listingId: { in: listingIds } },
+              _count: { _all: true },
+            })
+          : [];
+      const reportCountByListingId = new Map(
+        reportCounts.map((row) => [row.listingId, row._count._all])
+      );
+      const reportedListings = ownedListings.filter(
+        (listing) => (reportCountByListingId.get(listing.id) ?? 0) > 0
+      );
+      const unreportedListingIds = ownedListings
+        .filter((listing) => (reportCountByListingId.get(listing.id) ?? 0) === 0)
+        .map((listing) => listing.id);
+
+      for (const listing of reportedListings) {
+        await tx.listing.update({
+          where: { id: listing.id },
+          data: {
+            status: "PAUSED",
+            statusReason: "SUPPRESSED",
+            version: listing.version + 1,
+          },
+        });
+        await markListingDirtyInTx(tx, listing.id, "status_changed");
+      }
+
+      if (unreportedListingIds.length > 0) {
+        await tx.listing.deleteMany({
+          where: { id: { in: unreportedListingIds } },
+        });
+      }
+
+      await tx.message.deleteMany({ where: { senderId: session.user.id } });
+      await tx.conversationDeletion.deleteMany({
+        where: { userId: session.user.id },
+      });
+      await tx.typingStatus.deleteMany({ where: { userId: session.user.id } });
+      await tx.blockedUser.deleteMany({
+        where: {
+          OR: [
+            { blockerId: session.user.id },
+            { blockedId: session.user.id },
+          ],
+        },
+      });
+      await tx.notification.deleteMany({ where: { userId: session.user.id } });
+      await tx.recentlyViewed.deleteMany({ where: { userId: session.user.id } });
+      await tx.savedListing.deleteMany({ where: { userId: session.user.id } });
+      await tx.alertDelivery.deleteMany({ where: { userId: session.user.id } });
+      await tx.alertSubscription.deleteMany({
+        where: { userId: session.user.id },
+      });
+      await tx.savedSearch.deleteMany({ where: { userId: session.user.id } });
+      await tx.verificationUpload.deleteMany({
+        where: { userId: session.user.id },
+      });
+      await tx.verificationRequest.deleteMany({
+        where: { userId: session.user.id },
+      });
+      await tx.review.deleteMany({
+        where: {
+          OR: [
+            { authorId: session.user.id },
+            { targetUserId: session.user.id },
+          ],
+        },
+      });
+      await tx.hostContactChannel.deleteMany({
+        where: { hostUserId: session.user.id },
+      });
+      await tx.publicCachePushSubscription.deleteMany({
+        where: { userId: session.user.id },
+      });
+
+      if (user?.email) {
+        await tx.passwordResetToken.deleteMany({
+          where: { email: user.email },
+        });
+        await tx.verificationToken.deleteMany({
+          where: { identifier: user.email },
+        });
+      }
+
+      await tx.account.deleteMany({ where: { userId: session.user.id } });
+      await tx.session.deleteMany({ where: { userId: session.user.id } });
+      await tx.user.update({
+        where: { id: session.user.id },
+        data: {
+          name: "Deleted User",
+          email: null,
+          emailVerified: null,
+          image: null,
+          password: null,
+          passwordChangedAt: new Date(),
+          bio: null,
+          countryOfOrigin: null,
+          languages: [],
+          isVerified: false,
+          isAdmin: false,
+          isSuspended: true,
+          notificationPreferences: Prisma.DbNull,
+          conversations: { set: [] },
+        },
+      });
+
+      return {
+        suppressedListings: reportedListings.length,
+        deletedListings: unreportedListingIds.length,
+      };
+    });
+
+    logger.sync.info("Account deletion tombstoned user", {
+      action: "deleteAccountTombstone",
+      userId: session.user.id,
+      suppressedListings: deleteResult.suppressedListings,
+      deletedListings: deleteResult.deletedListings,
     });
 
     return { success: true };

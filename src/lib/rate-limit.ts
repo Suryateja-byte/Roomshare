@@ -284,6 +284,11 @@ export const RATE_LIMITS = {
   notifications: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute
   savedSearchMutations: { limit: 30, windowMs: 60 * 60 * 1000 }, // 30 per hour
   canDeleteCheck: { limit: 30, windowMs: 60 * 60 * 1000 }, // 30 per hour
+  profileUpdate: { limit: 20, windowMs: 60 * 60 * 1000 }, // 20 per hour
+  verificationSubmit: { limit: 5, windowMs: 24 * 60 * 60 * 1000 }, // 5 per day
+  verificationCancel: { limit: 10, windowMs: 60 * 60 * 1000 }, // 10 per hour
+  verificationUpload: { limit: 10, windowMs: 60 * 60 * 1000 }, // 10 per hour
+  verificationDocumentView: { limit: 60, windowMs: 60 * 60 * 1000 }, // 60 per hour
   // SEC-007 FIX: Rate limit viewer-state endpoint (called on every listing page load)
   viewerState: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute
   // API-008 FIX: Rate limit booking audit endpoint (lower frequency, viewed less often)

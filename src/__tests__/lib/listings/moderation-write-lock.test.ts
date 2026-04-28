@@ -1,4 +1,5 @@
 import {
+  getHostModerationWriteLockResult,
   getModerationWriteLockReason,
   getModerationWriteLockResult,
 } from "@/lib/listings/moderation-write-lock";
@@ -49,5 +50,40 @@ describe("moderation-write-lock", () => {
         statusReason: "MIGRATION_REVIEW",
       })
     ).toBeNull();
+  });
+
+  it("always locks suppressed host rows, even when feature locks are disabled", () => {
+    expect(
+      getHostModerationWriteLockResult({
+        statusReason: "SUPPRESSED",
+        moderationWriteLocksEnabled: false,
+      })
+    ).toEqual({
+      code: "LISTING_LOCKED",
+      error: "This listing is locked while under review.",
+      httpStatus: 423,
+      lockReason: "SUPPRESSED",
+    });
+  });
+
+  it("keeps admin-paused host rows feature-gated", () => {
+    expect(
+      getHostModerationWriteLockResult({
+        statusReason: "ADMIN_PAUSED",
+        moderationWriteLocksEnabled: false,
+      })
+    ).toBeNull();
+
+    expect(
+      getHostModerationWriteLockResult({
+        statusReason: "ADMIN_PAUSED",
+        moderationWriteLocksEnabled: true,
+      })
+    ).toEqual({
+      code: "LISTING_LOCKED",
+      error: "This listing is locked while under review.",
+      httpStatus: 423,
+      lockReason: "ADMIN_PAUSED",
+    });
   });
 });

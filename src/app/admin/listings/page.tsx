@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import type { ListingStatus, Prisma } from "@prisma/client";
 import Link from "next/link";
 import { ArrowLeft, Home } from "lucide-react";
 import ListingList from "./ListingList";
@@ -10,7 +11,28 @@ export const metadata = {
   description: "Moderate listings on the RoomShare platform",
 };
 
-export default async function AdminListingsPage() {
+const PAGE_SIZE = 50;
+const LISTING_STATUSES = ["all", "ACTIVE", "PAUSED", "RENTED"] as const;
+type ListingStatusFilter = (typeof LISTING_STATUSES)[number];
+
+type AdminListingsPageProps = {
+  searchParams: Promise<{ q?: string; status?: string; page?: string }>;
+};
+
+function parsePage(value: string | undefined) {
+  const page = Number(value);
+  return Number.isInteger(page) && page > 0 ? page : 1;
+}
+
+function parseStatus(value: string | undefined): ListingStatusFilter {
+  return LISTING_STATUSES.includes(value as ListingStatusFilter)
+    ? (value as ListingStatusFilter)
+    : "all";
+}
+
+export default async function AdminListingsPage({
+  searchParams,
+}: AdminListingsPageProps) {
   const session = await auth();
 
   if (!session?.user?.id) {
@@ -27,42 +49,69 @@ export default async function AdminListingsPage() {
     redirect("/");
   }
 
-  // Fetch all listings
-  const [listings, totalListings] = await Promise.all([
-    prisma.listing.findMany({
-      select: {
-        id: true,
-        title: true,
-        price: true,
-        status: true,
-        version: true,
-        images: true,
-        viewCount: true,
-        createdAt: true,
+  const params = await searchParams;
+  const searchQuery = (params.q || "").trim().slice(0, 100);
+  const currentStatus = parseStatus(params.status);
+  const requestedPage = parsePage(params.page);
+  const where: Prisma.ListingWhereInput = {};
+
+  if (searchQuery) {
+    where.OR = [
+      { title: { contains: searchQuery, mode: "insensitive" } },
+      { description: { contains: searchQuery, mode: "insensitive" } },
+      {
+        owner: { is: { name: { contains: searchQuery, mode: "insensitive" } } },
+      },
+      {
         owner: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        location: {
-          select: {
-            city: true,
-            state: true,
-          },
-        },
-        _count: {
-          select: {
-            reports: true,
-          },
+          is: { email: { contains: searchQuery, mode: "insensitive" } },
         },
       },
-      orderBy: { createdAt: "desc" },
-      take: 100, // Limit for initial load
-    }),
-    prisma.listing.count(),
-  ]);
+    ];
+  }
+
+  if (currentStatus !== "all") {
+    where.status = currentStatus as ListingStatus;
+  }
+
+  const totalListings = await prisma.listing.count({ where });
+  const totalPages = Math.max(1, Math.ceil(totalListings / PAGE_SIZE));
+  const currentPage = Math.min(requestedPage, totalPages);
+
+  const listings = await prisma.listing.findMany({
+    where,
+    select: {
+      id: true,
+      title: true,
+      price: true,
+      status: true,
+      version: true,
+      images: true,
+      viewCount: true,
+      createdAt: true,
+      owner: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+      location: {
+        select: {
+          city: true,
+          state: true,
+        },
+      },
+      _count: {
+        select: {
+          reports: true,
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    skip: (currentPage - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
+  });
 
   return (
     <div className="min-h-screen bg-surface-canvas">
@@ -98,6 +147,10 @@ export default async function AdminListingsPage() {
             price: Number(l.price),
           }))}
           totalListings={totalListings}
+          searchQuery={searchQuery}
+          currentStatus={currentStatus}
+          currentPage={currentPage}
+          totalPages={totalPages}
         />
       </div>
     </div>

@@ -391,7 +391,7 @@ async function grantEntitlementForPayment(
       windowEndDelta: activeUntil,
       metadata: {
         purchaseContext: input.metadata.purchaseContext,
-        ...(input.metadata.purchaseContext === "CONTACT_HOST"
+        ...(input.metadata.purchaseContext !== "SEARCH_ALERTS"
           ? {
               listingId: input.metadata.listingId,
               unitId: input.metadata.unitId,
@@ -403,7 +403,11 @@ async function grantEntitlementForPayment(
   });
 
   if (features.entitlementState) {
-    await recomputeEntitlementState(client, input.userId);
+    await recomputeEntitlementState(
+      client,
+      input.userId,
+      input.metadata.contactKind
+    );
   }
 }
 

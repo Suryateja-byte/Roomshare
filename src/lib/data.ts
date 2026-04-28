@@ -26,6 +26,7 @@ import {
   isListingEligibleForPublicSearch,
   resolvePublicAvailability,
 } from "@/lib/search/public-availability";
+import { toPublicCoordinates } from "@/lib/search/public-coordinates";
 
 function isPresent<T>(value: T | null | undefined): value is T {
   return value != null;
@@ -196,6 +197,24 @@ function buildListSearchAvailabilitySqlFragments(options: {
     params,
     nextParamIndex: paramIndex,
   };
+}
+
+function applyLegacyBookingModeFilter(
+  conditions: string[],
+  bookingMode: string | undefined
+) {
+  if (!bookingMode || bookingMode === "any") {
+    return;
+  }
+
+  if (bookingMode === "WHOLE_UNIT") {
+    conditions.push(`LOWER(l."roomType") = LOWER('Entire Place')`);
+    return;
+  }
+
+  if (bookingMode === "SHARED") {
+    conditions.push(`COALESCE(LOWER(l."roomType"), '') <> LOWER('Entire Place')`);
+  }
 }
 
 // hasValidCoordinates, crossesAntimeridian, ListingWithMetadata — see @/lib/search-types
@@ -419,6 +438,12 @@ export function sortListings(
 // Maximum map markers to return (prevents UI performance issues)
 const MAX_MAP_MARKERS = 200;
 
+export interface MapListingsResult {
+  listings: MapListingData[];
+  truncated: boolean;
+  totalCandidates?: number;
+}
+
 /**
  * Optimized query for map markers - uses SQL-level bounds filtering
  * and returns only the fields needed for map display.
@@ -432,6 +457,13 @@ const MAX_MAP_MARKERS = 200;
 export async function getMapListings(
   params: FilterParams = {}
 ): Promise<MapListingData[]> {
+  const result = await getMapListingsResult(params);
+  return result.listings;
+}
+
+export async function getMapListingsResult(
+  params: FilterParams = {}
+): Promise<MapListingsResult> {
   const {
     query,
     minPrice,
@@ -570,11 +602,7 @@ export async function getMapListings(
     queryParams.push(householdGender);
   }
 
-  // Booking mode filter (SQL level, case-insensitive)
-  if (bookingMode && bookingMode !== "any") {
-    conditions.push(`'SHARED' = $${paramIndex++}`);
-    queryParams.push(bookingMode);
-  }
+  applyLegacyBookingModeFilter(conditions, bookingMode);
 
   // Languages filter (SQL level with GIN index) - OR logic
   if (languages?.length) {
@@ -662,12 +690,14 @@ export async function getMapListings(
         ) r ON r."listingId" = l.id
         WHERE ${whereClause}
         ORDER BY l."createdAt" DESC
-        LIMIT ${MAX_MAP_MARKERS}
+        LIMIT ${MAX_MAP_MARKERS + 1}
     `;
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Raw SQL query returns untyped rows; mapped to ListingData below
-    const listings = await queryWithTimeout<any>(sqlQuery, queryParams);
+    const rows = await queryWithTimeout<any>(sqlQuery, queryParams);
+    const truncated = rows.length > MAX_MAP_MARKERS;
+    const listings = truncated ? rows.slice(0, MAX_MAP_MARKERS) : rows;
 
     const mappedListings = listings
       .map((l) => {
@@ -755,10 +785,16 @@ export async function getMapListings(
       }))
     );
 
-    return sanitizedListings.map((listing) => {
+    const publicListings = sanitizedListings.map((listing) => {
       const groupMetadata = groupMetadataById.get(listing.id);
       return groupMetadata ? { ...listing, ...groupMetadata } : listing;
     });
+
+    return {
+      listings: publicListings,
+      truncated,
+      ...(truncated ? { totalCandidates: rows.length } : {}),
+    };
   } catch (error) {
     const dataError = wrapDatabaseError(error, "getMapListings");
     dataError.log({
@@ -943,11 +979,7 @@ export async function getListingsPaginated(
       queryParams.push(householdGender);
     }
 
-    // Booking mode filter (SQL level, case-insensitive)
-    if (bookingMode && bookingMode !== "any") {
-      conditions.push(`'SHARED' = $${paramIndex++}`);
-      queryParams.push(bookingMode);
-    }
+    applyLegacyBookingModeFilter(conditions, bookingMode);
 
     // Languages filter (SQL level with GIN index) - OR logic
     // Pass ONE array param - simpler, fewer bugs, uses GIN index
@@ -1170,8 +1202,10 @@ export async function getListingsPaginated(
           location: {
             city: l.city,
             state: l.state,
-            lat: Number(l.lat) || 0,
-            lng: Number(l.lng) || 0,
+            ...toPublicCoordinates({
+              lat: Number(l.lat) || 0,
+              lng: Number(l.lng) || 0,
+            }),
           },
         };
       })
@@ -1225,6 +1259,7 @@ async function getListingsCountEfficient(
     languages,
     genderPreference,
     householdGender,
+    bookingMode,
     bounds,
     minAvailableSlots,
   } = params;
@@ -1335,6 +1370,8 @@ async function getListingsCountEfficient(
     conditions.push(`LOWER(l."householdGender") = LOWER($${paramIndex++})`);
     queryParams.push(householdGender);
   }
+
+  applyLegacyBookingModeFilter(conditions, bookingMode);
 
   // Languages filter (OR logic)
   if (languages?.length) {

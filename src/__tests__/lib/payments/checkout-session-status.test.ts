@@ -72,6 +72,42 @@ describe("checkout-session-status helpers", () => {
     });
   });
 
+  it("parses phone reveal checkout metadata as REVEAL_PHONE", () => {
+    expect(
+      parsePaywallMetadata({
+        purchaseContext: "PHONE_REVEAL",
+        userId: "user-123",
+        listingId: "listing-123",
+        unitId: "unit-123",
+        unitIdentityEpoch: "9",
+        productCode: "CONTACT_PACK_3",
+        contactKind: "REVEAL_PHONE",
+      })
+    ).toEqual({
+      purchaseContext: "PHONE_REVEAL",
+      userId: "user-123",
+      listingId: "listing-123",
+      unitId: "unit-123",
+      unitIdentityEpoch: 9,
+      productCode: "CONTACT_PACK_3",
+      contactKind: "REVEAL_PHONE",
+    });
+  });
+
+  it("rejects mismatched contact kind metadata", () => {
+    expect(
+      parsePaywallMetadata({
+        purchaseContext: "PHONE_REVEAL",
+        userId: "user-123",
+        listingId: "listing-123",
+        unitId: "unit-123",
+        unitIdentityEpoch: "9",
+        productCode: "CONTACT_PACK_3",
+        contactKind: "MESSAGE_START",
+      })
+    ).toBeNull();
+  });
+
   it("classifies an open checkout session before payment completes", () => {
     expect(
       classifyCheckoutSessionSnapshot({

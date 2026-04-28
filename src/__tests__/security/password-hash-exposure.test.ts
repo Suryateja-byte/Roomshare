@@ -28,6 +28,17 @@ jest.mock("next/cache", () => ({
   revalidatePath: jest.fn(),
 }));
 
+jest.mock("next/navigation", () => ({
+  redirect: jest.fn((url: string) => {
+    throw new Error(`redirect:${url}`);
+  }),
+}));
+
+jest.mock("@/app/profile/ProfileClient", () => ({
+  __esModule: true,
+  default: jest.fn(() => null),
+}));
+
 jest.mock("bcryptjs", () => ({
   compare: jest.fn(),
   hash: jest.fn(),
@@ -56,6 +67,7 @@ jest.mock("@/lib/logger", () => ({
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { hasPasswordSet } from "@/app/actions/settings";
+import ProfilePage from "@/app/profile/page";
 
 describe("Password Hash Exposure Prevention", () => {
   beforeEach(() => {
@@ -165,6 +177,49 @@ describe("Password Hash Exposure Prevention", () => {
       expect(responseStr).not.toMatch(/"password"\s*:/);
       expect(responseStr).not.toMatch(/"passwordHash"\s*:/);
       expect(responseStr).not.toMatch(/"hashedPassword"\s*:/);
+    });
+  });
+
+  describe("Profile page client boundary", () => {
+    it("selects only safe user fields and never serializes sensitive scalars", async () => {
+      (auth as jest.Mock).mockResolvedValue({
+        user: { id: "user-001" },
+      });
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        id: "user-001",
+        name: "Test User",
+        email: "test@example.com",
+        emailVerified: new Date("2026-01-01T00:00:00.000Z"),
+        image: null,
+        bio: null,
+        countryOfOrigin: null,
+        languages: [],
+        isVerified: false,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        listings: [],
+      });
+
+      const element = await ProfilePage();
+      const serializedUser = JSON.stringify(element.props.user);
+
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { id: "user-001" },
+        select: expect.objectContaining({
+          id: true,
+          email: true,
+          listings: expect.any(Object),
+        }),
+      });
+      const query = (prisma.user.findUnique as jest.Mock).mock.calls[0][0];
+      expect(query).not.toHaveProperty("include");
+      expect(query.select).not.toHaveProperty("password");
+      expect(query.select).not.toHaveProperty("isAdmin");
+      expect(query.select).not.toHaveProperty("isSuspended");
+      expect(query.select).not.toHaveProperty("notificationPreferences");
+      expect(serializedUser).not.toMatch(/"password"\s*:/);
+      expect(serializedUser).not.toMatch(/"isAdmin"\s*:/);
+      expect(serializedUser).not.toMatch(/"isSuspended"\s*:/);
+      expect(serializedUser).not.toMatch(/"notificationPreferences"\s*:/);
     });
   });
 });

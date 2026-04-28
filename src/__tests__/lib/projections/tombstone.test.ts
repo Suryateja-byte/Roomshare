@@ -37,6 +37,7 @@ async function seedUnitWithInventory(opts: {
   unitId?: string;
   invId?: string;
   publishStatus?: string;
+  sourceVersion?: bigint;
 }): Promise<{ unitId: string; invId: string }> {
   const unitId = opts.unitId ?? `unit-ts-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const invId = opts.invId ?? `inv-ts-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -48,7 +49,7 @@ async function seedUnitWithInventory(opts: {
     inventoryId: invId,
     unitId,
     publishStatus: opts.publishStatus ?? "PUBLISHED",
-    sourceVersion: BigInt(1),
+    sourceVersion: opts.sourceVersion ?? BigInt(1),
   });
 
   return { unitId, invId };
@@ -69,6 +70,7 @@ describe("handleTombstone()", () => {
     );
 
     expect(result.deletedInventoryRows).toBe(1);
+    expect(result.skippedStale).toBe(false);
 
     const rows = await fixture.getInventorySearchProjections();
     expect(rows.find((r) => r.inventoryId === invId)).toBeUndefined();
@@ -106,14 +108,50 @@ describe("handleTombstone()", () => {
       })
     );
 
-    expect(typeof result.cacheInvalidationId).toBe("string");
-    expect(result.cacheInvalidationId.length).toBeGreaterThan(0);
+    expect(result.cacheInvalidationId).toEqual(expect.any(String));
 
     const ci = await fixture.getCacheInvalidations();
     const found = ci.find((r) => r.id === result.cacheInvalidationId);
     expect(found).toBeDefined();
     expect(found!.reason).toBe("SUPPRESSION");
     expect(found!.unitId).toBe(unitId);
+  });
+
+  it("skips stale inventory tombstones without projection or cache fanout", async () => {
+    const { unitId, invId } = await seedUnitWithInventory({
+      sourceVersion: BigInt(10),
+    });
+
+    const result = await withTx((tx) =>
+      handleTombstone(tx, {
+        unitId,
+        inventoryId: invId,
+        reason: "PAUSE",
+        unitIdentityEpoch: 1,
+        sourceVersion: BigInt(9),
+      })
+    );
+
+    expect(result).toMatchObject({
+      deletedInventoryRows: 0,
+      unitRowDeleted: false,
+      cacheInvalidationId: null,
+      deletedSemanticRows: 0,
+      skippedStale: true,
+    });
+
+    const rows = await fixture.getInventorySearchProjections();
+    expect(rows.find((r) => r.inventoryId === invId)).toBeDefined();
+
+    const ci = await fixture.getCacheInvalidations();
+    expect(ci.filter((row) => row.unitId === unitId)).toHaveLength(0);
+
+    const outbox = await fixture.getOutboxEvents();
+    expect(
+      outbox.filter(
+        (event) => event.kind === "CACHE_INVALIDATE" && event.aggregateId === unitId
+      )
+    ).toHaveLength(0);
   });
 
   it("enqueues a CACHE_INVALIDATE outbox event at priority=10", async () => {

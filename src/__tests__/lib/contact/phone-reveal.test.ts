@@ -32,7 +32,7 @@ import {
 } from "@/lib/contact/phone-reveal";
 
 function buildClient() {
-  return {
+  const client = {
     listing: {
       findUnique: jest.fn(),
     },
@@ -58,7 +58,10 @@ function buildClient() {
     },
     $queryRaw: jest.fn(),
     $executeRaw: jest.fn().mockResolvedValue(1),
+    $transaction: jest.fn(),
   };
+  client.$transaction.mockImplementation((fn) => fn(client));
+  return client;
 }
 
 const activeListing = {
@@ -148,6 +151,9 @@ describe("revealHostPhoneForListing", () => {
         String(call[0]).includes("phone_reveal_audits")
       )
     ).toBe(true);
+    expect(client.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: "Serializable",
+    });
   });
 
   it("fails closed before database work when the kill switch is active", async () => {
@@ -223,9 +229,38 @@ describe("revealHostPhoneForListing", () => {
       error: "Phone reveal is unavailable right now.",
     });
     expect(client.$executeRaw).toHaveBeenCalled();
+    expect(client.contactConsumption.count).not.toHaveBeenCalled();
+    expect(client.contactConsumption.create).not.toHaveBeenCalled();
   });
 
-  it("returns a paywall response before phone lookup when reveal credits are exhausted", async () => {
+  it("does not consume entitlement when the host has no revealable phone", async () => {
+    process.env.ENABLE_CONTACT_PAYWALL = "true";
+    process.env.ENABLE_CONTACT_PAYWALL_ENFORCEMENT = "true";
+    const client = buildClient();
+    client.listing.findUnique.mockResolvedValue(activeListing);
+    client.blockedUser.findFirst.mockResolvedValue(null);
+    client.$queryRaw.mockResolvedValue([]);
+
+    const result = await revealHostPhoneForListing(
+      {
+        viewerUserId: "renter-1",
+        listingId: "listing-1",
+        clientIdempotencyKey: "no-phone-idem",
+      },
+      client as never
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      status: 404,
+      code: "NO_REVEALABLE_PHONE",
+      error: "Phone reveal is unavailable right now.",
+    });
+    expect(client.contactConsumption.count).not.toHaveBeenCalled();
+    expect(client.contactConsumption.create).not.toHaveBeenCalled();
+  });
+
+  it("returns a paywall response only after phone delivery is verified", async () => {
     process.env.ENABLE_CONTACT_PAYWALL = "true";
     process.env.ENABLE_CONTACT_PAYWALL_ENFORCEMENT = "true";
     const client = buildClient();
@@ -235,6 +270,12 @@ describe("revealHostPhoneForListing", () => {
       unitIdentityEpoch: 1,
     });
     client.blockedUser.findFirst.mockResolvedValue(null);
+    client.$queryRaw.mockResolvedValue([
+      {
+        phoneE164Ciphertext: encryptPhoneForReveal("+15551234567", key),
+        phoneE164Last4: "4567",
+      },
+    ]);
     client.contactConsumption.count.mockResolvedValue(2);
 
     const result = await revealHostPhoneForListing(
@@ -252,7 +293,11 @@ describe("revealHostPhoneForListing", () => {
       code: "PAYWALL_REQUIRED",
       error: "Unlock contact to message this host.",
     });
-    expect(client.$queryRaw).not.toHaveBeenCalled();
+    expect(client.$queryRaw).toHaveBeenCalled();
+    expect(client.contactConsumption.create).not.toHaveBeenCalled();
+    expect(client.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      client.contactConsumption.count.mock.invocationCallOrder[0]
+    );
     expect(client.$executeRaw).toHaveBeenCalled();
   });
 });

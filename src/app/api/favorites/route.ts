@@ -6,6 +6,7 @@ import { withRateLimit } from "@/lib/with-rate-limit";
 import { captureApiError } from "@/lib/api-error-handler";
 import { validateCsrf } from "@/lib/csrf";
 import { z } from "zod";
+import { checkSuspension } from "@/app/actions/suspension";
 
 // P2-4: Zod schema for request validation
 const toggleFavoriteSchema = z.object({
@@ -84,6 +85,14 @@ export async function POST(request: Request) {
     const session = await auth();
     if (!session || !session.user || !session.user.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const suspension = await checkSuspension(session.user.id);
+    if (suspension.suspended) {
+      return NextResponse.json(
+        { error: suspension.error || "Account suspended" },
+        { status: 403 }
+      );
     }
 
     let body;

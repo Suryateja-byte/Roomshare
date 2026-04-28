@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/daily-maintenance",
-      "schedule": "2 7 * * *"
+      "schedule": "2,17,32,47 * * * *"
     }
   ]
 }

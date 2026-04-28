@@ -2,6 +2,7 @@ import "server-only";
 
 import type {
   ContactConsumptionSource,
+  ContactKind,
   ContactRestorationReason,
   ContactRestorationState,
 } from "@prisma/client";
@@ -99,6 +100,7 @@ async function loadCandidateConsumptions(input: {
     select: {
       id: true,
       userId: true,
+      contactKind: true,
       listingId: true,
       conversationId: true,
       source: true,
@@ -135,6 +137,7 @@ async function loadListings(listingIds: string[]) {
 async function applyContactRestoration(input: {
   contactConsumptionId: string;
   userId: string;
+  contactKind: ContactKind;
   reason: ContactRestorationReason;
   details: Record<string, string | number | boolean | null>;
 }) {
@@ -175,7 +178,7 @@ async function applyContactRestoration(input: {
       });
 
       if (features.entitlementState) {
-        await recomputeEntitlementState(tx, input.userId);
+        await recomputeEntitlementState(tx, input.userId, input.contactKind);
       }
 
       return true;
@@ -251,6 +254,7 @@ export async function restoreConsumptionsForHostBounce(input: {
     const result = await applyContactRestoration({
       contactConsumptionId: candidate.id,
       userId: candidate.userId,
+      contactKind: candidate.contactKind,
       reason: "HOST_BOUNCE",
       details: {
         listingId: candidate.listingId,
@@ -275,6 +279,7 @@ export async function restoreContactConsumptionBySupport(input: {
     select: {
       id: true,
       userId: true,
+      contactKind: true,
       listingId: true,
       source: true,
       restorationState: true,
@@ -292,6 +297,7 @@ export async function restoreContactConsumptionBySupport(input: {
   const result = await applyContactRestoration({
     contactConsumptionId: consumption.id,
     userId: consumption.userId,
+    contactKind: consumption.contactKind,
     reason: "SUPPORT",
     details: {
       listingId: consumption.listingId,
@@ -324,6 +330,7 @@ export async function restoreConsumptionsForHostBan(hostUserId: string) {
     const result = await applyContactRestoration({
       contactConsumptionId: candidate.id,
       userId: candidate.userId,
+      contactKind: candidate.contactKind,
       reason: "HOST_BAN",
       details: {
         hostUserId,
@@ -416,6 +423,7 @@ export async function runGhostSlaRestoration() {
     const result = await applyContactRestoration({
       contactConsumptionId: candidate.id,
       userId: candidate.userId,
+      contactKind: candidate.contactKind,
       reason: "HOST_GHOST_SLA",
       details: {
         listingId: candidate.listingId,
@@ -504,6 +512,7 @@ export async function runMassDeactivationRestoration() {
     const result = await applyContactRestoration({
       contactConsumptionId: candidate.id,
       userId: candidate.userId,
+      contactKind: candidate.contactKind,
       reason: "HOST_MASS_DEACTIVATED",
       details: {
         listingId: candidate.listingId,

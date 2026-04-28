@@ -127,9 +127,9 @@ export default function SettingsClient({
     setShowPasswordModal(true);
   };
 
-  const handleDeleteAccount = async () => {
+  const handleDeleteAccount = async (password?: string) => {
     setDeleting(true);
-    const result = await deleteAccount();
+    const result = await deleteAccount(password);
 
     if (result.success) {
       await signOut({ callbackUrl: "/" });
@@ -418,7 +418,7 @@ export default function SettingsClient({
                 Delete Account
               </h2>
               <p className="text-sm text-on-surface-variant">
-                Permanently delete your account and all data
+                Delete your account and remove personal access
               </p>
             </div>
           </div>
@@ -427,9 +427,9 @@ export default function SettingsClient({
           {!showDeleteConfirm ? (
             <div>
               <p className="text-sm text-on-surface-variant mb-4">
-                Once you delete your account, there is no going back. All your
-                listings, messages, bookings, and reviews will be permanently
-                removed.
+                Once you delete your account, there is no going back. Your
+                sign-in access and personal profile data will be removed; safety,
+                fraud, and legal records may be retained when required.
               </p>
               <Button
                 variant="destructive"
@@ -447,8 +447,9 @@ export default function SettingsClient({
                     This action cannot be undone
                   </p>
                   <p className="text-sm text-red-700 mt-1">
-                    This will permanently delete your account ({userEmail}) and
-                    all associated data.
+                    This will delete your account ({userEmail}) and remove
+                    personal access. Some safety, fraud, and legal records may be
+                    retained when required.
                   </p>
                 </div>
               </div>
@@ -498,7 +499,7 @@ export default function SettingsClient({
         onClose={() => setShowPasswordModal(false)}
         onConfirm={handleDeleteAccount}
         title="Delete Account"
-        description="This action will permanently delete your account and all associated data. This cannot be undone."
+        description="This action will delete your account and remove personal access. Safety, fraud, and legal records may be retained when required. This cannot be undone."
         confirmText="Delete My Account"
         confirmVariant="destructive"
         hasPassword={hasPassword}

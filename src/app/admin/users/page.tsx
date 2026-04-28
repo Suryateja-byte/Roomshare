@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import Link from "next/link";
 import { ArrowLeft, Users } from "lucide-react";
 import UserList from "./UserList";
@@ -10,7 +11,28 @@ export const metadata = {
   description: "Manage users on the RoomShare platform",
 };
 
-export default async function AdminUsersPage() {
+const PAGE_SIZE = 50;
+const USER_FILTERS = ["all", "verified", "admin", "suspended"] as const;
+type UserFilter = (typeof USER_FILTERS)[number];
+
+type AdminUsersPageProps = {
+  searchParams: Promise<{ q?: string; filter?: string; page?: string }>;
+};
+
+function parsePage(value: string | undefined) {
+  const page = Number(value);
+  return Number.isInteger(page) && page > 0 ? page : 1;
+}
+
+function parseFilter(value: string | undefined): UserFilter {
+  return USER_FILTERS.includes(value as UserFilter)
+    ? (value as UserFilter)
+    : "all";
+}
+
+export default async function AdminUsersPage({
+  searchParams,
+}: AdminUsersPageProps) {
   const session = await auth();
 
   if (!session?.user?.id) {
@@ -27,30 +49,49 @@ export default async function AdminUsersPage() {
     redirect("/");
   }
 
-  // Fetch all users
-  const [users, totalUsers] = await Promise.all([
-    prisma.user.findMany({
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        image: true,
-        isVerified: true,
-        isAdmin: true,
-        isSuspended: true,
-        emailVerified: true,
-        _count: {
-          select: {
-            listings: true,
-            reviewsWritten: true,
-          },
+  const params = await searchParams;
+  const searchQuery = (params.q || "").trim().slice(0, 100);
+  const currentFilter = parseFilter(params.filter);
+  const requestedPage = parsePage(params.page);
+  const where: Prisma.UserWhereInput = {};
+
+  if (searchQuery) {
+    where.OR = [
+      { name: { contains: searchQuery, mode: "insensitive" } },
+      { email: { contains: searchQuery, mode: "insensitive" } },
+    ];
+  }
+
+  if (currentFilter === "verified") where.isVerified = true;
+  if (currentFilter === "admin") where.isAdmin = true;
+  if (currentFilter === "suspended") where.isSuspended = true;
+
+  const totalUsers = await prisma.user.count({ where });
+  const totalPages = Math.max(1, Math.ceil(totalUsers / PAGE_SIZE));
+  const currentPage = Math.min(requestedPage, totalPages);
+
+  const users = await prisma.user.findMany({
+    where,
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      image: true,
+      isVerified: true,
+      isAdmin: true,
+      isSuspended: true,
+      emailVerified: true,
+      _count: {
+        select: {
+          listings: true,
+          reviewsWritten: true,
         },
       },
-      orderBy: { email: "asc" },
-      take: 100, // Limit for initial load
-    }),
-    prisma.user.count(),
-  ]);
+    },
+    orderBy: { email: "asc" },
+    skip: (currentPage - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
+  });
 
   return (
     <div className="min-h-screen bg-surface-canvas">
@@ -84,6 +125,10 @@ export default async function AdminUsersPage() {
           initialUsers={users}
           totalUsers={totalUsers}
           currentUserId={session.user.id}
+          searchQuery={searchQuery}
+          currentFilter={currentFilter}
+          currentPage={currentPage}
+          totalPages={totalPages}
         />
       </div>
     </div>

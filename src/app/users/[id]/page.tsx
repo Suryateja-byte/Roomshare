@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import UserProfileClient from "./UserProfileClient";
 import { getAverageRating } from "@/lib/data";
+import { resolvePublicListingVisibilityState } from "@/lib/listings/public-contact-contract";
 
 export async function generateMetadata({
   params,
@@ -80,6 +81,13 @@ export default async function UserProfilePage({
             availableSlots: true,
             images: true,
             status: true,
+            statusReason: true,
+            openSlots: true,
+            totalSlots: true,
+            moveInDate: true,
+            availableUntil: true,
+            minStayMonths: true,
+            lastConfirmedAt: true,
             createdAt: true,
             location: {
               select: { city: true, state: true },
@@ -113,9 +121,24 @@ export default async function UserProfilePage({
   const isOwnProfile = currentUserId === id;
 
   // Convert Prisma Decimal price fields to plain numbers at the query boundary
+  const visibleListings = isOwnProfile
+    ? user.listings
+    : user.listings.filter(
+        (listing) =>
+          resolvePublicListingVisibilityState(listing).isPubliclyVisible
+      );
+
   const userWithNumberPrices = {
     ...user,
-    listings: user.listings.map((l) => ({ ...l, price: Number(l.price) })),
+    listings: visibleListings.map((l) => ({
+      id: l.id,
+      title: l.title,
+      description: l.description,
+      price: Number(l.price),
+      availableSlots: l.availableSlots,
+      images: l.images,
+      location: l.location,
+    })),
   };
 
   return (

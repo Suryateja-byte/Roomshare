@@ -24,8 +24,9 @@ interface VerificationRequest {
   id: string;
   userId: string;
   documentType: string;
-  documentUrl: string;
-  selfieUrl: string | null;
+  hasDocument: boolean;
+  hasSelfie: boolean;
+  canApprove: boolean;
   status: "PENDING" | "APPROVED" | "REJECTED";
   adminNotes: string | null;
   createdAt: Date;
@@ -78,9 +79,12 @@ export default function VerificationList({
               : r
           )
         );
+      } else if (result.error) {
+        toast.error(result.error);
       }
     } catch (error) {
       console.error("Error approving:", error);
+      toast.error("Failed to approve verification");
     } finally {
       setProcessingId(null);
     }
@@ -110,9 +114,12 @@ export default function VerificationList({
         );
         setRejectingId(null);
         setRejectReason("");
+      } else if (result.error) {
+        toast.error(result.error);
       }
     } catch (error) {
       console.error("Error rejecting:", error);
+      toast.error("Failed to reject verification");
     } finally {
       setProcessingId(null);
     }
@@ -215,17 +222,23 @@ export default function VerificationList({
                     </span>
                   </div>
                   <div className="flex gap-4 text-sm">
-                    <a
-                      href={request.documentUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-blue-600 hover:underline"
-                    >
-                      View Document <ExternalLink className="w-3 h-3" />
-                    </a>
-                    {request.selfieUrl && (
+                    {request.hasDocument ? (
                       <a
-                        href={request.selfieUrl}
+                        href={`/api/admin/verifications/${request.id}/documents/document`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-blue-600 hover:underline"
+                      >
+                        View Document <ExternalLink className="w-3 h-3" />
+                      </a>
+                    ) : (
+                      <span className="text-on-surface-variant">
+                        Document unavailable
+                      </span>
+                    )}
+                    {request.hasSelfie && (
+                      <a
+                        href={`/api/admin/verifications/${request.id}/documents/selfie`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1 text-blue-600 hover:underline"
@@ -285,7 +298,14 @@ export default function VerificationList({
                       <>
                         <button
                           onClick={() => handleApprove(request.id)}
-                          disabled={processingId === request.id}
+                          disabled={
+                            processingId === request.id || !request.canApprove
+                          }
+                          title={
+                            request.canApprove
+                              ? undefined
+                              : "Document unavailable or expired"
+                          }
                           className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-60"
                         >
                           {processingId === request.id ? (

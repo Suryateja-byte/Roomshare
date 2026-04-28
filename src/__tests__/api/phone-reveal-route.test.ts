@@ -30,6 +30,8 @@ const mockAuth = jest.fn();
 const mockCheckRateLimit = jest.fn();
 const mockGetClientIPFromHeaders = jest.fn();
 const mockRevealHostPhoneForListing = jest.fn();
+const mockCheckSuspension = jest.fn();
+const mockCheckEmailVerified = jest.fn();
 
 jest.mock("@/auth", () => ({
   auth: () => mockAuth(),
@@ -49,6 +51,15 @@ jest.mock("@/lib/contact/phone-reveal", () => ({
     mockRevealHostPhoneForListing(...args),
 }));
 
+jest.mock("@/lib/csrf", () => ({
+  validateCsrf: jest.fn(() => null),
+}));
+
+jest.mock("@/app/actions/suspension", () => ({
+  checkSuspension: (...args: unknown[]) => mockCheckSuspension(...args),
+  checkEmailVerified: (...args: unknown[]) => mockCheckEmailVerified(...args),
+}));
+
 import { POST } from "@/app/api/phone-reveal/route";
 
 describe("POST /api/phone-reveal", () => {
@@ -64,6 +75,8 @@ describe("POST /api/phone-reveal", () => {
     mockAuth.mockResolvedValue({ user: { id: "renter-1" } });
     mockGetClientIPFromHeaders.mockReturnValue("127.0.0.1");
     mockCheckRateLimit.mockResolvedValue({ success: true });
+    mockCheckSuspension.mockResolvedValue({ suspended: false });
+    mockCheckEmailVerified.mockResolvedValue({ verified: true });
     mockRevealHostPhoneForListing.mockResolvedValue({
       ok: true,
       phoneNumber: "+15551234567",
@@ -94,6 +107,40 @@ describe("POST /api/phone-reveal", () => {
     expect(payload).toEqual({
       error: "Phone reveal is unavailable right now.",
       code: "RATE_LIMITED",
+    });
+    expect(mockRevealHostPhoneForListing).not.toHaveBeenCalled();
+  });
+
+  it("blocks suspended viewers before reveal", async () => {
+    mockCheckSuspension.mockResolvedValueOnce({
+      suspended: true,
+      error: "Account suspended",
+    });
+
+    const response = await POST(request({ listingId: "listing-1" }) as never);
+    const payload = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(payload).toEqual({
+      error: "Account suspended",
+      code: "ACCOUNT_SUSPENDED",
+    });
+    expect(mockRevealHostPhoneForListing).not.toHaveBeenCalled();
+  });
+
+  it("blocks unverified viewers before reveal", async () => {
+    mockCheckEmailVerified.mockResolvedValueOnce({
+      verified: false,
+      error: "Please verify your email to continue",
+    });
+
+    const response = await POST(request({ listingId: "listing-1" }) as never);
+    const payload = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(payload).toEqual({
+      error: "Please verify your email to continue",
+      code: "EMAIL_VERIFICATION_REQUIRED",
     });
     expect(mockRevealHostPhoneForListing).not.toHaveBeenCalled();
   });

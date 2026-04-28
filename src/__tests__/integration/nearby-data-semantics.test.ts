@@ -124,7 +124,7 @@ describe("Nearby Places - Data Semantics", () => {
         createRequest({
           listingLat: 37.7749,
           listingLng: -122.4194,
-          categories: ["pharmacy", "fitness"],
+          categories: ["pharmacy", "gym"],
           radiusMeters: 1609,
         })
       );
@@ -150,14 +150,14 @@ describe("Nearby Places - Data Semantics", () => {
               _id: "place-dup",
               name: "Duplicate Store",
               formattedAddress: "123 Main St",
-              categories: ["grocery"],
+              categories: ["food-grocery"],
               location: { coordinates: [-122.4194, 37.7749] },
             },
             {
               _id: "place-dup", // Same ID
               name: "Duplicate Store",
               formattedAddress: "123 Main St",
-              categories: ["grocery"],
+              categories: ["food-grocery"],
               location: { coordinates: [-122.4194, 37.7749] },
             },
           ],

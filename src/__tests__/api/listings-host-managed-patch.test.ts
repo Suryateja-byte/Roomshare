@@ -68,6 +68,15 @@ jest.mock("@/lib/embeddings/sync", () => ({
   syncListingEmbedding: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock("@/lib/listings/canonical-inventory", () => ({
+  syncCanonicalListingInventory: jest.fn().mockResolvedValue({
+    unitId: "unit-456",
+    inventoryId: "listing-abc",
+    publishStatus: "PENDING_PROJECTION",
+    sourceVersion: BigInt(4),
+  }),
+}));
+
 jest.mock("@supabase/supabase-js", () => ({
   createClient: jest.fn(() => ({
     storage: {
@@ -100,7 +109,10 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "test-key";
 import { PATCH } from "@/app/api/listings/[id]/route";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { geocodeAddress } from "@/lib/geocoding";
+import { syncCanonicalListingInventory } from "@/lib/listings/canonical-inventory";
 import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
+import { createClient } from "@supabase/supabase-js";
 
 const ownerSession = {
   user: { id: "owner-123", email: "owner@example.com", isSuspended: false },
@@ -136,19 +148,16 @@ const listing = {
 
 function validPatchPayload(overrides: Record<string, unknown> = {}) {
   return {
+    expectedVersion: 3,
     title: "Updated Title",
     description: "Updated description",
     price: 1200,
     amenities: ["Wifi"],
     houseRules: [],
-    totalSlots: 2,
     address: "123 Main St",
     city: "San Francisco",
     state: "CA",
     zip: "94102",
-    moveInDate: "2026-05-01",
-    availableUntil: "2026-08-01",
-    minStayMonths: 1,
     leaseDuration: null,
     roomType: null,
     householdLanguages: [],
@@ -166,6 +175,8 @@ function lockedListing(overrides: Record<string, unknown> = {}) {
     version: 3,
     status: "ACTIVE",
     statusReason: null,
+    normalizedAddress: "123 main st san francisco ca 94102",
+    physicalUnitId: null,
     openSlots: 2,
     availableSlots: 2,
     totalSlots: 2,
@@ -213,6 +224,12 @@ describe("PATCH /api/listings/[id] contact-first availability contract", () => {
     delete process.env.FEATURE_MODERATION_WRITE_LOCKS;
     (auth as jest.Mock).mockResolvedValue(ownerSession);
     (prisma.listing.findUnique as jest.Mock).mockResolvedValue(listing);
+    (syncCanonicalListingInventory as jest.Mock).mockResolvedValue({
+      unitId: "unit-456",
+      inventoryId: "listing-abc",
+      publishStatus: "PENDING_PROJECTION",
+      sourceVersion: BigInt(4),
+    });
   });
 
   afterEach(() => {
@@ -223,7 +240,7 @@ describe("PATCH /api/listings/[id] contact-first availability contract", () => {
     }
   });
 
-  it("allows non-availability profile edits through the generic listing PATCH path", async () => {
+  it("allows non-availability profile edits without mutating availability fields", async () => {
     const { update } = mockTransaction();
 
     const response = await PATCH(
@@ -240,7 +257,63 @@ describe("PATCH /api/listings/[id] contact-first availability contract", () => {
         where: { id: "listing-abc" },
         data: expect.objectContaining({
           title: "Updated Title",
+          version: 4,
+        }),
+      })
+    );
+    expect(update.mock.calls[0][0].data).not.toHaveProperty("totalSlots");
+    expect(update.mock.calls[0][0].data).not.toHaveProperty("availableSlots");
+    expect(update.mock.calls[0][0].data).not.toHaveProperty("openSlots");
+    expect(markListingDirtyInTx).toHaveBeenCalledWith(
+      expect.any(Object),
+      "listing-abc",
+      "listing_updated"
+    );
+    expect(syncCanonicalListingInventory).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        listing: expect.objectContaining({ id: "listing-abc" }),
+        address: {
+          address: "123 Main St",
+          city: "San Francisco",
+          state: "CA",
+          zip: "94102",
+        },
+        actor: { role: "host", id: "owner-123" },
+      })
+    );
+  });
+
+  it("allows host-managed availability edits through the availability contract", async () => {
+    const { update } = mockTransaction();
+
+    const response = await PATCH(
+      new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify({
+          expectedVersion: 3,
+          openSlots: 1,
           totalSlots: 2,
+          moveInDate: "2026-05-01",
+          availableUntil: "2026-09-01",
+          minStayMonths: 2,
+          status: "ACTIVE",
+        }),
+      }),
+      { params: Promise.resolve({ id: "listing-abc" }) }
+    );
+
+    expect(response.status).toBe(200);
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "listing-abc" },
+        data: expect.objectContaining({
+          openSlots: 1,
+          availableSlots: 1,
+          totalSlots: 2,
+          minStayMonths: 2,
+          status: "ACTIVE",
+          version: 4,
         }),
       })
     );
@@ -251,28 +324,82 @@ describe("PATCH /api/listings/[id] contact-first availability contract", () => {
     );
   });
 
-  it("rejects availability edits so they stay on the contact-first inventory editor", async () => {
+  it("rejects overflow move-in dates before mutating availability", async () => {
     const { update } = mockTransaction();
 
     const response = await PATCH(
       new Request("http://localhost/api/listings/listing-abc", {
         method: "PATCH",
-        body: JSON.stringify(
-          validPatchPayload({
-            totalSlots: 3,
-            availableUntil: "2026-09-01",
-            minStayMonths: 2,
-          })
-        ),
+        body: JSON.stringify({
+          expectedVersion: 3,
+          openSlots: 1,
+          totalSlots: 2,
+          moveInDate: "2026-02-31",
+          availableUntil: "2026-09-01",
+          minStayMonths: 2,
+          status: "ACTIVE",
+        }),
+      }),
+      { params: Promise.resolve({ id: "listing-abc" }) }
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "Validation failed",
+      fields: { moveInDate: ["Invalid calendar date"] },
+    });
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("rejects overflow available-until dates before mutating availability", async () => {
+    const { update } = mockTransaction();
+
+    const response = await PATCH(
+      new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify({
+          expectedVersion: 3,
+          openSlots: 1,
+          totalSlots: 2,
+          moveInDate: "2026-05-01",
+          availableUntil: "2026-09-31",
+          minStayMonths: 2,
+          status: "ACTIVE",
+        }),
+      }),
+      { params: Promise.resolve({ id: "listing-abc" }) }
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "Validation failed",
+      fields: { availableUntil: ["Invalid calendar date"] },
+    });
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("returns VERSION_CONFLICT when the expected version is stale", async () => {
+    const { update } = mockTransaction();
+
+    const response = await PATCH(
+      new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify({
+          expectedVersion: 2,
+          openSlots: 1,
+          totalSlots: 2,
+          moveInDate: "2026-05-01",
+          availableUntil: "2026-09-01",
+          minStayMonths: 2,
+          status: "ACTIVE",
+        }),
       }),
       { params: Promise.resolve({ id: "listing-abc" }) }
     );
 
     expect(response.status).toBe(409);
-    await expect(response.json()).resolves.toEqual({
-      error:
-        "Availability is managed by the contact-first inventory editor. Reload and use the availability editor.",
-      code: "HOST_MANAGED_WRITE_PATH_REQUIRED",
+    await expect(response.json()).resolves.toMatchObject({
+      code: "VERSION_CONFLICT",
     });
     expect(update).not.toHaveBeenCalled();
   });
@@ -297,5 +424,229 @@ describe("PATCH /api/listings/[id] contact-first availability contract", () => {
       lockReason: "ADMIN_PAUSED",
     });
     expect(update).not.toHaveBeenCalled();
+  });
+
+  it("always blocks suppressed generic edits before version checks and image cleanup", async () => {
+    (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
+      ...listing,
+      images: [
+        "https://test.supabase.co/storage/v1/object/public/images/listings/original.jpg",
+      ],
+    });
+    const { update } = mockTransaction({
+      lockedRows: [
+        lockedListing({
+          status: "PAUSED",
+          statusReason: "SUPPRESSED",
+          version: 9,
+        }),
+      ],
+    });
+
+    const response = await PATCH(
+      new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify(
+          validPatchPayload({
+            expectedVersion: 3,
+            images: [],
+          })
+        ),
+      }),
+      { params: Promise.resolve({ id: "listing-abc" }) }
+    );
+
+    expect(response.status).toBe(423);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "LISTING_LOCKED",
+      lockReason: "SUPPRESSED",
+    });
+    expect(update).not.toHaveBeenCalled();
+    expect(markListingDirtyInTx).not.toHaveBeenCalled();
+    expect(createClient).not.toHaveBeenCalled();
+  });
+
+  it("keeps admin-paused generic edits feature-gated when locks are disabled", async () => {
+    const { update } = mockTransaction({
+      lockedRows: [lockedListing({ statusReason: "ADMIN_PAUSED" })],
+    });
+
+    const response = await PATCH(
+      new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify(validPatchPayload()),
+      }),
+      { params: Promise.resolve({ id: "listing-abc" }) }
+    );
+
+    expect(response.status).toBe(200);
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "listing-abc" },
+        data: expect.objectContaining({
+          title: "Updated Title",
+          version: 4,
+        }),
+      })
+    );
+  });
+
+  it("always blocks suppressed availability edits before version checks", async () => {
+    const { update } = mockTransaction({
+      lockedRows: [
+        lockedListing({
+          status: "PAUSED",
+          statusReason: "SUPPRESSED",
+          version: 9,
+        }),
+      ],
+    });
+
+    const response = await PATCH(
+      new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify({
+          expectedVersion: 3,
+          openSlots: 1,
+          totalSlots: 2,
+          moveInDate: "2026-05-01",
+          availableUntil: "2026-09-01",
+          minStayMonths: 2,
+          status: "ACTIVE",
+        }),
+      }),
+      { params: Promise.resolve({ id: "listing-abc" }) }
+    );
+
+    expect(response.status).toBe(423);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "LISTING_LOCKED",
+      lockReason: "SUPPRESSED",
+    });
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("refreshes normalized address and physical unit linkage on address edits", async () => {
+    (geocodeAddress as jest.Mock).mockResolvedValue({
+      status: "ok",
+      lat: 37.781,
+      lng: -122.412,
+    });
+    const { update, locationUpdate, executeRaw } = mockTransaction({
+      lockedRows: [
+        lockedListing({
+          normalizedAddress: "123 main st san francisco ca 94102",
+          physicalUnitId: "unit-123",
+        }),
+      ],
+    });
+
+    const response = await PATCH(
+      new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify(
+          validPatchPayload({
+            address: "456 Oak Ave",
+            city: "San Francisco",
+            state: "CA",
+            zip: "94103",
+          })
+        ),
+      }),
+      { params: Promise.resolve({ id: "listing-abc" }) }
+    );
+
+    expect(response.status).toBe(200);
+    expect(syncCanonicalListingInventory).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        address: {
+          address: "456 Oak Ave",
+          city: "San Francisco",
+          state: "CA",
+          zip: "94103",
+        },
+        actor: { role: "host", id: "owner-123" },
+      })
+    );
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "listing-abc" },
+        data: expect.objectContaining({
+          normalizedAddress: "456 oak ave san francisco ca 94103",
+          version: 4,
+        }),
+      })
+    );
+    expect(locationUpdate).toHaveBeenCalledWith({
+      where: { id: "loc-123" },
+      data: {
+        address: "456 Oak Ave",
+        city: "San Francisco",
+        state: "CA",
+        zip: "94103",
+      },
+    });
+    expect(executeRaw).toHaveBeenCalled();
+    expect(markListingDirtyInTx).toHaveBeenCalledWith(
+      expect.any(Object),
+      "listing-abc",
+      "listing_updated"
+    );
+  });
+
+  it("repairs canonical unit linkage when no physical unit exists", async () => {
+    (geocodeAddress as jest.Mock).mockResolvedValue({
+      status: "ok",
+      lat: 37.781,
+      lng: -122.412,
+    });
+    const { update } = mockTransaction({
+      lockedRows: [
+        lockedListing({
+          normalizedAddress: "123 main st san francisco ca 94102",
+          physicalUnitId: null,
+        }),
+      ],
+    });
+
+    const response = await PATCH(
+      new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify(
+          validPatchPayload({
+            address: "456 Oak Ave",
+            city: "San Francisco",
+            state: "CA",
+            zip: "94103",
+          })
+        ),
+      }),
+      { params: Promise.resolve({ id: "listing-abc" }) }
+    );
+
+    expect(response.status).toBe(200);
+    expect(syncCanonicalListingInventory).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        address: {
+          address: "456 Oak Ave",
+          city: "San Francisco",
+          state: "CA",
+          zip: "94103",
+        },
+        actor: { role: "host", id: "owner-123" },
+      })
+    );
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "listing-abc" },
+        data: expect.objectContaining({
+          normalizedAddress: "456 oak ave san francisco ca 94103",
+          version: 4,
+        }),
+      })
+    );
+    expect(update.mock.calls[0][0].data).not.toHaveProperty("physicalUnitId");
   });
 });

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { toggleUserAdmin, suspendUser } from "@/app/actions/admin";
 import UserAvatar from "@/components/UserAvatar";
+import Link from "next/link";
 import {
   Shield,
   ShieldOff,
@@ -36,20 +37,53 @@ interface UserListProps {
   initialUsers: User[];
   totalUsers: number;
   currentUserId: string;
+  searchQuery: string;
+  currentFilter: "all" | "verified" | "admin" | "suspended";
+  currentPage: number;
+  totalPages: number;
+}
+
+function userMatchesFilter(user: User, filter: UserListProps["currentFilter"]) {
+  if (filter === "verified") return user.isVerified;
+  if (filter === "admin") return user.isAdmin;
+  if (filter === "suspended") return user.isSuspended;
+  return true;
 }
 
 export default function UserList({
   initialUsers,
   totalUsers,
   currentUserId,
+  searchQuery,
+  currentFilter,
+  currentPage,
+  totalPages,
 }: UserListProps) {
   const [users, setUsers] = useState(initialUsers);
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<
-    "all" | "verified" | "admin" | "suspended"
-  >("all");
+  const [search, setSearch] = useState(searchQuery);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setUsers(initialUsers);
+    setSearch(searchQuery);
+  }, [initialUsers, searchQuery]);
+
+  const buildHref = (overrides: {
+    q?: string;
+    filter?: "all" | "verified" | "admin" | "suspended";
+    page?: number;
+  }) => {
+    const nextQuery = overrides.q ?? searchQuery;
+    const nextFilter = overrides.filter ?? currentFilter;
+    const nextPage = overrides.page ?? currentPage;
+    const params = new URLSearchParams();
+    if (nextQuery.trim()) params.set("q", nextQuery.trim());
+    if (nextFilter !== "all") params.set("filter", nextFilter);
+    if (nextPage > 1) params.set("page", String(nextPage));
+    const queryString = params.toString();
+    return `/admin/users${queryString ? `?${queryString}` : ""}`;
+  };
 
   const handleToggleAdmin = async (userId: string) => {
     setProcessingId(userId);
@@ -57,9 +91,13 @@ export default function UserList({
       const result = await toggleUserAdmin(userId);
       if (result.success) {
         setUsers((prev) =>
-          prev.map((u) =>
-            u.id === userId ? { ...u, isAdmin: result.isAdmin! } : u
-          )
+          prev.flatMap((u) => {
+            if (u.id !== userId) return [u];
+            const updatedUser = { ...u, isAdmin: result.isAdmin! };
+            return userMatchesFilter(updatedUser, currentFilter)
+              ? [updatedUser]
+              : [];
+          })
         );
       } else if (result.error) {
         toast.error(result.error);
@@ -78,9 +116,13 @@ export default function UserList({
       const result = await suspendUser(userId, suspend);
       if (result.success) {
         setUsers((prev) =>
-          prev.map((u) =>
-            u.id === userId ? { ...u, isSuspended: suspend } : u
-          )
+          prev.flatMap((u) => {
+            if (u.id !== userId) return [u];
+            const updatedUser = { ...u, isSuspended: suspend };
+            return userMatchesFilter(updatedUser, currentFilter)
+              ? [updatedUser]
+              : [];
+          })
         );
       } else if (result.error) {
         toast.error(result.error);
@@ -93,33 +135,21 @@ export default function UserList({
     }
   };
 
-  const filteredUsers = users.filter((user) => {
-    // Search filter
-    if (search) {
-      const searchLower = search.toLowerCase();
-      if (
-        !user.name?.toLowerCase().includes(searchLower) &&
-        !user.email?.toLowerCase().includes(searchLower)
-      ) {
-        return false;
-      }
-    }
-
-    // Status filter
-    if (filter === "verified") return user.isVerified;
-    if (filter === "admin") return user.isAdmin;
-    if (filter === "suspended") return user.isSuspended;
-    return true;
-  });
-
   return (
     <div>
       {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
+      <form
+        action="/admin/users"
+        className="flex flex-col sm:flex-row gap-4 mb-6"
+      >
+        {currentFilter !== "all" && (
+          <input type="hidden" name="filter" value={currentFilter} />
+        )}
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
           <input
             type="text"
+            name="q"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name or email..."
@@ -127,37 +157,43 @@ export default function UserList({
             className="w-full pl-10 pr-4 py-2 border border-outline-variant/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
         </div>
+        <button
+          type="submit"
+          className="px-4 py-2 bg-on-surface text-white rounded-lg font-medium text-sm hover:bg-on-surface/90"
+        >
+          Search
+        </button>
         <div className="flex gap-2">
           {(["all", "verified", "admin", "suspended"] as const).map((f) => (
-            <button
+            <Link
               key={f}
-              onClick={() => setFilter(f)}
+              href={buildHref({ filter: f, page: 1 })}
               className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors capitalize ${
-                filter === f
+                currentFilter === f
                   ? "bg-on-surface text-white"
                   : "bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-high/50 border border-outline-variant/20"
               }`}
             >
               {f}
-            </button>
+            </Link>
           ))}
         </div>
-      </div>
+      </form>
 
       {/* Stats */}
       <div className="mb-4 text-sm text-on-surface-variant">
-        Showing {filteredUsers.length} of {totalUsers} users
+        Showing {users.length} of {totalUsers} users
       </div>
 
       {/* Users List */}
       <div className="bg-surface-container-lowest rounded-lg shadow-ambient-sm overflow-hidden">
-        {filteredUsers.length === 0 ? (
+        {users.length === 0 ? (
           <div className="p-12 text-center text-on-surface-variant">
             No users found matching your criteria
           </div>
         ) : (
           <div className="space-y-px">
-            {filteredUsers.map((user) => (
+            {users.map((user) => (
               <div
                 key={user.id}
                 className={`p-4 flex items-center justify-between hover:bg-surface-container-high/50 ${
@@ -259,6 +295,34 @@ export default function UserList({
           </div>
         )}
       </div>
+
+      {totalPages > 1 && (
+        <div className="mt-6 flex items-center justify-between">
+          <Link
+            href={buildHref({ page: Math.max(1, currentPage - 1) })}
+            className={`px-4 py-2 rounded-lg border border-outline-variant/20 text-sm ${
+              currentPage <= 1
+                ? "pointer-events-none opacity-50"
+                : "hover:bg-surface-container-high"
+            }`}
+          >
+            Previous
+          </Link>
+          <span className="text-sm text-on-surface-variant">
+            Page {currentPage} of {totalPages}
+          </span>
+          <Link
+            href={buildHref({ page: Math.min(totalPages, currentPage + 1) })}
+            className={`px-4 py-2 rounded-lg border border-outline-variant/20 text-sm ${
+              currentPage >= totalPages
+                ? "pointer-events-none opacity-50"
+                : "hover:bg-surface-container-high"
+            }`}
+          >
+            Next
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

@@ -58,6 +58,38 @@ describe("V2MapDataSetter source does NOT pass dataVersion", () => {
   });
 });
 
+describe("SSR v2 snapshot map hydration contract", () => {
+  it("requests map data when SSR will inject V2MapDataSetter", () => {
+    const fs = require("fs");
+    const path = require("path");
+    const source = fs.readFileSync(
+      path.resolve(__dirname, "../../app/search/page.tsx"),
+      "utf-8"
+    );
+
+    expect(source).toMatch(/includeMap:\s*features\.searchSnapshotContract/);
+    expect(source).toMatch(
+      /usedV2\s*&&\s*v2Response\s*&&\s*features\.searchSnapshotContract\s*\?/
+    );
+    expect(source).toMatch(/<V2MapDataSetter/);
+  });
+});
+
+describe("Search map drag prefetch contract", () => {
+  it("passes onMove in uncontrolled MapLibre mode", () => {
+    const fs = require("fs");
+    const path = require("path");
+    const source = fs.readFileSync(
+      path.resolve(__dirname, "../../components/Map.tsx"),
+      "utf-8"
+    );
+
+    expect(source).toMatch(
+      /:\s*\{\s*initialViewState,\s*onMove:\s*handleMove\s*\}/
+    );
+  });
+});
+
 // ── Issue B: Version guard rejects stale data ──
 
 describe("SearchV2DataContext version guard", () => {

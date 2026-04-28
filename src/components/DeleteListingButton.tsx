@@ -32,7 +32,16 @@ export default function DeleteListingButton({
     try {
       // Check if listing can be deleted
       const checkRes = await fetch(`/api/listings/${listingId}/can-delete`);
-      const { activeConversations } = await checkRes.json();
+      const checkPayload = await checkRes.json().catch(() => ({}));
+      if (!checkRes.ok) {
+        toast.error(
+          checkPayload.message ||
+            checkPayload.error ||
+            "Failed to check listing status"
+        );
+        return;
+      }
+      const { activeConversations } = checkPayload;
 
       const info: DeletionInfo = {
         activeConversations,
@@ -63,11 +72,15 @@ export default function DeleteListingButton({
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (password?: string) => {
     setIsDeleting(true);
     try {
       const response = await fetch(`/api/listings/${listingId}`, {
         method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(password ? { password } : {}),
       });
 
       if (response.ok) {

@@ -106,8 +106,8 @@ describe("search/transform", () => {
         title: "Test Listing",
         price: 1500,
         image: "image1.jpg",
-        lat: 37.7749,
-        lng: -122.4194,
+        lat: 37.77,
+        lng: -122.42,
         badges: undefined,
         availableSlots: 1,
         totalSlots: 1,
@@ -118,6 +118,24 @@ describe("search/transform", () => {
         groupSummary: null,
         groupContext: null,
       });
+    });
+
+    it("coarsens public list coordinates", () => {
+      const item = transformToListItem(
+        createListingData({
+          location: {
+            address: "123 Test St",
+            city: "San Francisco",
+            state: "CA",
+            zip: "94102",
+            lat: 37.77991,
+            lng: -122.41491,
+          },
+        })
+      );
+
+      expect(item.lat).toBe(37.78);
+      expect(item.lng).toBe(-122.41);
     });
 
     it("should use first image or null if no images", () => {
@@ -316,8 +334,8 @@ describe("search/transform", () => {
       const geojson = transformToGeoJSON(listings);
 
       const [lng, lat] = geojson.features[0].geometry.coordinates;
-      expect(lng).toBe(-122.4194); // longitude first
-      expect(lat).toBe(37.7749); // latitude second
+      expect(lng).toBe(-122.42); // longitude first
+      expect(lat).toBe(37.77); // latitude second
     });
 
     it("should include correct properties in features", () => {
@@ -350,6 +368,17 @@ describe("search/transform", () => {
           totalSlots: 2,
         })
       );
+    });
+
+    it("coarsens public GeoJSON coordinates", () => {
+      const geojson = transformToGeoJSON([
+        createMapListingData("1", 37.77991, -122.41491),
+      ]);
+
+      expect(geojson.features[0].geometry.coordinates).toEqual([
+        -122.41,
+        37.78,
+      ]);
     });
 
     it("should use null for image when no images", () => {
@@ -446,13 +475,24 @@ describe("search/transform", () => {
       expect(pins).toHaveLength(1);
       expect(pins[0]).toMatchObject({
         id: "1",
-        lat: 37.7749,
-        lng: -122.4194,
+        lat: 37.77,
+        lng: -122.42,
         price: 1500,
         publicAvailability: buildPublicAvailability({
           availableSlots: 1,
           totalSlots: 2,
         }),
+      });
+    });
+
+    it("coarsens public pin coordinates", () => {
+      const pins = transformToPins([
+        createMapListingData("1", 37.77991, -122.41491, 1500),
+      ]);
+
+      expect(pins[0]).toMatchObject({
+        lat: 37.78,
+        lng: -122.41,
       });
     });
 

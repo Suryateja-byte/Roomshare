@@ -8,6 +8,7 @@ import {
   Search,
   Loader2,
   Eye,
+  EyeOff,
   MapPin,
   DollarSign,
   Flag,
@@ -49,6 +50,10 @@ interface Listing {
 interface ListingListProps {
   initialListings: Listing[];
   totalListings: number;
+  searchQuery: string;
+  currentStatus: "all" | ListingStatus;
+  currentPage: number;
+  totalPages: number;
 }
 
 const statusConfig = {
@@ -68,19 +73,37 @@ const statusConfig = {
 export default function ListingList({
   initialListings,
   totalListings,
+  searchQuery,
+  currentStatus,
+  currentPage,
+  totalPages,
 }: ListingListProps) {
   const [listings, setListings] = useState(initialListings);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | ListingStatus>(
-    "all"
-  );
+  const [search, setSearch] = useState(searchQuery);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   useEffect(() => {
     setListings(initialListings);
-  }, [initialListings]);
+    setSearch(searchQuery);
+  }, [initialListings, searchQuery]);
+
+  const buildHref = (overrides: {
+    q?: string;
+    status?: "all" | ListingStatus;
+    page?: number;
+  }) => {
+    const nextQuery = overrides.q ?? searchQuery;
+    const nextStatus = overrides.status ?? currentStatus;
+    const nextPage = overrides.page ?? currentPage;
+    const params = new URLSearchParams();
+    if (nextQuery.trim()) params.set("q", nextQuery.trim());
+    if (nextStatus !== "all") params.set("status", nextStatus);
+    if (nextPage > 1) params.set("page", String(nextPage));
+    const queryString = params.toString();
+    return `/admin/listings${queryString ? `?${queryString}` : ""}`;
+  };
 
   const handleStatusChange = async (
     listingId: string,
@@ -96,18 +119,21 @@ export default function ListingList({
       );
       if (result.success) {
         setListings((prev) =>
-          prev.map((l) =>
-            l.id === listingId
-              ? {
-                  ...l,
-                  status: result.status ?? newStatus,
-                  version:
-                    typeof result.version === "number"
-                      ? result.version
-                      : l.version,
-                }
-              : l
-          )
+          prev.flatMap((l) => {
+            if (l.id !== listingId) return [l];
+            const status = result.status ?? newStatus;
+            if (currentStatus !== "all" && currentStatus !== status) return [];
+            return [
+              {
+                ...l,
+                status,
+                version:
+                  typeof result.version === "number"
+                    ? result.version
+                    : l.version,
+              },
+            ];
+          })
         );
       } else if (result.error) {
         toast.error(result.error);
@@ -125,7 +151,21 @@ export default function ListingList({
     try {
       const result = await deleteListing(listingId);
       if (result.success) {
-        setListings((prev) => prev.filter((l) => l.id !== listingId));
+        setListings((prev) =>
+          prev.flatMap((l) => {
+            if (l.id !== listingId) return [l];
+            if (result.action !== "suppressed") return [];
+            if (currentStatus !== "all" && currentStatus !== "PAUSED") return [];
+            return [
+              {
+                ...l,
+                status: "PAUSED",
+                version:
+                  typeof result.version === "number" ? result.version : l.version,
+              },
+            ];
+          })
+        );
       } else if (result.error) {
         toast.error(result.error);
       }
@@ -137,34 +177,21 @@ export default function ListingList({
     }
   };
 
-  const filteredListings = listings.filter((listing) => {
-    // Search filter
-    if (search) {
-      const searchLower = search.toLowerCase();
-      if (
-        !listing.title.toLowerCase().includes(searchLower) &&
-        !listing.owner.name?.toLowerCase().includes(searchLower) &&
-        !listing.owner.email?.toLowerCase().includes(searchLower)
-      ) {
-        return false;
-      }
-    }
-
-    // Status filter
-    if (statusFilter !== "all") {
-      return listing.status === statusFilter;
-    }
-    return true;
-  });
-
   return (
     <div>
       {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
+      <form
+        action="/admin/listings"
+        className="flex flex-col sm:flex-row gap-4 mb-6"
+      >
+        {currentStatus !== "all" && (
+          <input type="hidden" name="status" value={currentStatus} />
+        )}
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
           <input
             type="text"
+            name="q"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by title or owner..."
@@ -172,36 +199,42 @@ export default function ListingList({
             className="w-full pl-10 pr-4 py-2 border border-outline-variant/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
         </div>
+        <button
+          type="submit"
+          className="px-4 py-2 bg-on-surface text-white rounded-lg font-medium text-sm hover:bg-on-surface/90"
+        >
+          Search
+        </button>
         <div className="flex gap-2">
           {(["all", "ACTIVE", "PAUSED", "RENTED"] as const).map((f) => (
-            <button
+            <Link
               key={f}
-              onClick={() => setStatusFilter(f)}
+              href={buildHref({ status: f, page: 1 })}
               className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
-                statusFilter === f
+                currentStatus === f
                   ? "bg-on-surface text-white"
                   : "bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-high/50 border border-outline-variant/20"
               }`}
             >
               {f === "all" ? "All" : statusConfig[f].label}
-            </button>
+            </Link>
           ))}
         </div>
-      </div>
+      </form>
 
       {/* Stats */}
       <div className="mb-4 text-sm text-on-surface-variant">
-        Showing {filteredListings.length} of {totalListings} listings
+        Showing {listings.length} of {totalListings} listings
       </div>
 
       {/* Listings Grid */}
-      {filteredListings.length === 0 ? (
+      {listings.length === 0 ? (
         <div className="bg-surface-container-lowest rounded-lg shadow-ambient-sm p-12 text-center text-on-surface-variant">
           No listings found matching your criteria
         </div>
       ) : (
         <div className="grid gap-4">
-          {filteredListings.map((listing) => {
+          {listings.map((listing) => {
             const StatusIcon = statusConfig[listing.status].icon;
 
             return (
@@ -301,13 +334,13 @@ export default function ListingList({
                             <div className="absolute right-0 top-full mt-1 w-48 bg-surface-container-lowest rounded-lg shadow-ambient-lg border border-outline-variant/20 py-1 z-10">
                               {listing.status !== "ACTIVE" && (
                                 <button
-                                onClick={() =>
-                                  handleStatusChange(
-                                    listing.id,
-                                    "ACTIVE",
-                                    listing.version
-                                  )
-                                }
+                                  onClick={() =>
+                                    handleStatusChange(
+                                      listing.id,
+                                      "ACTIVE",
+                                      listing.version
+                                    )
+                                  }
                                   disabled={processingId === listing.id}
                                   className="w-full px-4 py-2 text-left text-sm hover:bg-surface-container-high/50 flex items-center gap-2 disabled:opacity-60"
                                 >
@@ -321,13 +354,13 @@ export default function ListingList({
                               )}
                               {listing.status !== "PAUSED" && (
                                 <button
-                                onClick={() =>
-                                  handleStatusChange(
-                                    listing.id,
-                                    "PAUSED",
-                                    listing.version
-                                  )
-                                }
+                                  onClick={() =>
+                                    handleStatusChange(
+                                      listing.id,
+                                      "PAUSED",
+                                      listing.version
+                                    )
+                                  }
                                   disabled={processingId === listing.id}
                                   className="w-full px-4 py-2 text-left text-sm hover:bg-surface-container-high/50 flex items-center gap-2 disabled:opacity-60"
                                 >
@@ -341,13 +374,13 @@ export default function ListingList({
                               )}
                               {listing.status !== "RENTED" && (
                                 <button
-                                onClick={() =>
-                                  handleStatusChange(
-                                    listing.id,
-                                    "RENTED",
-                                    listing.version
-                                  )
-                                }
+                                  onClick={() =>
+                                    handleStatusChange(
+                                      listing.id,
+                                      "RENTED",
+                                      listing.version
+                                    )
+                                  }
                                   disabled={processingId === listing.id}
                                   className="w-full px-4 py-2 text-left text-sm hover:bg-surface-container-high/50 flex items-center gap-2 disabled:opacity-60"
                                 >
@@ -367,8 +400,14 @@ export default function ListingList({
                                 }}
                                 className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
                               >
-                                <Trash2 className="w-4 h-4" />
-                                Delete Listing
+                                {listing._count.reports > 0 ? (
+                                  <EyeOff className="w-4 h-4" />
+                                ) : (
+                                  <Trash2 className="w-4 h-4" />
+                                )}
+                                {listing._count.reports > 0
+                                  ? "Suppress Listing"
+                                  : "Delete Listing"}
                               </button>
                             </div>
                           )}
@@ -382,8 +421,9 @@ export default function ListingList({
                 {deleteConfirmId === listing.id && (
                   <div className="p-4 bg-red-50 border-t border-red-100">
                     <p className="text-sm text-red-700 mb-3">
-                      Are you sure you want to delete this listing? This action
-                      cannot be undone.
+                      {listing._count.reports > 0
+                        ? "This listing has reports, so it will be suppressed instead of deleted to preserve moderation evidence."
+                        : "Are you sure you want to delete this listing? This action cannot be undone."}
                     </p>
                     <div className="flex gap-2">
                       <button
@@ -394,7 +434,9 @@ export default function ListingList({
                         {processingId === listing.id && (
                           <Loader2 className="w-4 h-4 animate-spin" />
                         )}
-                        Delete Forever
+                        {listing._count.reports > 0
+                          ? "Suppress Listing"
+                          : "Delete Forever"}
                       </button>
                       <button
                         onClick={() => setDeleteConfirmId(null)}
@@ -408,6 +450,34 @@ export default function ListingList({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="mt-6 flex items-center justify-between">
+          <Link
+            href={buildHref({ page: Math.max(1, currentPage - 1) })}
+            className={`px-4 py-2 rounded-lg border border-outline-variant/20 text-sm ${
+              currentPage <= 1
+                ? "pointer-events-none opacity-50"
+                : "hover:bg-surface-container-high"
+            }`}
+          >
+            Previous
+          </Link>
+          <span className="text-sm text-on-surface-variant">
+            Page {currentPage} of {totalPages}
+          </span>
+          <Link
+            href={buildHref({ page: Math.min(totalPages, currentPage + 1) })}
+            className={`px-4 py-2 rounded-lg border border-outline-variant/20 text-sm ${
+              currentPage >= totalPages
+                ? "pointer-events-none opacity-50"
+                : "hover:bg-surface-container-high"
+            }`}
+          >
+            Next
+          </Link>
         </div>
       )}
     </div>

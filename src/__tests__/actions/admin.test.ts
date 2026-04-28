@@ -104,6 +104,7 @@ import { revalidatePath } from "next/cache";
 import { logAdminAction } from "@/lib/audit";
 import { logger } from "@/lib/logger";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 
 describe("admin actions", () => {
   const mockAdminSession = {
@@ -112,6 +113,7 @@ describe("admin actions", () => {
 
   const mockAdminUser = {
     isAdmin: true,
+    isSuspended: false,
   };
 
   const mockRegularUser = {
@@ -141,11 +143,23 @@ describe("admin actions", () => {
     it("returns error when user is not admin", async () => {
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         isAdmin: false,
+        isSuspended: false,
       });
 
       const result = await getUsers();
 
       expect(result.error).toBe("Unauthorized");
+    });
+
+    it("returns ACCOUNT_SUSPENDED when admin account is suspended", async () => {
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        isAdmin: true,
+        isSuspended: true,
+      });
+
+      const result = await getUsers();
+
+      expect(result.error).toBe("Account suspended");
     });
 
     it("allows admin users", async () => {
@@ -513,7 +527,9 @@ describe("admin actions", () => {
       (prisma.$transaction as jest.Mock).mockImplementation(
         async (fn: (tx: unknown) => Promise<unknown>) =>
           fn({
-            $queryRaw: jest.fn().mockResolvedValue(listingRow ? [listingRow] : []),
+            $queryRaw: jest
+              .fn()
+              .mockResolvedValue(listingRow ? [listingRow] : []),
             listing: { update },
           })
       );
@@ -667,14 +683,20 @@ describe("admin actions", () => {
       title: "Test Listing",
       ownerId: "owner-123",
       status: "ACTIVE",
+      statusReason: null,
+      version: 3,
     };
 
     // Helper to set up interactive transaction mock
     function mockInteractiveTx(overrides: Record<string, unknown> = {}) {
+      const queryRaw = jest.fn().mockResolvedValue([mockListing]);
+      const reportCount = jest.fn().mockResolvedValue(0);
+      const listingDelete = jest.fn().mockResolvedValue({});
+      const listingUpdate = jest.fn().mockResolvedValue({});
       (prisma.$transaction as jest.Mock).mockImplementation(
         async (fn: (tx: unknown) => Promise<unknown>) => {
           const tx = {
-            $queryRaw: jest.fn().mockResolvedValue([mockListing]),
+            $queryRaw: queryRaw,
             booking: {
               count: jest.fn().mockResolvedValue(0),
               findMany: jest.fn().mockResolvedValue([]),
@@ -683,8 +705,9 @@ describe("admin actions", () => {
             notification: {
               createMany: jest.fn().mockResolvedValue({ count: 0 }),
             },
-            listing: { delete: jest.fn().mockResolvedValue({}) },
+            listing: { delete: listingDelete, update: listingUpdate },
             report: {
+              count: reportCount,
               findUnique: jest.fn().mockResolvedValue(null),
               update: jest.fn().mockResolvedValue({}),
             },
@@ -693,6 +716,7 @@ describe("admin actions", () => {
           return fn(tx);
         }
       );
+      return { queryRaw, reportCount, listingDelete, listingUpdate };
     }
 
     it("returns error when listing not found", async () => {
@@ -718,6 +742,7 @@ describe("admin actions", () => {
       const result = await deleteListing("listing-123");
 
       expect(result.success).toBe(true);
+      expect(result.action).toBe("deleted");
       expect(result.notifiedTenants).toBe(0);
     });
 
@@ -748,6 +773,7 @@ describe("admin actions", () => {
       const result = await deleteListing("listing-123");
 
       expect(result.success).toBe(true);
+      expect(result.action).toBe("deleted");
       expect(result.notifiedTenants).toBe(0);
       expect(mockNotifCreateMany).not.toHaveBeenCalled();
     });
@@ -765,19 +791,81 @@ describe("admin actions", () => {
       );
     });
 
-    it("deletion cascades to related records via schema (B3.3)", async () => {
-      const mockListingDelete = jest.fn().mockResolvedValue({});
-      mockInteractiveTx({
-        listing: { delete: mockListingDelete },
-      });
+    it("hard-deletes unreported listings", async () => {
+      const { listingDelete, listingUpdate, reportCount } = mockInteractiveTx();
       (logAdminAction as jest.Mock).mockResolvedValue({});
 
       const result = await deleteListing("listing-123");
 
       expect(result.success).toBe(true);
-      expect(mockListingDelete).toHaveBeenCalledWith({
+      expect(result.action).toBe("deleted");
+      expect(reportCount).toHaveBeenCalledWith({
+        where: { listingId: "listing-123" },
+      });
+      expect(listingDelete).toHaveBeenCalledWith({
         where: { id: "listing-123" },
       });
+      expect(listingUpdate).not.toHaveBeenCalled();
+      expect(markListingDirtyInTx).not.toHaveBeenCalled();
+    });
+
+    it("suppresses reported listings instead of deleting them", async () => {
+      const { reportCount, listingDelete, listingUpdate } = mockInteractiveTx();
+      reportCount.mockResolvedValue(2);
+      (logAdminAction as jest.Mock).mockResolvedValue({});
+
+      const result = await deleteListing("listing-123");
+
+      expect(result).toEqual({
+        success: true,
+        action: "suppressed",
+        notifiedTenants: 0,
+        status: "PAUSED",
+        version: 4,
+      });
+      expect(listingUpdate).toHaveBeenCalledWith({
+        where: { id: "listing-123" },
+        data: {
+          status: "PAUSED",
+          statusReason: "SUPPRESSED",
+          version: 4,
+        },
+      });
+      expect(listingDelete).not.toHaveBeenCalled();
+      expect(markListingDirtyInTx).toHaveBeenCalledWith(
+        expect.any(Object),
+        "listing-123",
+        "status_changed"
+      );
+    });
+
+    it("logs non-PII suppression details for reported listings", async () => {
+      const { reportCount } = mockInteractiveTx();
+      reportCount.mockResolvedValue(3);
+      (logAdminAction as jest.Mock).mockResolvedValue({});
+
+      await deleteListing("listing-123");
+
+      expect(logAdminAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "LISTING_HIDDEN",
+          targetType: "Listing",
+          targetId: "listing-123",
+          details: expect.objectContaining({
+            previousStatus: "ACTIVE",
+            previousStatusReason: null,
+            newStatus: "PAUSED",
+            newStatusReason: "SUPPRESSED",
+            reportCount: 3,
+            suppressedDueToAdminDelete: true,
+            version: 4,
+          }),
+        })
+      );
+      const details = (logAdminAction as jest.Mock).mock.calls[0][0].details;
+      expect(details.reason).toBeUndefined();
+      expect(details.reporterId).toBeUndefined();
+      expect(details.details).toBeUndefined();
     });
   });
 
@@ -820,23 +908,40 @@ describe("admin actions", () => {
       reporterId: "reporter-123",
     };
 
+    function mockResolveReportTx(
+      reportRow: typeof mockReport | null = mockReport,
+      update = jest.fn().mockResolvedValue({})
+    ) {
+      (prisma.$transaction as jest.Mock).mockImplementation(
+        async (fn: (tx: unknown) => Promise<unknown>) => {
+          const tx = {
+            $queryRaw: jest
+              .fn()
+              .mockResolvedValue(reportRow ? [reportRow] : []),
+            report: { update },
+          };
+          return fn(tx);
+        }
+      );
+      return { update };
+    }
+
     it("returns error when report not found", async () => {
-      (prisma.report.findUnique as jest.Mock).mockResolvedValue(null);
+      mockResolveReportTx(null);
 
       const result = await resolveReport("nonexistent", "RESOLVED");
 
-      expect(result.error).toBe("Report not found");
+      expect(result).toEqual({ error: "Report not found", code: "NOT_FOUND" });
     });
 
     it("resolves report", async () => {
-      (prisma.report.findUnique as jest.Mock).mockResolvedValue(mockReport);
-      (prisma.report.update as jest.Mock).mockResolvedValue({});
+      const { update } = mockResolveReportTx();
       (logAdminAction as jest.Mock).mockResolvedValue({});
 
       const result = await resolveReport("report-123", "RESOLVED", "Addressed");
 
       expect(result.success).toBe(true);
-      expect(prisma.report.update).toHaveBeenCalledWith({
+      expect(update).toHaveBeenCalledWith({
         where: { id: "report-123" },
         data: expect.objectContaining({
           status: "RESOLVED",
@@ -846,13 +951,12 @@ describe("admin actions", () => {
     });
 
     it("dismisses report", async () => {
-      (prisma.report.findUnique as jest.Mock).mockResolvedValue(mockReport);
-      (prisma.report.update as jest.Mock).mockResolvedValue({});
+      const { update } = mockResolveReportTx();
       (logAdminAction as jest.Mock).mockResolvedValue({});
 
       await resolveReport("report-123", "DISMISSED");
 
-      expect(prisma.report.update).toHaveBeenCalledWith({
+      expect(update).toHaveBeenCalledWith({
         where: { id: "report-123" },
         data: expect.objectContaining({
           status: "DISMISSED",
@@ -861,8 +965,7 @@ describe("admin actions", () => {
     });
 
     it("logs appropriate action type", async () => {
-      (prisma.report.findUnique as jest.Mock).mockResolvedValue(mockReport);
-      (prisma.report.update as jest.Mock).mockResolvedValue({});
+      mockResolveReportTx();
       (logAdminAction as jest.Mock).mockResolvedValue({});
 
       await resolveReport("report-123", "DISMISSED");
@@ -872,6 +975,22 @@ describe("admin actions", () => {
           action: "REPORT_DISMISSED",
         })
       );
+    });
+
+    it("does not reprocess an already reviewed report", async () => {
+      const { update } = mockResolveReportTx({
+        ...mockReport,
+        status: "RESOLVED",
+      });
+
+      const result = await resolveReport("report-123", "DISMISSED");
+
+      expect(result).toEqual({
+        error: "This report has already been reviewed.",
+        code: "STATE_CONFLICT",
+      });
+      expect(update).not.toHaveBeenCalled();
+      expect(logAdminAction).not.toHaveBeenCalled();
     });
   });
 
@@ -887,18 +1006,36 @@ describe("admin actions", () => {
       id: "listing-123",
       title: "Test Listing",
       ownerId: "owner-123",
+      status: "ACTIVE",
+      statusReason: null,
+      version: 3,
     };
 
-    function mockInteractiveTxForResolve(
-      overrides: Record<string, unknown> = {}
-    ) {
+    function mockInteractiveTxForResolve({
+      reportRow = mockReport,
+      listingRow = mockListing,
+      reportUpdate = jest.fn().mockResolvedValue({}),
+      listingUpdate = jest.fn().mockResolvedValue({}),
+      listingDelete = jest.fn().mockResolvedValue({}),
+      txOverrides = {},
+    }: {
+      reportRow?: typeof mockReport | null;
+      listingRow?: typeof mockListing | null;
+      reportUpdate?: jest.Mock;
+      listingUpdate?: jest.Mock;
+      listingDelete?: jest.Mock;
+      txOverrides?: Record<string, unknown>;
+    } = {}) {
+      const queryRaw = jest
+        .fn()
+        .mockResolvedValueOnce(reportRow ? [reportRow] : [])
+        .mockResolvedValueOnce(listingRow ? [listingRow] : []);
       (prisma.$transaction as jest.Mock).mockImplementation(
         async (fn: (tx: unknown) => Promise<unknown>) => {
           const tx = {
-            $queryRaw: jest.fn().mockResolvedValue([mockListing]),
+            $queryRaw: queryRaw,
             report: {
-              findUnique: jest.fn().mockResolvedValue(mockReport),
-              update: jest.fn().mockResolvedValue({}),
+              update: reportUpdate,
             },
             booking: {
               count: jest.fn().mockResolvedValue(0),
@@ -908,39 +1045,40 @@ describe("admin actions", () => {
             notification: {
               createMany: jest.fn().mockResolvedValue({ count: 0 }),
             },
-            listing: { delete: jest.fn().mockResolvedValue({}) },
-            ...overrides,
+            listing: { update: listingUpdate, delete: listingDelete },
+            ...txOverrides,
           };
           return fn(tx);
         }
       );
+      return { queryRaw, reportUpdate, listingUpdate, listingDelete };
     }
 
-    it("does not block removal on retired booking-era state", async () => {
+    it("does not block suppression on retired booking-era state", async () => {
       mockInteractiveTxForResolve({
-        booking: {
-          count: jest.fn().mockResolvedValue(1),
-          findMany: jest.fn().mockResolvedValue([]),
-          updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        txOverrides: {
+          booking: {
+            count: jest.fn().mockResolvedValue(1),
+            findMany: jest.fn().mockResolvedValue([]),
+            updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+          },
         },
       });
       (logAdminAction as jest.Mock).mockResolvedValue({});
 
       const result = await resolveReportAndRemoveListing("report-123");
 
-      expect(result.success).toBe(true);
-      expect(result.affectedBookings).toBe(0);
+      expect(result).toEqual({ success: true, affectedBookings: 0 });
     });
 
-    it("removes listing when no active bookings", async () => {
+    it("suppresses listing when no active bookings", async () => {
+      const mockListingUpdate = jest.fn().mockResolvedValue({});
       const mockListingDelete = jest.fn().mockResolvedValue({});
       const mockReportUpdate = jest.fn().mockResolvedValue({});
       mockInteractiveTxForResolve({
-        listing: { delete: mockListingDelete },
-        report: {
-          findUnique: jest.fn().mockResolvedValue(mockReport),
-          update: mockReportUpdate,
-        },
+        listingUpdate: mockListingUpdate,
+        listingDelete: mockListingDelete,
+        reportUpdate: mockReportUpdate,
       });
       (logAdminAction as jest.Mock).mockResolvedValue({});
 
@@ -950,9 +1088,20 @@ describe("admin actions", () => {
       );
 
       expect(result.success).toBe(true);
-      expect(mockListingDelete).toHaveBeenCalledWith({
+      expect(mockListingUpdate).toHaveBeenCalledWith({
         where: { id: "listing-123" },
+        data: {
+          status: "PAUSED",
+          statusReason: "SUPPRESSED",
+          version: 4,
+        },
       });
+      expect(mockListingDelete).not.toHaveBeenCalled();
+      expect(markListingDirtyInTx).toHaveBeenCalledWith(
+        expect.any(Object),
+        "listing-123",
+        "status_changed"
+      );
       expect(mockReportUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: "report-123" },
@@ -965,24 +1114,39 @@ describe("admin actions", () => {
 
     it("returns error when report not found", async () => {
       mockInteractiveTxForResolve({
-        report: {
-          findUnique: jest.fn().mockResolvedValue(null),
-          update: jest.fn().mockResolvedValue({}),
-        },
+        reportRow: null,
       });
 
       const result = await resolveReportAndRemoveListing("nonexistent-report");
 
-      expect(result.error).toBe("Report not found");
+      expect(result).toEqual({ error: "Report not found", code: "NOT_FOUND" });
     });
 
-    it("logs audit event on successful removal", async () => {
+    it("does not suppress listings for already reviewed reports", async () => {
+      const { reportUpdate, listingUpdate, listingDelete } =
+        mockInteractiveTxForResolve({
+          reportRow: { ...mockReport, status: "DISMISSED" },
+        });
+
+      const result = await resolveReportAndRemoveListing("report-123");
+
+      expect(result).toEqual({
+        error: "This report has already been reviewed.",
+        code: "STATE_CONFLICT",
+      });
+      expect(reportUpdate).not.toHaveBeenCalled();
+      expect(listingUpdate).not.toHaveBeenCalled();
+      expect(listingDelete).not.toHaveBeenCalled();
+      expect(logAdminAction).not.toHaveBeenCalled();
+    });
+
+    it("logs audit event on successful suppression", async () => {
       mockInteractiveTxForResolve();
       (logAdminAction as jest.Mock).mockResolvedValue({});
 
       await resolveReportAndRemoveListing("report-123", "Spam listing");
 
-      // Should log both report resolution and listing deletion
+      // Should log both report resolution and listing suppression
       expect(logAdminAction).toHaveBeenCalledTimes(2);
       expect(logAdminAction).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -993,9 +1157,15 @@ describe("admin actions", () => {
       );
       expect(logAdminAction).toHaveBeenCalledWith(
         expect.objectContaining({
-          action: "LISTING_DELETED",
+          action: "LISTING_HIDDEN",
           targetType: "Listing",
           targetId: "listing-123",
+          details: expect.objectContaining({
+            previousStatus: "ACTIVE",
+            newStatus: "PAUSED",
+            newStatusReason: "SUPPRESSED",
+            suppressedDueToReport: "report-123",
+          }),
         })
       );
     });
@@ -1222,20 +1392,27 @@ describe("admin actions", () => {
       (prisma.$transaction as jest.Mock).mockImplementation(
         async (fn: (tx: unknown) => Promise<unknown>) => {
           const tx = {
-            $queryRaw: jest.fn().mockResolvedValue([
-              {
-                id: "listing-123",
-                title: "Test",
-                ownerId: "owner-123",
-              },
-            ]),
+            $queryRaw: jest
+              .fn()
+              .mockResolvedValueOnce([
+                {
+                  listingId: "listing-123",
+                  reason: "INAPPROPRIATE",
+                  reporterId: "reporter-123",
+                  status: "OPEN",
+                },
+              ])
+              .mockResolvedValueOnce([
+                {
+                  id: "listing-123",
+                  title: "Test",
+                  ownerId: "owner-123",
+                  status: "ACTIVE",
+                  statusReason: null,
+                  version: 3,
+                },
+              ]),
             report: {
-              findUnique: jest.fn().mockResolvedValue({
-                listingId: "listing-123",
-                reason: "INAPPROPRIATE",
-                reporterId: "reporter-123",
-                status: "OPEN",
-              }),
               update: jest.fn().mockResolvedValue({}),
             },
             booking: {
@@ -1246,7 +1423,7 @@ describe("admin actions", () => {
             notification: {
               createMany: jest.fn().mockResolvedValue({ count: 0 }),
             },
-            listing: { delete: jest.fn().mockResolvedValue({}) },
+            listing: { update: jest.fn().mockResolvedValue({}) },
           };
           return fn(tx);
         }

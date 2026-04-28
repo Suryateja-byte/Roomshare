@@ -28,9 +28,90 @@ import type {
   RadarAutocompleteResponse,
 } from "@/types/nearby";
 import {
+  DEFAULT_NEARBY_CATEGORIES,
+  MAX_NEARBY_CATEGORY_COUNT,
+  MAX_NEARBY_CATEGORY_LENGTH,
   KEYWORD_CATEGORY_MAP,
+  isAllowedRadarCategory,
   shouldIncludePlace,
 } from "@/lib/nearby-categories";
+
+const MAX_REQUEST_BODY_BYTES = 10 * 1024;
+
+type JsonBodyResult =
+  | { ok: true; body: unknown }
+  | { ok: false; response: Response };
+
+function invalidBodyResponse(details: string, status = 400): Response {
+  return NextResponse.json(
+    {
+      error: "Invalid request body",
+      details,
+    },
+    { status }
+  );
+}
+
+async function readJsonBody(request: Request): Promise<JsonBodyResult> {
+  const canReadText = typeof request.text === "function";
+
+  if (canReadText) {
+    const contentType = request.headers.get("content-type") || "";
+    if (!contentType.toLowerCase().includes("application/json")) {
+      return {
+        ok: false,
+        response: invalidBodyResponse(
+          "Content-Type must be application/json"
+        ),
+      };
+    }
+
+    const contentLength = request.headers.get("content-length");
+    if (contentLength && Number(contentLength) > MAX_REQUEST_BODY_BYTES) {
+      return {
+        ok: false,
+        response: invalidBodyResponse("Request body is too large"),
+      };
+    }
+
+    const rawBody = await request.text();
+    const rawBodyBytes = new TextEncoder().encode(rawBody).byteLength;
+    if (rawBodyBytes > MAX_REQUEST_BODY_BYTES) {
+      return {
+        ok: false,
+        response: invalidBodyResponse("Request body is too large"),
+      };
+    }
+
+    try {
+      return { ok: true, body: JSON.parse(rawBody) };
+    } catch {
+      return {
+        ok: false,
+        response: invalidBodyResponse("Request body must be valid JSON"),
+      };
+    }
+  }
+
+  try {
+    return { ok: true, body: await request.json() };
+  } catch {
+    return {
+      ok: false,
+      response: invalidBodyResponse("Request body must be valid JSON"),
+    };
+  }
+}
+
+const categorySchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(MAX_NEARBY_CATEGORY_LENGTH)
+  .transform((category) => category.toLowerCase())
+  .refine(isAllowedRadarCategory, {
+    message: "Unsupported nearby category",
+  });
 
 function isFiniteLatitude(value: unknown): value is number {
   return (
@@ -98,7 +179,13 @@ const requestSchema = z.object({
   listingLat: z.number().min(-90).max(90),
   listingLng: z.number().min(-180).max(180),
   query: z.string().max(100).optional(),
-  categories: z.array(z.string()).optional(),
+  categories: z
+    .array(categorySchema)
+    .max(MAX_NEARBY_CATEGORY_COUNT)
+    .optional()
+    .transform((categories) =>
+      categories ? Array.from(new Set(categories)) : undefined
+    ),
   radiusMeters: z.union([
     z.literal(1609), // 1 mi
     z.literal(3218), // 2 mi
@@ -116,7 +203,7 @@ export async function POST(request: Request) {
     if (rateLimitResponse) return rateLimitResponse;
 
     // Check if Radar API is configured
-    const radarSecretKey = process.env.RADAR_SECRET_KEY;
+    const radarSecretKey = process.env.RADAR_SECRET_KEY?.trim();
     if (!radarSecretKey) {
       logger.sync.error("RADAR_SECRET_KEY is not configured");
       return NextResponse.json(
@@ -126,19 +213,11 @@ export async function POST(request: Request) {
     }
 
     // Parse and validate request body
-    let body;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json(
-        {
-          error: "Invalid request body",
-          details: "Request body must be valid JSON",
-        },
-        { status: 400 }
-      );
+    const bodyResult = await readJsonBody(request);
+    if (!bodyResult.ok) {
+      return bodyResult.response;
     }
-    const parseResult = requestSchema.safeParse(body);
+    const parseResult = requestSchema.safeParse(bodyResult.body);
 
     if (!parseResult.success) {
       return NextResponse.json(
@@ -154,7 +233,8 @@ export async function POST(request: Request) {
       parseResult.data;
 
     // Detect search mode: text query vs category chips vs keyword search
-    const queryLower = query?.trim().toLowerCase() || "";
+    const queryTrimmed = query?.trim() || "";
+    const queryLower = queryTrimmed.toLowerCase();
     const isTextSearch =
       queryLower.length >= 2 && (!categories || categories.length === 0);
 
@@ -332,7 +412,7 @@ export async function POST(request: Request) {
     // Radar requires at least one of: chains, categories, groups, iataCodes
     // Priority: keyword-mapped categories > user-provided categories > default categories
     if (isKeywordSearch && mappedCategories) {
-      // Keyword search: Use mapped categories (e.g., "gym" → ['gym', 'fitness-recreation'])
+      // Keyword search: Use verified Radar categories (e.g., "gym" -> ["gym"])
       radarUrl.searchParams.set("categories", mappedCategories.join(","));
     } else if (categories && categories.length > 0) {
       // Category chip: Use user-provided categories
@@ -340,19 +420,14 @@ export async function POST(request: Request) {
     } else {
       // Default categories for general nearby search
       // These cover common POI types users might be interested in
-      const defaultCategories = [
-        "food-beverage",
-        "grocery",
-        "shopping",
-        "health-medicine",
-        "fitness-recreation",
-        "gas-station",
-      ];
-      radarUrl.searchParams.set("categories", defaultCategories.join(","));
+      radarUrl.searchParams.set(
+        "categories",
+        DEFAULT_NEARBY_CATEGORIES.join(",")
+      );
     }
 
-    if (query) {
-      radarUrl.searchParams.set("query", query);
+    if (queryTrimmed) {
+      radarUrl.searchParams.set("query", queryTrimmed);
     }
 
     // P1-09/P1-10 FIX: Use circuit breaker + timeout for Radar API resilience

@@ -172,6 +172,40 @@ describe("processCapturedStripeEvent", () => {
     });
   });
 
+  it("grants phone reveal payments against the REVEAL_PHONE ledger", async () => {
+    const client = buildClient(
+      succeededIntent({
+        metadata: {
+          purchaseContext: "PHONE_REVEAL",
+          userId: "user-123",
+          listingId: "listing-123",
+          unitId: "unit-123",
+          unitIdentityEpoch: "7",
+          productCode: "CONTACT_PACK_3",
+          contactKind: "REVEAL_PHONE",
+        },
+      })
+    );
+
+    await processCapturedStripeEvent(client, "stripe-row-1");
+
+    expect(client.entitlementGrant.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId: "user-123",
+        productCode: "CONTACT_PACK_3",
+        contactKind: "REVEAL_PHONE",
+        paymentId: "payment-123",
+        idempotencyKey: "payment:payment-123:REVEAL_PHONE",
+        metadata: expect.objectContaining({
+          purchaseContext: "PHONE_REVEAL",
+          listingId: "listing-123",
+          unitId: "unit-123",
+          unitIdentityEpoch: 7,
+        }),
+      }),
+    });
+  });
+
   it("refuses amount-tampered payment intents without granting", async () => {
     const client = buildClient(succeededIntent({ amount_received: 1, amount: 1 }));
 
@@ -279,6 +313,55 @@ describe("processCapturedStripeEvent", () => {
       data: expect.objectContaining({
         processingStatus: "PENDING",
         nextAttemptAt: expect.any(Date),
+      }),
+    });
+  });
+
+  it("does not retry auto-refund webhooks when the banned-user payment has no grant", async () => {
+    const client = buildClient({
+      id: "evt_refund",
+      type: "refund.created",
+      data: {
+        object: {
+          id: "re_123",
+          amount: 499,
+          currency: "usd",
+          status: "succeeded",
+          created: 1776211200,
+          charge: "ch_123",
+          payment_intent: "pi_123",
+        },
+      },
+    });
+    client.payment.findUnique.mockResolvedValue({
+      id: "payment-123",
+      userId: "user-123",
+      productCode: "CONTACT_PACK_3",
+      amount: "4.99",
+      currency: "usd",
+      metadata: null,
+      status: "SUCCEEDED",
+      fraudFlag: true,
+      autoRefundStatus: "REFUND_SUBMITTED_BANNED_USER",
+    });
+    client.refund.findUnique.mockResolvedValue(null);
+    client.refund.create.mockResolvedValue({
+      id: "refund-row-123",
+      status: "SUCCEEDED",
+    });
+    client.entitlementGrant.findUnique.mockResolvedValue(null);
+
+    await processCapturedStripeEvent(client, "stripe-row-1");
+
+    expect(mockRecordPaymentAdjustmentMissingLink).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        adjustmentType: "refund_grant",
+      })
+    );
+    expect(client.stripeEvent.update).toHaveBeenLastCalledWith({
+      where: { id: "stripe-row-1" },
+      data: expect.objectContaining({
+        processingStatus: "PROCESSED",
       }),
     });
   });

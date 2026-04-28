@@ -7,6 +7,8 @@ import {
   RATE_LIMITS,
 } from "@/lib/rate-limit";
 import { revealHostPhoneForListing } from "@/lib/contact/phone-reveal";
+import { validateCsrf } from "@/lib/csrf";
+import { checkEmailVerified, checkSuspension } from "@/app/actions/suspension";
 
 export const runtime = "nodejs";
 
@@ -17,6 +19,9 @@ const phoneRevealRequestSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const csrfResponse = validateCsrf(request);
+  if (csrfResponse) return csrfResponse;
+
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json(
@@ -38,6 +43,28 @@ export async function POST(request: NextRequest) {
         code: "RATE_LIMITED",
       },
       { status: 429, headers: { "Cache-Control": "no-store" } }
+    );
+  }
+
+  const suspension = await checkSuspension(session.user.id);
+  if (suspension.suspended) {
+    return NextResponse.json(
+      {
+        error: suspension.error || "Account suspended",
+        code: "ACCOUNT_SUSPENDED",
+      },
+      { status: 403, headers: { "Cache-Control": "no-store" } }
+    );
+  }
+
+  const emailCheck = await checkEmailVerified(session.user.id);
+  if (!emailCheck.verified) {
+    return NextResponse.json(
+      {
+        error: emailCheck.error || "Please verify your email to continue",
+        code: "EMAIL_VERIFICATION_REQUIRED",
+      },
+      { status: 403, headers: { "Cache-Control": "no-store" } }
     );
   }
 

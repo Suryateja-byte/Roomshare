@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 
 const mockReportListProps = jest.fn();
@@ -55,6 +55,7 @@ jest.mock("sonner", () => ({
 }));
 
 jest.mock("@/app/actions/admin", () => ({
+  requireAdmin: jest.fn(),
   resolveReport: jest.fn(),
   resolveReportAndRemoveListing: jest.fn(),
 }));
@@ -82,8 +83,14 @@ jest.mock("@/lib/prisma", () => ({
 
 import ReportList from "@/app/admin/reports/ReportList";
 import AdminReportsPage from "@/app/admin/reports/page";
+import {
+  requireAdmin,
+  resolveReport,
+  resolveReportAndRemoveListing,
+} from "@/app/actions/admin";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { toast } from "sonner";
 
 function createReport(id: string, kind: "ABUSE_REPORT" | "PRIVATE_FEEDBACK") {
   return {
@@ -125,40 +132,108 @@ describe("Admin ReportList", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (resolveReport as jest.Mock).mockReset();
+    (resolveReportAndRemoveListing as jest.Mock).mockReset();
   });
 
-  it("shows both report kinds by default and can isolate private feedback", () => {
-    render(<ReportList initialReports={reports} totalReports={reports.length} />);
+  it("shows server-provided reports and links filters through the URL", () => {
+    render(
+      <ReportList initialReports={reports} totalReports={reports.length} />
+    );
 
     expect(screen.getByText("Showing 2 of 2 reports")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Abuse Report" })
+      screen.getByRole("link", { name: "Abuse Report" })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Private Feedback" })
+      screen.getByRole("link", { name: "Private Feedback" })
     ).toBeInTheDocument();
     expect(screen.getByText("Abuse details abuse")).toBeInTheDocument();
-    expect(screen.getByText("Private feedback details private")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Private Feedback" }));
-
-    expect(screen.getByText("Showing 1 of 2 reports")).toBeInTheDocument();
-    expect(screen.queryByText("Abuse details abuse")).not.toBeInTheDocument();
-    expect(screen.getByText("Private feedback details private")).toBeInTheDocument();
+    expect(
+      screen.getByText("Private feedback details private")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Private Feedback" })
+    ).toHaveAttribute("href", "/admin/reports?kind=PRIVATE_FEEDBACK");
   });
 
-  it("seeds the client filter from the initial kind prop", () => {
+  it("preserves active filters when building server-backed links", () => {
     render(
       <ReportList
-        initialReports={reports}
-        totalReports={reports.length}
+        initialReports={[reports[1]]}
+        totalReports={1}
         initialKindFilter="PRIVATE_FEEDBACK"
+        initialStatusFilter="OPEN"
       />
     );
 
-    expect(screen.getByText("Showing 1 of 2 reports")).toBeInTheDocument();
+    expect(screen.getByText("Showing 1 of 1 reports")).toBeInTheDocument();
     expect(screen.queryByText("Abuse details abuse")).not.toBeInTheDocument();
-    expect(screen.getByText("Private feedback details private")).toBeInTheDocument();
+    expect(
+      screen.getByText("Private feedback details private")
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Resolved" })).toHaveAttribute(
+      "href",
+      "/admin/reports?status=RESOLVED&kind=PRIVATE_FEEDBACK"
+    );
+  });
+
+  it("resolves the intended report action on the first click", async () => {
+    (resolveReport as jest.Mock).mockResolvedValue({ success: true });
+
+    render(
+      <ReportList initialReports={reports} totalReports={reports.length} />
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Take Action" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Mark Resolved" }));
+
+    await waitFor(() => {
+      expect(resolveReport).toHaveBeenCalledWith("abuse", "RESOLVED", "");
+    });
+    expect(resolveReportAndRemoveListing).not.toHaveBeenCalled();
+  });
+
+  it("does not reuse a previous action after an error", async () => {
+    (resolveReport as jest.Mock)
+      .mockResolvedValueOnce({ error: "Could not resolve report" })
+      .mockResolvedValueOnce({ success: true });
+
+    render(
+      <ReportList initialReports={reports} totalReports={reports.length} />
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Take Action" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Mark Resolved" }));
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith("Could not resolve report");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss Report" }));
+
+    await waitFor(() => {
+      expect(resolveReport).toHaveBeenLastCalledWith("abuse", "DISMISSED", "");
+    });
+    expect(resolveReport).toHaveBeenCalledTimes(2);
+  });
+
+  it("suppresses the listing on the first suppress click", async () => {
+    (resolveReportAndRemoveListing as jest.Mock).mockResolvedValue({
+      success: true,
+    });
+
+    render(
+      <ReportList initialReports={reports} totalReports={reports.length} />
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Take Action" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Suppress Listing" }));
+
+    await waitFor(() => {
+      expect(resolveReportAndRemoveListing).toHaveBeenCalledWith("abuse", "");
+    });
+    expect(resolveReport).not.toHaveBeenCalled();
   });
 });
 
@@ -177,12 +252,34 @@ describe("Admin reports page", () => {
     (auth as jest.Mock).mockResolvedValue({
       user: { id: "admin-1" },
     });
+    (requireAdmin as jest.Mock).mockResolvedValue({
+      error: null,
+      code: null,
+      isAdmin: true,
+      userId: "admin-1",
+    });
     (prisma.user.findUnique as jest.Mock).mockResolvedValue({ isAdmin: true });
     (prisma.report.findMany as jest.Mock).mockImplementation(
-      async ({ where }: { where?: { kind?: string } }) =>
-        where?.kind
-          ? allReports.filter((report) => report.kind === where.kind)
-          : allReports
+      async ({
+        where,
+        skip = 0,
+        take,
+      }: {
+        where?: { kind?: string; status?: string };
+        skip?: number;
+        take?: number;
+      }) => {
+        const filtered = allReports.filter((report) => {
+          if (where?.kind && report.kind !== where.kind) {
+            return false;
+          }
+          if (where?.status && report.status !== where.status) {
+            return false;
+          }
+          return true;
+        });
+        return filtered.slice(skip, take ? skip + take : undefined);
+      }
     );
     (prisma.report.count as jest.Mock).mockImplementation(
       async ({
@@ -221,6 +318,8 @@ describe("Admin reports page", () => {
           expect.objectContaining({ kind: "PRIVATE_FEEDBACK" }),
         ]),
         totalReports: 5,
+        currentPage: 1,
+        totalPages: 1,
       })
     );
     expect(screen.getByText("Showing 5 of 5 reports")).toBeInTheDocument();
@@ -235,16 +334,19 @@ describe("Admin reports page", () => {
 
     expect(prisma.report.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: undefined,
+        where: {},
+        skip: 0,
+        take: 50,
       })
     );
     expect(mockReportListProps).toHaveBeenCalledWith(
       expect.objectContaining({
         initialKindFilter: "all",
         totalReports: 205,
+        totalPages: 5,
       })
     );
-    expect(screen.getByText("Showing 205 of 205 reports")).toBeInTheDocument();
+    expect(screen.getByText("Showing 50 of 205 reports")).toBeInTheDocument();
   });
 
   it("ignores invalid kind params and returns all rows", async () => {
@@ -256,7 +358,7 @@ describe("Admin reports page", () => {
 
     expect(prisma.report.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: undefined,
+        where: {},
       })
     );
     expect(mockReportListProps).toHaveBeenCalledWith(
@@ -265,16 +367,63 @@ describe("Admin reports page", () => {
         totalReports: 205,
       })
     );
-    expect(screen.getByText("Showing 205 of 205 reports")).toBeInTheDocument();
+    expect(screen.getByText("Showing 50 of 205 reports")).toBeInTheDocument();
+  });
+
+  it("serves reports beyond the first 100 rows through page params", async () => {
+    render(
+      await AdminReportsPage({
+        searchParams: Promise.resolve({ page: "3" }),
+      })
+    );
+
+    expect(prisma.report.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {},
+        skip: 100,
+        take: 50,
+      })
+    );
+    expect(mockReportListProps).toHaveBeenCalledWith(
+      expect.objectContaining({
+        currentPage: 3,
+        totalPages: 5,
+        initialReports: expect.arrayContaining([
+          expect.objectContaining({ id: "abuse-101" }),
+        ]),
+      })
+    );
+    expect(screen.getByText("Showing 50 of 205 reports")).toBeInTheDocument();
   });
 
   it("redirects non-admin users before rendering the page", async () => {
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue({ isAdmin: false });
+    (requireAdmin as jest.Mock).mockResolvedValue({
+      error: "Unauthorized",
+      code: "NOT_ADMIN",
+      isAdmin: false,
+      userId: "user-1",
+    });
 
     await expect(
       AdminReportsPage({
         searchParams: Promise.resolve({ kind: "PRIVATE_FEEDBACK" }),
       })
     ).rejects.toThrow("REDIRECT:/");
+  });
+
+  it("redirects suspended admin users before rendering report PII", async () => {
+    (requireAdmin as jest.Mock).mockResolvedValue({
+      error: "Account suspended",
+      code: "ACCOUNT_SUSPENDED",
+      isAdmin: false,
+      userId: "admin-1",
+    });
+
+    await expect(
+      AdminReportsPage({
+        searchParams: Promise.resolve({ kind: "PRIVATE_FEEDBACK" }),
+      })
+    ).rejects.toThrow("REDIRECT:/");
+    expect(prisma.report.findMany).not.toHaveBeenCalled();
   });
 });

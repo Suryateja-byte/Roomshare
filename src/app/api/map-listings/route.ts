@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getMapListings, MapListingData } from "@/lib/data";
+import { getMapListingsResult, MapListingData } from "@/lib/data";
 import {
   isSearchDocEnabled,
   getSearchDocMapListings,
@@ -320,6 +320,8 @@ export async function GET(request: NextRequest) {
       // Fetch listings using SearchDoc path when enabled (faster, no JOINs),
       // falling back to the legacy getMapListings path.
       let listings: MapListingData[];
+      let truncated: boolean | undefined;
+      let totalCandidates: number | undefined;
       if (isSearchDocEnabled(searchParams.get("searchDoc"))) {
         const result = await withTimeout(
           getSearchDocMapListings(mapFilterParams),
@@ -327,17 +329,26 @@ export async function GET(request: NextRequest) {
           "getSearchDocMapListings"
         );
         listings = result.listings;
+        truncated = result.truncated;
+        totalCandidates = result.totalCandidates;
       } else {
-        listings = await withTimeout(
-          getMapListings(mapFilterParams),
+        const result = await withTimeout(
+          getMapListingsResult(mapFilterParams),
           DEFAULT_TIMEOUTS.DATABASE,
           "getMapListings"
         );
+        listings = result.listings;
+        truncated = result.truncated;
+        totalCandidates = result.totalCandidates;
       }
 
       const state = {
         kind: "ok",
-        data: { listings },
+        data: {
+          listings,
+          ...(truncated !== undefined ? { truncated } : {}),
+          ...(totalCandidates !== undefined ? { totalCandidates } : {}),
+        },
         meta,
       } satisfies SearchMapState;
 

@@ -51,6 +51,7 @@ jest.mock("@/lib/logger", () => ({
     info: jest.fn().mockResolvedValue(undefined),
     warn: jest.fn().mockResolvedValue(undefined),
     sync: {
+      info: jest.fn(),
       error: jest.fn(),
       warn: jest.fn(),
     },
@@ -81,6 +82,10 @@ jest.mock("@/lib/search/search-doc-sync", () => ({
   upsertSearchDocSync: jest.fn().mockResolvedValue(true),
 }));
 
+jest.mock("@/lib/embeddings/sync", () => ({
+  syncListingEmbedding: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock("@/lib/search-alerts", () => ({
   triggerInstantAlerts: jest.fn().mockResolvedValue({ sent: 0, errors: 0 }),
 }));
@@ -90,6 +95,15 @@ jest.mock("@/lib/search/search-doc-dirty", () => ({
   markListingsDirty: jest.fn().mockResolvedValue(undefined),
   markListingDirtyInTx: jest.fn().mockResolvedValue(undefined),
   markListingsDirtyInTx: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock("@/lib/listings/canonical-inventory", () => ({
+  syncCanonicalListingInventory: jest.fn().mockResolvedValue({
+    unitId: "unit-new",
+    inventoryId: "listing-new",
+    publishStatus: "PENDING_PROJECTION",
+    sourceVersion: BigInt(1),
+  }),
 }));
 
 jest.mock("@/lib/schemas", () => {
@@ -141,6 +155,7 @@ import { withIdempotency } from "@/lib/idempotency";
 import { upsertSearchDocSync } from "@/lib/search/search-doc-sync";
 import { triggerInstantAlerts } from "@/lib/search-alerts";
 import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
+import { syncCanonicalListingInventory } from "@/lib/listings/canonical-inventory";
 
 // ---------------------------------------------------------------------------
 // Shared fixtures
@@ -162,6 +177,7 @@ const validBody = {
   zip: "94102",
   roomType: "Private Room",
   totalSlots: "1",
+  moveInDate: "2026-05-01",
   images: [
     "https://test-project.supabase.co/storage/v1/object/public/images/listings/user-123/test.jpg",
   ],
@@ -196,7 +212,10 @@ function mockSuccessfulTransaction() {
       listing: { create: jest.fn().mockResolvedValue(mockListing) },
       location: { create: jest.fn().mockResolvedValue({ id: "loc-123" }) },
       $executeRaw: jest.fn().mockResolvedValue(1),
-      $queryRaw: jest.fn().mockResolvedValue([{ count: 0 }]),
+      $queryRaw: jest
+        .fn()
+        .mockResolvedValueOnce([{ count: 0 }])
+        .mockResolvedValue([]),
     };
     return callback(tx);
   });
@@ -214,6 +233,12 @@ describe("POST /api/listings — extended edge cases", () => {
     (checkEmailVerified as jest.Mock).mockResolvedValue({ verified: true });
     (prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: "user-123" });
     (prisma.listing.count as jest.Mock).mockResolvedValue(0);
+    (syncCanonicalListingInventory as jest.Mock).mockResolvedValue({
+      unitId: "unit-new",
+      inventoryId: "listing-new",
+      publishStatus: "PENDING_PROJECTION",
+      sourceVersion: BigInt(1),
+    });
     (geocodeAddress as jest.Mock).mockResolvedValue({
       status: "success",
       lat: 37.7749,
@@ -655,6 +680,24 @@ describe("POST /api/listings — extended edge cases", () => {
       );
     });
 
+    it("syncs canonical inventory inside the create transaction", async () => {
+      const response = await POST(makeRequest(validBody));
+      expect(response.status).toBe(201);
+      expect(syncCanonicalListingInventory).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          listing: expect.objectContaining({ id: "listing-new" }),
+          address: {
+            address: "123 Main St",
+            city: "San Francisco",
+            state: "CA",
+            zip: "94102",
+          },
+          actor: { role: "host", id: "user-123" },
+        })
+      );
+    });
+
     it("still returns 201 when triggerInstantAlerts fails (fire-and-forget)", async () => {
       (triggerInstantAlerts as jest.Mock).mockRejectedValue(
         new Error("Alerts service down")
@@ -704,7 +747,10 @@ describe("POST /api/listings — extended edge cases", () => {
       (prisma.$transaction as jest.Mock).mockImplementation(
         async (callback) => {
           const tx = {
-            $queryRaw: jest.fn().mockResolvedValue([{ count: 9 }]),
+            $queryRaw: jest
+              .fn()
+              .mockResolvedValueOnce([{ count: 9 }])
+              .mockResolvedValue([]),
             listing: { create: jest.fn().mockResolvedValue(mockListing) },
             location: {
               create: jest.fn().mockResolvedValue({ id: "loc-123" }),
@@ -738,7 +784,10 @@ describe("POST /api/listings — extended edge cases", () => {
           if (callCount === 1) {
             // First request: count is 9, succeeds
             const tx = {
-              $queryRaw: jest.fn().mockResolvedValue([{ count: 9 }]),
+              $queryRaw: jest
+                .fn()
+                .mockResolvedValueOnce([{ count: 9 }])
+                .mockResolvedValue([]),
               listing: { create: jest.fn().mockResolvedValue(mockListing) },
               location: {
                 create: jest.fn().mockResolvedValue({ id: "loc-123" }),

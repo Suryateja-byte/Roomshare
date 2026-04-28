@@ -5,17 +5,18 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { MapPin, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { loadPlacesUiKit } from "@/lib/googleMapsUiKitLoader";
+import { estimateWalkMins, haversineMiles } from "@/lib/geo/distance";
 import type { NeighborhoodSearchResult } from "@/lib/places/types";
+import type { POI } from "@/lib/places/types";
 
 /**
  * NearbyPlacesCard - Renders Google Places UI Kit components.
  *
  * COMPLIANCE NOTES:
- * - Places are rendered ONLY by UI Kit components (gmp-place-search)
- * - Do NOT extract place data and render in custom UI
- * - Do NOT remove/alter/obscure Google attributions
- * - Do NOT store place names/addresses/ratings
- * - Do NOT extract coordinates from place.location (ToS violation)
+ * - Free users see Google's UI Kit rendering with attribution.
+ * - Pro neighborhood intelligence uses transient in-memory POI data only.
+ * - Do NOT remove/alter/obscure Google attributions.
+ * - Do NOT persist Google place names/addresses/ratings/coordinates.
  */
 
 export interface NearbyPlacesCardProps {
@@ -59,6 +60,148 @@ const MAX_RESULTS = 5;
 // B6 FIX: Timeout for Places API search
 const SEARCH_TIMEOUT_MS = 15000; // 15 seconds
 
+type GooglePlaceCandidate = {
+  id?: string;
+  displayName?: string | { text?: string };
+  formattedAddress?: string;
+  location?: {
+    lat?: number | (() => number);
+    lng?: number | (() => number);
+  };
+  rating?: number;
+  userRatingCount?: number;
+  userRatingsTotal?: number;
+  primaryType?: string;
+  regularOpeningHours?: { isOpen?: () => boolean };
+  googleMapsURI?: string;
+  googleMapsUri?: string;
+};
+
+function resolveInitialRadius(radiusMeters: number | undefined): number {
+  return typeof radiusMeters === "number" &&
+    Number.isFinite(radiusMeters) &&
+    radiusMeters > 0
+    ? radiusMeters
+    : INITIAL_RADIUS;
+}
+
+function readCoordinate(value: number | (() => number) | undefined): number | null {
+  const resolved = typeof value === "function" ? value() : value;
+  return typeof resolved === "number" && Number.isFinite(resolved)
+    ? resolved
+    : null;
+}
+
+function readPlaceLocation(
+  location: GooglePlaceCandidate["location"]
+): { lat: number; lng: number } | null {
+  if (!location) return null;
+
+  const lat = readCoordinate(location.lat);
+  const lng = readCoordinate(location.lng);
+
+  if (lat == null || lng == null) return null;
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+
+  return { lat, lng };
+}
+
+function readDisplayName(
+  displayName: GooglePlaceCandidate["displayName"]
+): string | undefined {
+  if (typeof displayName === "string") {
+    return displayName.trim() || undefined;
+  }
+  if (displayName?.text) {
+    return displayName.text.trim() || undefined;
+  }
+  return undefined;
+}
+
+function readOptionalNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function readOpenNow(
+  regularOpeningHours: GooglePlaceCandidate["regularOpeningHours"]
+): boolean | undefined {
+  try {
+    const isOpen = regularOpeningHours?.isOpen?.();
+    return typeof isOpen === "boolean" ? isOpen : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function normalizePlacesForNeighborhoodResult(
+  places: GooglePlaceCandidate[],
+  listingLatLng: { lat: number; lng: number }
+): POI[] {
+  return places
+    .map((place, index): POI | null => {
+      const placeId = place.id?.trim();
+      const location = readPlaceLocation(place.location);
+
+      if (!placeId || !location) {
+        return null;
+      }
+
+      const distanceMiles = haversineMiles(
+        listingLatLng.lat,
+        listingLatLng.lng,
+        location.lat,
+        location.lng
+      );
+
+      return {
+        placeId,
+        name: readDisplayName(place.displayName) ?? `Place ${index + 1}`,
+        lat: location.lat,
+        lng: location.lng,
+        distanceMiles,
+        walkMins: estimateWalkMins(distanceMiles),
+        rating: readOptionalNumber(place.rating),
+        userRatingsTotal:
+          readOptionalNumber(place.userRatingCount) ??
+          readOptionalNumber(place.userRatingsTotal),
+        openNow: readOpenNow(place.regularOpeningHours),
+        address: place.formattedAddress?.trim() || undefined,
+        primaryType: place.primaryType?.trim() || undefined,
+        googleMapsURI:
+          place.googleMapsURI?.trim() || place.googleMapsUri?.trim() || undefined,
+      };
+    })
+    .filter((poi): poi is POI => poi !== null)
+    .sort((a, b) => (a.distanceMiles ?? 0) - (b.distanceMiles ?? 0))
+    .slice(0, MAX_RESULTS);
+}
+
+function buildNeighborhoodSearchResult(options: {
+  pois: POI[];
+  initialRadius: number;
+  radiusUsed: number;
+  searchMode: "type" | "text";
+  queryText?: string;
+}): NeighborhoodSearchResult {
+  const distances = options.pois
+    .map((poi) => poi.distanceMiles)
+    .filter((distance): distance is number => typeof distance === "number");
+
+  return {
+    pois: options.pois,
+    meta: {
+      radiusMeters: options.initialRadius,
+      radiusUsed: options.radiusUsed,
+      resultCount: options.pois.length,
+      closestMiles: distances.length > 0 ? Math.min(...distances) : 0,
+      farthestMiles: distances.length > 0 ? Math.max(...distances) : 0,
+      searchMode: options.searchMode,
+      queryText: options.queryText,
+      timestamp: Date.now(),
+    },
+  };
+}
+
 export function NearbyPlacesCard({
   latitude,
   longitude,
@@ -70,10 +213,10 @@ export function NearbyPlacesCard({
   canSearch = true, // C2 FIX: Default to true for backwards compatibility
   remainingSearches,
   multiBrandDetected = false, // P2-C3 FIX: Multi-brand warning
-  radiusMeters: _radiusMeters, // Used by NeighborhoodModule (passed through)
-  onSearchResultsReady: _onSearchResultsReady, // Used by NeighborhoodModule
-  onError: _onError, // Used by NeighborhoodModule
-  onLoadingChange: _onLoadingChange, // Used by NeighborhoodModule
+  radiusMeters, // Used by NeighborhoodModule
+  onSearchResultsReady, // Used by NeighborhoodModule
+  onError, // Used by NeighborhoodModule
+  onLoadingChange, // Used by NeighborhoodModule
 }: NearbyPlacesCardProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
@@ -86,8 +229,23 @@ export function NearbyPlacesCard({
     "loading" | "ready" | "error" | "no-results" | "rate-limited"
   >(canSearch === false ? "rate-limited" : "loading");
   const [errorMessage, setErrorMessage] = useState<string>("");
-  const [currentRadius, setCurrentRadius] = useState(INITIAL_RADIUS);
+  const initialRadius = resolveInitialRadius(radiusMeters);
+  const expandedRadius = Math.max(EXPANDED_RADIUS, initialRadius);
+  const includedTypesKey = normalizedIntent.includedTypes?.join("|") ?? "";
+  const [currentRadius, setCurrentRadius] = useState(initialRadius);
   const [hasExpandedOnce, setHasExpandedOnce] = useState(false);
+
+  useEffect(() => {
+    setCurrentRadius(initialRadius);
+    setHasExpandedOnce(false);
+  }, [
+    initialRadius,
+    latitude,
+    longitude,
+    normalizedIntent.mode,
+    normalizedIntent.textQuery,
+    includedTypesKey,
+  ]);
 
   // Load Places UI Kit on mount
   // P0-B27 FIX: Check canSearch BEFORE initializing - don't bypass rate limit
@@ -96,6 +254,7 @@ export function NearbyPlacesCard({
     // This sync is needed because canSearch prop can change after initial render
     if (!canSearch) {
       setStatus("rate-limited");
+      onLoadingChange?.(false);
       return;
     }
 
@@ -106,6 +265,7 @@ export function NearbyPlacesCard({
     async function initializePlaces() {
       try {
         setStatus("loading");
+        onLoadingChange?.(true);
         setErrorMessage("");
 
         await loadPlacesUiKit();
@@ -125,12 +285,14 @@ export function NearbyPlacesCard({
           "[NearbyPlacesCard] Failed to load Places UI Kit:",
           error
         );
-        setErrorMessage(
+        const message =
           error instanceof Error
             ? error.message
-            : "Failed to load Places UI Kit"
-        );
+            : "Failed to load Places UI Kit";
+        setErrorMessage(message);
         setStatus("error");
+        onError?.(message);
+        onLoadingChange?.(false);
       }
     }
 
@@ -139,9 +301,9 @@ export function NearbyPlacesCard({
     return () => {
       isMounted = false;
     };
-  }, [isVisible, canSearch]);
+  }, [isVisible, canSearch, onError, onLoadingChange]);
 
-  // Handle search results - NO coordinate extraction
+  // Handle search results
   const handleSearchLoad = useCallback(
     (event: Event) => {
       // B6 FIX: Clear timeout when search completes
@@ -151,24 +313,34 @@ export function NearbyPlacesCard({
       }
 
       const searchElement = event.target as HTMLElement & {
-        places?: Array<{ id?: string }>; // ONLY id, nothing else
+        places?: GooglePlaceCandidate[];
       };
 
       const results = searchElement?.places || [];
       const resultCount = results.length;
 
-      // NO coordinate extraction - just count results
-
       // If no results and haven't expanded yet, try with larger radius
       if (
         resultCount === 0 &&
         !hasExpandedOnce &&
-        currentRadius < EXPANDED_RADIUS
+        currentRadius < expandedRadius
       ) {
         setHasExpandedOnce(true);
-        setCurrentRadius(EXPANDED_RADIUS);
+        setCurrentRadius(expandedRadius);
         return;
       }
+
+      const pois = normalizePlacesForNeighborhoodResult(results, {
+        lat: latitude,
+        lng: longitude,
+      });
+      const result = buildNeighborhoodSearchResult({
+        pois,
+        initialRadius,
+        radiusUsed: currentRadius,
+        searchMode: normalizedIntent.mode,
+        queryText: queryText || normalizedIntent.textQuery,
+      });
 
       if (resultCount === 0) {
         setStatus("no-results");
@@ -177,9 +349,25 @@ export function NearbyPlacesCard({
         onSearchSuccess?.();
       }
 
+      onSearchResultsReady?.(result);
       onSearchComplete?.(resultCount);
+      onLoadingChange?.(false);
     },
-    [hasExpandedOnce, currentRadius, onSearchComplete, onSearchSuccess]
+    [
+      currentRadius,
+      expandedRadius,
+      hasExpandedOnce,
+      initialRadius,
+      latitude,
+      longitude,
+      normalizedIntent.mode,
+      normalizedIntent.textQuery,
+      onLoadingChange,
+      onSearchComplete,
+      onSearchResultsReady,
+      onSearchSuccess,
+      queryText,
+    ]
   );
 
   // Create and configure Places UI Kit elements IMPERATIVELY
@@ -262,6 +450,21 @@ export function NearbyPlacesCard({
 
     // Add event listener BEFORE adding to DOM
     searchEl.addEventListener("gmp-load", handleSearchLoad);
+    const handleSearchError = () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+        searchTimeoutRef.current = null;
+      }
+      const message = `Search for "${
+        queryText || normalizedIntent.textQuery || "nearby places"
+      }" failed. Please try again.`;
+      setErrorMessage(message);
+      setStatus("error");
+      onError?.(message);
+      onLoadingChange?.(false);
+      onSearchComplete?.(0);
+    };
+    searchEl.addEventListener("gmp-error", handleSearchError);
 
     // Store ref
     searchRef.current = searchEl;
@@ -278,10 +481,15 @@ export function NearbyPlacesCard({
         "ms"
       );
       const timeoutSec = Math.round(SEARCH_TIMEOUT_MS / 1000);
-      setErrorMessage(
-        `Search for "${queryText}" timed out after ${timeoutSec}s. This may be due to a slow connection. Please try again.`
-      );
+      const searchLabel =
+        queryText || normalizedIntent.textQuery || "nearby places";
+      const message =
+        `Search for "${searchLabel}" timed out after ${timeoutSec}s. This may be due to a slow connection. Please try again.`;
+      setErrorMessage(message);
       setStatus("error");
+      onError?.(message);
+      onLoadingChange?.(false);
+      onSearchComplete?.(0);
     }, SEARCH_TIMEOUT_MS);
 
     // B2 FIX: Proper cleanup - remove listener, clear container, null ref
@@ -292,6 +500,7 @@ export function NearbyPlacesCard({
         searchTimeoutRef.current = null;
       }
       searchEl.removeEventListener("gmp-load", handleSearchLoad);
+      searchEl.removeEventListener("gmp-error", handleSearchError);
       // Clear container to prevent DOM leaks
       if (container) {
         container.innerHTML = "";
@@ -306,25 +515,30 @@ export function NearbyPlacesCard({
     normalizedIntent,
     queryText,
     handleSearchLoad,
+    onError,
+    onLoadingChange,
+    onSearchComplete,
   ]);
 
   // Retry search
   const handleRetry = useCallback(() => {
     setStatus("loading");
+    onLoadingChange?.(true);
     setErrorMessage("");
-    setCurrentRadius(INITIAL_RADIUS);
+    setCurrentRadius(initialRadius);
     setHasExpandedOnce(false);
 
     // Re-trigger load
     loadPlacesUiKit()
       .then(() => setStatus("ready"))
       .catch((error: Error) => {
-        setErrorMessage(
-          error instanceof Error ? error.message : "Failed to load"
-        );
+        const message = error instanceof Error ? error.message : "Failed to load";
+        setErrorMessage(message);
         setStatus("error");
+        onError?.(message);
+        onLoadingChange?.(false);
       });
-  }, []);
+  }, [initialRadius, onError, onLoadingChange]);
 
   // Render loading state
   // C13 FIX: Enhanced skeleton UI during Google Maps script load
@@ -429,7 +643,7 @@ export function NearbyPlacesCard({
   // C8 FIX: Show actual search radius and indicate if search was expanded
   if (status === "no-results") {
     const radiusKm = (currentRadius / 1000).toFixed(1);
-    const wasExpanded = hasExpandedOnce || currentRadius > INITIAL_RADIUS;
+    const wasExpanded = hasExpandedOnce || currentRadius > initialRadius;
 
     return (
       <div className="bg-surface-container-lowest rounded-xl p-5 shadow-ambient-lg border border-outline-variant/20">
@@ -483,7 +697,7 @@ export function NearbyPlacesCard({
                 ? `Nearby ${normalizedIntent.includedTypes.map((t) => t.replace(/_/g, " ")).join(", ")}`
                 : `Nearby "${queryText}"`}
             </span>
-            {currentRadius > INITIAL_RADIUS && (
+            {currentRadius > initialRadius && (
               <span className="text-xs text-on-surface-variant tracking-wide">
                 Expanded search radius ({(currentRadius / 1000).toFixed(1)}km)
               </span>

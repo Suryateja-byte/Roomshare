@@ -3814,7 +3814,7 @@ export default function MapComponent({
         // Uncontrolled mode: use initialViewState (default behavior)
         {...(isControlledViewState && controlledViewState
           ? { ...controlledViewState, onMove: handleMove }
-          : { initialViewState })}
+          : { initialViewState, onMove: handleMove })}
         style={{ width: "100%", height: "100%" }}
         maxBounds={USA_MAX_BOUNDS}
         minZoom={MAP_MIN_ZOOM}

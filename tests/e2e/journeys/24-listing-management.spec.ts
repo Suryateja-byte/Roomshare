@@ -101,11 +101,7 @@ test.describe("J31: Edit Listing and Verify", () => {
       .catch(() => false);
     const updatedTitle = page.getByText(/Sunny Mission Room Updated/i);
     const hasUpdated = await updatedTitle.isVisible().catch(() => false);
-    const stayedOnEditSurface = await page
-      .getByRole("heading", { name: /edit listing/i })
-      .isVisible()
-      .catch(() => false);
-    expect(hasToast || hasUpdated || stayedOnEditSurface).toBeTruthy();
+    expect(hasToast || hasUpdated).toBeTruthy();
 
     // Restore original title for future test runs
     if (hasUpdated) {
@@ -284,10 +280,7 @@ test.describe("J33: Delete Listing with Confirmation", () => {
       .isVisible()
       .catch(() => false);
     const redirected = !page.url().includes("/listings/");
-    test.skip(
-      !(hasToast || redirected),
-      "Delete confirmation did not complete before the E2E timeout"
-    );
+    expect(hasToast || redirected).toBeTruthy();
   });
 });
 
@@ -321,8 +314,7 @@ test.describe("J34: Form Validation Errors", () => {
       .or(page.locator('[role="alert"]').filter({ hasText: /.+/ }));
 
     const errorCount = await errors.count();
-    // There should be at least one validation error
-    expect(errorCount).toBeGreaterThanOrEqual(0); // Soft — some forms use HTML5 validation
+    expect(errorCount).toBeGreaterThan(0);
 
     // Step 4: Fill title only
     const titleField = page

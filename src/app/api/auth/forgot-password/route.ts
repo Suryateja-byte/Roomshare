@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendNotificationEmail } from "@/lib/email";
 import { withRateLimit } from "@/lib/with-rate-limit";
@@ -14,6 +14,40 @@ const forgotPasswordSchema = z.object({
   email: z.string().email().max(254),
   turnstileToken: z.string().min(1).max(4096),
 });
+
+const PASSWORD_RESET_ACCEPTED_MIN_RESPONSE_MS = 1000;
+const PASSWORD_RESET_ACCEPTED_JITTER_MS = 250;
+
+const passwordResetAcceptedResponse = () =>
+  NextResponse.json({
+    message:
+      "If an account with that email exists, a password reset link has been sent.",
+  });
+
+function getPasswordResetAcceptedDelayMs() {
+  return (
+    PASSWORD_RESET_ACCEPTED_MIN_RESPONSE_MS +
+    Math.floor(Math.random() * (PASSWORD_RESET_ACCEPTED_JITTER_MS + 1))
+  );
+}
+
+async function waitForPasswordResetAcceptedTiming(
+  startedAt: number,
+  delayMs: number
+) {
+  const remainingMs = delayMs - (Date.now() - startedAt);
+  if (remainingMs > 0) {
+    await new Promise((resolve) => setTimeout(resolve, remainingMs));
+  }
+}
+
+async function passwordResetAcceptedAfterTiming(
+  startedAt: number,
+  delayMs: number
+) {
+  await waitForPasswordResetAcceptedTiming(startedAt, delayMs);
+  return passwordResetAcceptedResponse();
+}
 
 export async function POST(request: NextRequest) {
   const csrfResponse = validateCsrf(request);
@@ -50,18 +84,21 @@ export async function POST(request: NextRequest) {
     }
 
     const normalizedEmail = normalizeEmail(email);
+    const acceptedStartedAt = Date.now();
+    const acceptedDelayMs = getPasswordResetAcceptedDelayMs();
 
     // Check if user exists
     const user = await prisma.user.findUnique({
       where: { email: normalizedEmail },
+      select: { id: true, name: true },
     });
 
     // Always return success to prevent email enumeration attacks
     if (!user) {
-      return NextResponse.json({
-        message:
-          "If an account with that email exists, a password reset link has been sent.",
-      });
+      return passwordResetAcceptedAfterTiming(
+        acceptedStartedAt,
+        acceptedDelayMs
+      );
     }
 
     // Delete any existing reset tokens for this email
@@ -84,9 +121,11 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // In a production app, you would send an email here
-    // For now, we'll log the reset link (in development) and return success
-    const resetUrl = `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/reset-password?token=${token}`;
+    const baseUrl =
+      process.env.AUTH_URL ||
+      process.env.NEXTAUTH_URL ||
+      "http://localhost:3000";
+    const resetUrl = `${baseUrl}/reset-password?token=${token}`;
 
     // Log in development only (no PII — token is ephemeral)
     if (process.env.NODE_ENV === "development") {
@@ -95,26 +134,35 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Send password reset email
-    const emailResult = await sendNotificationEmail(
-      "passwordReset",
-      normalizedEmail,
-      {
-        userName: user.name || "User",
-        resetLink: resetUrl,
+    after(async () => {
+      try {
+        const emailResult = await sendNotificationEmail(
+          "passwordReset",
+          normalizedEmail,
+          {
+            userName: user.name || "User",
+            resetLink: resetUrl,
+          }
+        );
+        if (emailResult?.success) {
+          return;
+        }
+        logger.sync.error("Failed to send password reset email", {
+          error: sanitizeErrorMessage(emailResult?.error),
+          route: "/api/auth/forgot-password",
+        });
+      } catch (emailError) {
+        logger.sync.error("Failed to send password reset email", {
+          error: sanitizeErrorMessage(emailError),
+          route: "/api/auth/forgot-password",
+        });
       }
-    );
-    if (!emailResult.success) {
-      logger.sync.error("Failed to send password reset email", {
-        error: sanitizeErrorMessage(emailResult.error),
-        route: "/api/auth/forgot-password",
-      });
-    }
-
-    return NextResponse.json({
-      message:
-        "If an account with that email exists, a password reset link has been sent.",
     });
+
+    return passwordResetAcceptedAfterTiming(
+      acceptedStartedAt,
+      acceptedDelayMs
+    );
   } catch (error) {
     logger.sync.error("Forgot password error", {
       error: sanitizeErrorMessage(error),

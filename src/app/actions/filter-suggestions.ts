@@ -17,16 +17,20 @@ import { z } from "zod";
 const filterParamsSchema = z
   .object({
     query: z.string().max(200).optional(),
+    locationLabel: z.string().max(200).optional(),
+    vibeQuery: z.string().max(200).optional(),
     minPrice: z.number().min(0).optional(),
     maxPrice: z.number().min(0).optional(),
     amenities: z.array(z.string().max(100)).max(50).optional(),
     moveInDate: z.string().max(50).optional(),
+    endDate: z.string().max(50).optional(),
     leaseDuration: z.string().max(100).optional(),
     houseRules: z.array(z.string().max(100)).max(50).optional(),
     roomType: z.string().max(100).optional(),
     languages: z.array(z.string().max(10)).max(20).optional(),
     genderPreference: z.string().max(50).optional(),
     householdGender: z.string().max(50).optional(),
+    bookingMode: z.string().max(50).optional(),
     bounds: z
       .object({
         minLat: z.number(),
@@ -37,6 +41,9 @@ const filterParamsSchema = z
       .optional(),
     page: z.number().int().min(1).optional(),
     limit: z.number().int().min(1).max(100).optional(),
+    sort: z.string().max(50).optional(),
+    minAvailableSlots: z.number().int().min(1).optional(),
+    nearMatches: z.boolean().optional(),
   })
   .strict();
 

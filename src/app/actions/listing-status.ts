@@ -13,7 +13,7 @@ import {
   getClientIPFromHeaders,
 } from "@/lib/rate-limit";
 import { features } from "@/lib/env";
-import { getModerationWriteLockResult } from "@/lib/listings/moderation-write-lock";
+import { getHostModerationWriteLockResult } from "@/lib/listings/moderation-write-lock";
 import { recordFreshnessRecovered } from "@/lib/metrics/cfm-ops-telemetry";
 // Basic listingId format check — rejects empty/absurdly long strings
 // without being as strict as CUID/UUID validation (allows test IDs)
@@ -111,12 +111,10 @@ export async function updateListingStatus(
         }
 
         const currentListing = rows[0];
-        const writeLock = features.moderationWriteLocks
-          ? getModerationWriteLockResult({
-              actor: "host",
-              statusReason: currentListing.statusReason,
-            })
-          : null;
+        const writeLock = getHostModerationWriteLockResult({
+          statusReason: currentListing.statusReason,
+          moderationWriteLocksEnabled: features.moderationWriteLocks,
+        });
 
         if (writeLock) {
           return {
@@ -267,12 +265,10 @@ export async function recoverHostManagedListing(
         }
 
         const currentListing = rows[0];
-        const writeLock = features.moderationWriteLocks
-          ? getModerationWriteLockResult({
-              actor: "host",
-              statusReason: currentListing.statusReason,
-            })
-          : null;
+        const writeLock = getHostModerationWriteLockResult({
+          statusReason: currentListing.statusReason,
+          moderationWriteLocksEnabled: features.moderationWriteLocks,
+        });
 
         if (writeLock) {
           return {

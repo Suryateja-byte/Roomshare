@@ -55,7 +55,9 @@ export interface SearchV2ListItem {
   title: string;
   price: number | null;
   image: string | null;
+  /** Approximate public latitude, coarsened before leaving the server. */
   lat: number;
+  /** Approximate public longitude, coarsened before leaving the server. */
   lng: number;
   /** Badges like 'near-match', 'multi-room' */
   badges?: string[];
@@ -74,7 +76,9 @@ export interface SearchV2ListItem {
 /** Pin with tier information for sparse results */
 export interface SearchV2Pin {
   id: string;
+  /** Approximate public latitude, coarsened before leaving the server. */
   lat: number;
+  /** Approximate public longitude, coarsened before leaving the server. */
   lng: number;
   price?: number | null;
   publicAvailability: PublicAvailability;

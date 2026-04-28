@@ -1,8 +1,11 @@
 import "server-only";
 
 import type { ParsedSearchParams, RawSearchParams } from "@/lib/search-params";
-import type { ListingData, MapListingData, PaginatedResultHybrid } from "@/lib/data";
-import { features } from "@/lib/env";
+import type {
+  ListingData,
+  MapListingData,
+  PaginatedResultHybrid,
+} from "@/lib/data";
 import { getReadEmbeddingVersion } from "@/lib/embeddings/version";
 import { currentProjectionEpoch } from "@/lib/projections/epoch";
 import { prisma } from "@/lib/prisma";
@@ -25,6 +28,8 @@ import {
   toSnapshotResponseMeta,
   type SnapshotExpiredReason,
 } from "@/lib/search/query-snapshots";
+import type { ProjectionReadEligibility } from "@/lib/search/projection-read-eligibility";
+import { getProjectionReadEligibility } from "@/lib/search/projection-read-eligibility";
 import {
   SEARCH_RESPONSE_VERSION,
   type SearchMapState,
@@ -40,13 +45,23 @@ import {
   buildPublicAvailability,
   type PublicAvailability,
 } from "./public-availability";
-import {
-  isPhase04KillSwitchActive,
-} from "@/lib/flags/phase04";
+import { searchV2MapToListings } from "./v2-map-data";
+import { isPhase04KillSwitchActive } from "@/lib/flags/phase04";
 import { recordSearchSnapshotHoleRatio } from "./search-telemetry";
 import type { SearchV2Params, SearchV2Result } from "./search-v2-service";
 
 const DEFAULT_UNIT_IDENTITY_EPOCH_FLOOR = 1;
+
+type ProjectionReadUnsupportedError = {
+  code: "projection_read_unsupported";
+  message: string;
+  status: 400;
+  unsupportedReasons: ProjectionReadEligibility["unsupportedReasons"];
+};
+
+type ProjectionSearchCountResult =
+  | { ok: true; count: number | null }
+  | { ok: false; error: SearchAdmissionError | ProjectionReadUnsupportedError };
 
 type SqlValue = string | number | boolean | Date | null | string[];
 
@@ -96,12 +111,21 @@ interface RawProjectionUnitRow {
   source_version: bigint | number | string;
 }
 
-function getFirstValue(value: string | string[] | undefined): string | undefined {
+interface ParsedUnitKey {
+  unitId: string;
+  unitIdentityEpoch: number;
+  key: string;
+}
+
+function getFirstValue(
+  value: string | string[] | undefined
+): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
 function toStringArray(value: string[] | string | null | undefined): string[] {
-  if (Array.isArray(value)) return value.filter((item) => typeof item === "string");
+  if (Array.isArray(value))
+    return value.filter((item) => typeof item === "string");
   if (typeof value !== "string" || value.length === 0) return [];
   if (value.startsWith("{") && value.endsWith("}")) {
     return value
@@ -115,7 +139,8 @@ function toStringArray(value: string[] | string | null | undefined): string[] {
 
 function parseDate(value: Date | string | null): Date | null {
   if (!value) return null;
-  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (value instanceof Date)
+    return Number.isNaN(value.getTime()) ? null : value;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
 }
@@ -187,13 +212,25 @@ function isInsideBounds(row: ProjectionUnitRow, spec: SearchSpec): boolean {
       ? point.lng >= bounds.minLng && point.lng <= bounds.maxLng
       : point.lng >= bounds.minLng || point.lng <= bounds.maxLng;
   return (
-    point.lat >= bounds.minLat &&
-    point.lat <= bounds.maxLat &&
-    lngInBounds
+    point.lat >= bounds.minLat && point.lat <= bounds.maxLat && lngInBounds
   );
 }
 
-function buildPublicAvailabilityForRow(row: ProjectionUnitRow): PublicAvailability {
+function parseUnitKeys(unitKeys: string[]): ParsedUnitKey[] {
+  return unitKeys
+    .map((key) => {
+      const [unitId, epoch] = key.split(":");
+      const unitIdentityEpoch = Number(epoch);
+      return unitId && Number.isInteger(unitIdentityEpoch)
+        ? { unitId, unitIdentityEpoch, key }
+        : null;
+    })
+    .filter((item): item is ParsedUnitKey => Boolean(item));
+}
+
+function buildPublicAvailabilityForRow(
+  row: ProjectionUnitRow
+): PublicAvailability {
   return buildPublicAvailability({
     openSlots: row.matchingInventoryCount,
     availableSlots: row.matchingInventoryCount,
@@ -203,7 +240,9 @@ function buildPublicAvailabilityForRow(row: ProjectionUnitRow): PublicAvailabili
   });
 }
 
-function buildGroupSummary(row: ProjectionUnitRow): NonNullable<ListingData["groupSummary"]> {
+function buildGroupSummary(
+  row: ProjectionUnitRow
+): NonNullable<ListingData["groupSummary"]> {
   const firstDate = row.earliestAvailableFrom?.toISOString().slice(0, 10);
   const siblingIds = row.inventoryIds.filter(
     (id) => id !== row.representativeInventoryId
@@ -290,10 +329,14 @@ function projectionRowToListing(row: ProjectionUnitRow): ListingData {
   };
 }
 
-function projectionRowsToMapListings(rows: ProjectionUnitRow[]): MapListingData[] {
+function projectionRowsToMapListings(
+  rows: ProjectionUnitRow[]
+): MapListingData[] {
   return rows
     .map(projectionRowToListing)
-    .filter((listing) => !(listing.location.lat === 0 && listing.location.lng === 0))
+    .filter(
+      (listing) => !(listing.location.lat === 0 && listing.location.lng === 0)
+    )
     .map((listing) => ({
       id: listing.id,
       title: listing.title,
@@ -342,34 +385,36 @@ function addParam(params: SqlValue[], value: SqlValue): string {
 
 function normalizeRoomCategory(roomType: string | undefined): string | null {
   if (!roomType || roomType === "any") return null;
-  return roomType.trim().replace(/[\s-]+/g, "_").toUpperCase();
+  return roomType
+    .trim()
+    .replace(/[\s-]+/g, "_")
+    .toUpperCase();
 }
 
-async function queryProjectionUnitRows(spec: SearchSpec): Promise<ProjectionUnitRow[]> {
+async function queryProjectionUnitRows(
+  spec: SearchSpec,
+  opts: { unitKeys?: string[] } = {}
+): Promise<ProjectionUnitRow[]> {
+  const parsedUnitKeys = opts.unitKeys ? parseUnitKeys(opts.unitKeys) : [];
+  if (opts.unitKeys && parsedUnitKeys.length === 0) {
+    return [];
+  }
+
   const params: SqlValue[] = [];
   const where = [
     "isp.publish_status IN ('PUBLISHED', 'STALE_PUBLISHED')",
     "upp.matching_inventory_count > 0",
   ];
-  let semanticJoin = "";
-  const queryText = spec.filterParams.vibeQuery?.trim() || spec.filterParams.query?.trim();
-  const useSemantic =
-    features.semanticSearch &&
-    Boolean(queryText) &&
-    Boolean(spec.versions.embeddingVersion);
-
-  if (useSemantic) {
-    semanticJoin = `INNER JOIN semantic_inventory_projection sem
-      ON sem.inventory_id = isp.inventory_id
-     AND sem.embedding_version = ${addParam(params, spec.versions.embeddingVersion ?? "")}
-     AND sem.publish_status = 'PUBLISHED'`;
-  }
 
   if (spec.filterParams.minPrice !== undefined) {
-    where.push(`isp.price >= ${addParam(params, spec.filterParams.minPrice)}::NUMERIC`);
+    where.push(
+      `isp.price >= ${addParam(params, spec.filterParams.minPrice)}::NUMERIC`
+    );
   }
   if (spec.filterParams.maxPrice !== undefined) {
-    where.push(`isp.price <= ${addParam(params, spec.filterParams.maxPrice)}::NUMERIC`);
+    where.push(
+      `isp.price <= ${addParam(params, spec.filterParams.maxPrice)}::NUMERIC`
+    );
   }
 
   const roomCategory = normalizeRoomCategory(spec.filterParams.roomType);
@@ -377,7 +422,16 @@ async function queryProjectionUnitRows(spec: SearchSpec): Promise<ProjectionUnit
     where.push(`isp.room_category = ${addParam(params, roomCategory)}`);
   }
 
-  if (spec.filterParams.genderPreference && spec.filterParams.genderPreference !== "any") {
+  if (spec.filterParams.bookingMode === "WHOLE_UNIT") {
+    where.push("isp.room_category = 'ENTIRE_PLACE'");
+  } else if (spec.filterParams.bookingMode === "SHARED") {
+    where.push("isp.room_category <> 'ENTIRE_PLACE'");
+  }
+
+  if (
+    spec.filterParams.genderPreference &&
+    spec.filterParams.genderPreference !== "any"
+  ) {
     where.push(
       `(isp.gender_preference IS NULL OR isp.gender_preference = ${addParam(
         params,
@@ -385,7 +439,10 @@ async function queryProjectionUnitRows(spec: SearchSpec): Promise<ProjectionUnit
       )})`
     );
   }
-  if (spec.filterParams.householdGender && spec.filterParams.householdGender !== "any") {
+  if (
+    spec.filterParams.householdGender &&
+    spec.filterParams.householdGender !== "any"
+  ) {
     where.push(
       `(isp.household_gender IS NULL OR isp.household_gender = ${addParam(
         params,
@@ -397,31 +454,63 @@ async function queryProjectionUnitRows(spec: SearchSpec): Promise<ProjectionUnit
   if (spec.filterParams.moveInDate) {
     const moveIn = addParam(params, spec.filterParams.moveInDate);
     const gapDays = addParam(params, spec.maxGapDays);
-    where.push(`isp.available_from <= (${moveIn}::DATE + (${gapDays}::INTEGER * INTERVAL '1 day'))`);
-    where.push(`(isp.available_until IS NULL OR isp.available_until >= ${moveIn}::DATE)`);
+    where.push(
+      `isp.available_from <= (${moveIn}::DATE + (${gapDays}::INTEGER * INTERVAL '1 day'))`
+    );
+    where.push(
+      `(isp.available_until IS NULL OR isp.available_until >= ${moveIn}::DATE)`
+    );
   }
 
   const occupants = addParam(params, spec.requestedOccupants);
   where.push(`(
-    (isp.room_category = 'SHARED_ROOM' AND COALESCE(isp.open_beds, 0) >= ${occupants}::INTEGER)
-    OR
-    (isp.room_category <> 'SHARED_ROOM' AND COALESCE(isp.capacity_guests, isp.open_beds, isp.total_beds, 0) >= ${occupants}::INTEGER)
-  )`);
+	    (isp.room_category = 'SHARED_ROOM' AND COALESCE(isp.open_beds, 0) >= ${occupants}::INTEGER)
+	    OR
+	    (isp.room_category <> 'SHARED_ROOM' AND COALESCE(isp.capacity_guests, isp.open_beds, isp.total_beds, 0) >= ${occupants}::INTEGER)
+	  )`);
+
+  if (spec.filterParams.bounds) {
+    const cellExpr = "COALESCE(isp.public_cell_id, upp.public_cell_id)";
+    const numericCellPattern = "^-?[0-9]+(\\.[0-9]+)?,-?[0-9]+(\\.[0-9]+)?$";
+    const latExpr = `(CASE WHEN ${cellExpr} ~ '${numericCellPattern}' THEN split_part(${cellExpr}, ',', 1)::DOUBLE PRECISION END)`;
+    const lngExpr = `(CASE WHEN ${cellExpr} ~ '${numericCellPattern}' THEN split_part(${cellExpr}, ',', 2)::DOUBLE PRECISION END)`;
+    const minLat = addParam(params, spec.filterParams.bounds.minLat);
+    const maxLat = addParam(params, spec.filterParams.bounds.maxLat);
+    const minLng = addParam(params, spec.filterParams.bounds.minLng);
+    const maxLng = addParam(params, spec.filterParams.bounds.maxLng);
+
+    where.push(
+      `${latExpr} BETWEEN ${minLat}::DOUBLE PRECISION AND ${maxLat}::DOUBLE PRECISION`
+    );
+    where.push(
+      spec.filterParams.bounds.minLng <= spec.filterParams.bounds.maxLng
+        ? `${lngExpr} BETWEEN ${minLng}::DOUBLE PRECISION AND ${maxLng}::DOUBLE PRECISION`
+        : `(${lngExpr} >= ${minLng}::DOUBLE PRECISION OR ${lngExpr} <= ${maxLng}::DOUBLE PRECISION)`
+    );
+  }
+
+  if (parsedUnitKeys.length > 0) {
+    const tupleClause = parsedUnitKeys
+      .map((entry) => {
+        const unitId = addParam(params, entry.unitId);
+        const epoch = addParam(params, entry.unitIdentityEpoch);
+        return `(${unitId}, ${epoch}::INTEGER)`;
+      })
+      .join(", ");
+    where.push(`(upp.unit_id, upp.unit_identity_epoch) IN (${tupleClause})`);
+  }
 
   const sql = `
     SELECT
       (upp.unit_id || ':' || upp.unit_identity_epoch::TEXT) AS unit_key,
       upp.unit_id,
       upp.unit_identity_epoch,
-      COALESCE(
-        upp.representative_inventory_id,
-        (array_agg(isp.inventory_id ORDER BY isp.price ASC, isp.available_from ASC, isp.inventory_id ASC))[1]
-      ) AS representative_inventory_id,
+      (array_agg(isp.inventory_id ORDER BY isp.price ASC, isp.available_from ASC, isp.inventory_id ASC))[1] AS representative_inventory_id,
       array_agg(isp.inventory_id ORDER BY isp.price ASC, isp.available_from ASC, isp.inventory_id ASC) AS inventory_ids,
-      COALESCE(upp.from_price::TEXT, MIN(isp.price)::TEXT) AS from_price,
-      upp.room_categories,
-      upp.earliest_available_from,
-      upp.matching_inventory_count,
+      MIN(isp.price)::TEXT AS from_price,
+      array_agg(DISTINCT isp.room_category ORDER BY isp.room_category) AS room_categories,
+      MIN(isp.available_from) AS earliest_available_from,
+      COUNT(DISTINCT isp.inventory_id)::INTEGER AS matching_inventory_count,
       COALESCE(upp.public_point, (array_agg(isp.public_point ORDER BY isp.price ASC, isp.available_from ASC, isp.inventory_id ASC) FILTER (WHERE isp.public_point IS NOT NULL))[1]) AS public_point,
       COALESCE(upp.public_cell_id, (array_agg(isp.public_cell_id ORDER BY isp.price ASC, isp.available_from ASC, isp.inventory_id ASC) FILTER (WHERE isp.public_cell_id IS NOT NULL))[1]) AS public_cell_id,
       COALESCE(upp.public_area_name, (array_agg(isp.public_area_name ORDER BY isp.price ASC, isp.available_from ASC, isp.inventory_id ASC) FILTER (WHERE isp.public_area_name IS NOT NULL))[1]) AS public_area_name,
@@ -431,40 +520,41 @@ async function queryProjectionUnitRows(spec: SearchSpec): Promise<ProjectionUnit
       GREATEST(upp.projection_epoch, MAX(isp.projection_epoch)) AS projection_epoch,
       GREATEST(upp.source_version, MAX(isp.source_version)) AS source_version
     FROM inventory_search_projection isp
-    ${semanticJoin}
     INNER JOIN unit_public_projection upp
       ON upp.unit_id = isp.unit_id
      AND upp.unit_identity_epoch = isp.unit_identity_epoch_written_at
     WHERE ${where.join("\n      AND ")}
     GROUP BY
-      upp.unit_id, upp.unit_identity_epoch, upp.representative_inventory_id,
-      upp.from_price, upp.room_categories, upp.earliest_available_from,
-      upp.matching_inventory_count, upp.public_point, upp.public_cell_id,
+      upp.unit_id, upp.unit_identity_epoch, upp.public_point, upp.public_cell_id,
       upp.public_area_name, upp.display_title, upp.display_subtitle,
       upp.hero_image_url, upp.projection_epoch, upp.source_version
     ORDER BY ${getSortClause(spec.sort)}
     LIMIT 256
   `;
 
-  const rows = await rawSql.$queryRawUnsafe<RawProjectionUnitRow[]>(sql, ...params);
-  return rows.map(normalizeProjectionRow).filter((row) => isInsideBounds(row, spec));
+  const rows = await rawSql.$queryRawUnsafe<RawProjectionUnitRow[]>(
+    sql,
+    ...params
+  );
+  return rows
+    .map(normalizeProjectionRow)
+    .filter((row) => isInsideBounds(row, spec));
 }
 
 async function fetchProjectionRowsByUnitKeys(
-  unitKeys: string[]
+  unitKeys: string[],
+  spec?: SearchSpec
 ): Promise<ProjectionUnitRow[]> {
-  const parsed = unitKeys
-    .map((key) => {
-      const [unitId, epoch] = key.split(":");
-      const unitIdentityEpoch = Number(epoch);
-      return unitId && Number.isInteger(unitIdentityEpoch)
-        ? { unitId, unitIdentityEpoch, key }
-        : null;
-    })
-    .filter((item): item is { unitId: string; unitIdentityEpoch: number; key: string } =>
-      Boolean(item)
-    );
+  const parsed = parseUnitKeys(unitKeys);
   if (parsed.length === 0) return [];
+
+  if (spec) {
+    const rows = await queryProjectionUnitRows(spec, { unitKeys });
+    const byKey = new Map(rows.map((row) => [row.unitKey, row]));
+    return parsed
+      .map((entry) => byKey.get(entry.key))
+      .filter(Boolean) as ProjectionUnitRow[];
+  }
 
   const params: SqlValue[] = [];
   const tupleClause = parsed
@@ -480,15 +570,12 @@ async function fetchProjectionRowsByUnitKeys(
       (upp.unit_id || ':' || upp.unit_identity_epoch::TEXT) AS unit_key,
       upp.unit_id,
       upp.unit_identity_epoch,
-      COALESCE(
-        upp.representative_inventory_id,
-        (array_agg(isp.inventory_id ORDER BY isp.price ASC, isp.available_from ASC, isp.inventory_id ASC))[1]
-      ) AS representative_inventory_id,
+      (array_agg(isp.inventory_id ORDER BY isp.price ASC, isp.available_from ASC, isp.inventory_id ASC))[1] AS representative_inventory_id,
       array_agg(isp.inventory_id ORDER BY isp.price ASC, isp.available_from ASC, isp.inventory_id ASC) AS inventory_ids,
-      upp.from_price::TEXT AS from_price,
-      upp.room_categories,
-      upp.earliest_available_from,
-      upp.matching_inventory_count,
+      MIN(isp.price)::TEXT AS from_price,
+      array_agg(DISTINCT isp.room_category ORDER BY isp.room_category) AS room_categories,
+      MIN(isp.available_from) AS earliest_available_from,
+      COUNT(DISTINCT isp.inventory_id)::INTEGER AS matching_inventory_count,
       upp.public_point,
       upp.public_cell_id,
       upp.public_area_name,
@@ -505,16 +592,21 @@ async function fetchProjectionRowsByUnitKeys(
     WHERE (upp.unit_id, upp.unit_identity_epoch) IN (${tupleClause})
       AND upp.matching_inventory_count > 0
     GROUP BY
-      upp.unit_id, upp.unit_identity_epoch, upp.representative_inventory_id,
-      upp.from_price, upp.room_categories, upp.earliest_available_from,
-      upp.matching_inventory_count, upp.public_point, upp.public_cell_id,
+      upp.unit_id, upp.unit_identity_epoch, upp.public_point, upp.public_cell_id,
       upp.public_area_name, upp.display_title, upp.display_subtitle,
       upp.hero_image_url, upp.projection_epoch, upp.source_version
   `;
 
-  const rows = await rawSql.$queryRawUnsafe<RawProjectionUnitRow[]>(sql, ...params);
-  const byKey = new Map(rows.map((row) => [row.unit_key, normalizeProjectionRow(row)]));
-  return parsed.map((entry) => byKey.get(entry.key)).filter(Boolean) as ProjectionUnitRow[];
+  const rows = await rawSql.$queryRawUnsafe<RawProjectionUnitRow[]>(
+    sql,
+    ...params
+  );
+  const byKey = new Map(
+    rows.map((row) => [row.unit_key, normalizeProjectionRow(row)])
+  );
+  return parsed
+    .map((entry) => byKey.get(entry.key))
+    .filter(Boolean) as ProjectionUnitRow[];
 }
 
 function emptyMap(): SearchV2Map {
@@ -574,6 +666,17 @@ function buildSnapshotExpired(
   return { queryHash, reason };
 }
 
+function buildProjectionUnsupportedError(
+  eligibility: ProjectionReadEligibility
+): ProjectionReadUnsupportedError {
+  return {
+    code: "projection_read_unsupported",
+    message: "Phase04 projection reads do not support this search spec",
+    status: 400,
+    unsupportedReasons: eligibility.unsupportedReasons,
+  };
+}
+
 function buildResult(input: {
   rows: ProjectionUnitRow[];
   allRowsForMap: ProjectionUnitRow[];
@@ -588,7 +691,9 @@ function buildResult(input: {
   const map = input.includeMap ? buildMap(input.allRowsForMap) : emptyMap();
   const meta = {
     queryHash: input.queryHash,
-    ...(input.querySnapshotId ? { querySnapshotId: input.querySnapshotId } : {}),
+    ...(input.querySnapshotId
+      ? { querySnapshotId: input.querySnapshotId }
+      : {}),
     generatedAt: new Date().toISOString(),
     mode: getMode(map),
     projectionEpoch: String(input.versions.projectionEpoch),
@@ -628,6 +733,7 @@ async function hydratePhase04Snapshot(input: {
   cursor: SnapshotCursor;
   queryHash: string;
   includeMap: boolean;
+  spec: SearchSpec;
 }): Promise<SearchV2Result> {
   if (input.cursor.v !== 4) {
     return {
@@ -659,7 +765,10 @@ async function hydratePhase04Snapshot(input: {
     return {
       response: null,
       paginatedResult: null,
-      snapshotExpired: buildSnapshotExpired(input.queryHash, snapshotResult.reason),
+      snapshotExpired: buildSnapshotExpired(
+        input.queryHash,
+        snapshotResult.reason
+      ),
     };
   }
   const snapshot = snapshotResult.snapshot;
@@ -679,7 +788,7 @@ async function hydratePhase04Snapshot(input: {
   }
 
   const unitKeys = snapshot.orderedUnitKeys ?? [];
-  const visibleRows = await fetchProjectionRowsByUnitKeys(unitKeys);
+  const visibleRows = await fetchProjectionRowsByUnitKeys(unitKeys, input.spec);
   const holeCount = Math.max(0, unitKeys.length - visibleRows.length);
   recordSearchSnapshotHoleRatio({
     route: "search-page-ssr",
@@ -747,6 +856,29 @@ export async function executeProjectionSearchV2(input: {
   }
   const spec = specResult.spec;
   const queryHash = getPhase04SearchSpecHash(spec);
+  const eligibility = getProjectionReadEligibility(input.parsed);
+  if (!eligibility.supported) {
+    if (cursorStr) {
+      const decoded = decodeCursorAny(cursorStr, spec.sort);
+      if (decoded?.type === "snapshot" && decoded.cursor.v === 4) {
+        return {
+          response: null,
+          paginatedResult: null,
+          snapshotExpired: buildSnapshotExpired(
+            queryHash,
+            "search_contract_changed"
+          ),
+        };
+      }
+    }
+
+    return {
+      response: null,
+      paginatedResult: null,
+      error: "projection_read_unsupported",
+      projectionReadUnsupported: eligibility,
+    };
+  }
 
   if (cursorStr) {
     const decoded = decodeCursorAny(cursorStr, spec.sort);
@@ -755,6 +887,7 @@ export async function executeProjectionSearchV2(input: {
         cursor: decoded.cursor,
         queryHash,
         includeMap: shouldIncludeMap,
+        spec,
       });
     }
   }
@@ -820,16 +953,39 @@ export async function hydratePhase04MapSnapshot(input: {
     };
   }
   const snapshot = snapshotResult.snapshot;
-  if (snapshot.snapshotVersion !== PHASE04_SNAPSHOT_VERSION) {
+  const requestedQueryHash = input.queryHash?.trim() ?? "";
+  if (
+    snapshot.snapshotVersion !== PHASE04_SNAPSHOT_VERSION ||
+    snapshot.responseVersion !== SEARCH_RESPONSE_VERSION ||
+    (requestedQueryHash.length > 0 && snapshot.queryHash !== requestedQueryHash)
+  ) {
     return {
       error: "snapshot_expired",
       snapshotExpired: {
-        queryHash: queryHash || snapshot.queryHash,
+        queryHash: requestedQueryHash || snapshot.queryHash,
         reason: "search_contract_changed",
       },
     };
   }
-  const rows = await fetchProjectionRowsByUnitKeys(snapshot.orderedUnitKeys ?? []);
+  if (snapshot.mapPayload) {
+    const storedMap = snapshot.mapPayload as unknown as SearchV2Map;
+    return {
+      kind: "ok",
+      data: {
+        listings: searchV2MapToListings(storedMap),
+        ...(storedMap.truncated !== undefined
+          ? { truncated: storedMap.truncated }
+          : {}),
+        ...(storedMap.totalCandidates !== undefined
+          ? { totalCandidates: storedMap.totalCandidates }
+          : {}),
+      },
+      meta: toSnapshotResponseMeta(snapshot),
+    };
+  }
+  const rows = await fetchProjectionRowsByUnitKeys(
+    snapshot.orderedUnitKeys ?? []
+  );
   const map = buildMap(rows);
   return {
     kind: "ok",
@@ -844,9 +1000,7 @@ export async function hydratePhase04MapSnapshot(input: {
 export async function getProjectionSearchCount(input: {
   parsed: ParsedSearchParams;
   rawParams: RawSearchParams | Record<string, string | string[] | undefined>;
-}): Promise<
-  { ok: true; count: number | null } | { ok: false; error: SearchAdmissionError }
-> {
+}): Promise<ProjectionSearchCountResult> {
   const versions = {
     projectionEpoch: currentProjectionEpoch(),
     embeddingVersion: getReadEmbeddingVersion(),
@@ -860,6 +1014,10 @@ export async function getProjectionSearchCount(input: {
     versions,
   });
   if (!specResult.ok) return { ok: false, error: specResult.error };
+  const eligibility = getProjectionReadEligibility(input.parsed);
+  if (!eligibility.supported) {
+    return { ok: false, error: buildProjectionUnsupportedError(eligibility) };
+  }
   const rows = await queryProjectionUnitRows(specResult.spec);
   return { ok: true, count: rows.length > 100 ? null : rows.length };
 }

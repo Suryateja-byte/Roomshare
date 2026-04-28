@@ -1,9 +1,10 @@
-import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import type { Prisma, ReportStatus } from "@prisma/client";
 import Link from "next/link";
 import { ArrowLeft, Flag } from "lucide-react";
 import ReportList from "./ReportList";
+import { requireAdmin } from "@/app/actions/admin";
 
 export const metadata = {
   title: "Reports Management | Admin | RoomShare",
@@ -11,85 +12,105 @@ export const metadata = {
 };
 
 const ALLOWED_REPORT_KINDS = ["ABUSE_REPORT", "PRIVATE_FEEDBACK"] as const;
+const ALLOWED_REPORT_STATUSES = [
+  "all",
+  "OPEN",
+  "RESOLVED",
+  "DISMISSED",
+] as const;
+const PAGE_SIZE = 50;
 
 type AdminReportsPageProps = {
-  searchParams: Promise<{ kind?: string }>;
+  searchParams: Promise<{ kind?: string; status?: string; page?: string }>;
 };
+
+type ReportKindFilter = "all" | (typeof ALLOWED_REPORT_KINDS)[number];
+type ReportStatusFilter = (typeof ALLOWED_REPORT_STATUSES)[number];
+
+function parsePage(value: string | undefined) {
+  const page = Number(value);
+  return Number.isInteger(page) && page > 0 ? page : 1;
+}
 
 export default async function AdminReportsPage({
   searchParams,
 }: AdminReportsPageProps) {
-  const session = await auth();
-
-  if (!session?.user?.id) {
+  const adminCheck = await requireAdmin();
+  if (adminCheck.code === "SESSION_EXPIRED") {
     redirect("/login?callbackUrl=/admin/reports");
   }
 
-  // Check if user is admin
-  const currentUser = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { isAdmin: true },
-  });
-
-  if (!currentUser?.isAdmin) {
+  if (adminCheck.error) {
     redirect("/");
   }
 
   const params = await searchParams;
   const rawKind = params.kind;
-  const kindFilter: (typeof ALLOWED_REPORT_KINDS)[number] | null =
-    ALLOWED_REPORT_KINDS.includes(rawKind as (typeof ALLOWED_REPORT_KINDS)[number])
-      ? (rawKind as (typeof ALLOWED_REPORT_KINDS)[number])
-      : null;
-  const where = kindFilter ? { kind: kindFilter } : undefined;
+  const kindFilter: ReportKindFilter = ALLOWED_REPORT_KINDS.includes(
+    rawKind as (typeof ALLOWED_REPORT_KINDS)[number]
+  )
+    ? (rawKind as (typeof ALLOWED_REPORT_KINDS)[number])
+    : "all";
+  const statusFilter: ReportStatusFilter = ALLOWED_REPORT_STATUSES.includes(
+    params.status as ReportStatusFilter
+  )
+    ? (params.status as ReportStatusFilter)
+    : "all";
+  const requestedPage = parsePage(params.page);
+  const where: Prisma.ReportWhereInput = {};
+  if (kindFilter !== "all") where.kind = kindFilter;
+  if (statusFilter !== "all") where.status = statusFilter as ReportStatus;
 
-  // Fetch all reports, total count, and open count in parallel to minimize TTFB
-  const [reports, totalReports, openReportsCount] = await Promise.all([
-    prisma.report.findMany({
-      where,
-      include: {
-        listing: {
-          select: {
-            id: true,
-            title: true,
-            images: true,
-            owner: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              },
-            },
-          },
-        },
-        reporter: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        reviewer: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
-      orderBy: [
-        { status: "asc" }, // OPEN first
-        { createdAt: "desc" },
-      ],
-      take: 100, // Limit for initial load
-    }),
+  const [totalReports, openReportsCount] = await Promise.all([
     prisma.report.count({ where }),
     prisma.report.count({
       where: {
         status: "OPEN",
-        ...(kindFilter ? { kind: kindFilter } : {}),
+        ...(kindFilter !== "all" ? { kind: kindFilter } : {}),
       },
     }),
   ]);
+  const totalPages = Math.max(1, Math.ceil(totalReports / PAGE_SIZE));
+  const currentPage = Math.min(requestedPage, totalPages);
+
+  const reports = await prisma.report.findMany({
+    where,
+    include: {
+      listing: {
+        select: {
+          id: true,
+          title: true,
+          images: true,
+          owner: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+      },
+      reporter: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+      reviewer: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+    orderBy: [
+      { status: "asc" }, // OPEN first
+      { createdAt: "desc" },
+    ],
+    skip: (currentPage - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
+  });
 
   return (
     <div className="min-h-screen bg-surface-canvas">
@@ -127,7 +148,11 @@ export default async function AdminReportsPage({
         <ReportList
           initialReports={reports}
           totalReports={totalReports}
-          initialKindFilter={kindFilter ?? "all"}
+          initialKindFilter={kindFilter}
+          initialStatusFilter={statusFilter}
+          openReportsCount={openReportsCount}
+          currentPage={currentPage}
+          totalPages={totalPages}
         />
       </div>
     </div>

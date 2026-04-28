@@ -42,6 +42,7 @@ jest.mock("next/cache", () => ({
 jest.mock("@/lib/data", () => ({
   getListingsPaginated: jest.fn(),
   getMapListings: jest.fn(),
+  getMapListingsResult: jest.fn(),
   sanitizeSearchQuery: jest.fn((q: string) => q),
   isValidQuery: jest.fn(() => true),
   crossesAntimeridian: jest.fn(() => false),
@@ -73,6 +74,14 @@ jest.mock("@/lib/search/search-doc-queries", () => ({
   semanticSearchQuery: jest.fn(),
   mapSemanticRowsToListingData: jest.fn(),
   MAX_UNBOUNDED_RESULTS: 48,
+}));
+
+jest.mock("@/lib/flags/phase04", () => ({
+  isPhase04ProjectionReadsEnabled: jest.fn(() => false),
+}));
+
+jest.mock("@/lib/search/projection-search", () => ({
+  executeProjectionSearchV2: jest.fn(),
 }));
 
 // Mock ranking module
@@ -140,7 +149,10 @@ jest.mock("@/lib/timeout-wrapper", () => ({
 // ============================================================================
 
 import { executeSearchV2 } from "@/lib/search/search-v2-service";
-import { getListingsPaginated, getMapListings } from "@/lib/data";
+import {
+  getListingsPaginated,
+  getMapListingsResult,
+} from "@/lib/data";
 import {
   isSearchDocEnabled,
   getSearchDocListingsPaginated,
@@ -180,6 +192,8 @@ import { SEARCH_DOC_PROJECTION_VERSION } from "@/lib/search/search-doc-sync";
 import { prisma } from "@/lib/prisma";
 import { getAvailabilityForListings } from "@/lib/availability";
 import { getCurrentEmbeddingVersion } from "@/lib/embeddings/version";
+import { isPhase04ProjectionReadsEnabled } from "@/lib/flags/phase04";
+import { executeProjectionSearchV2 } from "@/lib/search/projection-search";
 
 // ============================================================================
 // Cast mocks for type-safe access
@@ -188,8 +202,8 @@ import { getCurrentEmbeddingVersion } from "@/lib/embeddings/version";
 const mockGetListingsPaginated = getListingsPaginated as jest.MockedFunction<
   typeof getListingsPaginated
 >;
-const mockGetMapListings = getMapListings as jest.MockedFunction<
-  typeof getMapListings
+const mockGetMapListings = getMapListingsResult as jest.MockedFunction<
+  typeof getMapListingsResult
 >;
 const mockIsSearchDocEnabled = isSearchDocEnabled as jest.MockedFunction<
   typeof isSearchDocEnabled
@@ -273,6 +287,12 @@ const mockGetCurrentEmbeddingVersion =
   getCurrentEmbeddingVersion as jest.MockedFunction<
     typeof getCurrentEmbeddingVersion
   >;
+const mockIsPhase04ProjectionReadsEnabled =
+  isPhase04ProjectionReadsEnabled as jest.MockedFunction<
+    typeof isPhase04ProjectionReadsEnabled
+  >;
+const mockExecuteProjectionSearchV2 =
+  executeProjectionSearchV2 as jest.MockedFunction<typeof executeProjectionSearchV2>;
 
 // ============================================================================
 // Shared test fixtures
@@ -389,7 +409,10 @@ function setupDefaultMocks({
     limit: 12,
     totalPages: 1,
   });
-  mockGetMapListings.mockResolvedValue(mapListings);
+  mockGetMapListings.mockResolvedValue({
+    listings: mapListings,
+    truncated: false,
+  });
 
   // SearchDoc path
   mockGetSearchDocListingsPaginated.mockResolvedValue({
@@ -481,9 +504,150 @@ describe("search-v2-service", () => {
     (features as Record<string, unknown>).searchRanking = false;
     (features as Record<string, unknown>).searchDebugRanking = false;
     (features as Record<string, unknown>).semanticSearch = false;
+    mockIsPhase04ProjectionReadsEnabled.mockReturnValue(false);
+    mockDecodeCursorAny.mockReturnValue(null);
   });
 
   describe("executeSearchV2", () => {
+    it("routes supported Phase04 specs to projection reads", async () => {
+      const projectionResult = {
+        response: {
+          meta: {
+            queryHash: "phase04-hash",
+            generatedAt: "2026-04-23T00:00:00.000Z",
+            mode: "pins" as const,
+            projectionEpoch: "1",
+            snapshotVersion: "phase04.v1",
+            unitIdentityEpochFloor: 1,
+          },
+          list: {
+            items: [],
+            fullItems: [],
+            nextCursor: null,
+            total: 0,
+          },
+          map: { geojson: { type: "FeatureCollection" as const, features: [] } },
+        },
+        paginatedResult: {
+          items: [],
+          total: 0,
+          page: null,
+          limit: 0,
+          totalPages: null,
+          hasNextPage: false,
+          hasPrevPage: false,
+          nextCursor: null,
+        },
+      };
+      mockIsPhase04ProjectionReadsEnabled.mockReturnValue(true);
+      mockParseSearchParams.mockReturnValue(
+        defaultParsedSearchParams({
+          filterParams: {
+            bounds: BOUNDS,
+            minPrice: 900,
+            maxPrice: 1800,
+          },
+        })
+      );
+      mockExecuteProjectionSearchV2.mockResolvedValue(projectionResult);
+
+      const params = {
+        rawParams: {
+          minLat: "37.7",
+          maxLat: "37.85",
+          minLng: "-122.52",
+          maxLng: "-122.35",
+          minPrice: "900",
+          maxPrice: "1800",
+        },
+        limit: 12,
+      };
+      const result = await executeSearchV2(params);
+
+      expect(result).toBe(projectionResult);
+      expect(mockExecuteProjectionSearchV2).toHaveBeenCalledWith({
+        params,
+        parsed: expect.objectContaining({
+          filterParams: expect.objectContaining({ minPrice: 900 }),
+        }),
+      });
+      expect(mockGetSearchDocListingsPaginated).not.toHaveBeenCalled();
+      expect(mockGetListingsPaginated).not.toHaveBeenCalled();
+    });
+
+    it("falls back to SearchDoc when Phase04 specs include unsupported filters", async () => {
+      setupDefaultMocks({ useSearchDoc: true });
+      mockIsPhase04ProjectionReadsEnabled.mockReturnValue(true);
+      mockParseSearchParams.mockReturnValue(
+        defaultParsedSearchParams({
+          filterParams: {
+            bounds: BOUNDS,
+            amenities: ["wifi"],
+          },
+        })
+      );
+
+      const result = await executeSearchV2({
+        rawParams: {
+          minLat: "37.7",
+          maxLat: "37.85",
+          minLng: "-122.52",
+          maxLng: "-122.35",
+          amenities: "wifi",
+          searchDoc: "1",
+        },
+      });
+
+      expect(result.response).not.toBeNull();
+      expect(mockExecuteProjectionSearchV2).not.toHaveBeenCalled();
+      expect(mockGetSearchDocListingsPaginated).toHaveBeenCalledWith(
+        expect.objectContaining({ amenities: ["wifi"] })
+      );
+    });
+
+    it("expires Phase04 cursors instead of passing unsupported specs to SearchDoc", async () => {
+      mockIsPhase04ProjectionReadsEnabled.mockReturnValue(true);
+      mockGenerateQueryHash.mockReturnValue("fallback-hash");
+      mockDecodeCursorAny.mockReturnValue({
+        type: "snapshot",
+        cursor: {
+          v: 4,
+          snapshotId: "snapshot-phase04",
+          page: 2,
+          pageSize: 12,
+          queryHash: "phase04-hash",
+          responseVersion: "search.v2",
+          snapshotVersion: "phase04.v1",
+        },
+      });
+      mockParseSearchParams.mockReturnValue(
+        defaultParsedSearchParams({
+          filterParams: {
+            bounds: BOUNDS,
+            query: "sunny room",
+          },
+        })
+      );
+
+      const result = await executeSearchV2({
+        rawParams: {
+          minLat: "37.7",
+          maxLat: "37.85",
+          minLng: "-122.52",
+          maxLng: "-122.35",
+          q: "sunny room",
+          cursor: "phase04-cursor",
+        },
+      });
+
+      expect(result.snapshotExpired).toEqual({
+        queryHash: "fallback-hash",
+        reason: "search_contract_changed",
+      });
+      expect(mockExecuteProjectionSearchV2).not.toHaveBeenCalled();
+      expect(mockGetSearchDocListingsPaginated).not.toHaveBeenCalled();
+    });
+
     it("returns paginated list results and map data", async () => {
       const listItems = [makeListingData({ id: "l-1" })];
       const mapItems = [makeMapListingData({ id: "m-1" })];
@@ -1577,7 +1741,10 @@ describe("search-v2-service", () => {
         limit: 12,
         totalPages: 0,
       });
-      mockGetMapListings.mockResolvedValue([]);
+      mockGetMapListings.mockResolvedValue({
+        listings: [],
+        truncated: false,
+      });
       mockDetermineMode.mockReturnValue("pins");
       mockShouldIncludePins.mockReturnValue(true);
       mockGenerateQueryHash.mockReturnValue("hash123");

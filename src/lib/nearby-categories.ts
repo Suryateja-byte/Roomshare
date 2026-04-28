@@ -7,6 +7,77 @@
 
 import type { NearbyPlace } from "@/types/nearby";
 
+export const MAX_NEARBY_CATEGORY_COUNT = 8;
+export const MAX_NEARBY_CATEGORY_LENGTH = 64;
+
+export const VERIFIED_RADAR_CATEGORY_SLUGS = [
+  "automated-teller-machine-atm",
+  "bank",
+  "bar",
+  "burger-restaurant",
+  "cafe",
+  "chinese-restaurant",
+  "dentist",
+  "doctor",
+  "finance",
+  "food-beverage",
+  "food-grocery",
+  "gas-station",
+  "gym",
+  "hotel",
+  "hotel-lodging",
+  "hospital",
+  "indian-restaurant",
+  "italian-restaurant",
+  "medical-health",
+  "mexican-restaurant",
+  "parking",
+  "pharmacy",
+  "pizza-place",
+  "restaurant",
+  "shopping-retail",
+  "supermarket",
+  "sushi-restaurant",
+  "tea-room",
+  "thai-restaurant",
+] as const;
+
+export type RadarCategorySlug = (typeof VERIFIED_RADAR_CATEGORY_SLUGS)[number];
+
+export interface CategoryChip {
+  label: string;
+  categories: RadarCategorySlug[];
+  query?: string;
+  icon:
+    | "ShoppingCart"
+    | "Utensils"
+    | "ShoppingBag"
+    | "Fuel"
+    | "Dumbbell"
+    | "Pill";
+}
+
+export const CATEGORY_CHIPS: CategoryChip[] = [
+  {
+    label: "Grocery",
+    categories: ["food-grocery", "supermarket"],
+    icon: "ShoppingCart",
+  },
+  {
+    label: "Restaurants",
+    categories: ["restaurant", "food-beverage"],
+    icon: "Utensils",
+  },
+  { label: "Shopping", categories: ["shopping-retail"], icon: "ShoppingBag" },
+  { label: "Gas Stations", categories: ["gas-station"], icon: "Fuel" },
+  {
+    label: "Fitness",
+    categories: ["gym"],
+    icon: "Dumbbell",
+  },
+  { label: "Pharmacy", categories: ["pharmacy"], icon: "Pill" },
+];
+
 // ============================================================================
 // CATEGORY FILTERING CONFIGURATION
 // Blocklists and allowlists to filter out irrelevant results from Radar API
@@ -256,34 +327,6 @@ export const CATEGORY_FILTERS: Record<string, CategoryFilter> = {
     ],
     requireAllowedTerms: true,
   },
-  "fitness-recreation": {
-    blocklist: ["night club", "nightclub", "bar", "pub", "lounge", "casino"],
-    allowedChains: [
-      "planet fitness",
-      "la fitness",
-      "24 hour fitness",
-      "anytime fitness",
-      "gold's gym",
-      "equinox",
-      "lifetime fitness",
-      "orangetheory",
-      "f45",
-    ],
-    allowedTerms: [
-      "fitness",
-      "gym",
-      "recreation",
-      "sports",
-      "athletic",
-      "yoga",
-      "pilates",
-      "exercise",
-      "training",
-      "workout",
-    ],
-    requireAllowedTerms: true,
-  },
-
   // Restaurants: Exclude bars, nightclubs, liquor stores
   restaurant: {
     blocklist: [
@@ -497,17 +540,17 @@ export function shouldIncludePlace(
  * When users search for category keywords like "gym", route to Places Search API
  * instead of Autocomplete (which only finds places literally named "gym").
  */
-export const KEYWORD_CATEGORY_MAP: Record<string, string[]> = {
+export const KEYWORD_CATEGORY_MAP: Record<string, RadarCategorySlug[]> = {
   // Fitness
-  gym: ["gym", "fitness-recreation"],
-  fitness: ["gym", "fitness-recreation"],
-  workout: ["gym", "fitness-recreation"],
+  gym: ["gym"],
+  fitness: ["gym"],
+  workout: ["gym"],
 
   // Food & Dining
   restaurant: ["restaurant", "food-beverage"],
   food: ["food-beverage", "restaurant"],
-  pizza: ["pizza", "restaurant"],
-  burger: ["burger-joint", "restaurant"],
+  pizza: ["pizza-place", "restaurant"],
+  burger: ["burger-restaurant", "restaurant"],
   sushi: ["sushi-restaurant", "restaurant"],
   chinese: ["chinese-restaurant", "restaurant"],
   mexican: ["mexican-restaurant", "restaurant"],
@@ -516,10 +559,10 @@ export const KEYWORD_CATEGORY_MAP: Record<string, string[]> = {
   indian: ["indian-restaurant", "restaurant"],
 
   // Coffee & Drinks
-  coffee: ["coffee-shop", "cafe"],
-  cafe: ["cafe", "coffee-shop"],
+  coffee: ["cafe"],
+  cafe: ["cafe"],
   tea: ["tea-room", "cafe"],
-  bar: ["bar", "nightlife"],
+  bar: ["bar"],
 
   // Shopping
   grocery: ["food-grocery", "supermarket"],
@@ -529,15 +572,34 @@ export const KEYWORD_CATEGORY_MAP: Record<string, string[]> = {
   // Health
   pharmacy: ["pharmacy"],
   drugstore: ["pharmacy"],
-  doctor: ["doctor", "health-medicine"],
-  hospital: ["hospital", "health-medicine"],
-  dentist: ["dentist", "health-medicine"],
+  doctor: ["doctor", "medical-health"],
+  hospital: ["hospital", "medical-health"],
+  dentist: ["dentist", "medical-health"],
 
   // Services
-  bank: ["bank", "financial-service"],
-  atm: ["atm", "financial-service"],
+  bank: ["bank", "finance"],
+  atm: ["automated-teller-machine-atm", "finance"],
   gas: ["gas-station"],
   "gas station": ["gas-station"],
   parking: ["parking"],
-  hotel: ["hotel", "lodging"],
+  hotel: ["hotel", "hotel-lodging"],
 };
+
+export const DEFAULT_NEARBY_CATEGORIES = [
+  "food-beverage",
+  "food-grocery",
+  "shopping-retail",
+  "medical-health",
+  "gym",
+  "gas-station",
+] satisfies RadarCategorySlug[];
+
+export const ALLOWED_RADAR_CATEGORIES = [...VERIFIED_RADAR_CATEGORY_SLUGS].sort();
+
+export const ALLOWED_RADAR_CATEGORY_SET: ReadonlySet<string> = new Set(
+  ALLOWED_RADAR_CATEGORIES
+);
+
+export function isAllowedRadarCategory(category: string): boolean {
+  return ALLOWED_RADAR_CATEGORY_SET.has(category);
+}

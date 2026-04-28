@@ -292,7 +292,7 @@ describe("POST /api/nearby - Response Consistency", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
 
@@ -327,7 +327,7 @@ describe("POST /api/nearby - Response Consistency", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
       const data = await response.json();
@@ -348,7 +348,7 @@ describe("POST /api/nearby - Response Consistency", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
 
@@ -390,7 +390,7 @@ describe("POST /api/nearby - Response Consistency", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
       const data = await response.json();
@@ -409,14 +409,14 @@ describe("POST /api/nearby - Response Consistency", () => {
               _id: "1",
               name: "Place 1",
               formattedAddress: "Address 1",
-              categories: ["test"],
+              categories: ["food-grocery"],
               location: { type: "Point", coordinates: [-122.4194, 37.7749] },
             },
             {
               _id: "2",
               name: "Place 2",
               formattedAddress: "Address 2",
-              categories: ["test"],
+              categories: ["food-grocery"],
               location: { type: "Point", coordinates: [-122.4194, 37.7749] },
             },
           ],
@@ -426,7 +426,7 @@ describe("POST /api/nearby - Response Consistency", () => {
       const response = await POST(
         createRequest({
           ...baseRequest,
-          categories: ["test"],
+          categories: ["food-grocery"],
         })
       );
       const data = await response.json();
