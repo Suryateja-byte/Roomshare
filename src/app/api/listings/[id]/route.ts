@@ -33,6 +33,10 @@ import { getHostModerationWriteLockResult } from "@/lib/listings/moderation-writ
 import { normalizeAddress } from "@/lib/search/normalize-address";
 import { syncCanonicalListingInventory } from "@/lib/listings/canonical-inventory";
 import {
+  syncListingLifecycleProjectionInTx,
+  tombstoneListingInventoryInTx,
+} from "@/lib/listings/canonical-lifecycle";
+import {
   isStrictDateOnly,
   parseStrictDateOnlyToUtcDate,
 } from "@/lib/date-only";
@@ -419,6 +423,10 @@ export async function DELETE(
             },
           });
           await markListingDirtyInTx(tx, id, "status_changed");
+          await syncListingLifecycleProjectionInTx(tx, id, {
+            role: "host",
+            id: session.user.id,
+          });
 
           return {
             action: "suppressed",
@@ -428,6 +436,7 @@ export async function DELETE(
         }
 
         // Delete listing; contact-first tables are independent projections/ledgers.
+        await tombstoneListingInventoryInTx(tx, id, "TOMBSTONE");
         await tx.listing.delete({ where: { id } });
         return {
           action: "deleted",

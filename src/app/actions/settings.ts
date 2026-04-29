@@ -14,6 +14,10 @@ import {
 import { headers } from "next/headers";
 import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 import { Prisma } from "@prisma/client";
+import {
+  syncListingLifecycleProjectionInTx,
+  tombstoneListingInventoryInTx,
+} from "@/lib/listings/canonical-lifecycle";
 
 export interface NotificationPreferences {
   emailBookingRequests: boolean;
@@ -351,9 +355,17 @@ export async function deleteAccount(
           },
         });
         await markListingDirtyInTx(tx, listing.id, "status_changed");
+        await syncListingLifecycleProjectionInTx(tx, listing.id, {
+          role: "host",
+          id: session.user.id,
+        });
       }
 
       if (unreportedListingIds.length > 0) {
+        for (const listingId of unreportedListingIds) {
+          await tombstoneListingInventoryInTx(tx, listingId, "TOMBSTONE");
+        }
+
         await tx.listing.deleteMany({
           where: { id: { in: unreportedListingIds } },
         });

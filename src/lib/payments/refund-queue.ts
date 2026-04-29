@@ -68,6 +68,20 @@ function resolveRefundStatus(refund: Stripe.Refund): RefundStatus {
   }
 }
 
+function resolveQueuedRefundOutcome(
+  refund: Stripe.Refund
+): "succeeded" | "submitted" | "manual_review" {
+  if (refund.status === "succeeded") {
+    return "succeeded";
+  }
+
+  if (refund.status === "pending") {
+    return "submitted";
+  }
+
+  return "manual_review";
+}
+
 function buildStripeRefundMetadata(row: RefundQueueRow, paymentId: string) {
   return {
     source: "auto_refund_queue",
@@ -107,6 +121,8 @@ async function recordQueuedRefund(
   }
 ) {
   const refundStatus = resolveRefundStatus(input.refund);
+  const outcome = resolveQueuedRefundOutcome(input.refund);
+  const manualReviewRequired = outcome === "manual_review";
   const stripePaymentIntentId =
     typeof input.refund.payment_intent === "string"
       ? input.refund.payment_intent
@@ -125,7 +141,7 @@ async function recordQueuedRefund(
       status: refundStatus,
       reason: input.refund.reason ?? input.row.reason,
       source: "AUTO_REFUND_QUEUE",
-      manualReviewRequired: false,
+      manualReviewRequired,
       metadata: {
         stripePaymentIntentId,
         stripeChargeId,
@@ -141,7 +157,7 @@ async function recordQueuedRefund(
       status: refundStatus,
       reason: input.refund.reason ?? input.row.reason,
       source: "AUTO_REFUND_QUEUE",
-      manualReviewRequired: false,
+      manualReviewRequired,
       metadata: {
         stripePaymentIntentId,
         stripeChargeId,
@@ -151,11 +167,30 @@ async function recordQueuedRefund(
     },
   });
 
+  if (outcome === "manual_review") {
+    await tx.payment.update({
+      where: { id: input.payment.id },
+      data: { autoRefundStatus: "MANUAL_REVIEW_BANNED_USER" },
+    });
+
+    await tx.refundQueueItem.update({
+      where: { id: input.row.id },
+      data: {
+        status: "MANUAL_REVIEW",
+        stripeRefundId: input.refund.id,
+        lastError: `stripe_refund_${input.refund.status ?? "unknown"}`,
+        processedAt: new Date(),
+      },
+    });
+
+    return "manual_review" as const;
+  }
+
   await tx.payment.update({
     where: { id: input.payment.id },
     data: {
       autoRefundStatus:
-        refundStatus === "SUCCEEDED"
+        outcome === "succeeded"
           ? "REFUNDED_BANNED_USER"
           : "REFUND_SUBMITTED_BANNED_USER",
     },
@@ -170,6 +205,8 @@ async function recordQueuedRefund(
       processedAt: new Date(),
     },
   });
+
+  return "refunded" as const;
 }
 
 async function processRefundQueueRow(row: RefundQueueRow) {
@@ -241,7 +278,7 @@ async function processRefundQueueRow(row: RefundQueueRow) {
     }
   );
 
-  await prisma.$transaction((tx) =>
+  const outcome = await prisma.$transaction((tx) =>
     recordQueuedRefund(tx, {
       row,
       payment,
@@ -249,7 +286,7 @@ async function processRefundQueueRow(row: RefundQueueRow) {
     })
   );
 
-  return "refunded" as const;
+  return outcome;
 }
 
 async function releaseUnprocessedRows(rowIds: string[]) {

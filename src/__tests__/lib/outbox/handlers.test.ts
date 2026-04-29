@@ -85,6 +85,8 @@ afterEach(() => {
   jest.clearAllMocks();
   __setProjectionEpochForTesting(BigInt(1));
   delete process.env.KILL_SWITCH_PAUSE_EMBED_PUBLISH;
+  delete process.env.KILL_SWITCH_PAUSE_GEOCODE_PUBLISH;
+  delete process.env.KILL_SWITCH_PAUSE_IDENTITY_RECONCILE;
 });
 
 async function withTx<T>(
@@ -349,6 +351,35 @@ describe("HANDLERS.IDENTITY_MUTATION", () => {
       cacheEvents.find((e) => (e.payload.unitId as string) === toUnitId)
     ).toBeDefined();
     expect(cacheEvents.every((event) => event.priority === 10)).toBe(true);
+  });
+
+  it("requeues identity mutations while identity reconciliation is paused", async () => {
+    process.env.KILL_SWITCH_PAUSE_IDENTITY_RECONCILE = "true";
+    const before = await fixture.getCacheInvalidations();
+
+    const result = await withTx((tx) =>
+      HANDLERS.IDENTITY_MUTATION(
+        tx,
+        makeEvent({
+          kind: "IDENTITY_MUTATION",
+          aggregateType: "IDENTITY_MUTATION",
+          aggregateId: "mutation-paused",
+          payload: {
+            fromUnitIds: ["unit-paused-from"],
+            toUnitIds: ["unit-paused-to"],
+          },
+        })
+      )
+    );
+
+    expect(result).toEqual({
+      outcome: "transient_error",
+      retryAfterMs: 60_000,
+      lastError: "Identity reconciliation paused",
+    });
+    await expect(fixture.getCacheInvalidations()).resolves.toHaveLength(
+      before.length
+    );
   });
 });
 
@@ -635,6 +666,27 @@ describe("HANDLERS Phase 03+ async integrations", () => {
       }
     }
   );
+
+  it("requeues GEOCODE_NEEDED while geocode publishing is paused", async () => {
+    process.env.KILL_SWITCH_PAUSE_GEOCODE_PUBLISH = "true";
+
+    const result = await HANDLERS.GEOCODE_NEEDED(
+      tx,
+      makeEvent({
+        kind: "GEOCODE_NEEDED",
+        aggregateType: "PHYSICAL_UNIT",
+        aggregateId: "unit-geocode-paused",
+        payload: { address: "Austin, TX", requestId: "request-paused" },
+      })
+    );
+
+    expect(result).toEqual({
+      outcome: "transient_error",
+      retryAfterMs: 60_000,
+      lastError: "Geocode publication paused",
+    });
+    expect(mockHandleGeocodeNeeded).not.toHaveBeenCalled();
+  });
 
   it("completes EMBED_NEEDED when semantic projection rebuild succeeds", async () => {
     mockRebuildSemanticInventoryProjection.mockResolvedValueOnce({

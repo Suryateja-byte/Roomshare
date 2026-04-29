@@ -79,7 +79,11 @@ import {
   resolvePublicAvailabilityForListings,
 } from "@/lib/search/public-availability";
 import type { FilterParams } from "@/lib/search-types";
-import { isPhase04ProjectionReadsEnabled } from "@/lib/flags/phase04";
+import {
+  isPhase04ForceClustersOnlyActive,
+  isPhase04ForceListOnlyActive,
+  isPhase04ProjectionReadsEnabled,
+} from "@/lib/flags/phase04";
 import { getReadEmbeddingVersion } from "@/lib/embeddings/version";
 import { executeProjectionSearchV2 } from "@/lib/search/projection-search";
 import {
@@ -102,6 +106,28 @@ function getEmptyMapResponse(): SearchV2Response["map"] {
 
 function getSnapshotMapMode(mapPayload: SearchV2Response["map"]): "geojson" | "pins" {
   return mapPayload.pins ? "pins" : "geojson";
+}
+
+function applyPhase04MapKillSwitches(
+  mapPayload: SearchV2Response["map"]
+): SearchV2Response["map"] {
+  if (isPhase04ForceListOnlyActive()) {
+    return getEmptyMapResponse();
+  }
+
+  if (isPhase04ForceClustersOnlyActive()) {
+    return {
+      geojson: mapPayload.geojson,
+      ...(mapPayload.truncated !== undefined
+        ? { truncated: mapPayload.truncated }
+        : {}),
+      ...(mapPayload.totalCandidates !== undefined
+        ? { totalCandidates: mapPayload.totalCandidates }
+        : {}),
+    };
+  }
+
+  return mapPayload;
 }
 
 function buildSnapshotExpired(
@@ -478,10 +504,11 @@ async function hydrateSnapshotPage(options: {
         queryHash: snapshot.queryHash,
       })
     : null;
-  const mapPayload =
+  const storedMapPayload =
     options.includeMap && snapshot.mapPayload
       ? (snapshot.mapPayload as unknown as SearchV2Response["map"])
       : getEmptyMapResponse();
+  const mapPayload = applyPhase04MapKillSwitches(storedMapPayload);
   const total = snapshot.total ?? null;
 
   return {
@@ -639,13 +666,16 @@ export async function executeSearchV2(
     );
     const useKeyset = features.searchKeyset && useSearchDoc;
     const snapshotContractEnabled = features.searchSnapshotContract;
-    const shouldIncludeMap = params.includeMap !== false;
+    const forceListOnly = isPhase04ForceListOnlyActive();
+    const forceClustersOnly = isPhase04ForceClustersOnlyActive();
+    const shouldIncludeMap = params.includeMap !== false && !forceListOnly;
     const vibeQuery = parsed.filterParams.vibeQuery?.trim();
     const shouldUseRecommendedVibeRanking =
       Boolean(vibeQuery) && sortOption === "recommended";
-    const rankerEnabled = isRankingEnabled(
-      getFirstValue(params.rawParams.ranker)
-    );
+    const rankerEnabled =
+      !forceListOnly &&
+      !forceClustersOnly &&
+      isRankingEnabled(getFirstValue(params.rawParams.ranker));
     const keysetSnapshot = useKeyset
       ? {
           engine: "searchdoc-keyset" as const,
@@ -934,7 +964,7 @@ export async function executeSearchV2(
     }
 
     // Determine mode based on mapListings count (not list total)
-    const mode = determineMode(mapListings.length);
+    const mode = forceClustersOnly ? "geojson" : determineMode(mapListings.length);
     const versionMeta = getSearchV2VersionMeta({
       useSearchDoc,
       usedSemanticSearch,
@@ -1016,11 +1046,12 @@ export async function executeSearchV2(
     // Transform map data (geojson always, pins only when sparse)
     // Pass scoreMap for score-based pin tiering when ranking is enabled
     // Include truncation info when map results exceed MAX_MAP_MARKERS
-    const mapResponse = transformToMapResponse(mapListings, {
+    const transformedMapResponse = transformToMapResponse(mapListings, {
       scoreMap,
       truncated: mapTruncated,
       totalCandidates: mapTotalCandidates,
     });
+    const mapResponse = applyPhase04MapKillSwitches(transformedMapResponse);
 
     let responseMetaBase: import("@/lib/search/search-response").SearchResponseMeta = {
       queryHash,

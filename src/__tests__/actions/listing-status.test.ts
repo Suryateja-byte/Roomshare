@@ -61,6 +61,12 @@ jest.mock("@/lib/search/search-doc-dirty", () => ({
   markListingsDirtyInTx: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock("@/lib/listings/canonical-lifecycle", () => ({
+  syncListingLifecycleProjectionInTx: jest.fn().mockResolvedValue({
+    action: "synced",
+  }),
+}));
+
 jest.mock("@/lib/metrics/cfm-ops-telemetry", () => ({
   recordFreshnessRecovered: jest.fn(),
 }));
@@ -78,6 +84,8 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
 import { recordFreshnessRecovered } from "@/lib/metrics/cfm-ops-telemetry";
+import { syncListingLifecycleProjectionInTx } from "@/lib/listings/canonical-lifecycle";
+import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 
 describe("listing-status actions", () => {
   const originalModerationWriteLocks =
@@ -227,7 +235,7 @@ describe("listing-status actions", () => {
         expect(result.success).toBe(true);
         expect(mockTx.listing.update).toHaveBeenCalledWith({
           where: { id: "listing-123" },
-          data: { status: "PAUSED", version: 4 },
+          data: { status: "PAUSED", statusReason: "HOST_PAUSED", version: 4 },
         });
       });
 
@@ -236,7 +244,7 @@ describe("listing-status actions", () => {
 
         expect(mockTx.listing.update).toHaveBeenCalledWith({
           where: { id: "listing-123" },
-          data: { status: "RENTED", version: 4 },
+          data: { status: "RENTED", statusReason: null, version: 4 },
         });
       });
 
@@ -245,7 +253,7 @@ describe("listing-status actions", () => {
 
         expect(mockTx.listing.update).toHaveBeenCalledWith({
           where: { id: "listing-123" },
-          data: { status: "ACTIVE", version: 4 },
+          data: { status: "ACTIVE", statusReason: null, version: 4 },
         });
       });
 
@@ -281,10 +289,10 @@ describe("listing-status actions", () => {
 
         await updateListingStatus("listing-123", "RENTED", 3);
 
-        // updateListingStatus only sets { status: 'RENTED' } — availableSlots is not modified
+        // updateListingStatus does not modify availableSlots.
         expect(mockTx.listing.update).toHaveBeenCalledWith({
           where: { id: "listing-123" },
-          data: { status: "RENTED", version: 4 },
+          data: { status: "RENTED", statusReason: null, version: 4 },
         });
       });
 
@@ -318,7 +326,7 @@ describe("listing-status actions", () => {
         expect(mockTx.booking.count).not.toHaveBeenCalled();
         expect(mockTx.listing.update).toHaveBeenCalledWith({
           where: { id: "listing-123" },
-          data: { status: "ACTIVE", version: 4 },
+          data: { status: "ACTIVE", statusReason: null, version: 4 },
         });
       });
 
@@ -338,7 +346,7 @@ describe("listing-status actions", () => {
         expect(result.success).toBe(true);
         expect(mockTx.listing.update).toHaveBeenCalledWith({
           where: { id: "listing-123" },
-          data: { status: "ACTIVE", version: 4 },
+          data: { status: "ACTIVE", statusReason: null, version: 4 },
         });
       });
 
@@ -362,7 +370,7 @@ describe("listing-status actions", () => {
         expect(mockTx.listing.update).not.toHaveBeenCalled();
       });
 
-      it("keeps admin-paused host updates feature-gated when locks are disabled", async () => {
+      it("locks admin-paused host updates even when locks are disabled", async () => {
         (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
           makeLockedListingRow({
             availabilitySource: "HOST_MANAGED",
@@ -373,11 +381,12 @@ describe("listing-status actions", () => {
 
         const result = await updateListingStatus("listing-123", "ACTIVE", 3);
 
-        expect(result.success).toBe(true);
-        expect(mockTx.listing.update).toHaveBeenCalledWith({
-          where: { id: "listing-123" },
-          data: { status: "ACTIVE", version: 4 },
+        expect(result).toEqual({
+          error: "This listing is locked while under review.",
+          code: "LISTING_LOCKED",
+          lockReason: "ADMIN_PAUSED",
         });
+        expect(mockTx.listing.update).not.toHaveBeenCalled();
       });
 
       it("returns LISTING_LOCKED for suppressed legacy rows before version checks", async () => {
@@ -413,7 +422,7 @@ describe("listing-status actions", () => {
         expect(result.success).toBe(true);
         expect(mockTx.listing.update).toHaveBeenCalledWith({
           where: { id: "listing-123" },
-          data: { status: "ACTIVE", version: 4 },
+          data: { status: "ACTIVE", statusReason: null, version: 4 },
         });
       });
     });
@@ -660,7 +669,7 @@ describe("listing-status actions", () => {
       expect(mockTx.listing.update).not.toHaveBeenCalled();
     });
 
-    it("keeps autoPausedAt untouched when updateListingStatus reactivates an auto-paused listing", async () => {
+    it("requires explicit freshness recovery when updateListingStatus reactivates an auto-paused listing", async () => {
       (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
         makeLockedListingRow({
           availabilitySource: "HOST_MANAGED",
@@ -682,20 +691,13 @@ describe("listing-status actions", () => {
       const result = await updateListingStatus("listing-123", "ACTIVE", 3);
 
       expect(result).toEqual({
-        success: true,
-        status: "ACTIVE",
-        statusReason: "STALE_AUTO_PAUSE",
-        version: 4,
+        error:
+          "This listing needs availability reconfirmation before it can be reopened.",
+        code: "LISTING_REQUIRES_RECONFIRMATION",
       });
-      expect(mockTx.listing.update).toHaveBeenCalledWith({
-        where: { id: "listing-123" },
-        data: { status: "ACTIVE", version: 4 },
-      });
-      const updateData = (mockTx.listing.update as jest.Mock).mock.calls[0][0]
-        .data;
-      expect(updateData).not.toHaveProperty("autoPausedAt");
-      expect(updateData).not.toHaveProperty("freshnessReminderSentAt");
-      expect(updateData).not.toHaveProperty("freshnessWarningSentAt");
+      expect(mockTx.listing.update).not.toHaveBeenCalled();
+      expect(markListingDirtyInTx).not.toHaveBeenCalled();
+      expect(syncListingLifecycleProjectionInTx).not.toHaveBeenCalled();
     });
 
     describe("transaction safety (FOR UPDATE)", () => {
@@ -728,7 +730,7 @@ describe("listing-status actions", () => {
         expect(mockTx.booking.count).not.toHaveBeenCalled();
         expect(mockTx.listing.update).toHaveBeenCalledWith({
           where: { id: "listing-123" },
-          data: { status: "PAUSED", version: 4 },
+          data: { status: "PAUSED", statusReason: "HOST_PAUSED", version: 4 },
         });
       });
 

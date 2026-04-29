@@ -267,4 +267,66 @@ describe("contact paywall evaluator", () => {
       }),
     });
   });
+
+  it("emergency-open bypasses entitlement state outages after unit resolution", async () => {
+    process.env.ENABLE_ENTITLEMENT_STATE = "true";
+    process.env.KILL_SWITCH_EMERGENCY_OPEN_PAYWALL = "true";
+    (prisma.entitlementState.upsert as jest.Mock).mockRejectedValueOnce(
+      new Error("state projection unavailable")
+    );
+
+    const result = await consumeContactEntitlement(prisma as any, {
+      userId: "user-123",
+      listingId: "listing-123",
+      physicalUnitId: "unit-123",
+      clientIdempotencyKey: "idem-emergency-state-down",
+      contactKind: "MESSAGE_START",
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      source: "EMERGENCY_OPEN",
+      consumptionId: null,
+      unitId: "unit-123",
+      unitIdentityEpoch: 4,
+    });
+    expect(prisma.entitlementState.upsert).not.toHaveBeenCalled();
+    expect(prisma.contactConsumption.create).not.toHaveBeenCalled();
+    expect(prisma.auditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        kind: "EMERGENCY_GRANT",
+        aggregateType: "contact_consumption",
+      }),
+      select: { id: true },
+    });
+    expect(prisma.fraudAuditJob.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        status: "SCHEDULED",
+        reason: "fraud_audit_after_emergency_open_paywall",
+      }),
+    });
+  });
+
+  it("emergency-open does not bypass missing unit identity", async () => {
+    process.env.KILL_SWITCH_EMERGENCY_OPEN_PAYWALL = "true";
+
+    const result = await consumeContactEntitlement(prisma as any, {
+      userId: "user-123",
+      listingId: "listing-123",
+      physicalUnitId: null,
+      clientIdempotencyKey: "idem-missing-unit",
+      contactKind: "MESSAGE_START",
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      source: "MIGRATION_BYPASS",
+      consumptionId: null,
+      unitId: null,
+      unitIdentityEpoch: null,
+    });
+    expect(prisma.auditEvent.create).not.toHaveBeenCalled();
+    expect(prisma.fraudAuditJob.create).not.toHaveBeenCalled();
+    expect(prisma.contactConsumption.create).not.toHaveBeenCalled();
+  });
 });

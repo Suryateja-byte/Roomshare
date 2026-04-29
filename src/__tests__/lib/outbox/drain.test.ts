@@ -60,6 +60,11 @@ const mockWithActor = withActor as jest.Mock;
 const mockHandlers = HANDLERS as jest.Mocked<typeof HANDLERS>;
 const mockRouteToDlq = routeToDlq as jest.Mock;
 
+type CapturedDrainTx = {
+  $queryRaw: jest.Mock;
+  $executeRaw: jest.Mock;
+};
+
 function makeOutboxRow(
   overrides: Record<string, unknown> = {}
 ): Record<string, unknown> {
@@ -428,16 +433,14 @@ describe("drainOutboxOnce() - exception from handler", () => {
 
 describe("drainOutboxOnce() - options", () => {
   it("passes priorityMax and maxBatch to claim query", async () => {
-    let capturedTx: Record<string, unknown> | null = null;
+    const capturedTx: CapturedDrainTx = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      $executeRaw: jest.fn().mockResolvedValue(0),
+    };
 
     (mockPrisma.$transaction as jest.Mock).mockImplementationOnce(
       async (fn: Function) => {
-        const mockTx = {
-          $queryRaw: jest.fn().mockResolvedValue([]),
-          $executeRaw: jest.fn().mockResolvedValue(0),
-        };
-        capturedTx = mockTx;
-        return fn(mockTx);
+        return fn(capturedTx);
       }
     );
 
@@ -445,6 +448,36 @@ describe("drainOutboxOnce() - options", () => {
 
     // The claim transaction should have been called
     expect(mockPrisma.$transaction).toHaveBeenCalled();
+    const querySql = String(
+      (capturedTx.$queryRaw.mock.calls[0][0] as string[]).join("")
+    );
+    expect(querySql).toContain("priority <=");
+    expect(querySql).not.toContain("kind <> ALL");
+  });
+
+  it("adds an outbox kind exclusion filter when excludedKinds are provided", async () => {
+    const capturedTx: CapturedDrainTx = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      $executeRaw: jest.fn().mockResolvedValue(0),
+    };
+
+    (mockPrisma.$transaction as jest.Mock).mockImplementationOnce(
+      async (fn: Function) => {
+        return fn(capturedTx);
+      }
+    );
+
+    await drainOutboxOnce({
+      maxBatch: 10,
+      priorityMax: 100,
+      excludedKinds: ["INVENTORY_UPSERTED", "GEOCODE_NEEDED"],
+    });
+
+    const querySql = String(
+      (capturedTx.$queryRaw.mock.calls[0][0] as string[]).join("")
+    );
+    expect(querySql).toContain("priority <=");
+    expect(querySql).toContain("kind <> ALL");
   });
 
   it("respects maxTickMs time limit and stops early", async () => {

@@ -182,4 +182,39 @@ describe("Multi-slot booking feature flag cross-validation", () => {
 
     expect(features.searchKeyset).toBe(false);
   });
+
+  it("rejects malformed kill-switch booleans in production validation", async () => {
+    process.env.KILL_SWITCH_FORCE_LIST_ONLY = "TRUE";
+    const consoleSpy = jest.spyOn(console, "error").mockImplementation();
+    const { getServerEnv } = await import("@/lib/env");
+
+    expect(() => getServerEnv()).toThrow("Invalid environment configuration");
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("KILL_SWITCH_FORCE_LIST_ONLY")
+    );
+    consoleSpy.mockRestore();
+  });
+
+  it("rejects unsupported ranker rollback values in production validation", async () => {
+    process.env.KILL_SWITCH_ROLLBACK_RANKER_PROFILE = "previous-profile";
+    const consoleSpy = jest.spyOn(console, "error").mockImplementation();
+    const { getServerEnv } = await import("@/lib/env");
+
+    expect(() => getServerEnv()).toThrow("Invalid environment configuration");
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("KILL_SWITCH_ROLLBACK_RANKER_PROFILE")
+    );
+    consoleSpy.mockRestore();
+  });
+
+  it("allows ranker rollback off and disables ranking at runtime", async () => {
+    process.env.ENABLE_SEARCH_RANKING = "true";
+    process.env.KILL_SWITCH_ROLLBACK_RANKER_PROFILE = "off";
+
+    const { features } = await import("@/lib/env");
+    const { isRankingEnabled } = await import("@/lib/search/ranking");
+
+    expect(features.rollbackRankerProfile).toBe("off");
+    expect(isRankingEnabled("1")).toBe(false);
+  });
 });

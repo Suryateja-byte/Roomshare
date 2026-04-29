@@ -23,3 +23,11 @@ export function isPhase04KillSwitchActive(name: Phase04KillSwitch): boolean {
     }
   }
 }
+
+export function isPhase04ForceListOnlyActive(): boolean {
+  return isPhase04KillSwitchActive("force_list_only");
+}
+
+export function isPhase04ForceClustersOnlyActive(): boolean {
+  return isPhase04KillSwitchActive("force_clusters_only");
+}

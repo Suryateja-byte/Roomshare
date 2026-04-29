@@ -28,6 +28,10 @@ function readRepoFile(file: string): string {
   return readFileSync(path.join(repoRoot, file), "utf8");
 }
 
+function repoPathFromReference(reference: string): string {
+  return reference.split("#")[0];
+}
+
 describe("Phase 10 launch hardening", () => {
   it("has a complete kill-switch catalog with runbook evidence", () => {
     expect(validateKillSwitchCatalog()).toEqual([]);
@@ -40,11 +44,20 @@ describe("Phase 10 launch hardening", () => {
       expect(entry.rollback).toContain("Unset");
       expect(existsSync(path.join(repoRoot, entry.runbook))).toBe(true);
       expect(existsSync(path.join(repoRoot, entry.testReference))).toBe(true);
+      expect(
+        existsSync(path.join(repoRoot, repoPathFromReference(entry.runtimeReference)))
+      ).toBe(true);
+      expect(existsSync(path.join(repoRoot, entry.runtimeTestReference))).toBe(
+        true
+      );
     }
 
     const catalog = readRepoFile("docs/runbooks/kill-switch-catalog.md");
-    for (const name of PHASE10_KILL_SWITCH_NAMES) {
-      expect(catalog).toContain(name);
+    const envExample = readRepoFile(".env.example");
+    for (const entry of PHASE10_KILL_SWITCH_CATALOG) {
+      expect(catalog).toContain(entry.name);
+      expect(catalog).toContain(entry.envVar);
+      expect(envExample).toContain(entry.envVar);
     }
   });
 

@@ -104,7 +104,7 @@ describe("CFM-602 legacy map eligibility cutover", () => {
 
     expect(sql).toContain(`COALESCE(FALSE, FALSE) = FALSE`);
     expect(sql).toContain(
-      `COALESCE(l."statusReason", '') <> 'MIGRATION_REVIEW'`
+      `COALESCE(l."statusReason", '') NOT IN ('MIGRATION_REVIEW', 'ADMIN_PAUSED', 'SUPPRESSED')`
     );
     expect(sql).not.toContain(`l."needsMigrationReview"`);
     expect(params.slice(0, 2)).toEqual([1, 1]);
@@ -124,8 +124,8 @@ describe("CFM-602 legacy map eligibility cutover", () => {
       location: {
         city: "San Francisco",
         state: "CA",
-        lat: 37.7749,
-        lng: -122.4194,
+        lat: 37.77,
+        lng: -122.42,
       },
     });
     expect(results[0].publicAvailability).toMatchObject({

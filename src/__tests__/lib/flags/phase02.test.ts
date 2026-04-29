@@ -53,11 +53,12 @@ describe("isPhase02ProjectionWritesEnabled()", () => {
 });
 
 describe("PHASE02_KILL_SWITCHES", () => {
-  it("defines all three kill switch keys", async () => {
+  it("defines all four kill switch keys", async () => {
     const { PHASE02_KILL_SWITCHES } = await import("@/lib/flags/phase02");
     expect(PHASE02_KILL_SWITCHES).toHaveProperty("disable_new_publication");
     expect(PHASE02_KILL_SWITCHES).toHaveProperty("pause_geocode_publish");
     expect(PHASE02_KILL_SWITCHES).toHaveProperty("pause_backfills_and_repairs");
+    expect(PHASE02_KILL_SWITCHES).toHaveProperty("pause_identity_reconcile");
   });
 });
 
@@ -102,5 +103,19 @@ describe("isKillSwitchActive()", () => {
     jest.resetModules();
     const { isKillSwitchActive } = await import("@/lib/flags/phase02");
     expect(isKillSwitchActive("pause_backfills_and_repairs")).toBe(true);
+  });
+
+  it("returns false for pause_identity_reconcile when env unset", async () => {
+    delete process.env.KILL_SWITCH_PAUSE_IDENTITY_RECONCILE;
+    jest.resetModules();
+    const { isKillSwitchActive } = await import("@/lib/flags/phase02");
+    expect(isKillSwitchActive("pause_identity_reconcile")).toBe(false);
+  });
+
+  it("returns true for pause_identity_reconcile when env=true", async () => {
+    process.env.KILL_SWITCH_PAUSE_IDENTITY_RECONCILE = "true";
+    jest.resetModules();
+    const { isKillSwitchActive } = await import("@/lib/flags/phase02");
+    expect(isKillSwitchActive("pause_identity_reconcile")).toBe(true);
   });
 });

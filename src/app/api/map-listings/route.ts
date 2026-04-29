@@ -38,6 +38,7 @@ import {
   SEARCH_RESPONSE_VERSION,
   type SearchMapState,
 } from "@/lib/search/search-response";
+import { isPhase04ForceListOnlyActive } from "@/lib/flags/phase04";
 import { normalizeSearchQuery } from "@/lib/search/search-query";
 import {
   buildScenarioSearchMapState,
@@ -76,6 +77,31 @@ export async function GET(request: NextRequest) {
       const meta = requestedQueryHash
         ? { ...baseMeta, queryHash: requestedQueryHash }
         : baseMeta;
+
+      if (isPhase04ForceListOnlyActive()) {
+        const state = {
+          kind: "ok",
+          data: { listings: [] },
+          meta,
+        } satisfies SearchMapState;
+
+        recordSearchRequestLatency({
+          route: "map-listings-api",
+          durationMs: performance.now() - requestStartTime,
+          backendSource: meta.backendSource,
+          stateKind: "zero-results",
+          queryHash: meta.queryHash,
+          resultCount: 0,
+        });
+
+        return NextResponse.json(state, {
+          headers: {
+            "Cache-Control": "no-store",
+            "x-request-id": requestId,
+          },
+        });
+      }
+
       const testScenario = resolveSearchScenario({
         headerValue: request.headers.get(SEARCH_SCENARIO_HEADER),
       });

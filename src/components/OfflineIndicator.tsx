@@ -13,7 +13,7 @@ export function OfflineIndicator() {
     <div
       role="alert"
       aria-live="polite"
-      className="fixed bottom-0 left-0 right-0 z-50 bg-amber-500 px-4 py-2 text-center text-sm font-medium text-white"
+      className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] left-0 right-0 z-tooltip bg-amber-500 px-4 py-2 text-center text-sm font-medium text-white md:bottom-0"
     >
       <div className="flex items-center justify-center gap-2">
         <svg

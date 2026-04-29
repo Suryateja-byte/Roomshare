@@ -60,6 +60,8 @@ export const RANKING_VERSION = "v1-heuristic";
  * @returns true if ranking should be applied
  */
 export function isRankingEnabled(urlRanker?: string | null): boolean {
+  if (features.rollbackRankerProfile === "off") return false;
+
   // URL override only allowed when debug mode is permitted
   // This prevents production users from enabling/disabling ranking via URL
   if (features.searchDebugRanking) {

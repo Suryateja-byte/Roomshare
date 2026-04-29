@@ -301,6 +301,14 @@ async function handleIdentityMutation(
 ): Promise<HandlerResult> {
   // Phase 02: Identity mutations fan out cache invalidations to every affected unit.
   try {
+    if (features.pauseIdentityReconcile) {
+      return {
+        outcome: "transient_error",
+        retryAfterMs: 60_000,
+        lastError: "Identity reconciliation paused",
+      };
+    }
+
     const affectedUnitIds = getIdentityMutationAffectedUnitIds(event);
     if (affectedUnitIds.length === 0) {
       return {
@@ -352,6 +360,14 @@ async function handleGeocodeNeededEvent(
   tx: TransactionClient,
   event: OutboxRow
 ): Promise<HandlerResult> {
+  if (features.pauseGeocodePublish) {
+    return {
+      outcome: "transient_error",
+      retryAfterMs: 60_000,
+      lastError: "Geocode publication paused",
+    };
+  }
+
   const geocodeEvent = {
     id: event.id,
     aggregateType: "PHYSICAL_UNIT" as const,

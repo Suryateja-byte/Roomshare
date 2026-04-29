@@ -1179,10 +1179,7 @@ export default function MessagesPageClient({
                 {isOffline && (
                   <div className="px-4 py-2 bg-surface-container-high rounded-xl flex items-center gap-2 text-sm text-on-surface-variant">
                     <WifiOff className="w-4 h-4" />
-                    <span>
-                      You&apos;re offline. Messages will be sent when you
-                      reconnect.
-                    </span>
+                    <span>You&apos;re offline. Reconnect to send messages.</span>
                   </div>
                 )}
                 <form

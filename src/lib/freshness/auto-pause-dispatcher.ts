@@ -15,6 +15,7 @@ import { createInternalNotification } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 import { AUTO_PAUSE_THRESHOLD_DAYS } from "@/lib/search/public-availability";
+import { syncListingLifecycleProjectionInTx } from "@/lib/listings/canonical-lifecycle";
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 export const AUTO_PAUSE_BATCH_SIZE = 500;
@@ -430,6 +431,10 @@ async function pauseListingInTransaction(
       }
 
       await markListingDirtyInTx(tx, lockedListing.id, "status_changed");
+      await syncListingLifecycleProjectionInTx(tx, lockedListing.id, {
+        role: "system",
+        id: null,
+      });
 
       return {
         outcome: "updated",
