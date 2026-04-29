@@ -34,6 +34,12 @@ jest.mock("@/lib/search/search-doc-dirty", () => ({
   markListingDirtyInTx: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock("@/lib/listings/canonical-lifecycle", () => ({
+  syncListingLifecycleProjectionInTx: jest.fn().mockResolvedValue({
+    action: "synced",
+  }),
+}));
+
 jest.mock("@/lib/messaging/cfm-messaging-telemetry", () => ({
   hashIdForLog: jest.fn(() => "hashed-listing-id"),
 }));

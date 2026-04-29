@@ -6,7 +6,7 @@
 
 // Mock dependencies before imports
 jest.mock("@/lib/data", () => ({
-  getMapListings: jest.fn(),
+  getMapListingsResult: jest.fn(),
 }));
 
 // Mock SearchDoc path — default to disabled so tests hit legacy (getMapListings) path
@@ -51,7 +51,7 @@ jest.mock("next/server", () => ({
 }));
 
 import { GET } from "@/app/api/map-listings/route";
-import { getMapListings } from "@/lib/data";
+import { getMapListingsResult as getMapListings } from "@/lib/data";
 import { withRateLimitRedis } from "@/lib/with-rate-limit-redis";
 import { NextRequest } from "next/server";
 
@@ -138,7 +138,10 @@ describe("Map Listings API", () => {
 
       it("clamps oversized viewport bounds instead of rejecting (P1-5)", async () => {
         const mockListings = [{ id: "1", title: "Test Listing" }];
-        (getMapListings as jest.Mock).mockResolvedValue(mockListings);
+        (getMapListings as jest.Mock).mockResolvedValue({
+          listings: mockListings,
+          truncated: false,
+        });
 
         const request = createRequest({
           minLng: "-135.0",
@@ -236,7 +239,10 @@ describe("Map Listings API", () => {
           { id: "1", title: "Test Listing 1" },
           { id: "2", title: "Test Listing 2" },
         ];
-        (getMapListings as jest.Mock).mockResolvedValue(mockListings);
+        (getMapListings as jest.Mock).mockResolvedValue({
+          listings: mockListings,
+          truncated: false,
+        });
 
         const request = createRequest({
           minLng: "-122.5",
@@ -261,7 +267,10 @@ describe("Map Listings API", () => {
       });
 
       it("includes x-request-id header in successful response", async () => {
-        (getMapListings as jest.Mock).mockResolvedValue([]);
+        (getMapListings as jest.Mock).mockResolvedValue({
+          listings: [],
+          truncated: false,
+        });
 
         const request = createRequest({
           minLng: "-122.5",
@@ -290,7 +299,10 @@ describe("Map Listings API", () => {
       });
 
       it("passes filter parameters to getMapListings", async () => {
-        (getMapListings as jest.Mock).mockResolvedValue([]);
+        (getMapListings as jest.Mock).mockResolvedValue({
+          listings: [],
+          truncated: false,
+        });
 
         // Use sort=newest to prevent semantic query stripping (which strips
         // query when sort=recommended and features.semanticSearch is enabled)

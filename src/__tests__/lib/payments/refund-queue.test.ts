@@ -131,6 +131,156 @@ describe("processRefundQueueOnce", () => {
         processedAt: expect.any(Date),
       }),
     });
+    expect(tx.payment.update).toHaveBeenCalledWith({
+      where: { id: "payment-123" },
+      data: { autoRefundStatus: "REFUNDED_BANNED_USER" },
+    });
+  });
+
+  it("completes accepted pending Stripe refunds as submitted", async () => {
+    mockCreateRefund.mockResolvedValue({
+      id: "re_pending",
+      amount: 499,
+      currency: "usd",
+      status: "pending",
+      reason: null,
+      payment_intent: "pi_123",
+      charge: "ch_123",
+    });
+
+    const result = await processRefundQueueOnce({ maxBatch: 1 });
+
+    expect(result).toMatchObject({
+      processed: 1,
+      refunded: 1,
+      manualReview: 0,
+    });
+    expect(tx.refund.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          status: "PENDING",
+          manualReviewRequired: false,
+        }),
+      })
+    );
+    expect(tx.payment.update).toHaveBeenCalledWith({
+      where: { id: "payment-123" },
+      data: { autoRefundStatus: "REFUND_SUBMITTED_BANNED_USER" },
+    });
+    expect(tx.refundQueueItem.update).toHaveBeenCalledWith({
+      where: { id: "queue-1" },
+      data: expect.objectContaining({
+        status: "COMPLETED",
+        stripeRefundId: "re_pending",
+        lastError: null,
+        processedAt: expect.any(Date),
+      }),
+    });
+  });
+
+  it("sends immediately failed Stripe refunds to manual review", async () => {
+    mockCreateRefund.mockResolvedValue({
+      id: "re_failed",
+      amount: 499,
+      currency: "usd",
+      status: "failed",
+      reason: null,
+      payment_intent: "pi_123",
+      charge: "ch_123",
+    });
+
+    const result = await processRefundQueueOnce({ maxBatch: 1 });
+
+    expect(result).toMatchObject({
+      processed: 1,
+      refunded: 0,
+      manualReview: 1,
+    });
+    expect(tx.refund.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          status: "FAILED",
+          manualReviewRequired: true,
+        }),
+      })
+    );
+    expect(tx.payment.update).toHaveBeenCalledWith({
+      where: { id: "payment-123" },
+      data: { autoRefundStatus: "MANUAL_REVIEW_BANNED_USER" },
+    });
+    expect(tx.refundQueueItem.update).toHaveBeenCalledWith({
+      where: { id: "queue-1" },
+      data: expect.objectContaining({
+        status: "MANUAL_REVIEW",
+        stripeRefundId: "re_failed",
+        lastError: "stripe_refund_failed",
+        processedAt: expect.any(Date),
+      }),
+    });
+  });
+
+  it("sends canceled Stripe refunds to manual review", async () => {
+    mockCreateRefund.mockResolvedValue({
+      id: "re_canceled",
+      amount: 499,
+      currency: "usd",
+      status: "canceled",
+      reason: null,
+      payment_intent: "pi_123",
+      charge: "ch_123",
+    });
+
+    const result = await processRefundQueueOnce({ maxBatch: 1 });
+
+    expect(result.manualReview).toBe(1);
+    expect(tx.refund.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          status: "CANCELED",
+          manualReviewRequired: true,
+        }),
+      })
+    );
+    expect(tx.refundQueueItem.update).toHaveBeenCalledWith({
+      where: { id: "queue-1" },
+      data: expect.objectContaining({
+        status: "MANUAL_REVIEW",
+        stripeRefundId: "re_canceled",
+        lastError: "stripe_refund_canceled",
+      }),
+    });
+  });
+
+  it("sends requires_action Stripe refunds to manual review", async () => {
+    mockCreateRefund.mockResolvedValue({
+      id: "re_requires_action",
+      amount: 499,
+      currency: "usd",
+      status: "requires_action",
+      reason: null,
+      payment_intent: "pi_123",
+      charge: "ch_123",
+    });
+
+    const result = await processRefundQueueOnce({ maxBatch: 1 });
+
+    expect(result.manualReview).toBe(1);
+    expect(tx.refund.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          status: "PENDING",
+          manualReviewRequired: true,
+        }),
+      })
+    );
+    expect(tx.refundQueueItem.update).toHaveBeenCalledWith({
+      where: { id: "queue-1" },
+      data: expect.objectContaining({
+        status: "MANUAL_REVIEW",
+        stripeRefundId: "re_requires_action",
+        lastError: "stripe_refund_requires_action",
+      }),
+    });
   });
 
   it("sends items with missing payment intents to manual review", async () => {

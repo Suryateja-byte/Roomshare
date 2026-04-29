@@ -1,3 +1,5 @@
+import { isPublicSearchBlockedStatusReason } from "@/lib/listings/moderation-write-lock";
+
 export type PublicAvailabilitySource = "LEGACY_BOOKING" | "HOST_MANAGED";
 
 export type FreshnessBucket =
@@ -421,6 +423,6 @@ export function isListingEligibleForPublicSearch(
   return (
     input.resolvedAvailability.searchEligible &&
     input.needsMigrationReview !== true &&
-    input.statusReason !== "MIGRATION_REVIEW"
+    !isPublicSearchBlockedStatusReason(input.statusReason)
   );
 }

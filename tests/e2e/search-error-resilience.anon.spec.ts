@@ -782,47 +782,39 @@ test.describe("Group 5: Network Resilience", () => {
       timeout: timeouts.navigation,
     });
 
-    // Go offline
     await network.goOffline();
-
-    // Try to trigger a new search (via URL change)
     try {
-      await page.goto(`/search?sort=newest&${boundsQS}`, {
-        timeout: 30_000,
-      });
-    } catch {
-      // Navigation will likely fail when offline -- this is expected
-    }
+      // Try to trigger a new search (via URL change)
+      try {
+        await page.goto(`/search?sort=newest&${boundsQS}`, {
+          timeout: 30_000,
+        });
+      } catch {
+        // Navigation will likely fail when offline -- this is expected
+      }
 
-    // Check for offline indicator, error message, or stale content
-    const offlineIndicator = page.getByText(
-      /offline|no internet|connection lost|network error|failed to fetch/i
-    );
-    const errorAlert = page.locator('[role="alert"]');
-    await offlineIndicator
-      .or(errorAlert)
-      .first()
-      .isVisible({ timeout: 30_000 })
-      .catch(() => false);
-
-    // The page should show some form of error, offline indicator, or stale content.
-    // It should NOT show a completely blank page.
-    const bodyContent = await page.locator("body").textContent();
-
-    if (!bodyContent || bodyContent.length < 10) {
-      // Offline simulation did not produce visible feedback -- skip
-      await network.goOnline();
-      test.skip(
-        true,
-        "Offline simulation did not produce visible feedback in this environment"
+      const globalOfflineBanner = page
+        .locator('[role="alert"]')
+        .filter({
+          hasText:
+            /offline|no internet|connection lost|network error|failed to fetch/i,
+        });
+      const offlineFallbackPage = page
+        .getByRole("heading", { name: /you're offline/i })
+        .or(page.getByText(/lost your internet connection/i));
+      const networkErrorText = page.getByText(
+        /no internet|connection lost|network error|failed to fetch|service unavailable/i
       );
-      return;
+
+      await expect(
+        globalOfflineBanner.or(offlineFallbackPage).or(networkErrorText).first()
+      ).toBeVisible({ timeout: 30_000 });
+
+      const bodyContent = await page.locator("body").textContent();
+      expect(bodyContent?.trim().length ?? 0).toBeGreaterThan(10);
+    } finally {
+      await network.goOnline();
     }
-
-    expect(bodyContent).toBeTruthy();
-
-    // Restore network
-    await network.goOnline();
   });
 
   test(`${tags.anon} ${tags.slow} 5.2 - Slow network shows loading states`, async ({

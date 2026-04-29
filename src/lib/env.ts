@@ -165,9 +165,24 @@ const serverEnvSchema = z
     ENABLE_IMAGE_EMBEDDINGS: z.enum(["true", "false"]).optional(),
     ENABLE_CLIENT_SIDE_SEARCH: z.enum(["true", "false"]).optional(),
     ENABLE_SEARCH_TEST_SCENARIOS: z.enum(["true", "false"]).optional(),
+    KILL_SWITCH_FORCE_LIST_ONLY: z.enum(["true", "false"]).optional(),
+    KILL_SWITCH_FORCE_CLUSTERS_ONLY: z.enum(["true", "false"]).optional(),
     KILL_SWITCH_DISABLE_SEMANTIC_SEARCH: z.enum(["true", "false"]).optional(),
+    KILL_SWITCH_DISABLE_NEW_PUBLICATION: z
+      .enum(["true", "false"])
+      .optional(),
+    KILL_SWITCH_PAUSE_GEOCODE_PUBLISH: z
+      .enum(["true", "false"])
+      .optional(),
+    KILL_SWITCH_PAUSE_BACKFILLS_AND_REPAIRS: z
+      .enum(["true", "false"])
+      .optional(),
+    KILL_SWITCH_PAUSE_IDENTITY_RECONCILE: z
+      .enum(["true", "false"])
+      .optional(),
     KILL_SWITCH_PAUSE_EMBED_PUBLISH: z.enum(["true", "false"]).optional(),
     KILL_SWITCH_ROLLBACK_EMBEDDING_VERSION: z.string().optional(),
+    KILL_SWITCH_ROLLBACK_RANKER_PROFILE: z.enum(["off"]).optional(),
     EMBEDDING_TOKEN_BUDGET_PER_MINUTE: z.coerce.number().int().positive().optional(),
     SEMANTIC_WEIGHT: z.coerce.number().min(0).max(1).optional(),
 
@@ -756,6 +771,9 @@ export const features = {
   get pauseBackfillsAndRepairs() {
     return process.env.KILL_SWITCH_PAUSE_BACKFILLS_AND_REPAIRS === "true";
   },
+  get pauseIdentityReconcile() {
+    return process.env.KILL_SWITCH_PAUSE_IDENTITY_RECONCILE === "true";
+  },
   get pauseEmbedPublish() {
     return process.env.KILL_SWITCH_PAUSE_EMBED_PUBLISH === "true";
   },
@@ -768,6 +786,11 @@ export const features = {
   },
   get forceClustersOnly() {
     return process.env.KILL_SWITCH_FORCE_CLUSTERS_ONLY === "true";
+  },
+  get rollbackRankerProfile(): "off" | null {
+    return process.env.KILL_SWITCH_ROLLBACK_RANKER_PROFILE === "off"
+      ? "off"
+      : null;
   },
   // Search debug ranking (only allowed in non-production, or with explicit env override)
   // This gates ?debugRank=1 and ?ranker=1 URL overrides to prevent leaking debug signals

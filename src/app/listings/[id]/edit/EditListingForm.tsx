@@ -148,19 +148,14 @@ const formatDateForInput = (date: Date | string | null | undefined) => {
 };
 
 function resolveInitialWriteLock(options: {
-  moderationWriteLocksEnabled?: boolean;
   statusReason?: string | null;
 }) {
-  return (
-    options.moderationWriteLocksEnabled === true &&
-    getModerationWriteLockReason(options.statusReason) !== null
-  );
+  return getModerationWriteLockReason(options.statusReason) !== null;
 }
 
 function HostManagedEditListingForm({
   listing,
   migrationReview: _migrationReview = null,
-  moderationWriteLocksEnabled = false,
 }: EditListingFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -184,7 +179,6 @@ function HostManagedEditListingForm({
   const [pendingReload, setPendingReload] = useState(false);
   const [isWriteLocked, setIsWriteLocked] = useState(() =>
     resolveInitialWriteLock({
-      moderationWriteLocksEnabled,
       statusReason: listing.statusReason,
     })
   );
@@ -259,11 +253,10 @@ function HostManagedEditListingForm({
   useEffect(() => {
     setIsWriteLocked(
       resolveInitialWriteLock({
-        moderationWriteLocksEnabled,
         statusReason: listing.statusReason,
       })
     );
-  }, [listing.statusReason, moderationWriteLocksEnabled]);
+  }, [listing.statusReason]);
 
   useEffect(() => {
     const previousSnapshotKey = previousSnapshotKeyRef.current;
@@ -678,7 +671,6 @@ function LegacyEditListingForm({
   listing,
   migrationReview = null,
   enableWholeUnitMode = false,
-  moderationWriteLocksEnabled = false,
 }: EditListingFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -693,7 +685,6 @@ function LegacyEditListingForm({
   const [draftRestored, setDraftRestored] = useState(false);
   const [isWriteLocked, setIsWriteLocked] = useState(() =>
     resolveInitialWriteLock({
-      moderationWriteLocksEnabled,
       statusReason: listing.statusReason,
     })
   );
@@ -777,11 +768,10 @@ function LegacyEditListingForm({
   useEffect(() => {
     setIsWriteLocked(
       resolveInitialWriteLock({
-        moderationWriteLocksEnabled,
         statusReason: listing.statusReason,
       })
     );
-  }, [listing.statusReason, moderationWriteLocksEnabled]);
+  }, [listing.statusReason]);
 
   // Show draft banner when we have a draft and haven't restored yet
   useEffect(() => {

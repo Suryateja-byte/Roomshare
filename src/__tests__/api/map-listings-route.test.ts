@@ -45,6 +45,7 @@ jest.mock("@/lib/search/search-doc-queries", () => ({
 jest.mock("@/lib/env", () => ({
   __esModule: true,
   features: {
+    forceListOnly: false,
     semanticSearch: false,
   },
 }));
@@ -130,6 +131,17 @@ jest.mock("@/lib/search/search-telemetry", () => ({
   recordSearchRequestLatency: jest.fn(),
 }));
 
+jest.mock("@/lib/search/query-snapshots", () => ({
+  loadValidQuerySnapshot: jest.fn(),
+  PHASE04_SNAPSHOT_VERSION: "phase04.v1",
+  toSnapshotResponseMeta: jest.fn((snapshot: Record<string, unknown>) => ({
+    queryHash: snapshot.queryHash,
+    backendSource: snapshot.backendSource,
+    responseVersion: snapshot.responseVersion,
+    querySnapshotId: snapshot.id,
+  })),
+}));
+
 // --- Imports (after mocks) ---
 
 import { GET } from "@/app/api/map-listings/route";
@@ -143,8 +155,13 @@ import { withRateLimitRedis } from "@/lib/with-rate-limit-redis";
 import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
 import { validateAndParseBounds } from "@/lib/validation";
 import { parseSearchParams } from "@/lib/search-params";
+import { recordSearchRequestLatency } from "@/lib/search/search-telemetry";
+import { loadValidQuerySnapshot } from "@/lib/search/query-snapshots";
 
-const mockFeatures = features as { semanticSearch: boolean };
+const mockFeatures = features as {
+  forceListOnly: boolean;
+  semanticSearch: boolean;
+};
 
 // --- Helpers ---
 
@@ -212,7 +229,51 @@ describe("GET /api/map-listings (C2.2)", () => {
       (promise: Promise<unknown>) => promise
     );
     // Default: semantic search off
+    mockFeatures.forceListOnly = false;
     mockFeatures.semanticSearch = false;
+  });
+
+  it("returns an empty non-cacheable map payload without map dependencies when list-only is active", async () => {
+    mockFeatures.forceListOnly = true;
+
+    const req = createGetRequest({
+      minLng: "-122.5",
+      maxLng: "-122.0",
+      minLat: "37.5",
+      maxLat: "38.0",
+      query_snapshot_id: "snapshot-with-map-payload",
+    });
+
+    const res = await GET(req);
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Cache-Control")).toBe("no-store");
+    const body = await res.json();
+    expect(body).toEqual({
+      kind: "ok",
+      data: { listings: [] },
+      meta: expect.objectContaining({
+        backendSource: "map-api",
+        responseVersion: expect.any(String),
+        queryHash: expect.any(String),
+      }),
+    });
+    expect(withRateLimitRedis).not.toHaveBeenCalled();
+    expect(loadValidQuerySnapshot).not.toHaveBeenCalled();
+    expect(validateAndParseBounds).not.toHaveBeenCalled();
+    expect(withTimeout).not.toHaveBeenCalled();
+    expect(isSearchDocEnabled).not.toHaveBeenCalled();
+    expect(getSearchDocMapListings).not.toHaveBeenCalled();
+    expect(getMapListings).not.toHaveBeenCalled();
+    expect(recordSearchRequestLatency).toHaveBeenCalledWith(
+      expect.objectContaining({
+        route: "map-listings-api",
+        backendSource: "map-api",
+        stateKind: "zero-results",
+        queryHash: body.meta.queryHash,
+        resultCount: 0,
+      })
+    );
   });
 
   it("returns 400 when no bounds are provided", async () => {
