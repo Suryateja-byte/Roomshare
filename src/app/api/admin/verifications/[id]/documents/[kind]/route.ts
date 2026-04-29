@@ -1,5 +1,5 @@
-import { auth } from "@/auth";
 import { logAdminAction } from "@/lib/audit";
+import { requireAdminAuth } from "@/lib/admin-auth";
 import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { getClientIP, checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
@@ -25,23 +25,22 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const session = await auth();
-  if (!session?.user?.id) {
+  const adminCheck = await requireAdminAuth();
+  if (adminCheck.code === "SESSION_EXPIRED") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const admin = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { isAdmin: true },
-  });
-
-  if (!admin?.isAdmin) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  if (adminCheck.error) {
+    return NextResponse.json({ error: adminCheck.error }, { status: 403 });
+  }
+  const adminId = adminCheck.userId;
+  if (!adminId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const ip = getClientIP(request);
   const rateLimit = await checkRateLimit(
-    `${ip}:${session.user.id}`,
+    `${ip}:${adminId}`,
     "verificationDocumentView",
     RATE_LIMITS.verificationDocumentView
   );
@@ -96,7 +95,7 @@ export async function GET(
     const signedUrl = await createVerificationSignedUrl(storagePath);
 
     await logAdminAction({
-      adminId: session.user.id,
+      adminId,
       action: "VERIFICATION_DOCUMENT_VIEWED",
       targetType: "VerificationRequest",
       targetId: verificationRequest.id,

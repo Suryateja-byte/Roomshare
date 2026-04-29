@@ -37,6 +37,8 @@ export interface DrainOptions {
   maxTickMs?: number;
   /** Only claim rows with priority <= this value (default: 100 = all) */
   priorityMax?: number;
+  /** Event kinds to leave pending for a later, more specific drain window. */
+  excludedKinds?: readonly OutboxKind[];
   /** Clock override for testing */
   now?: () => Date;
   /** Reset IN_FLIGHT rows older than this age before claiming (default: 5 minutes) */
@@ -78,9 +80,11 @@ export async function drainOutboxOnce(
     maxBatch = 50,
     maxTickMs = 9000,
     priorityMax = 100,
+    excludedKinds = [],
     now = () => new Date(),
     staleInFlightMs = STALE_IN_FLIGHT_MS,
   } = opts;
+  const excludedOutboxKinds = Array.from(new Set(excludedKinds));
 
   const tickStart = Date.now();
   let processed = 0;
@@ -101,20 +105,37 @@ export async function drainOutboxOnce(
         AND updated_at < ${staleCutoff}
     `;
 
-    const rows = await tx.$queryRaw<OutboxRow[]>`
-      SELECT
-        id, aggregate_type AS "aggregateType", aggregate_id AS "aggregateId",
-        kind, payload, source_version AS "sourceVersion",
-        unit_identity_epoch AS "unitIdentityEpoch", priority,
-        attempt_count AS "attemptCount", created_at AS "createdAt"
-      FROM outbox_events
-      WHERE status = 'PENDING'
-        AND priority <= ${priorityMax}
-        AND next_attempt_at <= ${now()}
-      ORDER BY priority ASC, next_attempt_at ASC
-      LIMIT ${maxBatch}
-      FOR UPDATE SKIP LOCKED
-    `;
+    const rows =
+      excludedOutboxKinds.length > 0
+        ? await tx.$queryRaw<OutboxRow[]>`
+            SELECT
+              id, aggregate_type AS "aggregateType", aggregate_id AS "aggregateId",
+              kind, payload, source_version AS "sourceVersion",
+              unit_identity_epoch AS "unitIdentityEpoch", priority,
+              attempt_count AS "attemptCount", created_at AS "createdAt"
+            FROM outbox_events
+            WHERE status = 'PENDING'
+              AND priority <= ${priorityMax}
+              AND kind <> ALL(${excludedOutboxKinds}::TEXT[])
+              AND next_attempt_at <= ${now()}
+            ORDER BY priority ASC, next_attempt_at ASC
+            LIMIT ${maxBatch}
+            FOR UPDATE SKIP LOCKED
+          `
+        : await tx.$queryRaw<OutboxRow[]>`
+            SELECT
+              id, aggregate_type AS "aggregateType", aggregate_id AS "aggregateId",
+              kind, payload, source_version AS "sourceVersion",
+              unit_identity_epoch AS "unitIdentityEpoch", priority,
+              attempt_count AS "attemptCount", created_at AS "createdAt"
+            FROM outbox_events
+            WHERE status = 'PENDING'
+              AND priority <= ${priorityMax}
+              AND next_attempt_at <= ${now()}
+            ORDER BY priority ASC, next_attempt_at ASC
+            LIMIT ${maxBatch}
+            FOR UPDATE SKIP LOCKED
+          `;
 
     if (rows.length === 0) return [];
 

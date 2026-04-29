@@ -59,7 +59,9 @@ describe("getFreshnessOpsMetricsSnapshot", () => {
     const [query, ...params] = (prisma.$queryRawUnsafe as jest.Mock).mock.calls[0];
 
     expect(query).toContain(`COALESCE(FALSE, FALSE) = FALSE`);
-    expect(query).toContain(`l."statusReason" IS DISTINCT FROM 'MIGRATION_REVIEW'`);
+    expect(query).toContain(
+      `COALESCE(l."statusReason", '') NOT IN ('MIGRATION_REVIEW', 'ADMIN_PAUSED', 'SUPPRESSED')`
+    );
     expect(query).toContain(`'HOST_MANAGED' = 'HOST_MANAGED'`);
     expect(query).toContain(`l."lastConfirmedAt" <= NOW() - make_interval(days => $3)`);
     expect(params).toContain(1);

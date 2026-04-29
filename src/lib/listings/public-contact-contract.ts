@@ -6,6 +6,10 @@ import {
   type PublicAvailabilityListingInput,
   type ResolvedPublicAvailability,
 } from "@/lib/search/public-availability";
+import {
+  isModerationLockedStatusReason,
+  isPublicSearchBlockedStatusReason,
+} from "@/lib/listings/moderation-write-lock";
 
 export type ContactDisabledReason =
   | "LOGIN_REQUIRED"
@@ -67,24 +71,12 @@ export interface ViewerContactFields {
   availabilitySource: PublicAvailabilitySource;
 }
 
-const MODERATION_LOCKED_STATUS_REASONS = new Set(["ADMIN_PAUSED", "SUPPRESSED"]);
-
 export const LISTING_UNAVAILABLE_MESSAGE =
   "This listing is not available for new messages right now.";
 export const MIGRATION_REVIEW_MESSAGE =
   "This listing is temporarily unavailable.";
 export const MODERATION_LOCKED_MESSAGE =
   "This listing is temporarily unavailable while it is under review.";
-
-export function isModerationLockedStatusReason(
-  statusReason: string | null | undefined
-): boolean {
-  if (!statusReason) {
-    return false;
-  }
-
-  return MODERATION_LOCKED_STATUS_REASONS.has(statusReason);
-}
 
 export function resolveListingAvailabilityGateReason(
   listing: Pick<
@@ -180,7 +172,7 @@ function isEligibleForPublicSearch(input: {
   return (
     input.publicAvailability.searchEligible &&
     input.needsMigrationReview !== true &&
-    input.statusReason !== "MIGRATION_REVIEW"
+    !isPublicSearchBlockedStatusReason(input.statusReason)
   );
 }
 

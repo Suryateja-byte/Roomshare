@@ -34,10 +34,11 @@ jest.mock("sonner", () => ({
 
 jest.mock("@/app/actions/admin", () => ({
   updateListingStatus: jest.fn(),
+  unsuppressListing: jest.fn(),
   deleteListing: jest.fn(),
 }));
 
-import { deleteListing } from "@/app/actions/admin";
+import { deleteListing, unsuppressListing } from "@/app/actions/admin";
 import ListingList from "@/app/admin/listings/ListingList";
 
 type Listing = React.ComponentProps<typeof ListingList>["initialListings"][number];
@@ -48,6 +49,7 @@ function createListing(overrides: Partial<Listing> = {}): Listing {
     title: "Reported Listing",
     price: 1200,
     status: "ACTIVE",
+    statusReason: null,
     version: 3,
     images: [],
     viewCount: 7,
@@ -108,6 +110,7 @@ describe("Admin ListingList evidence-preserving delete", () => {
       action: "suppressed",
       status: "PAUSED",
       version: 4,
+      statusReason: "SUPPRESSED",
     });
 
     renderListingList();
@@ -131,6 +134,7 @@ describe("Admin ListingList evidence-preserving delete", () => {
       action: "suppressed",
       status: "PAUSED",
       version: 4,
+      statusReason: "SUPPRESSED",
     });
 
     renderListingList({ currentStatus: "ACTIVE" });
@@ -182,5 +186,42 @@ describe("Admin ListingList evidence-preserving delete", () => {
       expect(screen.queryByText("Clean Listing")).not.toBeInTheDocument();
     });
     expect(deleteListing).toHaveBeenCalledWith("listing-2");
+  });
+
+  it("uses explicit unsuppress for moderation-locked listings", async () => {
+    (unsuppressListing as jest.Mock).mockResolvedValue({
+      success: true,
+      status: "ACTIVE",
+      statusReason: null,
+      version: 5,
+    });
+
+    renderListingList({
+      initialListings: [
+        createListing({
+          status: "PAUSED",
+          statusReason: "SUPPRESSED",
+          version: 4,
+        }),
+      ],
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Actions for Reported Listing" })
+    );
+
+    expect(screen.getByText("Suppressed")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Set Active" })
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Unsuppress Listing" })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Active")).toBeInTheDocument();
+    });
+    expect(unsuppressListing).toHaveBeenCalledWith("listing-1", 4);
   });
 });

@@ -11,6 +11,7 @@ interface ServiceWorkerRegistrationProps {
 
 const UPDATE_POLL_MS = 60 * 60 * 1000;
 const CACHE_FLOOR_POLL_MS = 60 * 1000;
+const DYNAMIC_CACHE_PREFIX = "roomshare-dynamic-v";
 
 async function postServiceWorkerMessage(message: {
   type: string;
@@ -30,6 +31,23 @@ async function postServiceWorkerMessage(message: {
     registration.active?.postMessage(message);
   } catch {
     // SW readiness is best-effort for cache invalidation only.
+  }
+}
+
+async function clearDynamicCachesFromWindow() {
+  if (typeof window === "undefined" || !("caches" in window)) {
+    return;
+  }
+
+  try {
+    const cacheNames = await window.caches.keys();
+    await Promise.all(
+      cacheNames
+        .filter((name) => name.startsWith(DYNAMIC_CACHE_PREFIX))
+        .map((name) => window.caches.delete(name))
+    );
+  } catch {
+    // The service worker receives the same clear message as a fallback.
   }
 }
 
@@ -141,7 +159,7 @@ export function ServiceWorkerRegistration({
       );
       eventSource = source;
 
-      source.addEventListener("public-cache.invalidate", (event) => {
+      source.addEventListener("public-cache.invalidate", async (event) => {
         try {
           const data = JSON.parse((event as MessageEvent).data) as {
             cursor?: string;
@@ -153,6 +171,7 @@ export function ServiceWorkerRegistration({
           if (typeof data.cursor === "string") {
             lastCursorRef.current = data.cursor;
           }
+          await clearDynamicCachesFromWindow();
           if (typeof data.cacheFloorToken === "string") {
             lastCacheFloorTokenRef.current = data.cacheFloorToken;
             emitPublicCacheInvalidated(data.cacheFloorToken);
@@ -162,6 +181,7 @@ export function ServiceWorkerRegistration({
             type: "PUBLIC_CACHE_INVALIDATED",
             payload: { ...data, broadcast: false },
           });
+          void postServiceWorkerMessage({ type: "CLEAR_DYNAMIC_CACHE" });
 
           source.close();
           if (!disposed) {
@@ -248,6 +268,7 @@ export function ServiceWorkerRegistration({
           return;
         }
 
+        await clearDynamicCachesFromWindow();
         await postServiceWorkerMessage({ type: "CLEAR_DYNAMIC_CACHE" });
         emitPublicCacheInvalidated(data.cacheFloorToken);
       } catch (error) {

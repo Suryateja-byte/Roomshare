@@ -4,6 +4,7 @@ import type { ActorContext, TransactionClient } from "@/lib/db/with-actor";
 import { setActorContext } from "@/lib/db/with-actor";
 import type { RawAddressInput } from "@/lib/identity/canonical-address";
 import { resolveOrCreateUnit } from "@/lib/identity/resolve-or-create-unit";
+import { isPublicSearchBlockedStatusReason } from "@/lib/listings/moderation-write-lock";
 import { appendOutboxEvent } from "@/lib/outbox/append";
 import type { TombstoneReason } from "@/lib/projections/tombstone";
 import { handleTombstone } from "@/lib/projections/tombstone";
@@ -13,6 +14,7 @@ type CanonicalRoomCategory = "ENTIRE_PLACE" | "PRIVATE_ROOM" | "SHARED_ROOM";
 type CanonicalPublishStatus =
   | "PENDING_GEOCODE"
   | "PENDING_PROJECTION"
+  | "SUPPRESSED"
   | "PAUSED"
   | "ARCHIVED";
 
@@ -36,6 +38,7 @@ export interface CanonicalListingInventoryListing {
   availableUntil?: Date | string | null;
   minStayMonths?: number | null;
   status: ListingStatusForCanonical;
+  statusReason?: string | null;
   version?: number | null;
   genderPreference?: string | null;
   householdGender?: string | null;
@@ -109,23 +112,53 @@ function classifyRoomCategory(input: {
 
 function isVisibleListing(input: {
   status: ListingStatusForCanonical;
+  statusReason?: string | null;
   openSlots: number;
   moveInDate: Date | null;
 }): boolean {
   return (
     input.status === "ACTIVE" &&
+    !isPublicSearchBlockedStatusReason(input.statusReason) &&
     input.openSlots > 0 &&
     input.moveInDate !== null
   );
 }
 
-function hiddenPublishStatus(
-  status: ListingStatusForCanonical
-): "PAUSED" | "ARCHIVED" {
-  return status === "PAUSED" ? "PAUSED" : "ARCHIVED";
+function hiddenPublishStatus(input: {
+  status: ListingStatusForCanonical;
+  statusReason?: string | null;
+}): "SUPPRESSED" | "PAUSED" | "ARCHIVED" {
+  if (input.statusReason === "SUPPRESSED") return "SUPPRESSED";
+  if (
+    input.statusReason === "ADMIN_PAUSED" ||
+    input.statusReason === "MIGRATION_REVIEW"
+  ) {
+    return "PAUSED";
+  }
+  return input.status === "PAUSED" ? "PAUSED" : "ARCHIVED";
+}
+
+export function resolveCanonicalPublishStatus(input: {
+  status: ListingStatusForCanonical;
+  statusReason?: string | null;
+  openSlots: number;
+  moveInDate: Date | null;
+  geocodeStatus: string;
+}): CanonicalPublishStatus {
+  if (isVisibleListing(input)) {
+    return input.geocodeStatus === "COMPLETE"
+      ? "PENDING_PROJECTION"
+      : "PENDING_GEOCODE";
+  }
+
+  return hiddenPublishStatus({
+    status: input.status,
+    statusReason: input.statusReason,
+  });
 }
 
 function tombstoneReason(status: CanonicalPublishStatus): TombstoneReason {
+  if (status === "SUPPRESSED") return "SUPPRESSION";
   if (status === "PAUSED") return "PAUSE";
   if (status === "ARCHIVED") return "ARCHIVE";
   return "TOMBSTONE";
@@ -208,11 +241,17 @@ export async function syncCanonicalListingInventory(
   const moveInDate = toDateOnly(listing.moveInDate);
   const visible = isVisibleListing({
     status: listing.status,
+    statusReason: listing.statusReason,
     openSlots,
     moveInDate,
   });
 
-  if (listing.status === "ACTIVE" && openSlots > 0 && !moveInDate) {
+  if (
+    listing.status === "ACTIVE" &&
+    !isPublicSearchBlockedStatusReason(listing.statusReason) &&
+    openSlots > 0 &&
+    !moveInDate
+  ) {
     throw new CanonicalInventorySyncError(
       "Active canonical inventory requires a move-in date"
     );
@@ -236,11 +275,13 @@ export async function syncCanonicalListingInventory(
     requestId: input.requestId,
   });
 
-  const publishStatus: CanonicalPublishStatus = visible
-    ? unit.geocodeStatus === "COMPLETE"
-      ? "PENDING_PROJECTION"
-      : "PENDING_GEOCODE"
-    : hiddenPublishStatus(listing.status);
+  const publishStatus = resolveCanonicalPublishStatus({
+    status: listing.status,
+    statusReason: listing.statusReason,
+    openSlots,
+    moveInDate,
+    geocodeStatus: unit.geocodeStatus,
+  });
 
   const previousRows = await tx.$queryRaw<
     {

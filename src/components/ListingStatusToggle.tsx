@@ -50,7 +50,6 @@ export default function ListingStatusToggle({
   currentStatus,
   currentVersion,
   currentStatusReason = null,
-  moderationWriteLocksEnabled = false,
 }: ListingStatusToggleProps) {
   const router = useRouter();
   const [status, setStatus] = useState<ListingStatus>(currentStatus);
@@ -60,7 +59,6 @@ export default function ListingStatusToggle({
   const [awaitingRefresh, setAwaitingRefresh] = useState(false);
   const awaitingRefreshRef = useRef(false);
   const isLockedFromProps =
-    moderationWriteLocksEnabled &&
     getModerationWriteLockReason(currentStatusReason) !== null;
 
   useEffect(() => {
