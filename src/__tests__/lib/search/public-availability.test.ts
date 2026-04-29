@@ -355,6 +355,31 @@ describe("search/public-availability", () => {
     ).toBe(false);
   });
 
+  it("excludes moderation-locked active listings from public list search", () => {
+    const resolvedAvailability = resolvePublicAvailability({
+      id: "listing-active-locked",
+      availabilitySource: "LEGACY_BOOKING",
+      status: "ACTIVE",
+      availableSlots: 2,
+      totalSlots: 2,
+    });
+
+    expect(
+      isListingEligibleForPublicSearch({
+        needsMigrationReview: false,
+        statusReason: "SUPPRESSED",
+        resolvedAvailability,
+      })
+    ).toBe(false);
+    expect(
+      isListingEligibleForPublicSearch({
+        needsMigrationReview: false,
+        statusReason: "ADMIN_PAUSED",
+        resolvedAvailability,
+      })
+    ).toBe(false);
+  });
+
   it("maps public status snapshots from row status and reason", () => {
     expect(
       resolvePublicAvailability({

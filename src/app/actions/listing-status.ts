@@ -15,6 +15,7 @@ import {
 import { features } from "@/lib/env";
 import { getHostModerationWriteLockResult } from "@/lib/listings/moderation-write-lock";
 import { recordFreshnessRecovered } from "@/lib/metrics/cfm-ops-telemetry";
+import { syncListingLifecycleProjectionInTx } from "@/lib/listings/canonical-lifecycle";
 // Basic listingId format check — rejects empty/absurdly long strings
 // without being as strict as CUID/UUID validation (allows test IDs)
 const isReasonableId = (id: string) =>
@@ -46,6 +47,28 @@ type LockedListingRow = {
   freshnessWarningSentAt: Date | null;
   autoPausedAt: Date | null;
 };
+
+function isFreshnessRecoveryReason(statusReason: string | null | undefined) {
+  return (
+    statusReason === "STALE_AUTO_PAUSE" ||
+    statusReason === "FRESHNESS_WARNING"
+  );
+}
+
+function resolveHostStatusReason(input: {
+  status: ListingStatus;
+  currentStatusReason: string | null;
+}): string | null {
+  if (input.status === "PAUSED") {
+    return "HOST_PAUSED";
+  }
+
+  if (input.status === "ACTIVE" && input.currentStatusReason === "HOST_PAUSED") {
+    return null;
+  }
+
+  return input.currentStatusReason;
+}
 
 export async function updateListingStatus(
   listingId: string,
@@ -132,18 +155,42 @@ export async function updateListingStatus(
           } as const;
         }
 
+        if (
+          status === "ACTIVE" &&
+          isFreshnessRecoveryReason(currentListing.statusReason)
+        ) {
+          return {
+            error:
+              "This listing needs availability reconfirmation before it can be reopened.",
+            code: "LISTING_REQUIRES_RECONFIRMATION",
+          } as const;
+        }
+
+        const nextStatusReason = resolveHostStatusReason({
+          status,
+          currentStatusReason: currentListing.statusReason,
+        });
+
         await tx.listing.update({
           where: { id: listingId },
-          data: { status, version: currentListing.version + 1 },
+          data: {
+            status,
+            statusReason: nextStatusReason,
+            version: currentListing.version + 1,
+          },
         });
 
         await markListingDirtyInTx(tx, listingId, "status_changed");
+        await syncListingLifecycleProjectionInTx(tx, listingId, {
+          role: "host",
+          id: session.user.id,
+        });
 
         return {
           success: true,
           status,
           version: currentListing.version + 1,
-          statusReason: currentListing.statusReason ?? null,
+          statusReason: nextStatusReason,
         } as const;
       },
       { timeout: 10000 }
@@ -287,11 +334,11 @@ export async function recoverHostManagedListing(
         }
 
         const nextStatus = mode === "REOPEN" ? "ACTIVE" : currentListing.status;
-        const nextStatusReason =
-          currentListing.statusReason === "STALE_AUTO_PAUSE" ||
-          currentListing.statusReason === "FRESHNESS_WARNING"
-            ? null
-            : currentListing.statusReason;
+        const nextStatusReason = isFreshnessRecoveryReason(
+          currentListing.statusReason
+        )
+          ? null
+          : currentListing.statusReason;
         const nextVersion = currentListing.version + 1;
 
         if (nextStatus === "ACTIVE" && (currentListing.openSlots ?? 0) <= 0) {
@@ -315,6 +362,10 @@ export async function recoverHostManagedListing(
         });
 
         await markListingDirtyInTx(tx, listingId, "status_changed");
+        await syncListingLifecycleProjectionInTx(tx, listingId, {
+          role: "host",
+          id: session.user.id,
+        });
 
         return {
           success: true,

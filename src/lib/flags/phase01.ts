@@ -18,7 +18,7 @@ export type Phase01KillSwitch = keyof typeof PHASE01_KILL_SWITCHES;
  * Kill switch resolver for Phase 01 callers.
  *
  * `disable_new_publication` is now live-backed via Phase 02's flag module.
- * `pause_identity_reconcile` remains a stub until the identity reconciler lands (Phase 04+).
+ * `pause_identity_reconcile` is live-backed through the identity mutation outbox lane.
  */
 export function isKillSwitchActive(name: Phase01KillSwitch): boolean {
   switch (name) {
@@ -26,8 +26,7 @@ export function isKillSwitchActive(name: Phase01KillSwitch): boolean {
       // Phase 02 un-stubs this — delegate to the live env-backed value.
       return phase02KillSwitch("disable_new_publication");
     case "pause_identity_reconcile":
-      // Still stub in Phase 02; identity reconciler deferred to Phase 04+.
-      return false;
+      return phase02KillSwitch("pause_identity_reconcile");
     default: /* istanbul ignore next */ {
       const _exhaustive: never = name;
       return _exhaustive;

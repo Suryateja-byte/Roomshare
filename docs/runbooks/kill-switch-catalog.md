@@ -22,7 +22,7 @@ by `src/lib/launch/kill-switch-catalog.ts`.
 | `disable_semantic_search` | `KILL_SWITCH_DISABLE_SEMANTIC_SEARCH` | `degraded-safe-mode.md` | Filter-only projection search remains available. |
 | `pause_geocode_publish` | `KILL_SWITCH_PAUSE_GEOCODE_PUBLISH` | This runbook | Geocode publish requeues; existing public rows remain readable. |
 | `pause_embed_publish` | `KILL_SWITCH_PAUSE_EMBED_PUBLISH` | `embedding-swap.md` | Embedding work requeues without deleting active rows. |
-| `rollback_ranker_profile` | `KILL_SWITCH_ROLLBACK_RANKER_PROFILE` | This runbook | Operators can pin reads to the previous ranker profile when wired. |
+| `rollback_ranker_profile` | `KILL_SWITCH_ROLLBACK_RANKER_PROFILE` | This runbook | Ranking can be disabled with `off` while search remains available. |
 | `rollback_embedding_version` | `KILL_SWITCH_ROLLBACK_EMBEDDING_VERSION` | `embedding-swap.md` | Semantic reads target the previous published embedding version. |
 | `pause_backfills_and_repairs` | `KILL_SWITCH_PAUSE_BACKFILLS_AND_REPAIRS` | This runbook | Low-priority repair jobs pause. |
 | `pause_identity_reconcile` | `KILL_SWITCH_PAUSE_IDENTITY_RECONCILE` | `identity-merge.md` | Identity repair queues pause without deleting public rows. |
@@ -32,6 +32,7 @@ by `src/lib/launch/kill-switch-catalog.ts`.
 | `emergency_open_paywall` | `KILL_SWITCH_EMERGENCY_OPEN_PAYWALL` | `emergency-open-paywall.md` | Contact actions proceed with audit-only emergency grants. |
 | `disable_phone_reveal` | `KILL_SWITCH_DISABLE_PHONE_REVEAL` | `degraded-safe-mode.md` | Phone reveal fails closed. |
 | `disable_new_publication` | `KILL_SWITCH_DISABLE_NEW_PUBLICATION` | `degraded-safe-mode.md` | New publication pauses; existing published projections remain. |
+| `disable_public_cache_push` | `KILL_SWITCH_DISABLE_PUBLIC_CACHE_PUSH` | `public-cache-coherence.md` | Web Push fanout pauses; SSE and polling continue. |
 
 ## Evidence
 

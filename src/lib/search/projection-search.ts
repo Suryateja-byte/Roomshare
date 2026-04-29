@@ -46,7 +46,10 @@ import {
   type PublicAvailability,
 } from "./public-availability";
 import { searchV2MapToListings } from "./v2-map-data";
-import { isPhase04KillSwitchActive } from "@/lib/flags/phase04";
+import {
+  isPhase04ForceClustersOnlyActive,
+  isPhase04ForceListOnlyActive,
+} from "@/lib/flags/phase04";
 import { recordSearchSnapshotHoleRatio } from "./search-telemetry";
 import type { SearchV2Params, SearchV2Result } from "./search-v2-service";
 
@@ -616,12 +619,12 @@ function emptyMap(): SearchV2Map {
 }
 
 function buildMap(rows: ProjectionUnitRow[]): SearchV2Map {
-  if (isPhase04KillSwitchActive("force_list_only")) {
+  if (isPhase04ForceListOnlyActive()) {
     return emptyMap();
   }
   const mapListings = projectionRowsToMapListings(rows);
   const response = transformToMapResponse(mapListings);
-  if (isPhase04KillSwitchActive("force_clusters_only")) {
+  if (isPhase04ForceClustersOnlyActive()) {
     return {
       geojson: response.geojson,
       truncated: response.truncated,
@@ -632,10 +635,10 @@ function buildMap(rows: ProjectionUnitRow[]): SearchV2Map {
 }
 
 function getMode(map: SearchV2Map): SearchV2Mode {
-  if (isPhase04KillSwitchActive("force_clusters_only")) {
+  if (isPhase04ForceClustersOnlyActive()) {
     return "geojson";
   }
-  if (isPhase04KillSwitchActive("force_list_only")) {
+  if (isPhase04ForceListOnlyActive()) {
     return "pins";
   }
   const count = map.geojson.features.length;

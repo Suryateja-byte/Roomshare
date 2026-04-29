@@ -1021,9 +1021,7 @@ export default function ChatWindow({
           {isOffline && (
             <div className="flex items-center gap-2 p-2 rounded-lg bg-surface-container-high text-sm text-on-surface-variant">
               <WifiOff className="w-4 h-4 flex-shrink-0" />
-              <span>
-                You&apos;re offline. Messages will send when reconnected.
-              </span>
+              <span>You&apos;re offline. Reconnect to send messages.</span>
             </div>
           )}
           {/* Rate limit countdown */}

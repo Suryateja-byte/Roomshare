@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { updateListingStatus, deleteListing } from "@/app/actions/admin";
+import {
+  updateListingStatus,
+  deleteListing,
+  unsuppressListing,
+} from "@/app/actions/admin";
 import { formatPrice } from "@/lib/format";
 import {
   Search,
@@ -29,6 +33,7 @@ interface Listing {
   title: string;
   price: number;
   status: ListingStatus;
+  statusReason: string | null;
   version: number;
   images: string[];
   viewCount: number;
@@ -68,6 +73,12 @@ const statusConfig = {
     color: "bg-blue-100 text-blue-700",
     icon: CheckCircle,
   },
+};
+
+const moderationLockedReasons = new Set(["ADMIN_PAUSED", "SUPPRESSED"]);
+const statusReasonLabels: Record<string, string> = {
+  ADMIN_PAUSED: "Admin paused",
+  SUPPRESSED: "Suppressed",
 };
 
 export default function ListingList({
@@ -127,6 +138,10 @@ export default function ListingList({
               {
                 ...l,
                 status,
+                statusReason:
+                  "statusReason" in result
+                    ? (result.statusReason ?? null)
+                    : l.statusReason,
                 version:
                   typeof result.version === "number"
                     ? result.version
@@ -140,6 +155,42 @@ export default function ListingList({
       }
     } catch (error) {
       console.error("Error updating status:", error);
+    } finally {
+      setProcessingId(null);
+      setOpenMenuId(null);
+    }
+  };
+
+  const handleUnsuppress = async (
+    listingId: string,
+    expectedVersion: number
+  ) => {
+    setProcessingId(listingId);
+    try {
+      const result = await unsuppressListing(listingId, expectedVersion);
+      if (result.success) {
+        setListings((prev) =>
+          prev.flatMap((l) => {
+            if (l.id !== listingId) return [l];
+            if (currentStatus !== "all" && currentStatus !== "ACTIVE") return [];
+            return [
+              {
+                ...l,
+                status: "ACTIVE",
+                statusReason: null,
+                version:
+                  typeof result.version === "number"
+                    ? result.version
+                    : l.version,
+              },
+            ];
+          })
+        );
+      } else if (result.error) {
+        toast.error(result.error);
+      }
+    } catch (error) {
+      console.error("Error restoring listing:", error);
     } finally {
       setProcessingId(null);
       setOpenMenuId(null);
@@ -160,6 +211,10 @@ export default function ListingList({
               {
                 ...l,
                 status: "PAUSED",
+                statusReason:
+                  "statusReason" in result
+                    ? (result.statusReason ?? l.statusReason)
+                    : l.statusReason,
                 version:
                   typeof result.version === "number" ? result.version : l.version,
               },
@@ -236,6 +291,9 @@ export default function ListingList({
         <div className="grid gap-4">
           {listings.map((listing) => {
             const StatusIcon = statusConfig[listing.status].icon;
+            const isModerationLocked = moderationLockedReasons.has(
+              listing.statusReason ?? ""
+            );
 
             return (
               <div
@@ -281,6 +339,12 @@ export default function ListingList({
                             <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-medium flex items-center gap-1">
                               <Flag className="w-3 h-3" />
                               {listing._count.reports} reports
+                            </span>
+                          )}
+                          {isModerationLocked && (
+                            <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-medium">
+                              {statusReasonLabels[listing.statusReason ?? ""] ??
+                                "Moderation locked"}
                             </span>
                           )}
                         </div>
@@ -332,12 +396,11 @@ export default function ListingList({
 
                           {openMenuId === listing.id && (
                             <div className="absolute right-0 top-full mt-1 w-48 bg-surface-container-lowest rounded-lg shadow-ambient-lg border border-outline-variant/20 py-1 z-10">
-                              {listing.status !== "ACTIVE" && (
+                              {isModerationLocked ? (
                                 <button
                                   onClick={() =>
-                                    handleStatusChange(
+                                    handleUnsuppress(
                                       listing.id,
-                                      "ACTIVE",
                                       listing.version
                                     )
                                   }
@@ -349,48 +412,71 @@ export default function ListingList({
                                   ) : (
                                     <Play className="w-4 h-4 text-green-500" />
                                   )}
-                                  Set Active
+                                  Unsuppress Listing
                                 </button>
-                              )}
-                              {listing.status !== "PAUSED" && (
-                                <button
-                                  onClick={() =>
-                                    handleStatusChange(
-                                      listing.id,
-                                      "PAUSED",
-                                      listing.version
-                                    )
-                                  }
-                                  disabled={processingId === listing.id}
-                                  className="w-full px-4 py-2 text-left text-sm hover:bg-surface-container-high/50 flex items-center gap-2 disabled:opacity-60"
-                                >
-                                  {processingId === listing.id ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                  ) : (
-                                    <Pause className="w-4 h-4 text-amber-500" />
+                              ) : (
+                                <>
+                                  {listing.status !== "ACTIVE" && (
+                                    <button
+                                      onClick={() =>
+                                        handleStatusChange(
+                                          listing.id,
+                                          "ACTIVE",
+                                          listing.version
+                                        )
+                                      }
+                                      disabled={processingId === listing.id}
+                                      className="w-full px-4 py-2 text-left text-sm hover:bg-surface-container-high/50 flex items-center gap-2 disabled:opacity-60"
+                                    >
+                                      {processingId === listing.id ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                      ) : (
+                                        <Play className="w-4 h-4 text-green-500" />
+                                      )}
+                                      Set Active
+                                    </button>
                                   )}
-                                  Set Paused
-                                </button>
-                              )}
-                              {listing.status !== "RENTED" && (
-                                <button
-                                  onClick={() =>
-                                    handleStatusChange(
-                                      listing.id,
-                                      "RENTED",
-                                      listing.version
-                                    )
-                                  }
-                                  disabled={processingId === listing.id}
-                                  className="w-full px-4 py-2 text-left text-sm hover:bg-surface-container-high/50 flex items-center gap-2 disabled:opacity-60"
-                                >
-                                  {processingId === listing.id ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                  ) : (
-                                    <CheckCircle className="w-4 h-4 text-blue-500" />
+                                  {listing.status !== "PAUSED" && (
+                                    <button
+                                      onClick={() =>
+                                        handleStatusChange(
+                                          listing.id,
+                                          "PAUSED",
+                                          listing.version
+                                        )
+                                      }
+                                      disabled={processingId === listing.id}
+                                      className="w-full px-4 py-2 text-left text-sm hover:bg-surface-container-high/50 flex items-center gap-2 disabled:opacity-60"
+                                    >
+                                      {processingId === listing.id ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                      ) : (
+                                        <Pause className="w-4 h-4 text-amber-500" />
+                                      )}
+                                      Set Paused
+                                    </button>
                                   )}
-                                  Set Rented
-                                </button>
+                                  {listing.status !== "RENTED" && (
+                                    <button
+                                      onClick={() =>
+                                        handleStatusChange(
+                                          listing.id,
+                                          "RENTED",
+                                          listing.version
+                                        )
+                                      }
+                                      disabled={processingId === listing.id}
+                                      className="w-full px-4 py-2 text-left text-sm hover:bg-surface-container-high/50 flex items-center gap-2 disabled:opacity-60"
+                                    >
+                                      {processingId === listing.id ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                      ) : (
+                                        <CheckCircle className="w-4 h-4 text-blue-500" />
+                                      )}
+                                      Set Rented
+                                    </button>
+                                  )}
+                                </>
                               )}
                               <hr className="my-1" />
                               <button

@@ -142,7 +142,7 @@ describe("ListingStatusToggle", () => {
         currentStatus="PAUSED"
         currentVersion={7}
         currentStatusReason="ADMIN_PAUSED"
-        moderationWriteLocksEnabled={true}
+        moderationWriteLocksEnabled={false}
       />
     );
 

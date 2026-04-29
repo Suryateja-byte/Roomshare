@@ -1,9 +1,33 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { RefreshCw, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export default function OfflineClient() {
+interface OfflineClientProps {
+  reloadPage?: () => void;
+}
+
+export default function OfflineClient({
+  reloadPage = () => window.location.reload(),
+}: OfflineClientProps = {}) {
+  const hasRetriedRef = useRef(false);
+
+  useEffect(() => {
+    const retryWhenOnline = () => {
+      if (hasRetriedRef.current) {
+        return;
+      }
+      hasRetriedRef.current = true;
+      reloadPage();
+    };
+
+    window.addEventListener("online", retryWhenOnline);
+    return () => {
+      window.removeEventListener("online", retryWhenOnline);
+    };
+  }, [reloadPage]);
+
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-surface-canvas p-8">
       {/* Offline icon */}
@@ -22,7 +46,7 @@ export default function OfflineClient() {
 
       <div className="flex flex-col items-center gap-4">
         <Button
-          onClick={() => window.location.reload()}
+          onClick={reloadPage}
           size="lg"
           className="gap-2"
         >

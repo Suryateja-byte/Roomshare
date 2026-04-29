@@ -258,4 +258,19 @@ describe("verification document APIs", () => {
     expect(response.status).toBe(403);
     expect(createVerificationSignedUrl).not.toHaveBeenCalled();
   });
+
+  it("blocks suspended admins from signed document access before signing or audit", async () => {
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+      isAdmin: true,
+      isSuspended: true,
+    });
+
+    const response = await GET(createMockGetRequest(), {
+      params: Promise.resolve({ id: "request-123", kind: "document" }),
+    });
+
+    expect(response.status).toBe(403);
+    expect(createVerificationSignedUrl).not.toHaveBeenCalled();
+    expect(logAdminAction).not.toHaveBeenCalled();
+  });
 });

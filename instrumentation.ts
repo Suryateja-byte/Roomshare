@@ -22,8 +22,9 @@ export async function register() {
     const { registerShutdownHandlers } = await import("./src/lib/shutdown");
     registerShutdownHandlers();
 
-    // Log warnings for missing optional services at startup
-    const { logStartupWarnings } = await import("./src/lib/env");
+    // Validate env first so malformed kill switches fail fast in production.
+    const { getServerEnv, logStartupWarnings } = await import("./src/lib/env");
+    getServerEnv();
     logStartupWarnings();
   }
 

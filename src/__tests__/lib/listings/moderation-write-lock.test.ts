@@ -2,6 +2,7 @@ import {
   getHostModerationWriteLockResult,
   getModerationWriteLockReason,
   getModerationWriteLockResult,
+  isPublicSearchBlockedStatusReason,
 } from "@/lib/listings/moderation-write-lock";
 
 describe("moderation-write-lock", () => {
@@ -52,6 +53,14 @@ describe("moderation-write-lock", () => {
     ).toBeNull();
   });
 
+  it("blocks public search for migration review and moderation lock reasons", () => {
+    expect(isPublicSearchBlockedStatusReason("MIGRATION_REVIEW")).toBe(true);
+    expect(isPublicSearchBlockedStatusReason("ADMIN_PAUSED")).toBe(true);
+    expect(isPublicSearchBlockedStatusReason("SUPPRESSED")).toBe(true);
+    expect(isPublicSearchBlockedStatusReason("HOST_PAUSED")).toBe(false);
+    expect(isPublicSearchBlockedStatusReason(null)).toBe(false);
+  });
+
   it("always locks suppressed host rows, even when feature locks are disabled", () => {
     expect(
       getHostModerationWriteLockResult({
@@ -66,13 +75,18 @@ describe("moderation-write-lock", () => {
     });
   });
 
-  it("keeps admin-paused host rows feature-gated", () => {
+  it("always locks admin-paused host rows, even when feature locks are disabled", () => {
     expect(
       getHostModerationWriteLockResult({
         statusReason: "ADMIN_PAUSED",
         moderationWriteLocksEnabled: false,
       })
-    ).toBeNull();
+    ).toEqual({
+      code: "LISTING_LOCKED",
+      error: "This listing is locked while under review.",
+      httpStatus: 423,
+      lockReason: "ADMIN_PAUSED",
+    });
 
     expect(
       getHostModerationWriteLockResult({

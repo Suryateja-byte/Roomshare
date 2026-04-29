@@ -72,6 +72,7 @@ jest.mock("@/lib/embeddings/version", () => ({
 // Mock search-doc-queries
 jest.mock("@/lib/search/search-doc-queries", () => ({
   isSearchDocEnabled: jest.fn(),
+  getSearchDocListingsByIds: jest.fn(),
   getSearchDocListingsPaginated: jest.fn(),
   getSearchDocMapListings: jest.fn(),
   getSearchDocListingsWithKeyset: jest.fn(),
@@ -83,6 +84,8 @@ jest.mock("@/lib/search/search-doc-queries", () => ({
 
 jest.mock("@/lib/flags/phase04", () => ({
   isPhase04ProjectionReadsEnabled: jest.fn(() => false),
+  isPhase04ForceListOnlyActive: jest.fn(() => false),
+  isPhase04ForceClustersOnlyActive: jest.fn(() => false),
 }));
 
 jest.mock("@/lib/search/projection-search", () => ({
@@ -111,8 +114,25 @@ jest.mock("@/lib/search/transform", () => ({
 jest.mock("@/lib/search/hash", () => ({
   generateQueryHash: jest.fn(),
   encodeCursor: jest.fn(),
+  encodeSnapshotCursor: jest.fn(),
   decodeCursor: jest.fn(),
   decodeCursorAny: jest.fn(),
+}));
+
+jest.mock("@/lib/search/query-snapshots", () => ({
+  createQuerySnapshot: jest.fn(),
+  loadValidQuerySnapshot: jest.fn(),
+  QUERY_SNAPSHOT_MAX_LISTING_IDS: 256,
+  toSnapshotResponseMeta: jest.fn((snapshot: Record<string, unknown>) => ({
+    queryHash: snapshot.queryHash,
+    querySnapshotId: snapshot.id,
+    backendSource: snapshot.backendSource,
+    responseVersion: snapshot.responseVersion,
+    ...(snapshot.projectionVersion !== null &&
+    snapshot.projectionVersion !== undefined
+      ? { projectionVersion: snapshot.projectionVersion }
+      : {}),
+  })),
 }));
 
 // Mock search-params
@@ -132,6 +152,7 @@ jest.mock("@/lib/env", () => ({
     searchRanking: false,
     searchDebugRanking: false,
     searchDoc: false,
+    searchSnapshotContract: false,
     semanticSearch: false,
   },
   CURSOR_SECRET: "",
@@ -160,6 +181,7 @@ import {
 } from "@/lib/data";
 import {
   isSearchDocEnabled,
+  getSearchDocListingsByIds,
   getSearchDocListingsPaginated,
   getSearchDocMapListings,
   getSearchDocListingsWithKeyset,
@@ -186,6 +208,7 @@ import {
   decodeCursor,
   decodeCursorAny,
 } from "@/lib/search/hash";
+import { loadValidQuerySnapshot } from "@/lib/search/query-snapshots";
 import { parseSearchParams } from "@/lib/search-params";
 import { clampBoundsToMaxSpan } from "@/lib/validation";
 import { features } from "@/lib/env";
@@ -193,6 +216,7 @@ import { logger } from "@/lib/logger";
 import { withTimeout } from "@/lib/timeout-wrapper";
 import type { ListingData, MapListingData } from "@/lib/data";
 import { buildPublicAvailability } from "@/lib/search/public-availability";
+import { SEARCH_RESPONSE_VERSION } from "@/lib/search/search-response";
 import { SEARCH_DOC_PROJECTION_VERSION } from "@/lib/search/search-doc-sync";
 import { prisma } from "@/lib/prisma";
 import { getAvailabilityForListings } from "@/lib/availability";
@@ -200,7 +224,11 @@ import {
   getCurrentEmbeddingVersion,
   getReadEmbeddingVersion,
 } from "@/lib/embeddings/version";
-import { isPhase04ProjectionReadsEnabled } from "@/lib/flags/phase04";
+import {
+  isPhase04ForceClustersOnlyActive,
+  isPhase04ForceListOnlyActive,
+  isPhase04ProjectionReadsEnabled,
+} from "@/lib/flags/phase04";
 import { executeProjectionSearchV2 } from "@/lib/search/projection-search";
 
 // ============================================================================
@@ -219,6 +247,10 @@ const mockIsSearchDocEnabled = isSearchDocEnabled as jest.MockedFunction<
 const mockGetSearchDocListingsPaginated =
   getSearchDocListingsPaginated as jest.MockedFunction<
     typeof getSearchDocListingsPaginated
+  >;
+const mockGetSearchDocListingsByIds =
+  getSearchDocListingsByIds as jest.MockedFunction<
+    typeof getSearchDocListingsByIds
   >;
 const mockGetSearchDocMapListings =
   getSearchDocMapListings as jest.MockedFunction<
@@ -302,6 +334,14 @@ const mockGetReadEmbeddingVersion =
 const mockIsPhase04ProjectionReadsEnabled =
   isPhase04ProjectionReadsEnabled as jest.MockedFunction<
     typeof isPhase04ProjectionReadsEnabled
+  >;
+const mockIsPhase04ForceListOnlyActive =
+  isPhase04ForceListOnlyActive as jest.MockedFunction<
+    typeof isPhase04ForceListOnlyActive
+  >;
+const mockIsPhase04ForceClustersOnlyActive =
+  isPhase04ForceClustersOnlyActive as jest.MockedFunction<
+    typeof isPhase04ForceClustersOnlyActive
   >;
 const mockExecuteProjectionSearchV2 =
   executeProjectionSearchV2 as jest.MockedFunction<typeof executeProjectionSearchV2>;
@@ -515,8 +555,11 @@ describe("search-v2-service", () => {
     (features as Record<string, unknown>).searchKeyset = false;
     (features as Record<string, unknown>).searchRanking = false;
     (features as Record<string, unknown>).searchDebugRanking = false;
+    (features as Record<string, unknown>).searchSnapshotContract = false;
     (features as Record<string, unknown>).semanticSearch = false;
     mockIsPhase04ProjectionReadsEnabled.mockReturnValue(false);
+    mockIsPhase04ForceListOnlyActive.mockReturnValue(false);
+    mockIsPhase04ForceClustersOnlyActive.mockReturnValue(false);
     mockDecodeCursorAny.mockReturnValue(null);
     mockGetCurrentEmbeddingVersion.mockReturnValue(
       "gemini-embedding-2.search-result.nosensitive-v1.d768"
@@ -524,6 +567,7 @@ describe("search-v2-service", () => {
     mockGetReadEmbeddingVersion.mockReturnValue(
       "gemini-embedding-2.search-result.nosensitive-v1.d768"
     );
+    (loadValidQuerySnapshot as jest.Mock).mockReset();
   });
 
   describe("executeSearchV2", () => {
@@ -621,6 +665,204 @@ describe("search-v2-service", () => {
       expect(mockGetSearchDocListingsPaginated).toHaveBeenCalledWith(
         expect.objectContaining({ amenities: ["wifi"] })
       );
+    });
+
+    it("does not run fallback map queries when list-only kill switch is active", async () => {
+      setupDefaultMocks({
+        listItems: [makeListingData({ id: "listing-list-only" })],
+        mapListings: [makeMapListingData({ id: "map-should-not-load" })],
+      });
+      mockIsPhase04ProjectionReadsEnabled.mockReturnValue(false);
+      mockIsPhase04ForceListOnlyActive.mockReturnValue(true);
+
+      const result = await executeSearchV2({
+        rawParams: {
+          minLat: "37.7",
+          maxLat: "37.85",
+          minLng: "-122.52",
+          maxLng: "-122.35",
+        },
+      });
+
+      expect(result.response).not.toBeNull();
+      expect(mockGetListingsPaginated).toHaveBeenCalled();
+      expect(mockGetMapListings).not.toHaveBeenCalled();
+      expect(mockGetSearchDocMapListings).not.toHaveBeenCalled();
+      expect(mockIsRankingEnabled).not.toHaveBeenCalled();
+      expect(mockDetermineMode).toHaveBeenCalledWith(0);
+      expect(mockTransformToMapResponse).toHaveBeenCalledWith([], {
+        scoreMap: undefined,
+        truncated: undefined,
+        totalCandidates: undefined,
+      });
+      expect(result.response?.map.geojson.features).toHaveLength(0);
+    });
+
+    it("strips fallback pins while preserving map metadata when cluster-only kill switch is active", async () => {
+      const mapListings = [
+        makeMapListingData({ id: "map-cluster-only" }),
+      ];
+      setupDefaultMocks({
+        listItems: [makeListingData({ id: "listing-cluster-only" })],
+        mapListings,
+        mode: "pins",
+      });
+      mockIsPhase04ProjectionReadsEnabled.mockReturnValue(false);
+      mockIsPhase04ForceClustersOnlyActive.mockReturnValue(true);
+      mockIsRankingEnabled.mockReturnValue(true);
+      mockShouldIncludePins.mockReturnValue(true);
+      mockGetMapListings.mockResolvedValue({
+        listings: mapListings,
+        truncated: true,
+        totalCandidates: 77,
+      });
+      mockTransformToMapResponse.mockReturnValue({
+        geojson: {
+          type: "FeatureCollection",
+          features: [
+            {
+              type: "Feature",
+              geometry: {
+                type: "Point",
+                coordinates: [-122.42, 37.77],
+              },
+              properties: {
+                id: "map-cluster-only",
+                title: "Map Listing",
+                price: 1500,
+                image: "img1.jpg",
+                availableSlots: 1,
+                publicAvailability: mapListings[0].publicAvailability,
+                groupContext: null,
+              },
+            },
+          ],
+        },
+        pins: [
+          {
+            id: "map-cluster-only",
+            lat: 37.77,
+            lng: -122.42,
+            price: 1500,
+            publicAvailability: mapListings[0].publicAvailability,
+          },
+        ],
+        truncated: true,
+        totalCandidates: 77,
+      });
+
+      const result = await executeSearchV2({
+        rawParams: {
+          minLat: "37.7",
+          maxLat: "37.85",
+          minLng: "-122.52",
+          maxLng: "-122.35",
+        },
+      });
+
+      expect(result.response).not.toBeNull();
+      expect(mockGetMapListings).toHaveBeenCalled();
+      expect(mockBuildScoreMap).not.toHaveBeenCalled();
+      expect(mockComputeMedianPrice).not.toHaveBeenCalled();
+      expect(mockGetDebugSignals).not.toHaveBeenCalled();
+      expect(result.response?.meta.mode).toBe("geojson");
+      expect(result.response?.map.geojson.features).toHaveLength(1);
+      expect(result.response?.map.pins).toBeUndefined();
+      expect(result.response?.map.truncated).toBe(true);
+      expect(result.response?.map.totalCandidates).toBe(77);
+    });
+
+    it("strips stored snapshot pins while preserving map metadata when cluster-only kill switch is active", async () => {
+      const listItems = [makeListingData({ id: "listing-snapshot" })];
+      setupDefaultMocks({
+        listItems,
+        mapListings: [makeMapListingData({ id: "map-snapshot" })],
+      });
+      (features as Record<string, unknown>).searchSnapshotContract = true;
+      mockIsPhase04ProjectionReadsEnabled.mockReturnValue(false);
+      mockIsPhase04ForceClustersOnlyActive.mockReturnValue(true);
+      mockDecodeCursorAny.mockReturnValue({
+        type: "snapshot",
+        cursor: {
+          v: 3,
+          snapshotId: "snapshot-v3",
+          offset: 0,
+          limit: 12,
+          queryHash: "abcdef1234567890",
+          responseVersion: SEARCH_RESPONSE_VERSION,
+        },
+      });
+      mockGetSearchDocListingsByIds.mockResolvedValue(listItems);
+      (loadValidQuerySnapshot as jest.Mock).mockResolvedValue({
+        ok: true,
+        snapshot: {
+          id: "snapshot-v3",
+          queryHash: "abcdef1234567890",
+          backendSource: "v2",
+          responseVersion: SEARCH_RESPONSE_VERSION,
+          projectionVersion: 7,
+          projectionEpoch: null,
+          embeddingVersion: null,
+          rankerProfileVersion: null,
+          unitIdentityEpochFloor: null,
+          snapshotVersion: null,
+          orderedListingIds: ["listing-snapshot"],
+          mapPayload: {
+            geojson: {
+              type: "FeatureCollection",
+              features: [
+                {
+                  type: "Feature",
+                  geometry: {
+                    type: "Point",
+                    coordinates: [-122.42, 37.77],
+                  },
+                  properties: {
+                    id: "map-snapshot",
+                    title: "Map Listing",
+                    price: 1500,
+                    image: "img1.jpg",
+                    availableSlots: 1,
+                    publicAvailability: listItems[0].publicAvailability,
+                    groupContext: null,
+                  },
+                },
+              ],
+            },
+            pins: [
+              {
+                id: "map-snapshot",
+                lat: 37.77,
+                lng: -122.42,
+                price: 1500,
+                publicAvailability: listItems[0].publicAvailability,
+              },
+            ],
+            truncated: true,
+            totalCandidates: 77,
+          },
+          total: 1,
+        },
+      });
+
+      const result = await executeSearchV2({
+        rawParams: {
+          minLat: "37.7",
+          maxLat: "37.85",
+          minLng: "-122.52",
+          maxLng: "-122.35",
+          cursor: "snapshot-cursor",
+        },
+      });
+
+      expect(result.response).not.toBeNull();
+      expect(result.response?.meta.mode).toBe("geojson");
+      expect(result.response?.map.geojson.features).toHaveLength(1);
+      expect(result.response?.map.pins).toBeUndefined();
+      expect(result.response?.map.truncated).toBe(true);
+      expect(result.response?.map.totalCandidates).toBe(77);
+      expect(mockGetMapListings).not.toHaveBeenCalled();
+      expect(mockGetSearchDocMapListings).not.toHaveBeenCalled();
     });
 
     it("expires Phase04 cursors instead of passing unsupported specs to SearchDoc", async () => {
