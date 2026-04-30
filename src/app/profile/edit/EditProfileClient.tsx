@@ -201,7 +201,7 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
   };
 
   return (
-    <div className="min-h-screen bg-surface-canvas pt-4 pb-20">
+    <div className="min-h-svh bg-surface-canvas pt-4 pb-20">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
@@ -246,6 +246,7 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                       src={imageUrl || user.image || ""}
                       alt="Profile"
                       className="w-full h-full object-cover transition-opacity group-hover:opacity-75"
+                      decoding="async"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-on-surface-variant text-3xl font-medium">

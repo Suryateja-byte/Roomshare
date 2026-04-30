@@ -162,7 +162,8 @@ function ImageCarouselInner({
           fill
           className="object-cover"
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-          priority={priority}
+          loading={priority ? "eager" : "lazy"}
+          fetchPriority={priority ? "high" : "auto"}
           onError={() => onImageError?.(0)}
         />
       </div>
@@ -206,8 +207,8 @@ function ImageCarouselInner({
                 fill
                 className="object-cover"
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                priority={priority && index === 0}
-                loading={index === 0 ? undefined : "lazy"}
+                loading={priority && index === 0 ? "eager" : "lazy"}
+                fetchPriority={priority && index === 0 ? "high" : "auto"}
                 placeholder="blur"
                 blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZTRlNGU3Ii8+PC9zdmc+"
                 onError={() => onImageError?.(index)}

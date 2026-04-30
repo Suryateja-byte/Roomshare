@@ -1025,7 +1025,7 @@ export default function ListingPageClient({
   ]);
 
   return (
-    <div className="min-h-screen bg-surface-canvas pb-20">
+    <div className="min-h-svh bg-surface-canvas pb-20">
       <ListingViewTracker
         listingId={listing.id}
         ownerId={listing.ownerId}

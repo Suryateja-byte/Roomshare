@@ -23,7 +23,7 @@ export default async function MessagesPage() {
   return (
     <Suspense
       fallback={
-        <div className="h-[calc(100vh-64px)] flex items-center justify-center">
+        <div className="h-[calc(100svh-64px)] flex items-center justify-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
         </div>
       }

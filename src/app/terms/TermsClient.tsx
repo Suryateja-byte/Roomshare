@@ -39,7 +39,7 @@ export default function TermsClient() {
   };
 
   return (
-    <div className="min-h-screen bg-surface-canvas font-body text-on-surface selection:bg-on-surface selection:text-surface-container-lowest">
+    <div className="min-h-svh bg-surface-canvas font-body text-on-surface selection:bg-on-surface selection:text-surface-container-lowest">
       {/* Hero */}
       <div className="pt-32 pb-16 px-6 bg-surface-canvas">
         <div className="container mx-auto max-w-4xl text-center">

@@ -407,6 +407,7 @@ export default function ImageUploader({
                 src={image.previewUrl}
                 alt={`Preview ${index + 1}`}
                 className={`w-full h-full object-cover ${image.isUploading ? "opacity-50" : ""}`}
+                decoding="async"
               />
 
               {/* Uploading Overlay */}

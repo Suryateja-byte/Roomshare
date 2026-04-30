@@ -57,7 +57,7 @@ export default async function SearchLayout({
       <SearchTransitionProvider>
         <FilterStateProvider>
           <MobileSearchProvider>
-            <div className="h-screen-safe flex flex-col bg-surface-canvas overflow-hidden">
+            <div className="h-screen-dynamic flex flex-col bg-surface-canvas overflow-hidden">
               <SearchUrlCanonicalizer />
               <SkipLink href="#search-results">Skip to search results</SkipLink>
               {/* Search Header - Persistent across navigations, fixed position */}

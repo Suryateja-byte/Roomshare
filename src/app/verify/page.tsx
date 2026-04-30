@@ -24,7 +24,7 @@ export default async function VerifyPage() {
   const status = await getMyVerificationStatus();
 
   return (
-    <div className="min-h-screen bg-surface-canvas py-12">
+    <div className="min-h-svh bg-surface-canvas py-12">
       <div className="max-w-2xl mx-auto px-4">
         <div className="bg-surface-container-lowest rounded-lg shadow-ambient overflow-hidden">
           {/* Header */}

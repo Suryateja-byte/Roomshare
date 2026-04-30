@@ -353,6 +353,7 @@ export default function ScrollAnimation() {
               alt="Person entering a welcoming home"
               className="w-full h-full object-cover"
               loading="lazy"
+              decoding="async"
             />
             <div className="absolute inset-0 flex items-center justify-center">
               <p className="text-white text-3xl md:text-5xl font-medium tracking-tight text-center drop-shadow-lg">
@@ -447,6 +448,8 @@ export default function ScrollAnimation() {
               aria-hidden="true"
               className="w-full h-full object-cover opacity-40"
               loading="eager"
+              fetchPriority="low"
+              decoding="async"
             />
           </div>
         )}

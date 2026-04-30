@@ -312,6 +312,7 @@ export default function ListingList({
                         src={listing.images[0]}
                         alt={listing.title}
                         fill
+                        sizes="96px"
                         className="object-cover"
                       />
                     ) : (

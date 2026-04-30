@@ -443,7 +443,7 @@ function ListingCardInner({
       }}
       onBlur={() => setHovered(null)}
       className={cn(
-        "group relative mb-4 flex cursor-pointer flex-col overflow-hidden rounded-2xl bg-surface-container-lowest shadow-ambient-sm transition-all duration-500",
+        "listing-card-shell group relative mb-4 flex cursor-pointer flex-col overflow-hidden rounded-2xl bg-surface-container-lowest shadow-ambient-sm transition-all duration-500",
         isDesktopRow &&
           "md:mb-2 md:overflow-visible md:bg-transparent md:p-2 md:shadow-none",
         !isActive &&
@@ -545,7 +545,7 @@ function ListingCardInner({
 
         <div
           className={cn(
-            "flex flex-1 flex-col p-4",
+            "listing-card-body flex flex-1 flex-col p-4",
             isDesktopRow && "md:min-w-0 md:p-1 md:py-1.5"
           )}
         >
@@ -561,7 +561,7 @@ function ListingCardInner({
               <span
                 data-testid="listing-price"
                 className={cn(
-                  "font-display text-xl font-medium italic text-on-surface",
+                  "listing-card-price font-display text-xl font-medium italic text-on-surface",
                   isDesktopRow && "md:text-[1.45rem]"
                 )}
               >
@@ -590,7 +590,7 @@ function ListingCardInner({
           {/* Row 2: Room Type / Title + Location */}
           <h3
             className={cn(
-              "mb-0.5 line-clamp-1 text-[0.95rem] font-medium leading-tight text-on-surface",
+              "listing-card-title mb-0.5 line-clamp-1 text-[0.95rem] font-medium leading-tight text-on-surface",
               isDesktopRow && "md:text-base md:font-semibold"
             )}
             title={displayTitle}
@@ -601,7 +601,7 @@ function ListingCardInner({
           </h3>
 
           {/* Row 3: Location (when no roomType) or Availability */}
-          <p className="truncate text-sm font-medium text-on-surface-variant">
+          <p className="listing-card-meta truncate text-sm font-medium text-on-surface-variant">
             {displayRoomType
               ? [displayMoveIn, displayLease].filter(Boolean).join(" · ") ||
                 formattedLocation

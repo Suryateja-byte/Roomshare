@@ -912,7 +912,7 @@ export default function SearchForm({
   const fieldPaddingClasses = isCompact
     ? "px-4 py-2"
     : isHome
-      ? "px-3 py-2.5 md:px-5 md:py-4 lg:px-6 lg:py-5"
+      ? "px-4 py-1 md:px-4 md:py-3 lg:px-5 lg:py-3.5"
       : "px-4 py-2 md:px-6 md:py-2.5";
 
   const getFieldStateClasses = (field: "what" | "where" | "budget") => {
@@ -934,11 +934,11 @@ export default function SearchForm({
   return (
     <div
       className={cn(
-        "relative w-full mx-auto",
+        "search-form-shell relative w-full mx-auto",
         isCompact
           ? "min-h-[56px] sm:min-h-[64px] max-w-2xl"
           : isHome
-            ? "max-w-[380px] md:max-w-none"
+            ? "max-w-[400px] md:max-w-none"
             : "min-h-[56px] sm:min-h-[64px] max-w-5xl"
       )}
     >
@@ -948,7 +948,7 @@ export default function SearchForm({
         className={cn(
           "group relative flex w-full flex-col",
           isHome
-            ? "rounded-[1.5rem] bg-surface-container-lowest p-1.5 shadow-[0_30px_60px_-30px_rgb(27_28_25/0.24),0_10px_24px_-12px_rgb(27_28_25/0.10),0_0_0_1px_rgb(27_28_25/0.05)] md:flex-row md:items-stretch md:rounded-[1.875rem] md:bg-surface-container-lowest md:p-3 md:backdrop-blur-2xl md:transition-all md:duration-300 md:hover:shadow-[0_34px_70px_-36px_rgb(27_28_25/0.26),0_12px_26px_-16px_rgb(27_28_25/0.14),0_0_0_1px_rgb(27_28_25/0.06)] md:focus-within:shadow-[0_42px_84px_-42px_rgb(27_28_25/0.28),0_18px_36px_-18px_rgb(154_64_39/0.18),0_0_0_1px_rgb(154_64_39/0.16)]"
+            ? "home-search-form-surface rounded-[2rem] bg-surface-container-lowest p-1.5 shadow-[0_30px_60px_-30px_rgb(27_28_25/0.24),0_10px_24px_-12px_rgb(27_28_25/0.10),0_0_0_1px_rgb(27_28_25/0.05)] md:flex-row md:items-stretch md:rounded-[1.5rem] md:bg-surface-container-lowest md:p-2 md:backdrop-blur-2xl md:transition-all md:duration-300 md:hover:shadow-[0_34px_70px_-36px_rgb(27_28_25/0.26),0_12px_26px_-16px_rgb(27_28_25/0.14),0_0_0_1px_rgb(27_28_25/0.06)] md:focus-within:shadow-[0_42px_84px_-42px_rgb(27_28_25/0.28),0_18px_36px_-18px_rgb(154_64_39/0.18),0_0_0_1px_rgb(154_64_39/0.16)]"
             : "bg-surface-container-lowest backdrop-blur-2xl rounded-3xl md:rounded-full shadow-ambient-lg hover:shadow-ghost focus-within:shadow-ghost transition-all duration-300 md:flex-row md:items-center",
           isCompact && "p-1",
           !isCompact && !isHome && "p-2"
@@ -974,7 +974,7 @@ export default function SearchForm({
                 className={cn(
                   "transition-opacity duration-200",
                   isHome
-                    ? "mb-2.5 flex items-center text-[11px] font-bold uppercase tracking-[0.2em] leading-none text-primary md:mb-1 md:gap-1.5 md:text-xs md:tracking-[0.15em]"
+                    ? "mb-1 flex items-center text-[11px] font-bold uppercase tracking-[0.2em] leading-none text-primary md:mb-1 md:gap-1.5 md:text-xs md:tracking-[0.15em]"
                     : "mb-1 flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.15em] text-primary",
                   focusedField !== null &&
                     focusedField !== "what" &&
@@ -1014,7 +1014,7 @@ export default function SearchForm({
                   className={cn(
                     "w-full bg-transparent border-none focus:ring-0 focus:outline-none",
                     isHome
-                      ? "rounded-md px-1 py-1 -ml-1 text-[16px] text-on-surface placeholder:text-on-surface-variant transition-colors focus:bg-surface-canvas md:-ml-0 md:px-0 md:py-0 md:text-base md:font-medium md:focus:bg-transparent"
+                      ? "min-h-[44px] rounded-md px-1 py-0 -ml-1 text-[16px] text-on-surface placeholder:text-on-surface-variant transition-colors focus:bg-surface-canvas md:min-h-0 md:-ml-0 md:px-0 md:py-0 md:text-base md:font-medium md:focus:bg-transparent"
                       : "p-0 text-[16px] md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant"
                   )}
                   autoComplete="off"
@@ -1026,7 +1026,7 @@ export default function SearchForm({
                     className={cn(
                       "flex-shrink-0 rounded-full transition-colors",
                       isHome
-                        ? "p-1.5 text-on-surface-variant hover:bg-surface-canvas hover:text-on-surface md:p-1 md:hover:bg-transparent md:hover:text-on-surface"
+                        ? "min-h-[44px] min-w-[44px] p-1.5 text-on-surface-variant hover:bg-surface-canvas hover:text-on-surface md:min-h-0 md:min-w-0 md:p-1 md:hover:bg-transparent md:hover:text-on-surface"
                         : "p-3 text-on-surface-variant hover:text-on-surface-variant"
                     )}
                     aria-label="Clear search description"
@@ -1064,7 +1064,7 @@ export default function SearchForm({
               className={cn(
                 "transition-opacity duration-200",
                 isHome
-                  ? "mb-2.5 ml-1 text-[11px] font-bold uppercase tracking-[0.2em] leading-none text-on-surface-variant md:mb-1 md:ml-0 md:text-xs md:tracking-[0.15em]"
+                  ? "mb-1 ml-1 text-[11px] font-bold uppercase tracking-[0.2em] leading-none text-on-surface-variant md:mb-1 md:ml-0 md:text-xs md:tracking-[0.15em]"
                   : "mb-1 text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant",
                 focusedField !== null &&
                   focusedField !== "where" &&
@@ -1120,7 +1120,7 @@ export default function SearchForm({
               className="flex-1"
               inputClassName={
                 isHome
-                  ? "rounded-md px-1 py-1 -ml-1 text-[16px] text-on-surface placeholder:text-on-surface-variant transition-colors focus:bg-surface-canvas md:-ml-0 md:px-0 md:py-0 md:text-base md:font-medium md:focus:bg-transparent"
+                  ? "min-h-[44px] rounded-md px-1 py-0 -ml-1 text-[16px] text-on-surface placeholder:text-on-surface-variant transition-colors focus:bg-surface-canvas md:min-h-0 md:-ml-0 md:px-0 md:py-0 md:text-base md:font-medium md:focus:bg-transparent"
                   : "text-[16px] md:text-sm"
               }
             />
@@ -1131,7 +1131,7 @@ export default function SearchForm({
               className={cn(
                 "flex-shrink-0 rounded-full transition-colors disabled:opacity-50",
                 isHome
-                  ? "p-2 -mr-2 text-on-surface-variant hover:bg-surface-canvas hover:text-on-surface active:bg-surface-container-high md:mr-0 md:p-1.5 md:hover:bg-transparent"
+                  ? "min-h-[44px] min-w-[44px] p-2 -mr-2 text-on-surface-variant hover:bg-surface-canvas hover:text-on-surface active:bg-surface-container-high md:min-h-0 md:min-w-0 md:mr-0 md:p-1.5 md:hover:bg-transparent"
                   : "p-3 text-on-surface-variant hover:text-on-surface"
               )}
               aria-label="Use my current location"
@@ -1226,7 +1226,7 @@ export default function SearchForm({
               className={cn(
                 "transition-opacity duration-200",
                 isHome
-                  ? "mb-2.5 ml-1 text-[11px] font-bold uppercase tracking-[0.2em] leading-none text-on-surface-variant md:mb-1 md:ml-0 md:text-xs md:tracking-[0.15em]"
+                  ? "mb-1 ml-1 text-[11px] font-bold uppercase tracking-[0.2em] leading-none text-on-surface-variant md:mb-1 md:ml-0 md:text-xs md:tracking-[0.15em]"
                   : "mb-1 text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant",
                 focusedField !== null &&
                   focusedField !== "budget" &&
@@ -1260,7 +1260,7 @@ export default function SearchForm({
                 className={cn(
                   "w-full bg-transparent border-none appearance-none focus:ring-0 focus:outline-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
                   isHome
-                    ? "rounded-md px-1 py-1 -ml-1 text-[16px] text-on-surface placeholder:text-on-surface-variant transition-colors focus:bg-surface-canvas md:-ml-0 md:px-0 md:py-0 md:text-base md:font-medium md:focus:bg-transparent"
+                    ? "min-h-[44px] rounded-md px-1 py-0 -ml-1 text-[16px] text-on-surface placeholder:text-on-surface-variant transition-colors focus:bg-surface-canvas md:min-h-0 md:-ml-0 md:px-0 md:py-0 md:text-base md:font-medium md:focus:bg-transparent"
                     : "p-0 text-[16px] md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant"
                 )}
                 min="0"
@@ -1299,7 +1299,7 @@ export default function SearchForm({
                 className={cn(
                   "w-full bg-transparent border-none appearance-none focus:ring-0 focus:outline-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
                   isHome
-                    ? "rounded-md px-1 py-1 -ml-1 text-[16px] text-on-surface placeholder:text-on-surface-variant transition-colors focus:bg-surface-canvas md:-ml-0 md:px-0 md:py-0 md:text-base md:font-medium md:focus:bg-transparent"
+                    ? "min-h-[44px] rounded-md px-1 py-0 -ml-1 text-[16px] text-on-surface placeholder:text-on-surface-variant transition-colors focus:bg-surface-canvas md:min-h-0 md:-ml-0 md:px-0 md:py-0 md:text-base md:font-medium md:focus:bg-transparent"
                     : "p-0 text-[16px] md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant"
                 )}
                 min="0"
@@ -1312,7 +1312,7 @@ export default function SearchForm({
         <div
           className={cn(
             isHome
-              ? "mt-4 flex items-center justify-between pt-0.5 md:mt-0 md:pt-0 md:contents"
+              ? "mt-2 flex items-center justify-between pt-0 md:mt-0 md:pt-0 md:contents"
               : "contents"
           )}
         >
@@ -1322,7 +1322,7 @@ export default function SearchForm({
               <div
                 className={cn(
                   "hidden md:block w-px bg-outline-variant/20 mx-1",
-                  isHome ? "h-14" : "h-8"
+                  isHome ? "h-12" : "h-8"
                 )}
                 aria-hidden="true"
               ></div>
@@ -1340,8 +1340,8 @@ export default function SearchForm({
                     "relative flex items-center gap-2 transition-all duration-300",
                     isHome
                       ? activeFilterCount > 0
-                        ? "-ml-3 rounded-xl bg-primary/10 px-3 py-2 text-[12px] font-bold uppercase tracking-[0.1em] text-primary md:ml-0 md:h-14 md:rounded-full md:px-5 md:text-xs md:tracking-wider"
-                        : "-ml-3 rounded-xl px-3 py-2 text-[12px] font-bold uppercase tracking-[0.1em] text-on-surface-variant hover:bg-surface-canvas hover:text-on-surface active:bg-surface-container-high md:ml-0 md:h-14 md:rounded-full md:px-5 md:text-xs md:tracking-wider md:hover:bg-surface-container-high"
+                        ? "-ml-3 min-h-[44px] rounded-xl bg-primary/10 px-3 py-2 text-[12px] font-bold uppercase tracking-[0.1em] text-primary md:ml-0 md:h-12 md:rounded-full md:px-4 md:text-xs md:tracking-wider"
+                        : "-ml-3 min-h-[44px] rounded-xl px-3 py-2 text-[12px] font-bold uppercase tracking-[0.1em] text-on-surface-variant hover:bg-surface-canvas hover:text-on-surface active:bg-surface-container-high md:ml-0 md:h-12 md:rounded-full md:px-4 md:text-xs md:tracking-wider md:hover:bg-surface-container-high"
                       : activeFilterCount > 0
                         ? "h-10 rounded-full bg-primary/10 px-4 text-xs font-bold uppercase tracking-wider text-primary"
                         : "h-10 rounded-full px-4 text-xs font-bold uppercase tracking-wider text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
@@ -1371,7 +1371,11 @@ export default function SearchForm({
           <div
             className={cn(
               "flex items-center justify-center",
-              isHome ? "p-0 md:p-1" : isCompact ? "p-0.5" : "p-1"
+              isHome
+                ? "flex-[0_0_54%] p-0 xs:flex-[0_0_52%] md:flex-none md:p-1"
+                : isCompact
+                  ? "p-0.5"
+                  : "p-1"
             )}
           >
             <Button
@@ -1383,7 +1387,7 @@ export default function SearchForm({
               className={cn(
                 "rounded-full transition-all duration-500 hover:scale-105 active:scale-95",
                 isHome
-                  ? "h-14 w-full min-h-[56px] gap-2 bg-primary text-on-primary shadow-[0_14px_28px_-14px_rgb(154_64_39/0.6)] hover:bg-primary-container md:h-16 md:w-16 md:min-h-[64px] md:min-w-[64px] md:p-0 lg:h-[4.5rem] lg:w-[4.5rem] lg:min-h-[72px] lg:min-w-[72px]"
+                  ? "h-12 w-full min-h-12 gap-1.5 whitespace-nowrap bg-primary px-3 text-[0.875rem] text-on-primary shadow-[0_14px_28px_-14px_rgb(154_64_39/0.6)] hover:bg-primary-container md:h-14 md:w-14 md:min-h-[56px] md:min-w-[56px] md:p-0 md:text-base lg:h-16 lg:w-16 lg:min-h-[64px] lg:min-w-[64px]"
                   : isCompact
                     ? "h-10 w-10 p-0 shadow-ambient-lg shadow-primary/20"
                     : "h-12 w-full md:w-12 bg-gradient-to-br from-primary to-primary-container hover:from-primary hover:to-primary shadow-ambient-lg shadow-primary/20"
@@ -1410,7 +1414,9 @@ export default function SearchForm({
                 </span>
               )}
               {isHome && (
-                <span className="font-semibold md:hidden">Search Rooms</span>
+                <span className="whitespace-nowrap font-semibold leading-none md:hidden">
+                  Search Rooms
+                </span>
               )}
             </Button>
           </div>

@@ -52,20 +52,26 @@ class SearchFormErrorBoundary extends React.Component<
 }
 
 function AuthCTA() {
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
 
-  if (status === "loading" || session?.user) return null;
+  if (session?.user) return null;
 
   return (
-    <div className="animate-editorial-rise flex flex-wrap items-center justify-center gap-2 text-sm">
-      <span className="text-on-surface">New here?</span>
-      <Link
-        href="/signup"
-        className="inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-surface-container-lowest px-3 py-1 font-semibold text-primary shadow-[0_12px_30px_rgba(29,30,28,0.14)] transition-colors hover:border-primary/45 hover:bg-primary hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface-canvas"
-      >
-        Create an account
-        <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-      </Link>
+    <div className="animate-editorial-rise flex flex-col items-center gap-3 text-sm md:flex-row md:items-center md:justify-between md:gap-6">
+      <p className="text-on-surface-variant">
+        Join <span className="font-semibold text-on-surface">50,000+</span>{" "}
+        people who found their perfect match
+      </p>
+      <div className="flex items-center gap-2">
+        <span className="text-on-surface">New here?</span>
+        <Link
+          href="/signup"
+          className="inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-surface-container-lowest px-3 py-1 font-semibold text-primary shadow-[0_12px_30px_rgba(29,30,28,0.14)] transition-colors hover:border-primary/45 hover:bg-primary hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface-canvas"
+        >
+          Create an account
+          <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+        </Link>
+      </div>
     </div>
   );
 }
@@ -87,30 +93,67 @@ function HeroSection() {
   return (
     <section
       aria-label="Search for rooms"
-      className="relative isolate flex min-h-[100dvh] flex-col overflow-hidden bg-surface-canvas pb-6 pt-[4.75rem] md:pb-8 md:pt-24"
+      className="home-hero-section relative isolate flex min-h-[100svh] flex-col overflow-hidden bg-surface-canvas pb-5 pt-[4.75rem] md:h-[100svh] md:min-h-0 md:pb-8 md:pt-24"
     >
+      <picture className="home-hero-photo absolute inset-0 opacity-100 md:opacity-100">
+        <source
+          media="(max-width: 767px)"
+          type="image/avif"
+          sizes="100vw"
+          srcSet="/images/home/hero-living-room-mobile-400.avif 400w, /images/home/hero-living-room-mobile-800.avif 800w, /images/home/hero-living-room-mobile-1024.avif 1024w"
+        />
+        <source
+          media="(max-width: 767px)"
+          type="image/webp"
+          sizes="100vw"
+          srcSet="/images/home/hero-living-room-mobile-400.webp 400w, /images/home/hero-living-room-mobile-800.webp 800w, /images/home/hero-living-room-mobile-1024.webp 1024w"
+        />
+        <source
+          media="(max-width: 767px)"
+          type="image/png"
+          sizes="100vw"
+          srcSet="/images/home/hero-living-room-mobile.png 1024w"
+        />
+        <source
+          type="image/avif"
+          sizes="100vw"
+          srcSet="/images/home/hero-living-room-800.avif 800w, /images/home/hero-living-room-1200.avif 1200w, /images/home/hero-living-room-1600.avif 1600w, /images/home/hero-living-room-1774.avif 1774w"
+        />
+        <source
+          type="image/webp"
+          sizes="100vw"
+          srcSet="/images/home/hero-living-room-800.webp 800w, /images/home/hero-living-room-1200.webp 1200w, /images/home/hero-living-room-1600.webp 1600w, /images/home/hero-living-room-1774.webp 1774w"
+        />
+        <img
+          src="/images/home/hero-living-room.png"
+          alt=""
+          width={1774}
+          height={887}
+          className="home-hero-photo-img h-full w-full object-cover"
+          fetchPriority="high"
+          loading="eager"
+          decoding="async"
+        />
+      </picture>
       <div
         aria-hidden="true"
-        className="home-hero-photo absolute inset-0 bg-[url('/images/home/hero-living-room.png')] bg-cover bg-[63%_top] opacity-45 md:bg-[center_right] md:opacity-100"
-      />
-      <div
-        aria-hidden="true"
-        className="home-hero-wash absolute inset-0 bg-[linear-gradient(180deg,rgb(251_249_244/0.97)_0%,rgb(251_249_244/0.91)_48%,rgb(251_249_244/0.84)_100%)] md:bg-[linear-gradient(90deg,rgb(251_249_244/0.98)_0%,rgb(251_249_244/0.93)_31%,rgb(251_249_244/0.68)_48%,rgb(251_249_244/0.16)_70%,rgb(251_249_244/0.03)_100%)]"
+        className="home-hero-wash absolute inset-0 bg-[linear-gradient(90deg,rgb(251_249_244/0.98)_0%,rgb(251_249_244/0.91)_43%,rgb(251_249_244/0.38)_76%,rgb(251_249_244/0.04)_100%)] md:bg-[linear-gradient(90deg,rgb(251_249_244/0.98)_0%,rgb(251_249_244/0.93)_31%,rgb(251_249_244/0.68)_48%,rgb(251_249_244/0.16)_70%,rgb(251_249_244/0.03)_100%)]"
       />
 
-      <div className="home-hero-frame relative z-10 flex w-full flex-1 flex-col justify-start">
-        <div className="w-full">
+      <div className="home-hero-frame relative z-10 flex w-full flex-1 flex-col justify-between gap-6 md:gap-8">
+        <div className="home-hero-top w-full">
           <div className="grid items-start gap-4 md:grid-cols-[minmax(0,0.56fr)_minmax(0,0.44fr)] md:gap-8 lg:gap-12">
-            <div className="max-w-[34rem] md:max-w-[46rem] lg:max-w-[52rem]">
-              <div className="animate-editorial-rise mb-3 inline-flex items-center gap-2 text-micro-label text-primary md:mb-4">
-                <span
-                  className="hidden h-2 w-2 rounded-full bg-on-surface-variant md:block"
+            <div className="home-hero-copy max-w-[34rem] md:max-w-[46rem] lg:max-w-[52rem]">
+              <div className="animate-editorial-rise mb-5 inline-flex items-center gap-2 text-micro-label text-primary md:mb-4">
+                <Sparkles
+                  className="hidden h-3 w-3 md:block"
+                  strokeWidth={2}
                   aria-hidden="true"
                 />
                 <span>Find your people</span>
               </div>
               <h1
-                className="animate-editorial-rise font-display text-[clamp(2.35rem,11vw,2.85rem)] font-normal leading-[0.98] tracking-normal text-on-surface sm:text-[4rem] md:text-[clamp(4.1rem,6.25vw,6.15rem)]"
+                className="home-hero-title animate-editorial-rise font-display text-[min(9.2vw,11vh,2.85rem)] font-normal leading-[0.98] tracking-normal text-on-surface sm:text-[4rem] md:text-[min(6.25vw,12vh,6.15rem)]"
                 style={{ animationDelay: "80ms" }}
               >
                 <span className="block whitespace-nowrap">Better Rooms.</span>
@@ -119,13 +162,14 @@ function HeroSection() {
                 </em>
               </h1>
               <p
-                className="animate-editorial-rise mt-4 max-w-md text-base leading-relaxed text-on-surface-variant md:mt-4 md:text-[1.05rem] lg:text-lg"
+                className="home-hero-subtitle animate-editorial-rise mt-4 max-w-[18.5rem] text-[0.95rem] leading-[1.4] text-on-surface-variant md:mt-4 md:max-w-md md:text-[1.05rem] md:leading-relaxed lg:text-lg"
                 style={{ animationDelay: "150ms" }}
               >
                 Verified roommates. Real listings.
-                <br className="hidden sm:block" />
-                <span className="sm:hidden"> </span>People who actually show up
-                to the tour.
+                <br />
+                People who actually
+                <span className="md:hidden"> show up.</span>
+                <span className="hidden md:inline"> show up to the tour.</span>
               </p>
               <div
                 className="home-hero-secondary animate-editorial-rise mt-5 grid-cols-1 gap-3 sm:grid-cols-3 md:mt-6 md:max-w-[44rem] md:gap-4"
@@ -150,9 +194,11 @@ function HeroSection() {
             </div>
             <div className="hidden md:block" aria-hidden="true" />
           </div>
+        </div>
 
+        <div className="home-hero-bottom w-full">
           <div
-            className="home-hero-search-row animate-editorial-rise mt-5 w-full md:mt-8 lg:mt-9"
+            className="home-hero-search-row animate-editorial-rise w-full"
             style={{ animationDelay: "280ms" }}
           >
             <SearchFormErrorBoundary>
@@ -187,9 +233,13 @@ function TrustChip({
   sub: string;
 }) {
   return (
-    <div className="flex min-w-0 items-center gap-3">
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-surface-container-lowest/82 text-primary shadow-[inset_0_0_0_1px_rgb(220_193_185/0.36),0_8px_18px_-14px_rgb(27_28_25/0.28)]">
-        <Icon className="h-5 w-5" strokeWidth={1.7} aria-hidden="true" />
+    <div className="flex min-w-0 items-center gap-2.5">
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[rgb(154_64_39/0.08)] text-primary">
+        <Icon
+          className="h-[1.05rem] w-[1.05rem]"
+          strokeWidth={1.8}
+          aria-hidden="true"
+        />
       </span>
       <div className="min-w-0 leading-tight">
         <div className="truncate text-[0.8rem] font-semibold text-on-surface">
@@ -749,7 +799,27 @@ function FinalCTA() {
             </div>
 
             <div className="rotate-2 rounded-[1.25rem] bg-surface-container-lowest p-3 text-on-surface shadow-[0_30px_60px_-20px_rgb(0_0_0/0.22)]">
-              <div className="aspect-[4/3] rounded-2xl bg-[url('/images/home/hero-living-room.png')] bg-cover bg-center" />
+              <picture className="block aspect-[4/3] overflow-hidden rounded-2xl">
+                <source
+                  type="image/avif"
+                  sizes="(max-width: 768px) 92vw, 28rem"
+                  srcSet="/images/home/hero-living-room-800.avif 800w, /images/home/hero-living-room-1200.avif 1200w"
+                />
+                <source
+                  type="image/webp"
+                  sizes="(max-width: 768px) 92vw, 28rem"
+                  srcSet="/images/home/hero-living-room-800.webp 800w, /images/home/hero-living-room-1200.webp 1200w"
+                />
+                <img
+                  src="/images/home/hero-living-room.png"
+                  alt=""
+                  width={1774}
+                  height={887}
+                  className="h-full w-full object-cover object-center"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </picture>
               <div className="p-4">
                 <div className="mb-3 flex items-center justify-between text-[0.65rem] uppercase tracking-[0.14em] text-on-surface-variant">
                   <span>Dispatch from</span>

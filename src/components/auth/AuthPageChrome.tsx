@@ -4,6 +4,7 @@ import type {
   Ref,
   MouseEventHandler,
 } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { Loader2 } from "lucide-react";
@@ -24,6 +25,9 @@ interface AuthPageChromeProps {
   mobileTestimonialAttribution: string;
   mobileVariant?: "default" | "login";
   mobileHeroImageSrc?: string;
+  desktopHeroImageSrc?: string;
+  desktopHeroImageAlt?: string;
+  desktopAvatarTone?: "glass" | "solid";
   rightPanelClassName?: string;
   stackClassName?: string;
   children: ReactNode;
@@ -78,11 +82,16 @@ export function AuthPageChrome({
   mobileTestimonialAttribution,
   mobileVariant = "default",
   mobileHeroImageSrc,
+  desktopHeroImageSrc,
+  desktopHeroImageAlt,
+  desktopAvatarTone = "glass",
   rightPanelClassName,
   stackClassName,
   children,
 }: AuthPageChromeProps) {
   const isLoginMobileVariant = mobileVariant === "login";
+  const hasDesktopHeroImage = Boolean(desktopHeroImageSrc);
+  const isSolidAvatar = desktopAvatarTone === "solid";
 
   return (
     <div
@@ -91,31 +100,143 @@ export function AuthPageChrome({
         "bg-surface-canvas"
       )}
     >
-      <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-primary to-primary-container relative flex-col justify-between p-8 xl:p-12 text-on-primary">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-primary/80 to-primary-container opacity-50"></div>
+      <div
+        className={cn(
+          "hidden lg:flex w-1/2 relative flex-col justify-between p-8 xl:p-12 text-on-primary overflow-hidden",
+          !hasDesktopHeroImage &&
+            "bg-gradient-to-br from-primary to-primary-container"
+        )}
+      >
+        {hasDesktopHeroImage ? (
+          <>
+            <Image
+              src={desktopHeroImageSrc!}
+              alt={desktopHeroImageAlt ?? ""}
+              fill
+              priority
+              quality={85}
+              sizes="50vw"
+              className="object-cover"
+            />
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 bg-gradient-to-b from-[#3a1408]/20 via-transparent to-[#3a1408]/30"
+            />
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 bg-gradient-to-r from-[#9a4027]/10 via-transparent to-transparent"
+            />
+          </>
+        ) : (
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-primary/80 to-primary-container opacity-50"></div>
+        )}
         <div className="relative z-10">
-          <Link
-            href="/"
-            className="text-xl font-display font-semibold tracking-tighter hover:opacity-80 transition-opacity"
-          >
-            RoomShare<span className="text-on-primary/70">.</span>
-          </Link>
+          {hasDesktopHeroImage ? (
+            <Link
+              href="/"
+              aria-label="RoomShare home"
+              className="inline-flex items-center transition-opacity hover:opacity-85"
+            >
+              <Image
+                src="/images/auth/rs-logo-light.svg"
+                alt="RoomShare"
+                width={166}
+                height={40}
+                priority
+                className="h-9 w-auto drop-shadow-[0_2px_8px_rgba(58,20,8,0.35)]"
+              />
+            </Link>
+          ) : (
+            <Link
+              href="/"
+              className="text-xl font-display font-semibold tracking-tighter hover:opacity-80 transition-opacity"
+            >
+              RoomShare<span className="text-on-primary/70">.</span>
+            </Link>
+          )}
         </div>
-        <div className="relative z-10 max-w-md">
-          <h2 className="font-display text-2xl xl:text-3xl font-medium leading-tight">
+        <div
+          className={cn(
+            "relative z-10",
+            hasDesktopHeroImage ? "max-w-[22rem]" : "max-w-md"
+          )}
+        >
+          {hasDesktopHeroImage && (
+            <span
+              aria-hidden="true"
+              className="block font-display text-4xl leading-none text-on-primary/60"
+            >
+              &ldquo;
+            </span>
+          )}
+          <h2
+            className={cn(
+              "font-display font-medium leading-tight",
+              hasDesktopHeroImage
+                ? "mt-2 text-3xl leading-[1.18] xl:text-[2rem] xl:leading-[1.18] drop-shadow-[0_2px_12px_rgba(58,20,8,0.45)]"
+                : "text-2xl xl:text-3xl"
+            )}
+          >
             {desktopQuote}
           </h2>
-          <div className="mt-8 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-surface-container-lowest/12 flex items-center justify-center border border-surface-container-lowest/20">
-              <span className="font-medium text-sm">{desktopInitials}</span>
+          {hasDesktopHeroImage && (
+            <span
+              aria-hidden="true"
+              className="mt-7 block h-px w-12 bg-on-primary/40"
+            />
+          )}
+          <div
+            className={cn(
+              "mt-8 flex items-center gap-4",
+              hasDesktopHeroImage && "mt-5"
+            )}
+          >
+            <div
+              className={cn(
+                "w-10 h-10 rounded-full flex items-center justify-center border",
+                isSolidAvatar
+                  ? "bg-primary border-on-primary/30 shadow-[0_4px_14px_rgba(58,20,8,0.35)]"
+                  : "bg-surface-container-lowest/12 border-surface-container-lowest/20"
+              )}
+            >
+              <span
+                className={cn(
+                  "font-medium text-sm",
+                  isSolidAvatar ? "text-on-primary" : ""
+                )}
+              >
+                {desktopInitials}
+              </span>
             </div>
             <div>
-              <p className="font-medium text-on-primary">{desktopName}</p>
-              <p className="text-sm text-on-primary/70">{desktopLocation}</p>
+              <p
+                className={cn(
+                  "font-medium text-on-primary",
+                  hasDesktopHeroImage &&
+                    "drop-shadow-[0_1px_6px_rgba(58,20,8,0.5)]"
+                )}
+              >
+                {desktopName}
+              </p>
+              <p
+                className={cn(
+                  "text-sm text-on-primary/75",
+                  hasDesktopHeroImage &&
+                    "drop-shadow-[0_1px_6px_rgba(58,20,8,0.5)]"
+                )}
+              >
+                {desktopLocation}
+              </p>
             </div>
           </div>
         </div>
-        <p className="relative z-10 text-sm text-on-primary/70">
+        <p
+          className={cn(
+            "relative z-10 text-sm text-on-primary/75",
+            hasDesktopHeroImage &&
+              "drop-shadow-[0_1px_6px_rgba(58,20,8,0.5)]"
+          )}
+        >
           © {new Date().getFullYear()} RoomShare Inc.
         </p>
       </div>
@@ -130,7 +251,7 @@ export function AuthPageChrome({
       >
         <div
           className={cn(
-            "w-full max-w-[420px] rounded-[2.5rem] border border-outline-variant/15 bg-surface-container-lowest/88 px-6 py-10 shadow-ambient sm:px-8 sm:py-12 md:max-w-[440px] md:rounded-[2rem] md:bg-surface-container-lowest/78 md:px-8 md:py-10 md:shadow-ambient-lg md:backdrop-blur-[18px]",
+            "w-full max-w-[420px] rounded-[2.5rem] border border-outline-variant/15 bg-surface-container-lowest/88 px-6 py-10 shadow-ambient sm:px-8 sm:py-12 md:max-w-[440px] md:rounded-[2rem] md:bg-surface-container-lowest/78 md:px-8 md:py-10 md:shadow-ambient-lg md:backdrop-blur-[18px] lg:bg-surface-container-lowest lg:backdrop-blur-0",
             isLoginMobileVariant &&
               "relative flex h-auto flex-col overflow-visible rounded-none border-0 bg-transparent px-1 pb-6 pt-2 shadow-none sm:px-2 md:h-auto md:overflow-visible md:rounded-[2rem] md:border md:border-outline-variant/15 md:bg-surface-container-lowest/78 md:px-8 md:py-10 md:shadow-ambient-lg"
           )}

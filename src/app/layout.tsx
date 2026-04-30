@@ -51,6 +51,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
+  interactiveWidget: "resizes-content",
 };
 
 import MainLayout from "@/components/MainLayout";
@@ -109,7 +110,7 @@ export default async function RootLayout({
         <Providers nonce={nonce}>
           <SkipLink />
           <CustomScrollContainer>
-            <div className="flex flex-col min-h-screen">
+            <div className="flex min-h-svh flex-col">
               <NavbarWrapper>
                 <Navbar />
               </NavbarWrapper>

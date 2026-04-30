@@ -358,7 +358,7 @@ export default function SearchHeaderWrapper() {
                 alt=""
                 width={47}
                 height={38}
-                priority
+                loading="eager"
                 className="h-9 w-auto transition-transform duration-300 group-hover:scale-[1.04]"
               />
             </Link>

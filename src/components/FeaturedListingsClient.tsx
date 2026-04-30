@@ -162,7 +162,7 @@ export default function FeaturedListingsClient({
             </Button>
           </div>
         ) : (
-          <div className="grid gap-x-6 gap-y-10 md:grid-cols-12">
+          <div className="grid grid-cols-1 gap-x-6 gap-y-10 md:grid-cols-12">
             {visibleListings.map((listing, index) => {
               const big = index % 5 === 0;
               return (
@@ -220,7 +220,7 @@ function EditorialListingCard({
 
   return (
     <article
-      className={`group ${big ? "md:col-span-6" : "md:col-span-3"} col-span-1`}
+      className={`group col-span-1 min-w-0 ${big ? "md:col-span-6" : "md:col-span-3"}`}
     >
       <div
         className={`relative overflow-hidden rounded-[1.125rem] bg-surface-container-high ${
@@ -238,6 +238,8 @@ function EditorialListingCard({
             alt={`${listing.title} in ${location}`}
             className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
             loading={index < 2 ? "eager" : "lazy"}
+            fetchPriority={index === 0 ? "high" : "auto"}
+            decoding="async"
           />
           <span className="absolute inset-0 bg-gradient-to-t from-on-surface/40 via-transparent to-transparent" />
         </Link>
@@ -276,9 +278,9 @@ function EditorialListingCard({
         ) : null}
       </div>
 
-      <div className="pt-4">
-        <div className="flex items-baseline justify-between gap-4">
-          <h3 className="line-clamp-1 text-base font-semibold text-on-surface">
+      <div className="min-w-0 pt-4">
+        <div className="flex min-w-0 items-baseline justify-between gap-4">
+          <h3 className="min-w-0 line-clamp-1 text-base font-semibold text-on-surface">
             <Link href={`/listings/${listing.id}`} className="hover:underline">
               {listing.title}
             </Link>
@@ -287,7 +289,7 @@ function EditorialListingCard({
             {listing.totalSlots} slot{listing.totalSlots === 1 ? "" : "s"}
           </span>
         </div>
-        <p className="mt-1 truncate text-sm text-on-surface-variant">
+        <p className="mt-1 min-w-0 truncate text-sm text-on-surface-variant">
           {location} ·{" "}
           <span className="font-medium text-tertiary">{detailLine}</span>
         </p>

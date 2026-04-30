@@ -58,7 +58,9 @@ const TurnstileWidget = forwardRef<TurnstileWidgetRef, TurnstileWidgetProps>(
           onExpire={handleExpire}
           onError={handleError}
           options={{
-            theme: "auto",
+            theme: "light",
+            size: "flexible",
+            appearance: "always",
             responseField: true,
             responseFieldName: "cf-turnstile-response",
           }}

@@ -28,7 +28,7 @@ export default async function SavedSearchesPage() {
   ]);
 
   return (
-    <div className="min-h-screen bg-surface-canvas py-12">
+    <div className="min-h-svh bg-surface-canvas py-12">
       <div className="max-w-3xl mx-auto px-4">
         {/* Header */}
         <div className="mb-8">

@@ -273,6 +273,7 @@ export default function ReportList({
                             src={report.listing.images[0]}
                             alt={report.listing.title}
                             fill
+                            sizes="64px"
                             className="object-cover"
                           />
                         ) : (

@@ -151,7 +151,8 @@ function ListingCardCarousel({
         className="object-cover group-hover:scale-105 transition-transform duration-normal ease-out"
         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
         onError={onImageError}
-        loading="lazy"
+        loading={priority ? "eager" : "lazy"}
+        fetchPriority={priority ? "high" : "auto"}
       />
     );
   }
@@ -193,8 +194,8 @@ function ListingCardCarousel({
                 className="object-cover"
                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                 onError={index === 0 ? onImageError : undefined}
-                loading={index === 0 ? "eager" : "lazy"}
-                priority={priority && index === 0}
+                loading={priority && index === 0 ? "eager" : "lazy"}
+                fetchPriority={priority && index === 0 ? "high" : "auto"}
               />
             ) : (
               <div className="w-full h-full bg-surface-container-high animate-pulse" />

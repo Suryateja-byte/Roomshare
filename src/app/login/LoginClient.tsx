@@ -145,6 +145,9 @@ function LoginForm() {
       mobileTestimonialAttribution="Sarah J., San Francisco"
       mobileVariant="login"
       mobileHeroImageSrc="/images/auth/login-living-room.webp"
+      desktopHeroImageSrc="/images/auth/login-hero-desktop.png"
+      desktopHeroImageAlt="A sunlit terracotta living room with a beige armchair and ceramic vase"
+      desktopAvatarTone="solid"
       rightPanelClassName="items-start md:items-center"
       stackClassName="gap-6 md:gap-6 lg:gap-8"
     >

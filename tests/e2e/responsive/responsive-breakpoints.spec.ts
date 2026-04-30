@@ -13,11 +13,13 @@ import { VIEWPORTS } from "../helpers/visual-helpers";
 
 const breakpoints = [
   { name: "small-mobile", width: 320, height: 568 },
-  { name: "mobile-se", ...VIEWPORTS.mobileSmall },
-  { name: "mobile-14", ...VIEWPORTS.mobileLarge },
+  { name: "mobile-small", ...VIEWPORTS.mobileSmall },
+  { name: "mobile", ...VIEWPORTS.mobile },
+  { name: "mobile-landscape", ...VIEWPORTS.mobileLandscape },
   { name: "tablet", ...VIEWPORTS.tablet },
-  { name: "desktop-sm", width: 1024, height: 768 },
-  { name: "desktop", ...VIEWPORTS.desktop },
+  { name: "tablet-landscape", ...VIEWPORTS.tabletLandscape },
+  { name: "laptop", ...VIEWPORTS.laptop },
+  { name: "desktop", ...VIEWPORTS.desktopFullHd },
 ] as const;
 
 // Pages that can be tested without auth (public routes)

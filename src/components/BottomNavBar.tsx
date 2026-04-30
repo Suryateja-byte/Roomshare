@@ -86,7 +86,13 @@ export default function BottomNavBar() {
   const isSearchPage =
     pathname === "/search" || pathname.startsWith("/search/");
   const isHomePage = pathname === "/";
-  if (isHomePage || isMessageThread || isSearchPage) return null;
+  const isAuthPage =
+    pathname === "/login" ||
+    pathname === "/signup" ||
+    pathname === "/forgot-password" ||
+    pathname === "/reset-password" ||
+    pathname === "/verify";
+  if (isHomePage || isMessageThread || isSearchPage || isAuthPage) return null;
 
   return (
     <nav

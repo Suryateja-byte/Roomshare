@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 
 export default function VerifyEmailPage() {
   return (
-    <div className="min-h-screen bg-surface-canvas py-12 pt-24">
+    <div className="min-h-svh bg-surface-canvas py-12 pt-24">
       <div className="mx-auto max-w-md rounded-lg bg-surface-container-lowest p-8 shadow-ambient">
         <h1 className="text-2xl font-bold text-on-surface">Verify Email</h1>
         <p className="mt-3 text-sm text-on-surface-variant">

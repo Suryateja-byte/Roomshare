@@ -58,7 +58,7 @@ function ImageWithFallback({
       alt={alt}
       fill
       sizes={sizes}
-      priority={priority}
+      preload={priority}
       className={cn("object-cover", className)}
       onError={onError}
     />
@@ -433,7 +433,7 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
             {/* Image */}
             <div
               className={cn(
-                "relative w-full max-w-4xl h-[calc(100vh-180px)] transition-transform duration-200",
+                "relative w-full max-w-4xl h-[calc(100dvh-180px)] transition-transform duration-200",
                 isZoomed
                   ? "cursor-zoom-out scale-150"
                   : "cursor-zoom-in scale-100"

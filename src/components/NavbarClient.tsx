@@ -169,6 +169,7 @@ export default function NavbarClient({
         : (session?.user ?? initialUser);
 
   const pathname = usePathname();
+  const showMobileMenuToggle = pathname !== "/" || !!user;
   const menuButtonId = useId();
   const menuId = useId();
 
@@ -527,12 +528,12 @@ export default function NavbarClient({
         }`}
       >
         <nav aria-label="Main navigation">
-          <div data-header-bar className="max-w-7xl mx-auto px-6 sm:px-8">
+          <div data-header-bar className="max-w-7xl mx-auto px-4 xs:px-6 sm:px-8">
             <div className="flex justify-between items-center h-10">
               {/* --- LEFT: Logo --- */}
               <Link
                 href="/"
-                className="flex items-center gap-2.5 cursor-pointer group flex-shrink-0"
+                className="flex min-h-[44px] items-center gap-2.5 cursor-pointer group flex-shrink-0"
                 aria-label="RoomShare home"
               >
                 <Image
@@ -540,7 +541,7 @@ export default function NavbarClient({
                   alt=""
                   width={138}
                   height={30}
-                  priority
+                  loading="eager"
                   className="h-8 w-auto transition-transform duration-300 group-hover:-translate-y-0.5"
                 />
                 <span className="sr-only">RoomShare</span>
@@ -573,7 +574,7 @@ export default function NavbarClient({
               </div>
 
               {/* --- RIGHT: Actions --- */}
-              <div className="flex items-center gap-3 sm:gap-5 flex-shrink-0">
+              <div className="flex items-center gap-2 xs:gap-3 sm:gap-5 flex-shrink-0">
                 <div className="hidden md:flex items-center gap-1 pr-2">
                   <NotificationCenter />
                   <IconButton
@@ -701,17 +702,19 @@ export default function NavbarClient({
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-1.5 xs:gap-2.5">
                     <Link
                       href="/login"
-                      className="text-sm font-medium text-on-surface-variant hover:text-on-surface px-4 py-2 min-h-[44px] flex items-center transition-colors duration-300 rounded-full hover:bg-surface-container-high"
+                      className="text-sm font-medium text-on-surface-variant hover:text-on-surface px-2 xs:px-4 py-2 min-h-[44px] flex items-center transition-colors duration-300 rounded-full hover:bg-surface-container-high"
                     >
                       Log in
                     </Link>
                     <Button
                       asChild
                       size="sm"
-                      className="rounded-full px-6 h-10 shadow-ambient shadow-on-surface/10"
+                      className={`rounded-full shadow-ambient shadow-on-surface/10 ${
+                        pathname === "/" ? "h-11 px-5 text-sm xs:h-12 xs:px-7 xs:text-base" : "h-10 px-6"
+                      } md:h-10 md:px-6 md:text-sm`}
                     >
                       <Link href="/signup">Join</Link>
                     </Button>
@@ -719,16 +722,18 @@ export default function NavbarClient({
                 )}
 
                 {/* Mobile Menu Toggle */}
-                <div className="md:hidden flex items-center">
-                  <button
-                    onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                    className="text-on-surface p-2 min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors hover:bg-surface-container-high rounded-full focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
-                    aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
-                    aria-expanded={isMobileMenuOpen}
-                  >
-                    {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-                  </button>
-                </div>
+                {showMobileMenuToggle && (
+                  <div className="md:hidden flex items-center">
+                    <button
+                      onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                      className="text-on-surface p-2 min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors hover:bg-surface-container-high rounded-full focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
+                      aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+                      aria-expanded={isMobileMenuOpen}
+                    >
+                      {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>

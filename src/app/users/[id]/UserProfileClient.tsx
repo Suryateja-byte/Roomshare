@@ -104,6 +104,8 @@ const ListingCard = ({
             src={imageUrl}
             alt={listing.title}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            loading="lazy"
+            decoding="async"
           />
           <div className="absolute top-2 right-2 px-2 py-1 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg text-xs font-bold uppercase tracking-wide text-green-600">
             {listing.availableSlots > 0 ? "Available" : "Full"}
@@ -217,7 +219,7 @@ export default function UserProfileClient({
     : "Recently joined";
 
   return (
-    <div className="min-h-screen bg-surface-canvas font-body selection:bg-on-surface selection:text-white pb-20 pt-4">
+    <div className="min-h-svh bg-surface-canvas font-body selection:bg-on-surface selection:text-white pb-20 pt-4">
       <div className="container mx-auto max-w-5xl px-6 py-10">
         {/* Profile Header */}
         <div className="bg-surface-container-lowest rounded-[2.5rem] p-8 md:p-12 shadow-ambient-sm border border-outline-variant/20 mb-8 relative overflow-hidden">

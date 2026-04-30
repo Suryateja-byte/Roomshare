@@ -25,7 +25,7 @@ export default function SearchError({
   }, [error]);
 
   return (
-    <div className="min-h-screen bg-surface-canvas pt-[80px] sm:pt-[96px]">
+    <div className="min-h-svh bg-surface-canvas pt-[80px] sm:pt-[96px]">
       <div className="max-w-lg mx-auto px-4 py-16 text-center">
         <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6">
           <AlertCircle className="w-8 h-8 text-primary" />

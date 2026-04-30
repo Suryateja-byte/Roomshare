@@ -103,7 +103,7 @@ function ResetPasswordForm() {
   // Loading state while validating token
   if (isValidating) {
     return (
-      <div className="min-h-screen bg-surface-canvas flex items-center justify-center px-4">
+      <div className="min-h-svh bg-surface-canvas flex items-center justify-center px-4">
         <div className="text-center">
           <Loader2 className="w-8 h-8 text-on-surface-variant animate-spin mx-auto mb-4" />
           <p className="text-on-surface-variant">Validating reset link...</p>
@@ -115,7 +115,7 @@ function ResetPasswordForm() {
   // No token or invalid token
   if (!token || !isValidToken) {
     return (
-      <div className="min-h-screen bg-surface-canvas flex items-center justify-center px-4">
+      <div className="min-h-svh bg-surface-canvas flex items-center justify-center px-4">
         <div className="w-full max-w-md">
           <div className="bg-surface-container-lowest rounded-lg shadow-ambient p-8 text-center">
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -146,7 +146,7 @@ function ResetPasswordForm() {
   // Success state
   if (success) {
     return (
-      <div className="min-h-screen bg-surface-canvas flex items-center justify-center px-4">
+      <div className="min-h-svh bg-surface-canvas flex items-center justify-center px-4">
         <div className="w-full max-w-md">
           <div className="bg-surface-container-lowest rounded-lg shadow-ambient p-8 text-center">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -170,7 +170,7 @@ function ResetPasswordForm() {
 
   // Reset password form
   return (
-    <div className="min-h-screen bg-surface-canvas flex items-center justify-center px-4">
+    <div className="min-h-svh bg-surface-canvas flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="bg-surface-container-lowest rounded-lg shadow-ambient p-8">
           <Link
@@ -265,7 +265,7 @@ export default function ResetPasswordClient() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-surface-canvas flex items-center justify-center px-4">
+        <div className="min-h-svh bg-surface-canvas flex items-center justify-center px-4">
           <div className="text-center">
             <Loader2 className="w-8 h-8 text-on-surface-variant animate-spin mx-auto mb-4" />
             <p className="text-on-surface-variant">Loading...</p>

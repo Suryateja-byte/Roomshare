@@ -4,7 +4,7 @@ import { ListingGridSkeleton as SearchListingGridSkeleton } from "./ListingCardS
 export function PageSkeleton() {
   return (
     <div
-      className="min-h-screen bg-surface-canvas"
+      className="min-h-svh bg-surface-canvas"
       aria-busy="true"
       aria-label="Loading page content"
     >
@@ -42,7 +42,7 @@ export function PageSkeleton() {
 export function DashboardSkeleton() {
   return (
     <div
-      className="min-h-screen bg-surface-canvas"
+      className="min-h-svh bg-surface-canvas"
       aria-busy="true"
       aria-label="Loading dashboard"
     >
@@ -176,7 +176,7 @@ export function ListingSkeleton() {
 export function ListingGridSkeleton({ count = 6 }: { count?: number }) {
   return (
     <div
-      className="min-h-screen bg-surface-canvas"
+      className="min-h-svh bg-surface-canvas"
       aria-busy="true"
       aria-label="Loading listings"
     >
@@ -198,7 +198,7 @@ export function ListingGridSkeleton({ count = 6 }: { count?: number }) {
 export function SearchResultsSkeleton({ count = 6 }: { count?: number }) {
   return (
     <div
-      className="h-screen flex flex-col bg-surface-container-lowest overflow-hidden pt-[80px] sm:pt-[96px]"
+      className="h-screen-dynamic flex flex-col bg-surface-container-lowest overflow-hidden pt-[80px] sm:pt-[96px]"
       role="status"
       aria-busy="true"
       aria-label="Loading search results"
@@ -283,7 +283,7 @@ export function SearchResultsSkeleton({ count = 6 }: { count?: number }) {
 export function MessageListSkeleton() {
   return (
     <div
-      className="min-h-screen bg-surface-canvas"
+      className="min-h-svh bg-surface-canvas"
       aria-busy="true"
       aria-label="Loading messages"
     >
@@ -314,7 +314,7 @@ export function MessageListSkeleton() {
 export function ChatSkeleton() {
   return (
     <div
-      className="min-h-screen bg-surface-canvas"
+      className="min-h-svh bg-surface-canvas"
       aria-busy="true"
       aria-label="Loading chat"
     >
@@ -356,7 +356,7 @@ export function ChatSkeleton() {
 export function AdminTableSkeleton() {
   return (
     <div
-      className="min-h-screen bg-surface-canvas"
+      className="min-h-svh bg-surface-canvas"
       aria-busy="true"
       aria-label="Loading admin data"
     >
@@ -397,7 +397,7 @@ export function AdminTableSkeleton() {
 export function BookingsSkeleton() {
   return (
     <div
-      className="min-h-screen bg-surface-canvas"
+      className="min-h-svh bg-surface-canvas"
       aria-busy="true"
       aria-label="Loading bookings"
     >
@@ -432,7 +432,7 @@ export function BookingsSkeleton() {
 export function SettingsSkeleton() {
   return (
     <div
-      className="min-h-screen bg-surface-canvas"
+      className="min-h-svh bg-surface-canvas"
       aria-busy="true"
       aria-label="Loading settings"
     >
@@ -474,7 +474,7 @@ export function SettingsSkeleton() {
 export function SavedSearchesSkeleton() {
   return (
     <div
-      className="min-h-screen bg-surface-canvas"
+      className="min-h-svh bg-surface-canvas"
       aria-busy="true"
       aria-label="Loading saved searches"
     >
@@ -507,7 +507,7 @@ export function SavedSearchesSkeleton() {
 export function NotificationsSkeleton() {
   return (
     <div
-      className="min-h-screen bg-surface-canvas"
+      className="min-h-svh bg-surface-canvas"
       aria-busy="true"
       aria-label="Loading notifications"
     >

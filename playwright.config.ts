@@ -33,6 +33,25 @@ if (runningDedupeSuite) {
 webServerEnv.NEXT_PUBLIC_SUPABASE_URL =
   webServerEnv.NEXT_PUBLIC_SUPABASE_URL || "https://fake.supabase.co";
 
+const responsiveViewportProjectFiles =
+  /responsive\/project-viewport\.anon\.spec\.ts|visual\/home-hero-visual\.anon\.spec\.ts|performance\/image-budget\.anon\.spec\.ts/;
+
+const responsiveViewportProjects = [
+  { name: "responsive-mobile-small", viewport: { width: 360, height: 640 } },
+  { name: "responsive-mobile", viewport: { width: 390, height: 844 } },
+  {
+    name: "responsive-mobile-landscape",
+    viewport: { width: 812, height: 375 },
+  },
+  { name: "responsive-tablet", viewport: { width: 768, height: 1024 } },
+  {
+    name: "responsive-tablet-landscape",
+    viewport: { width: 1024, height: 768 },
+  },
+  { name: "responsive-laptop", viewport: { width: 1440, height: 900 } },
+  { name: "responsive-desktop", viewport: { width: 1920, height: 1080 } },
+];
+
 /**
  * Playwright configuration for RoomShare E2E tests
  * @see https://playwright.dev/docs/test-configuration
@@ -101,7 +120,10 @@ export default defineConfig({
 
     {
       name: "chromium",
-      testIgnore: [/(\.anon|\.admin)\.spec\.ts/, ...retiredBookingLifecycleSpecs],
+      testIgnore: [
+        /(\.anon|\.admin)\.spec\.ts/,
+        ...retiredBookingLifecycleSpecs,
+      ],
       use: {
         ...devices["Desktop Chrome"],
         storageState: "playwright/.auth/user.json",
@@ -111,7 +133,10 @@ export default defineConfig({
 
     {
       name: "firefox",
-      testIgnore: [/(\.anon|\.admin)\.spec\.ts/, ...retiredBookingLifecycleSpecs],
+      testIgnore: [
+        /(\.anon|\.admin)\.spec\.ts/,
+        ...retiredBookingLifecycleSpecs,
+      ],
       use: {
         ...devices["Desktop Firefox"],
         storageState: "playwright/.auth/user.json",
@@ -121,7 +146,10 @@ export default defineConfig({
 
     {
       name: "webkit",
-      testIgnore: [/(\.anon|\.admin)\.spec\.ts/, ...retiredBookingLifecycleSpecs],
+      testIgnore: [
+        /(\.anon|\.admin)\.spec\.ts/,
+        ...retiredBookingLifecycleSpecs,
+      ],
       use: {
         ...devices["Desktop Safari"],
         storageState: "playwright/.auth/user.json",
@@ -132,7 +160,10 @@ export default defineConfig({
     /* Mobile viewports */
     {
       name: "Mobile Chrome",
-      testIgnore: [/(\.anon|\.admin)\.spec\.ts/, ...retiredBookingLifecycleSpecs],
+      testIgnore: [
+        /(\.anon|\.admin)\.spec\.ts/,
+        ...retiredBookingLifecycleSpecs,
+      ],
       use: {
         ...devices["Pixel 7"],
         storageState: "playwright/.auth/user.json",
@@ -142,7 +173,10 @@ export default defineConfig({
 
     {
       name: "Mobile Safari",
-      testIgnore: [/(\.anon|\.admin)\.spec\.ts/, ...retiredBookingLifecycleSpecs],
+      testIgnore: [
+        /(\.anon|\.admin)\.spec\.ts/,
+        ...retiredBookingLifecycleSpecs,
+      ],
       use: {
         ...devices["iPhone 14"],
         storageState: "playwright/.auth/user.json",
@@ -194,6 +228,14 @@ export default defineConfig({
         ...devices["Desktop Safari"],
       },
     },
+    ...responsiveViewportProjects.map(({ name, viewport }) => ({
+      name,
+      testMatch: responsiveViewportProjectFiles,
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport,
+      },
+    })),
   ],
 
   /* Start dev server locally; skip in CI where server is started manually */

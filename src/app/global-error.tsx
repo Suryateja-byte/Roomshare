@@ -23,7 +23,7 @@ export default function GlobalError({
   return (
     <html>
       <body className="bg-surface-canvas">
-        <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="min-h-svh flex items-center justify-center p-4">
           <div className="text-center max-w-md">
             <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <AlertTriangle className="w-10 h-10 text-red-600" />

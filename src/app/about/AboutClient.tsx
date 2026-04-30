@@ -56,7 +56,7 @@ const TeamMember = ({ name, role, image }: TeamMemberProps) => (
 
 export default function AboutClient() {
   return (
-    <div className="min-h-screen bg-surface-canvas font-body selection:bg-on-surface selection:text-surface-container-lowest">
+    <div className="min-h-svh bg-surface-canvas font-body selection:bg-on-surface selection:text-surface-container-lowest">
       <div>
         {/* Hero Section */}
         <section className="relative pt-20 pb-32 px-6 overflow-hidden">
@@ -84,7 +84,7 @@ export default function AboutClient() {
                 src="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?q=80&w=2832&auto=format&fit=crop"
                 alt="Friends hanging out in apartment"
                 fill
-                priority
+                preload
                 sizes="(max-width: 768px) 100vw, (max-width: 1600px) 90vw, 1600px"
                 className="object-cover"
               />

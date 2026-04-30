@@ -6,6 +6,10 @@
    =================================================================== */
 
 @theme {
+  /* === RESPONSIVE BREAKPOINTS === */
+  --breakpoint-xs: 22.5rem;
+  --breakpoint-3xl: 120rem;
+
   /* === COLORS: Editorial Living Room === */
 
   /* Surface system */
@@ -386,24 +390,86 @@ textarea:focus-visible {
   @apply mx-auto px-4 sm:px-6 max-w-7xl;
 }
 
+.home-hero-section {
+  min-height: 0;
+  height: min(calc(100svh - 1rem), 760px);
+}
+
 .home-hero-frame {
   padding-inline: clamp(1.25rem, 3.7vw, 3.75rem);
-  padding-top: clamp(0.875rem, 2.4vh, 2.25rem);
+  justify-content: flex-start;
+  min-height: 0;
+}
+
+.home-hero-bottom {
+  margin-top: clamp(6rem, 17svh, 8.5rem);
 }
 
 .home-hero-search-row {
-  max-width: 24rem;
+  max-width: none;
   margin-inline: auto;
 }
 
+.home-hero-photo {
+  overflow: hidden;
+  background-color: var(--color-surface-canvas);
+}
+
+.home-hero-photo-img {
+  object-position: 82% top;
+  transform: scale(1.08);
+  transform-origin: 82% top;
+}
+
+.home-hero-copy {
+  padding-inline: 0.75rem;
+}
+
 @media (min-width: 768px) {
+  .home-hero-section {
+    height: min(calc(100svh - 1.5rem), 900px);
+    min-height: 42rem;
+  }
+
   .home-hero-frame {
-    padding-top: clamp(1rem, 2.7vh, 2.75rem);
+    justify-content: space-between;
+  }
+
+  .home-hero-bottom {
+    margin-top: 0;
   }
 
   .home-hero-search-row {
-    max-width: 96rem;
-    margin-inline: 0;
+    max-width: min(68rem, calc(100vw - 6rem));
+    margin-inline: auto;
+  }
+
+  .home-hero-copy {
+    padding-inline: 0;
+  }
+
+  .home-hero-photo-img {
+    object-position: center right;
+    transform: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  .home-hero-section {
+    height: min(calc(100svh - 1.5rem), 860px);
+  }
+}
+
+@media (min-width: 768px) and (max-height: 760px) {
+  .home-hero-section {
+    padding-top: 5.25rem;
+    padding-bottom: 1.5rem;
+  }
+  .home-hero-frame {
+    gap: 1rem;
+  }
+  .home-hero-secondary {
+    margin-top: 1rem;
   }
 }
 
@@ -419,15 +485,24 @@ textarea:focus-visible {
   }
 }
 
-@media (min-height: 760px), (min-width: 768px) {
+@media (min-width: 768px) {
   .home-hero-secondary {
     display: grid;
   }
 }
 
 @media (max-width: 767px) and (max-height: 720px) {
+  .home-hero-section {
+    height: 100svh;
+  }
+
   .home-hero-frame {
+    justify-content: space-between;
     padding-top: 0.875rem;
+  }
+
+  .home-hero-bottom {
+    margin-top: 0;
   }
 
   .home-hero-auth,
@@ -436,10 +511,61 @@ textarea:focus-visible {
   }
 }
 
-/* Mobile viewport height fix */
+@media (max-width: 932px) and (max-height: 600px) and (orientation: landscape) {
+  .home-hero-section {
+    height: auto;
+    min-height: 100svh;
+    padding-top: calc(env(safe-area-inset-top) + 4.5rem) !important;
+    padding-bottom: max(env(safe-area-inset-bottom), 0.75rem) !important;
+  }
+
+  .home-hero-frame {
+    justify-content: flex-start;
+    padding-top: 0.25rem;
+  }
+
+  .home-hero-title {
+    font-size: clamp(2rem, 5vw, 3rem) !important;
+    line-height: 1;
+  }
+
+  .home-hero-subtitle {
+    margin-top: 0.75rem;
+    max-width: 30rem;
+    font-size: 0.95rem;
+    line-height: 1.35;
+  }
+
+  .home-hero-search-row {
+    margin-top: 1rem;
+    max-width: min(48rem, calc(100vw - 2rem));
+  }
+
+  .home-hero-auth,
+  .home-hero-secondary {
+    display: none;
+  }
+}
+
+/* Mobile viewport height utilities */
 .h-screen-safe {
   height: 100vh;
+  height: 100svh;
+}
+
+.min-h-screen-safe {
+  min-height: 100vh;
+  min-height: 100svh;
+}
+
+.h-screen-dynamic {
+  height: 100vh;
   height: 100dvh;
+}
+
+.min-h-screen-dynamic {
+  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 /* Touch-friendly minimum target size */
@@ -455,6 +581,48 @@ textarea:focus-visible {
 
 .desktop-only {
   @apply hidden md:block;
+}
+
+/* Component-level adaptation: listing cards respond to their own slot width. */
+.listing-card-shell {
+  container-type: inline-size;
+}
+
+.search-form-shell {
+  container-type: inline-size;
+}
+
+@container (min-width: 30rem) {
+  .listing-card-body {
+    padding: 1.25rem;
+  }
+
+  .listing-card-price {
+    font-size: 1.5rem;
+    line-height: 2rem;
+  }
+
+  .listing-card-title {
+    font-size: 1rem;
+  }
+
+  .listing-card-meta {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+}
+
+@container (min-width: 48rem) and (max-width: 56rem) {
+  .home-search-form-surface {
+    padding: 0.375rem;
+  }
+}
+
+@container (max-width: 28rem) {
+  .home-search-form-surface {
+    border-radius: 1.5rem;
+  }
 }
 
 /* Respect reduced motion preferences */

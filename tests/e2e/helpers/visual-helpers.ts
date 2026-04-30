@@ -12,10 +12,15 @@ import type { Page, Locator } from "@playwright/test";
 // ---------------------------------------------------------------------------
 
 export const VIEWPORTS = {
-  desktop: { width: 1440, height: 900 },
+  mobileSmall: { width: 360, height: 640 },
+  mobile: { width: 390, height: 844 },
+  mobileLarge: { width: 390, height: 844 }, // Backwards-compatible alias
+  mobileLandscape: { width: 812, height: 375 },
   tablet: { width: 768, height: 1024 },
-  mobileLarge: { width: 390, height: 844 }, // iPhone 14
-  mobileSmall: { width: 375, height: 667 }, // iPhone SE
+  tabletLandscape: { width: 1024, height: 768 },
+  laptop: { width: 1440, height: 900 },
+  desktop: { width: 1440, height: 900 }, // Backwards-compatible alias
+  desktopFullHd: { width: 1920, height: 1080 },
 } as const;
 
 // ---------------------------------------------------------------------------

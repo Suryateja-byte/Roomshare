@@ -816,7 +816,7 @@ export default function NeighborhoodChat({
             className={cn(
               "fixed bottom-24 right-6 z-[9999]",
               "w-[400px] max-w-[calc(100vw-32px)]",
-              "h-[600px] max-h-[calc(100vh-120px)]",
+              "h-[600px] max-h-[calc(100dvh-120px)]",
               "bg-white/80 backdrop-blur-2xl",
               "supports-[backdrop-filter]:bg-white/60[backdrop-filter]:bg-on-surface/60",
               "rounded-[32px]",

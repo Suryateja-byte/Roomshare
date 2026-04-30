@@ -4,11 +4,13 @@ import Image, { type ImageProps } from "next/image";
 import { useState, useRef, useEffect } from "react";
 import { Skeleton } from "@/components/skeletons/Skeleton";
 
-interface LazyImageProps extends Omit<ImageProps, "onLoad" | "onError"> {
+interface LazyImageProps
+  extends Omit<ImageProps, "onLoad" | "onError" | "priority"> {
   fallback?: React.ReactNode;
   showSkeleton?: boolean;
   threshold?: number;
   rootMargin?: string;
+  priority?: boolean;
 }
 
 export function LazyImage({
@@ -21,14 +23,22 @@ export function LazyImage({
   threshold = 0.1,
   rootMargin = "100px",
   className = "",
+  priority = false,
+  preload,
+  loading,
+  fetchPriority,
   ...props
 }: LazyImageProps) {
   const [isLoaded, setIsLoaded] = useState(false);
-  const [isInView, setIsInView] = useState(false);
+  const shouldLoadImmediately =
+    priority || preload === true || loading === "eager";
+  const [isInView, setIsInView] = useState(shouldLoadImmediately);
   const [hasError, setHasError] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (shouldLoadImmediately) return;
+
     const element = containerRef.current;
     if (!element) return;
 
@@ -50,7 +60,7 @@ export function LazyImage({
     observer.observe(element);
 
     return () => observer.disconnect();
-  }, [threshold, rootMargin]);
+  }, [threshold, rootMargin, shouldLoadImmediately]);
 
   const handleLoad = () => {
     setIsLoaded(true);
@@ -114,6 +124,9 @@ export function LazyImage({
           className={`transition-opacity duration-300 ${
             isLoaded ? "opacity-100" : "opacity-0"
           }`}
+          preload={preload ?? priority}
+          loading={priority || preload ? undefined : loading}
+          fetchPriority={priority ? "high" : fetchPriority}
           onLoad={handleLoad}
           onError={handleError}
           {...props}
