@@ -15,17 +15,15 @@ test.describe("Homepage — Anonymous User", () => {
     // (requestAnimationFrame) don't reliably complete in headless browsers,
     // leaving elements at opacity:0 and failing toBeVisible assertions.
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.goto("/");
-    await page.waitForLoadState("domcontentloaded");
+    await page.goto("/", { waitUntil: "domcontentloaded" });
   });
 
   test("HP-01: Hero section renders with heading and search CTA", async ({
     page,
   }) => {
-    // The hero has heading text "Finding Your People, Not Just a Place"
     const heading = page.getByRole("heading", { level: 1 });
     await expect(heading).toBeVisible({ timeout: 15000 });
-    await expect(heading).toContainText(/finding.*people/i);
+    await expect(heading).toContainText(/better rooms.*better people/i);
 
     // Check for the tagline subheading text
     await expect(
@@ -39,8 +37,9 @@ test.describe("Homepage — Anonymous User", () => {
     // Check sign-up CTA for non-logged-in users
     await expect(
       page
-        .getByRole("link", { name: /create an account/i })
-        .or(page.getByRole("link", { name: /sign up/i }))
+        .getByRole("link", {
+          name: /create (an account|your profile)|sign up|join/i,
+        })
         .first()
     ).toBeVisible({ timeout: 10000 });
   });
@@ -69,12 +68,13 @@ test.describe("Homepage — Anonymous User", () => {
         .first()
     ).toBeVisible({ timeout: 10000 });
 
-    // Check for at least one feature card description
+    // Check for at least one feature card from the redesigned promise band.
     await expect(
       page
-        .getByText(/no catfishing/i)
-        .or(page.getByText(/matched on what matters/i))
-        .or(page.getByText(/filters that actually/i))
+        .getByText(/no catfish/i)
+        .or(page.getByText(/rooms, not inventory/i))
+        .or(page.getByText(/compatibility, not queries/i))
+        .or(page.getByText(/handholds, not helplines/i))
         .first()
     ).toBeVisible();
   });
@@ -83,40 +83,14 @@ test.describe("Homepage — Anonymous User", () => {
     page,
   }) => {
     test.slow();
-    // Framer Motion uses whileInView + initial="hidden" for featured listings.
-    // <MotionConfig reducedMotion="user"> (Providers.tsx:17) + _disableAnimations
-    // fixture (emulates prefers-reduced-motion: reduce) makes transitions instant,
-    // but IntersectionObserver must still fire to trigger the variant switch.
-    // Use scrollIntoViewIfNeeded to reliably trigger IntersectionObserver.
     const section = page.locator('[data-testid="featured-listings-section"]');
     await section.waitFor({ state: "attached", timeout: 20_000 });
     await section.scrollIntoViewIfNeeded();
-    // Wait for IntersectionObserver + Framer Motion whileInView to complete.
-    // Double-rAF is unreliable in headless CI (50-200ms IO callback delay).
-    // Instead, poll for the actual style change (opacity !== '0') which signals
-    // the animation variant has been applied.
-    await page.waitForFunction(
-      () => {
-        const el = document.querySelector(
-          '[data-testid="featured-listings-section"] [data-testid="listing-card"]'
-        );
-        if (!el) {
-          // No listing cards — may be empty state, which is also valid
-          const emptyText = document.querySelector(
-            '[data-testid="featured-listings-section"]'
-          )?.textContent ?? '';
-          return /latest curated spaces|be the first to share/i.test(emptyText);
-        }
-        return getComputedStyle(el).opacity !== '0';
-      },
-      { timeout: 20_000 }
-    );
 
     await expect(
-      page
+      section
         .locator('[data-testid="listing-card"]')
-        .or(page.getByText(/latest curated spaces/i))
-        .or(page.getByText(/be the first to share/i))
+        .or(section.getByText(/be the first to share/i))
         .first()
     ).toBeVisible({ timeout: 20000 });
   });
@@ -161,13 +135,13 @@ test.describe("Homepage — Anonymous User", () => {
 
     await expect(searchCta).toBeVisible({ timeout: 10000 });
     await Promise.all([
-      page.waitForURL(/\/search/, { timeout: 15000 }),
+      page.waitForURL(/\/search/, { timeout: 15000, waitUntil: "commit" }),
       searchCta.evaluate((element) => (element as HTMLAnchorElement).click()),
     ]);
   });
 
   test("HP-07: Footer renders with links", async ({ page }) => {
-    const footer = page.locator("footer").first();
+    const footer = page.getByRole("contentinfo").last();
     await expect(footer).toBeVisible({ timeout: 10000 });
 
     // Check for at least one link in the footer

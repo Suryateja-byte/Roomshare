@@ -387,6 +387,31 @@ describe("FilterModal", () => {
       const applyBtn = screen.getByTestId("filter-modal-apply");
       expect(applyBtn).toHaveTextContent("Show 42 listings");
     });
+
+    it("only disables apply when bounds are required", () => {
+      const { rerender } = render(
+        <FilterModal
+          {...makeProps({
+            boundsRequired: false,
+            count: 0,
+            formattedCount: "0 listings",
+          })}
+        />
+      );
+
+      expect(screen.getByTestId("filter-modal-apply")).not.toBeDisabled();
+
+      rerender(
+        <FilterModal
+          {...makeProps({
+            boundsRequired: true,
+            formattedCount: "Select a location",
+          })}
+        />
+      );
+
+      expect(screen.getByTestId("filter-modal-apply")).toBeDisabled();
+    });
   });
 
   describe("clear all button", () => {

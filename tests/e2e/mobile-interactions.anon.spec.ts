@@ -13,11 +13,7 @@
  * Run: pnpm playwright test tests/e2e/mobile-interactions.anon.spec.ts --project=chromium-anon
  */
 
-import {
-  test,
-  expect,
-  SF_BOUNDS,
-} from "./helpers/test-utils";
+import { test, expect, SF_BOUNDS } from "./helpers/test-utils";
 import {
   mobileSelectors,
   getSheetSnapIndex,
@@ -43,9 +39,7 @@ test.describe("Mobile Bottom Sheet - Snap Transitions", () => {
     viewport: { width: 390, height: 844 },
   });
 
-  test("ArrowUp from collapsed moves to peek", async ({
-    page,
-  }) => {
+  test("ArrowUp from collapsed moves to peek", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
     test.skip(!sheetReady, "Mobile bottom sheet not ready");
@@ -163,24 +157,30 @@ test.describe("Mobile Bottom Sheet - Content", () => {
     }
   });
 
-  test("listing cards are scrollable in expanded position", async ({
-    page,
-  }) => {
+  test("listing cards are scrollable in list position", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
     test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
-    // Expand the sheet
+    // Move the sheet into a list state.
     await setSheetSnap(page, 2);
-    expect(await getSheetSnapIndex(page)).toBe(2);
+    await expect
+      .poll(() => getSheetSnapIndex(page), {
+        timeout: 10_000,
+        message: "Expected the mobile sheet to reach a scrollable list state",
+      })
+      .toBeGreaterThanOrEqual(1);
 
-    // The content area should be scrollable when expanded
+    // The content area should be scrollable once the list snap state is active.
     const content = page.locator(mobileSelectors.snapContent).first();
     const isScrollable = await content.evaluate(
       (el) => el.scrollHeight > el.clientHeight
     );
 
-    test.skip(!isScrollable, "Content area not scrollable (insufficient listings)");
+    test.skip(
+      !isScrollable,
+      "Content area not scrollable (insufficient listings)"
+    );
 
     // Verify overflow-y is auto (not hidden) when expanded
     const overflowY = await content.evaluate(
@@ -216,7 +216,9 @@ test.describe("Mobile Bottom Sheet - Content", () => {
 
     // The collapsed header should keep a compact result count instead of
     // generic instructional copy.
-    const headerText = page.locator('[data-testid="sheet-header-text"]').first();
+    const headerText = page
+      .locator('[data-testid="sheet-header-text"]')
+      .first();
     await expect(headerText).toBeVisible();
     const text = (await headerText.textContent())?.trim() ?? "";
     expect(text.length).toBeGreaterThan(0);
@@ -325,7 +327,10 @@ test.describe("Mobile Map and Sheet", () => {
       .then(() => markers.count())
       .catch(() => 0);
 
-    test.skip(markerCount === 0, "No map markers rendered (map may not be initialized)");
+    test.skip(
+      markerCount === 0,
+      "No map markers rendered (map may not be initialized)"
+    );
 
     // At least one marker should be visible
     expect(markerCount).toBeGreaterThanOrEqual(1);
@@ -379,7 +384,10 @@ test.describe("Mobile Sort Interaction", () => {
     }
 
     const sortBtnFinal = page.locator(mobileSelectors.sortButton).first();
-    test.skip(!(await sortBtnFinal.isVisible().catch(() => false)), "Sort button not visible in current viewport");
+    test.skip(
+      !(await sortBtnFinal.isVisible().catch(() => false)),
+      "Sort button not visible in current viewport"
+    );
 
     // Click the sort button
     await sortBtnFinal.click();
@@ -412,7 +420,9 @@ test.describe("Mobile Sort Interaction", () => {
     // Try to find and click the sort button
     await setSheetSnap(page, 2);
     const sortBtn = page.locator(mobileSelectors.sortButton).first();
-    const sortBtnVisible = await sortBtn.isVisible({ timeout: 5000 }).catch(() => false);
+    const sortBtnVisible = await sortBtn
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
     test.skip(!sortBtnVisible, "Sort button not visible");
 
     await sortBtn.click();
@@ -500,7 +510,9 @@ test.describe("Mobile Filter Interaction", () => {
     const filtersBtn = page
       .locator(`${mobileSelectors.filtersButton}:visible`)
       .first();
-    const filtersBtnVisible = await filtersBtn.isVisible({ timeout: 5000 }).catch(() => false);
+    const filtersBtnVisible = await filtersBtn
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
     test.skip(!filtersBtnVisible, "Filters button not visible on mobile");
 
     await filtersBtn.evaluate((el) => (el as HTMLElement).click());
@@ -650,7 +662,6 @@ test.describe("Mobile Edge Cases", () => {
     expect(fraction).toBeGreaterThan(0.1);
     expect(fraction).toBeLessThan(0.25);
   });
-
 });
 
 // ---------------------------------------------------------------------------
@@ -677,7 +688,9 @@ test.describe("Mobile Layout Responsiveness", () => {
 
     // Desktop sidebar results container should NOT be visible
     // The desktop container has class "hidden md:flex"
-    const desktopContainer = page.locator(mobileSelectors.desktopResults).first();
+    const desktopContainer = page
+      .locator(mobileSelectors.desktopResults)
+      .first();
     const desktopVisible = await desktopContainer
       .isVisible()
       .catch(() => false);

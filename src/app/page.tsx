@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import HomeClient from "./HomeClient";
+import HomeClient, { PostListingsHomeSections } from "./HomeClient";
 import FeaturedListings from "@/components/FeaturedListings";
 
 export const metadata: Metadata = {
@@ -69,6 +69,7 @@ export default function HomePage() {
       >
         <FeaturedListings />
       </Suspense>
+      <PostListingsHomeSections />
     </>
   );
 }

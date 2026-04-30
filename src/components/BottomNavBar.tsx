@@ -81,10 +81,12 @@ export default function BottomNavBar() {
     return () => scrollContainer.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Don't render on message thread - it has its own input bar
+  // Don't render on pages with their own full-screen navigation/search chrome.
   const isMessageThread = pathname.startsWith("/messages/");
-  const isSearchPage = pathname === "/search" || pathname.startsWith("/search/");
-  if (isMessageThread || isSearchPage) return null;
+  const isSearchPage =
+    pathname === "/search" || pathname.startsWith("/search/");
+  const isHomePage = pathname === "/";
+  if (isHomePage || isMessageThread || isSearchPage) return null;
 
   return (
     <nav

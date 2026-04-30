@@ -48,6 +48,8 @@ import { useDebouncedFilterCount } from "@/hooks/useDebouncedFilterCount";
 import { useFacets } from "@/hooks/useFacets";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import {
+  buildSearchFilterPatchFromPending,
+  sanitizePendingFilters,
   useBatchedFilters,
   type BatchedFilterValues,
 } from "@/hooks/useBatchedFilters";
@@ -65,6 +67,7 @@ import {
   applySearchQueryChange,
   buildCanonicalSearchUrl,
   normalizeSearchQuery,
+  serializeSearchQuery,
 } from "@/lib/search/search-query";
 
 // Debounce delay in milliseconds
@@ -228,7 +231,9 @@ export default function SearchForm({
   } = pending;
 
   const [selectedCoords, setSelectedCoords] =
-    useState<SearchLocationSelection | null>(initialIntentState.selectedLocation);
+    useState<SearchLocationSelection | null>(
+      initialIntentState.selectedLocation
+    );
   const [geoLoading, setGeoLoading] = useState(false);
 
   const [hasMounted, setHasMounted] = useState(false);
@@ -471,8 +476,17 @@ export default function SearchForm({
         : null;
       if (nlParsed && !selectedCoords) {
         // NL query detected — merge parsed filters with existing URL state.
-        // Start from current params (preserves filter modal state), then overlay NLP extractions.
-        const current = new URLSearchParams(searchParams.toString());
+        // Start from current URL plus pending filters, then overlay NLP extractions.
+        const currentQuery = normalizeSearchQuery(
+          new URLSearchParams(searchParams.toString())
+        );
+        const current = serializeSearchQuery(
+          applySearchQueryChange(
+            currentQuery,
+            "filter",
+            buildSearchFilterPatchFromPending(sanitizePendingFilters(pending))
+          )
+        );
         const nlParams = nlQueryToSearchParams(nlParsed);
 
         // Overlay NLP-extracted params onto current state (NLP wins on conflict)
@@ -547,39 +561,7 @@ export default function SearchForm({
 
       const trimmedWhat = whatQuery.trim();
 
-      // Price validation with auto-swap if inverted
-      // IMPORTANT: Use pending.minPrice/maxPrice (primitives) not the full pending object.
-      // Inline price inputs write to pending only — modal filters use committed via commitFilters().
-      // Using full pending would recreate this callback on every keystroke in any filter input.
-      let finalMinPrice = pending.minPrice
-        ? parseFloat(pending.minPrice)
-        : null;
-      let finalMaxPrice = pending.maxPrice
-        ? parseFloat(pending.maxPrice)
-        : null;
-
-      // EU-D: Guard against NaN from invalid input (e.g., "abc" → NaN)
-      if (finalMinPrice !== null && !Number.isFinite(finalMinPrice))
-        finalMinPrice = null;
-      if (finalMaxPrice !== null && !Number.isFinite(finalMaxPrice))
-        finalMaxPrice = null;
-
-      // Enforce non-negative values
-      if (finalMinPrice !== null && finalMinPrice < 0) finalMinPrice = 0;
-      if (finalMaxPrice !== null && finalMaxPrice < 0) finalMaxPrice = 0;
-
-      // Auto-swap if min > max
-      if (
-        finalMinPrice !== null &&
-        finalMaxPrice !== null &&
-        finalMinPrice > finalMaxPrice
-      ) {
-        [finalMinPrice, finalMaxPrice] = [finalMaxPrice, finalMinPrice];
-      }
-      const validatedDateRange = getValidatedSearchDateRange(
-        committed.moveInDate,
-        committed.endDate
-      );
+      const sanitizedPending = sanitizePendingFilters(pending);
       const currentQuery = normalizeSearchQuery(
         new URLSearchParams(searchParams.toString())
       );
@@ -599,28 +581,11 @@ export default function SearchForm({
       }
       // CFM-604: canonical-on-write guarantee — must go through buildCanonicalSearchUrl.
       const searchUrl = buildCanonicalSearchUrl(
-        applySearchQueryChange(intentQuery, "filter", {
-          minPrice: finalMinPrice ?? undefined,
-          maxPrice: finalMaxPrice ?? undefined,
-          moveInDate: validatedDateRange.moveInDate || undefined,
-          endDate: validatedDateRange.endDate || undefined,
-          leaseDuration: committed.leaseDuration || undefined,
-          roomType: committed.roomType || undefined,
-          amenities:
-            committed.amenities.length > 0 ? committed.amenities : undefined,
-          houseRules:
-            committed.houseRules.length > 0
-              ? committed.houseRules
-              : undefined,
-          languages:
-            committed.languages.length > 0 ? committed.languages : undefined,
-          genderPreference: committed.genderPreference || undefined,
-          householdGender: committed.householdGender || undefined,
-          minSlots:
-            committed.minSlots && parseInt(committed.minSlots, 10) >= 2
-              ? parseInt(committed.minSlots, 10)
-              : undefined,
-        })
+        applySearchQueryChange(
+          intentQuery,
+          "filter",
+          buildSearchFilterPatchFromPending(sanitizedPending)
+        )
       );
 
       // Prevent duplicate searches (same URL within debounce window)
@@ -637,15 +602,18 @@ export default function SearchForm({
       // Save to recent searches when navigating (with filters for enhanced format)
       if (trimmedLocation) {
         const activeFilters: Partial<RecentSearchFilters> = {};
-        if (pending.minPrice) activeFilters.minPrice = pending.minPrice;
-        if (pending.maxPrice) activeFilters.maxPrice = pending.maxPrice;
-        if (committed.roomType) activeFilters.roomType = committed.roomType;
-        if (committed.leaseDuration)
-          activeFilters.leaseDuration = committed.leaseDuration;
-        if (committed.amenities.length > 0)
-          activeFilters.amenities = committed.amenities;
-        if (committed.houseRules.length > 0)
-          activeFilters.houseRules = committed.houseRules;
+        if (sanitizedPending.minPrice)
+          activeFilters.minPrice = sanitizedPending.minPrice;
+        if (sanitizedPending.maxPrice)
+          activeFilters.maxPrice = sanitizedPending.maxPrice;
+        if (sanitizedPending.roomType)
+          activeFilters.roomType = sanitizedPending.roomType;
+        if (sanitizedPending.leaseDuration)
+          activeFilters.leaseDuration = sanitizedPending.leaseDuration;
+        if (sanitizedPending.amenities.length > 0)
+          activeFilters.amenities = sanitizedPending.amenities;
+        if (sanitizedPending.houseRules.length > 0)
+          activeFilters.houseRules = sanitizedPending.houseRules;
 
         saveRecentSearch(
           trimmedLocation,
@@ -686,9 +654,7 @@ export default function SearchForm({
     [
       location,
       whatQuery,
-      pending.minPrice,
-      pending.maxPrice,
-      committed,
+      pending,
       selectedCoords,
       router,
       // H4 FIX: isSearching removed — read from isSearchingRef.current instead
@@ -934,7 +900,7 @@ export default function SearchForm({
   const fieldPaddingClasses = isCompact
     ? "px-4 py-2"
     : isHome
-      ? "px-0 py-0 md:px-6 md:py-2.5"
+      ? "px-3 py-3 md:px-5 md:py-3"
       : "px-4 py-2 md:px-6 md:py-2.5";
 
   const getFieldStateClasses = (field: "what" | "where" | "budget") => {
@@ -961,7 +927,7 @@ export default function SearchForm({
         isCompact
           ? "min-h-[56px] sm:min-h-[64px] max-w-2xl"
           : isHome
-            ? "max-w-[360px] md:max-w-5xl"
+            ? "max-w-[380px] md:max-w-5xl lg:max-w-[1120px]"
             : "min-h-[56px] sm:min-h-[64px] max-w-5xl"
       )}
     >
@@ -971,7 +937,7 @@ export default function SearchForm({
         className={cn(
           "group relative flex w-full flex-col",
           isHome
-            ? "rounded-[2rem] bg-surface-container-lowest p-7 shadow-ambient md:flex-row md:items-center md:rounded-full md:bg-surface-container-lowest md:p-2 md:shadow-ambient-lg md:backdrop-blur-2xl md:transition-all md:duration-300 md:hover:shadow-ghost md:focus-within:shadow-ghost"
+            ? "rounded-[1.375rem] bg-surface-container-lowest p-2 shadow-[0_30px_60px_-30px_rgb(27_28_25/0.24),0_10px_24px_-12px_rgb(27_28_25/0.10)] md:flex-row md:items-stretch md:bg-surface-container-lowest md:p-2 md:backdrop-blur-2xl md:transition-all md:duration-300 md:hover:shadow-ghost md:focus-within:shadow-[0_40px_80px_-40px_rgb(27_28_25/0.28),0_16px_32px_-16px_rgb(154_64_39/0.18)]"
             : "bg-surface-container-lowest backdrop-blur-2xl rounded-3xl md:rounded-full shadow-ambient-lg hover:shadow-ghost focus-within:shadow-ghost transition-all duration-300 md:flex-row md:items-center",
           isCompact && "p-1",
           !isCompact && !isHome && "p-2"
@@ -1063,7 +1029,7 @@ export default function SearchForm({
             <div
               className={cn(
                 isHome
-                  ? "my-5 block h-1.5 w-full rounded-full bg-surface-container-high/70 md:hidden lg:my-0 lg:block lg:h-8 lg:w-1.5 lg:bg-surface-container-high/75"
+                  ? "my-0 block h-px w-[calc(100%-1rem)] self-center bg-on-surface/10 md:hidden lg:my-0 lg:block lg:h-9 lg:w-px lg:bg-on-surface/10"
                   : "mx-0 my-1 hidden h-1.5 w-full rounded-full bg-surface-container-high/70 lg:mx-1 lg:my-0 lg:block lg:h-8 lg:w-1.5"
               )}
               aria-hidden="true"
@@ -1211,7 +1177,7 @@ export default function SearchForm({
                         e.stopPropagation();
                         selectRecentSearch(search);
                       }}
-                      className="w-full flex items-center gap-4 px-5 py-3 hover:bg-surface-canvas[0.02] text-left transition-colors"
+                      className="w-full flex items-center gap-4 px-5 py-3 hover:bg-surface-canvas/80 text-left transition-colors"
                     >
                       <Clock className="w-4 h-4 text-on-surface-variant flex-shrink-0" />
                       <span className="text-sm font-medium text-on-surface-variant truncate">
@@ -1229,7 +1195,7 @@ export default function SearchForm({
         <div
           className={cn(
             isHome
-              ? "my-5 h-1.5 w-full rounded-full bg-surface-container-high/70 md:mx-1 md:my-0 md:h-8 md:w-1.5"
+              ? "my-0 h-px w-[calc(100%-1rem)] self-center bg-on-surface/10 md:mx-1 md:my-0 md:h-9 md:w-px"
               : "mx-0 my-1 h-1.5 w-full rounded-full bg-surface-container-high/70 md:mx-1 md:my-0 md:h-8 md:w-1.5"
           )}
           aria-hidden="true"
@@ -1396,14 +1362,14 @@ export default function SearchForm({
           >
             <Button
               type="submit"
-              size={isHome ? "icon" : undefined}
+              size={isCompact ? "icon" : undefined}
               disabled={isSearching}
               aria-label={isSearching ? "Searching" : "Search"}
               aria-busy={isSearching}
               className={cn(
                 "rounded-full transition-all duration-500 hover:scale-105 active:scale-95",
                 isHome
-                  ? "h-[54px] w-[54px] min-h-[54px] min-w-[54px] bg-gradient-to-br from-primary to-primary-container text-on-primary shadow-ambient-lg hover:from-primary-container hover:to-primary md:h-12 md:w-12 md:min-h-[44px] md:min-w-[44px] md:shadow-primary/20"
+                  ? "h-14 w-full min-h-[54px] gap-2 bg-primary text-on-primary shadow-[0_14px_28px_-14px_rgb(154_64_39/0.6)] hover:bg-primary-container md:h-12 md:w-12 md:min-h-[44px] md:min-w-[44px] md:p-0"
                   : isCompact
                     ? "h-10 w-10 p-0 shadow-ambient-lg shadow-primary/20"
                     : "h-12 w-full md:w-12 bg-gradient-to-br from-primary to-primary-container hover:from-primary hover:to-primary shadow-ambient-lg shadow-primary/20"
@@ -1428,6 +1394,9 @@ export default function SearchForm({
                 <span className="md:hidden ml-2 font-bold text-sm uppercase tracking-widest">
                   Search
                 </span>
+              )}
+              {isHome && (
+                <span className="font-semibold md:hidden">Search Rooms</span>
               )}
             </Button>
           </div>

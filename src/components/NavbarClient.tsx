@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useId } from "react";
 import { signOut, useSession } from "next-auth/react";
 import type { Session } from "next-auth";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -516,217 +517,223 @@ export default function NavbarClient({
 
   return (
     <>
-    <header
-      className={`fixed top-0 left-0 right-0 z-dropdown transition-[transform,opacity,background-color,border-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] data-[anim-hidden=true]:-translate-y-full data-[anim-hidden=true]:opacity-0 data-[anim-hidden=true]:pointer-events-none data-[anim-hidden=true]:border-transparent ${
-        isScrolled
-          ? isMobileMenuOpen
-            ? "py-4 bg-transparent"
-            : "py-4 glass-nav"
-          : "py-6 bg-transparent"
-      }`}
-    >
-      <nav aria-label="Main navigation">
-        <div data-header-bar className="max-w-7xl mx-auto px-6 sm:px-8">
-          <div className="flex justify-between items-center h-10">
-            {/* --- LEFT: Logo --- */}
-            <Link
-              href="/"
-              className="flex items-center gap-2.5 cursor-pointer group flex-shrink-0"
-            >
-              <div className="w-9 h-9 bg-on-surface rounded-lg flex items-center justify-center text-surface-container-lowest font-bold text-xl transition-transform duration-200 group-hover:rotate-[10deg] group-hover:scale-110 shadow-ambient shadow-on-surface/10">
-                R
-              </div>
-              <span className="text-xl font-display font-semibold tracking-[-0.03em] text-on-surface hidden sm:block">
-                RoomShare
-                <span className="text-primary">.</span>
-              </span>
-            </Link>
-
-            {/* --- CENTER: Navigation Links --- */}
-            <div className="hidden md:flex flex-1 items-center justify-center gap-1">
+      <header
+        className={`fixed top-0 left-0 right-0 z-dropdown transition-[transform,opacity,background-color,border-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] data-[anim-hidden=true]:-translate-y-full data-[anim-hidden=true]:opacity-0 data-[anim-hidden=true]:pointer-events-none data-[anim-hidden=true]:border-transparent ${
+          isScrolled
+            ? isMobileMenuOpen
+              ? "py-4 bg-transparent"
+              : "py-4 glass-nav"
+            : "py-6 bg-transparent"
+        }`}
+      >
+        <nav aria-label="Main navigation">
+          <div data-header-bar className="max-w-7xl mx-auto px-6 sm:px-8">
+            <div className="flex justify-between items-center h-10">
+              {/* --- LEFT: Logo --- */}
               <Link
-                href="/search"
-                className={`text-sm font-medium px-5 py-2 rounded-full transition-colors duration-300 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 ${
-                  pathname === "/search"
-                    ? "text-on-surface bg-surface-container-high"
-                    : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high"
-                }`}
-                aria-current={pathname === "/search" ? "page" : undefined}
+                href="/"
+                className="flex items-center gap-2.5 cursor-pointer group flex-shrink-0"
+                aria-label="RoomShare home"
               >
-                Find a Room
-              </Link>
-              <Link
-                href="/about"
-                className={`text-sm font-medium px-5 py-2 rounded-full transition-colors duration-300 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 ${
-                  pathname === "/about"
-                    ? "text-on-surface bg-surface-container-high"
-                    : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high"
-                }`}
-                aria-current={pathname === "/about" ? "page" : undefined}
-              >
-                How it works
-              </Link>
-            </div>
-
-            {/* --- RIGHT: Actions --- */}
-            <div className="flex items-center gap-3 sm:gap-5 flex-shrink-0">
-              <div className="hidden md:flex items-center gap-1 pr-2">
-                <NotificationCenter />
-                <IconButton
-                  icon={<MessageSquare size={18} strokeWidth={2} />}
-                  count={currentUnreadCount}
-                  href="/messages"
-                  ariaLabel={
-                    currentUnreadCount > 0
-                      ? `Messages, ${currentUnreadCount} unread`
-                      : "Messages"
-                  }
+                <Image
+                  src="/images/home/rs-logo.svg?v=2"
+                  alt=""
+                  width={138}
+                  height={30}
+                  priority
+                  className="h-8 w-auto transition-transform duration-300 group-hover:-translate-y-0.5"
                 />
+                <span className="sr-only">RoomShare</span>
+              </Link>
+
+              {/* --- CENTER: Navigation Links --- */}
+              <div className="hidden md:flex flex-1 items-center justify-center gap-1">
+                <Link
+                  href="/search"
+                  className={`text-sm font-medium px-5 py-2 rounded-full transition-colors duration-300 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 ${
+                    pathname === "/search"
+                      ? "text-on-surface bg-surface-container-lowest shadow-[inset_0_0_0_1px_rgb(220_193_185/0.35)]"
+                      : "text-on-surface hover:text-primary hover:bg-surface-container-lowest/70"
+                  }`}
+                  aria-current={pathname === "/search" ? "page" : undefined}
+                >
+                  Find a Room
+                </Link>
+                <Link
+                  href="/about"
+                  className={`text-sm font-medium px-5 py-2 rounded-full transition-colors duration-300 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 ${
+                    pathname === "/about"
+                      ? "text-on-surface bg-surface-container-lowest shadow-[inset_0_0_0_1px_rgb(220_193_185/0.35)]"
+                      : "text-on-surface hover:text-primary hover:bg-surface-container-lowest/70"
+                  }`}
+                  aria-current={pathname === "/about" ? "page" : undefined}
+                >
+                  How it works
+                </Link>
               </div>
 
-              {/* Profile Dropdown / Auth Buttons */}
-              {user ? (
-                <div className="relative hidden md:block" ref={profileRef}>
-                  <button
-                    ref={triggerButtonRef}
-                    id={menuButtonId}
-                    onClick={() => setIsProfileOpen(!isProfileOpen)}
-                    onKeyDown={handleTriggerKeyDown}
-                    className={`group flex items-center gap-2 p-1 pl-1.5 pr-1 min-h-[44px] rounded-full transition-[background-color,transform] duration-300 ${
-                      isProfileOpen
-                        ? "bg-surface-container-high"
-                        : pathname === "/profile" ||
-                            pathname === "/settings" ||
-                            pathname === "/saved"
-                          ? "bg-surface-container-high/50"
-                          : "hover:bg-surface-canvas"
-                    }`}
-                    aria-expanded={isProfileOpen}
-                    aria-haspopup="menu"
-                    aria-controls={isProfileOpen ? menuId : undefined}
-                    data-testid="user-menu"
-                    aria-label="User menu"
-                  >
-                    <UserAvatar image={user.image} name={user.name} size="sm" />
-                    <ChevronDown
-                      size={14}
-                      className={`transition-colors duration-300 ${isProfileOpen ? "text-on-surface rotate-180" : "text-on-surface-variant"}`}
-                    />
-                  </button>
+              {/* --- RIGHT: Actions --- */}
+              <div className="flex items-center gap-3 sm:gap-5 flex-shrink-0">
+                <div className="hidden md:flex items-center gap-1 pr-2">
+                  <NotificationCenter />
+                  <IconButton
+                    icon={<MessageSquare size={18} strokeWidth={2} />}
+                    count={currentUnreadCount}
+                    href="/messages"
+                    ariaLabel={
+                      currentUnreadCount > 0
+                        ? `Messages, ${currentUnreadCount} unread`
+                        : "Messages"
+                    }
+                  />
+                </div>
 
-                  {/* Dropdown Menu - CSS animated, WAI-ARIA Menu Button pattern */}
-                  <div
-                    id={menuId}
-                    role="menu"
-                    aria-labelledby={menuButtonId}
-                    onKeyDown={handleMenuKeyDown}
-                    className={`absolute right-0 mt-4 w-72 bg-surface-container-lowest/95 backdrop-blur-[20px] rounded-lg shadow-ambient shadow-on-surface/10 overflow-hidden origin-top-right z-sticky transition-[opacity,transform,visibility] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-                      isProfileOpen
-                        ? "opacity-100 translate-y-0 visible scale-100"
-                        : "opacity-0 -translate-y-4 invisible scale-95 pointer-events-none"
-                    }`}
-                  >
-                    <div
-                      role="none"
-                      className="p-6 bg-surface-container-high/40"
+                {/* Profile Dropdown / Auth Buttons */}
+                {user ? (
+                  <div className="relative hidden md:block" ref={profileRef}>
+                    <button
+                      ref={triggerButtonRef}
+                      id={menuButtonId}
+                      onClick={() => setIsProfileOpen(!isProfileOpen)}
+                      onKeyDown={handleTriggerKeyDown}
+                      className={`group flex items-center gap-2 p-1 pl-1.5 pr-1 min-h-[44px] rounded-full transition-[background-color,transform] duration-300 ${
+                        isProfileOpen
+                          ? "bg-surface-container-high"
+                          : pathname === "/profile" ||
+                              pathname === "/settings" ||
+                              pathname === "/saved"
+                            ? "bg-surface-container-high/50"
+                            : "hover:bg-surface-canvas"
+                      }`}
+                      aria-expanded={isProfileOpen}
+                      aria-haspopup="menu"
+                      aria-controls={isProfileOpen ? menuId : undefined}
+                      data-testid="user-menu"
+                      aria-label="User menu"
                     >
-                      <p className="font-semibold text-on-surface tracking-tight truncate">
-                        {user.name}
-                      </p>
-                      <p className="text-xs text-on-surface-variant truncate mt-0.5">
-                        {user.email}
-                      </p>
-                    </div>
-                    <div role="none" className="p-2.5 space-y-0.5">
-                      <MenuItem
-                        icon={<User size={16} />}
-                        text="Profile"
-                        href="/profile"
-                        onClick={() => setIsProfileOpen(false)}
-                        tabIndex={activeMenuIndex === 0 ? 0 : -1}
-                        onMouseEnter={() => setActiveMenuIndex(0)}
+                      <UserAvatar
+                        image={user.image}
+                        name={user.name}
+                        size="sm"
                       />
-                      <MenuItem
-                        icon={<Plus size={16} />}
-                        text="List a Room"
-                        href="/listings/create"
-                        onClick={() => setIsProfileOpen(false)}
-                        tabIndex={activeMenuIndex === 1 ? 0 : -1}
-                        onMouseEnter={() => setActiveMenuIndex(1)}
+                      <ChevronDown
+                        size={14}
+                        className={`transition-colors duration-300 ${isProfileOpen ? "text-on-surface rotate-180" : "text-on-surface-variant"}`}
                       />
-                      <MenuItem
-                        icon={<Heart size={16} />}
-                        text="Saved"
-                        href="/saved"
-                        onClick={() => setIsProfileOpen(false)}
-                        tabIndex={activeMenuIndex === 2 ? 0 : -1}
-                        onMouseEnter={() => setActiveMenuIndex(2)}
-                      />
+                    </button>
+
+                    {/* Dropdown Menu - CSS animated, WAI-ARIA Menu Button pattern */}
+                    <div
+                      id={menuId}
+                      role="menu"
+                      aria-labelledby={menuButtonId}
+                      onKeyDown={handleMenuKeyDown}
+                      className={`absolute right-0 mt-4 w-72 bg-surface-container-lowest/95 backdrop-blur-[20px] rounded-lg shadow-ambient shadow-on-surface/10 overflow-hidden origin-top-right z-sticky transition-[opacity,transform,visibility] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                        isProfileOpen
+                          ? "opacity-100 translate-y-0 visible scale-100"
+                          : "opacity-0 -translate-y-4 invisible scale-95 pointer-events-none"
+                      }`}
+                    >
                       <div
-                        role="separator"
-                        className="h-px bg-surface-container-high my-2 mx-3"
-                      ></div>
-                      <MenuItem
-                        icon={<Settings size={16} />}
-                        text="Settings"
-                        href="/settings"
-                        onClick={() => setIsProfileOpen(false)}
-                        tabIndex={activeMenuIndex === 3 ? 0 : -1}
-                        onMouseEnter={() => setActiveMenuIndex(3)}
-                      />
-                      <div
-                        role="separator"
-                        className="h-px bg-surface-container-high my-2 mx-3"
-                      ></div>
-                      <MenuItem
-                        icon={<LogOut size={16} />}
-                        text="Log out"
-                        danger
-                        onClick={() => {
-                          signOut({ callbackUrl: "/" });
-                          setIsProfileOpen(false);
-                        }}
-                        tabIndex={activeMenuIndex === 7 ? 0 : -1}
-                        onMouseEnter={() => setActiveMenuIndex(7)}
-                      />
+                        role="none"
+                        className="p-6 bg-surface-container-high/40"
+                      >
+                        <p className="font-semibold text-on-surface tracking-tight truncate">
+                          {user.name}
+                        </p>
+                        <p className="text-xs text-on-surface-variant truncate mt-0.5">
+                          {user.email}
+                        </p>
+                      </div>
+                      <div role="none" className="p-2.5 space-y-0.5">
+                        <MenuItem
+                          icon={<User size={16} />}
+                          text="Profile"
+                          href="/profile"
+                          onClick={() => setIsProfileOpen(false)}
+                          tabIndex={activeMenuIndex === 0 ? 0 : -1}
+                          onMouseEnter={() => setActiveMenuIndex(0)}
+                        />
+                        <MenuItem
+                          icon={<Plus size={16} />}
+                          text="List a Room"
+                          href="/listings/create"
+                          onClick={() => setIsProfileOpen(false)}
+                          tabIndex={activeMenuIndex === 1 ? 0 : -1}
+                          onMouseEnter={() => setActiveMenuIndex(1)}
+                        />
+                        <MenuItem
+                          icon={<Heart size={16} />}
+                          text="Saved"
+                          href="/saved"
+                          onClick={() => setIsProfileOpen(false)}
+                          tabIndex={activeMenuIndex === 2 ? 0 : -1}
+                          onMouseEnter={() => setActiveMenuIndex(2)}
+                        />
+                        <div
+                          role="separator"
+                          className="h-px bg-surface-container-high my-2 mx-3"
+                        ></div>
+                        <MenuItem
+                          icon={<Settings size={16} />}
+                          text="Settings"
+                          href="/settings"
+                          onClick={() => setIsProfileOpen(false)}
+                          tabIndex={activeMenuIndex === 3 ? 0 : -1}
+                          onMouseEnter={() => setActiveMenuIndex(3)}
+                        />
+                        <div
+                          role="separator"
+                          className="h-px bg-surface-container-high my-2 mx-3"
+                        ></div>
+                        <MenuItem
+                          icon={<LogOut size={16} />}
+                          text="Log out"
+                          danger
+                          onClick={() => {
+                            signOut({ callbackUrl: "/" });
+                            setIsProfileOpen(false);
+                          }}
+                          tabIndex={activeMenuIndex === 7 ? 0 : -1}
+                          onMouseEnter={() => setActiveMenuIndex(7)}
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2.5">
-                  <Link
-                    href="/login"
-                    className="text-sm font-medium text-on-surface-variant hover:text-on-surface px-4 py-2 min-h-[44px] flex items-center transition-colors duration-300 rounded-full hover:bg-surface-container-high"
-                  >
-                    Log in
-                  </Link>
-                  <Button
-                    asChild
-                    size="sm"
-                    className="rounded-full px-6 h-10 shadow-ambient shadow-on-surface/10"
-                  >
-                    <Link href="/signup">Join</Link>
-                  </Button>
-                </div>
-              )}
+                ) : (
+                  <div className="flex items-center gap-2.5">
+                    <Link
+                      href="/login"
+                      className="text-sm font-medium text-on-surface-variant hover:text-on-surface px-4 py-2 min-h-[44px] flex items-center transition-colors duration-300 rounded-full hover:bg-surface-container-high"
+                    >
+                      Log in
+                    </Link>
+                    <Button
+                      asChild
+                      size="sm"
+                      className="rounded-full px-6 h-10 shadow-ambient shadow-on-surface/10"
+                    >
+                      <Link href="/signup">Join</Link>
+                    </Button>
+                  </div>
+                )}
 
-              {/* Mobile Menu Toggle */}
-              <div className="md:hidden flex items-center">
-                <button
-                  onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                  className="text-on-surface p-2 min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors hover:bg-surface-container-high rounded-full focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
-                  aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
-                  aria-expanded={isMobileMenuOpen}
-                >
-                  {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-                </button>
+                {/* Mobile Menu Toggle */}
+                <div className="md:hidden flex items-center">
+                  <button
+                    onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                    className="text-on-surface p-2 min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors hover:bg-surface-container-high rounded-full focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
+                    aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+                    aria-expanded={isMobileMenuOpen}
+                  >
+                    {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-
-      </nav>
-    </header>
+        </nav>
+      </header>
 
       {/* Mobile Menu - Full-screen glassmorphism overlay
           MUST be outside <header> to escape its z-dropdown stacking context,
