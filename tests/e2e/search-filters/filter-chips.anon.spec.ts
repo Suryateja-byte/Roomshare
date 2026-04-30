@@ -161,9 +161,9 @@ test.describe("Active Filter Chips", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Private Room chip should be gone, Furnished should appear
-    await expect(
-      region.getByText(/Private Room/i).first()
-    ).not.toBeVisible({ timeout: 10_000 });
+    await expect(region.getByText(/Private Room/i).first()).not.toBeVisible({
+      timeout: 10_000,
+    });
     await expect(region.getByText(/Furnished/i).first()).toBeVisible({
       timeout: 10_000,
     });
@@ -223,27 +223,43 @@ test.describe("Active Filter Chips", () => {
     if (removeVisible) {
       await removeWifi.click();
 
-      // Wait for URL to lose Wifi via soft navigation
+      const getAmenitiesParam = () =>
+        new URL(page.url()).searchParams.getAll("amenities").join(",");
+
+      const parkingChip = region.getByRole("button", {
+        name: /remove filter.*parking/i,
+      });
+
+      // Wait for the soft navigation and the chip UI to agree after the
+      // transition settles.
       await expect
         .poll(
-          () => {
-            const amenities =
-              new URL(page.url(), "http://localhost").searchParams.get(
-                "amenities"
-              ) ?? "";
-            return !amenities.includes("Wifi");
+          async () => {
+            const firstAmenities = getAmenitiesParam();
+            const hasParkingChip = await parkingChip
+              .isVisible()
+              .catch(() => false);
+            const hasWifiChip = await removeWifi.isVisible().catch(() => false);
+
+            await page.waitForTimeout(150);
+
+            const stableAmenities = getAmenitiesParam();
+            return (
+              stableAmenities === firstAmenities &&
+              stableAmenities === "Parking" &&
+              hasParkingChip &&
+              !hasWifiChip
+            );
           },
           {
             timeout: 30_000,
-            message: 'URL param "amenities" to not contain "Wifi"',
+            message: 'URL param "amenities" to settle on "Parking"',
           }
         )
         .toBe(true);
 
       // Parking should remain
-      const amenities = getUrlParam(page, "amenities") ?? "";
-      expect(amenities).not.toContain("Wifi");
-      expect(amenities).toContain("Parking");
+      expect(getUrlParam(page, "amenities")).toBe("Parking");
     }
   });
 
@@ -331,7 +347,9 @@ test.describe("Active Filter Chips", () => {
   test(`${tags.core} - clear all preserves non-filter params (bounds, sort)`, async ({
     page,
   }) => {
-    await page.goto(`${SEARCH_URL}&roomType=Private+Room&amenities=Wifi&sort=price_asc`);
+    await page.goto(
+      `${SEARCH_URL}&roomType=Private+Room&amenities=Wifi&sort=price_asc`
+    );
     await page.waitForLoadState("domcontentloaded");
 
     const region = appliedFiltersRegion(page);
