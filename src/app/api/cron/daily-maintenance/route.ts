@@ -2,10 +2,11 @@
  * Daily Maintenance Cron Route
  *
  * Consolidates background maintenance work into a single dispatcher route
- * to stay within the app's Vercel cron-entry budget. Each task runs independently
- * with its own try/catch, so one failure does not block others.
+ * to stay within the app's Vercel cron-entry budget and Hobby-plan daily
+ * cadence limit. Each task runs independently with its own try/catch, so one
+ * failure does not block others.
  *
- * Schedule: 2,17,32,47 * * * * (every 15 minutes)
+ * Vercel schedule: 2 9 * * * (daily at 09:02 UTC)
  *
  * Every invocation:
  * 1. Refresh dirty search documents
@@ -23,8 +24,8 @@
  * logic (SQL, geospatial, etc.). Simple DB cleanup tasks stay inlined here.
  *
  * The daily-only gate is time-based rather than persisted. That keeps the
- * dispatcher within the cron-entry budget while preserving a once-daily cadence
- * for low-priority maintenance tasks.
+ * dispatcher compatible with Vercel Hobby while preserving a once-daily
+ * cadence for low-priority maintenance tasks.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -165,7 +166,7 @@ export async function GET(request: NextRequest) {
   const startTime = Date.now();
   const results: TaskResult[] = [];
 
-  // --- Fast cadence tasks ---
+  // --- Dispatcher tasks ---
   await runDelegatedTask(
     results,
     "refresh-search-docs",
@@ -173,7 +174,7 @@ export async function GET(request: NextRequest) {
     cronSecret
   );
 
-  // Phase 02: outbox drain — all priority lanes every 15 min
+  // Phase 02: outbox drain — all priority lanes on each dispatcher tick
   if (isPhase02ProjectionWritesEnabled()) {
     await runTask(results, "outbox-drain", async () => {
       const result = await drainOutboxOnce({

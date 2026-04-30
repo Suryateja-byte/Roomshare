@@ -12,8 +12,9 @@ When `ENABLE_LEGACY_CRONS=off`, both legacy cron handlers early-return immediate
 
 Semantics:
 
-- `sweep-expired-holds` runs via `vercel.json` (every 5 min). Post-flip steady-state: ~288 skipped counts/day.
-- `reconcile-slots` has NO `vercel.json` entry of its own, but is invoked by `src/app/api/cron/daily-maintenance/route.ts:162-167` every 15 min. Post-flip steady-state: ~96 skipped counts/day.
+- `sweep-expired-holds` has no dedicated `vercel.json` entry. It can still be called manually or by an external scheduler during the retention window.
+- `reconcile-slots` has no dedicated `vercel.json` entry and is not part of the Hobby-plan daily-maintenance fan-out. It can still be called manually or by an external scheduler during the retention window.
+- `vercel.json` keeps one Hobby-compatible daily cron for `/api/cron/daily-maintenance` at `2 9 * * *`.
 
 ---
 
@@ -44,7 +45,7 @@ Run these before setting the flag to `off`:
 
 1. Set `ENABLE_LEGACY_CRONS=off` in the Vercel production environment.
 2. Trigger a deploy (Vercel auto-redeploys on env var change). The gate takes effect on next request.
-3. Within 10 min: confirm `cfm.cron.legacy_sweep_skipped_count` starts incrementing at ~1/5 min. Confirm `cfm.cron.legacy_reconcile_skipped_count` starts at ~1/15 min (driven by daily-maintenance). No DB write load from either route.
+3. Trigger one authenticated manual request to each retained legacy cron route. Confirm `cfm.cron.legacy_sweep_skipped_count` and `cfm.cron.legacy_reconcile_skipped_count` each increment once with `reason=flag_off`. No DB write load from either route.
 4. Within 60 min: confirm `cfm.booking.legacy_open_count` remains at `0` (nothing new getting stuck because nothing is being created).
 
 ---
@@ -55,12 +56,12 @@ Watch the following for regression:
 
 | Signal | Expected | Action if not |
 |---|---|---|
-| `cfm.cron.legacy_sweep_skipped_count{reason=flag_off}` | ~288/day | If 0: cron stopped firing. Check Vercel cron logs. If > 288/day: spurious invocations — investigate. |
-| `cfm.cron.legacy_reconcile_skipped_count{reason=flag_off}` | ~96/day | Same thresholds scaled to 1/15 min. |
+| `cfm.cron.legacy_sweep_skipped_count{reason=flag_off}` | No steady-state Vercel increments; manual/external invocations only | If it increments unexpectedly, investigate the caller. |
+| `cfm.cron.legacy_reconcile_skipped_count{reason=flag_off}` | No steady-state Vercel increments; manual/external invocations only | If it increments unexpectedly, investigate the caller. |
 | `cfm.booking.legacy_open_count` | `0` | If > 0: some path is creating new bookings. Roll back the flag. |
 | `cfm.booking.legacy_mutation_blocked_count{role=non_admin}` | monotonic | If it unexpectedly drops to 0, investigate for a missing caller path, telemetry breakage, or an unexpected code regression in the permanent lockdown. |
 
-Note: `daily-maintenance/route.ts`'s summary counter reports reconcile as `succeeded: true` when the gate skips (its `runDelegatedTask` helper does not currently promote `detail.skipped === true` to the top-level `skipped` field). This is cosmetic — the skipped-count log is the source of truth. A future follow-up (CFM-904-F2, optional) can promote the `skipped` field for cleaner summary semantics.
+Note: `daily-maintenance/route.ts` no longer invokes `reconcile-slots` on the Hobby-plan daily dispatcher. The skipped-count logs are therefore a manual/external invocation signal, not a steady-state Vercel cron signal.
 
 ---
 
@@ -72,4 +73,4 @@ If any regression observed: set `ENABLE_LEGACY_CRONS=on` (or unset the var) in V
 
 ## Deferred cleanup (separate ticket)
 
-Removing the `vercel.json` entry for `sweep-expired-holds` is deferred to a later cleanup ticket once `cfm.cron.legacy_sweep_skipped_count` shows 7+ days of steady-state post-flip (i.e., zero unexpected invocations or errors). Same criterion for removing `reconcile-slots` from `daily-maintenance`'s task list. The goal is to keep the rollback surface live for the 7-day safety window.
+Deleting the retained `sweep-expired-holds` and `reconcile-slots` route files is deferred to a later cleanup ticket once 7+ days of post-flip monitoring show zero unexpected invocations or errors. The goal is to keep the rollback surface live for the 7-day safety window.

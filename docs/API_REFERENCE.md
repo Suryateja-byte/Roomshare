@@ -1610,7 +1610,7 @@ Delete expired rate limit entries from the database.
 | Field | Value |
 |-------|-------|
 | **Auth** | Bearer token (`CRON_SECRET`) |
-| **Schedule** | Periodic (recommended: every 15 minutes) |
+| **Schedule** | Periodic via manual/external scheduler; Vercel Hobby uses the daily dispatcher |
 
 **Success Response (200):**
 
@@ -1667,7 +1667,7 @@ Process saved search alerts. Matches new listings against user-saved search crit
 | Field | Value |
 |-------|-------|
 | **Auth** | Bearer token (`CRON_SECRET`) |
-| **Schedule** | Periodic (recommended: every 15-30 minutes) |
+| **Schedule** | Periodic via manual/external scheduler; Vercel Hobby uses the daily dispatcher |
 | **Also supports** | POST (same behavior) |
 
 **Success Response (200):**
