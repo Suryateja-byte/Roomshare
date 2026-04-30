@@ -1,17 +1,30 @@
 import Link from "next/link";
+import Image from "next/image";
+import { cn } from "@/lib/utils";
 
-export default function AuthPageLogo() {
+interface AuthPageLogoProps {
+  className?: string;
+  imageClassName?: string;
+}
+
+export default function AuthPageLogo({
+  className,
+  imageClassName,
+}: AuthPageLogoProps) {
   return (
     <Link
       href="/"
-      className="lg:hidden inline-flex items-center gap-2.5 mb-8 group"
+      className={cn("lg:hidden inline-flex items-center mb-8 group", className)}
+      aria-label="RoomShare home"
     >
-      <div className="w-9 h-9 bg-on-surface rounded-lg flex items-center justify-center text-surface-container-lowest font-bold text-xl shadow-ambient shadow-on-surface/10">
-        R
-      </div>
-      <span className="text-xl font-display font-semibold tracking-[-0.03em] text-on-surface">
-        RoomShare<span className="text-primary">.</span>
-      </span>
+      <Image
+        src="/images/home/rs-logo.svg?v=2"
+        alt=""
+        width={166}
+        height={40}
+        className={cn("h-10 w-auto", imageClassName)}
+      />
+      <span className="sr-only">RoomShare</span>
     </Link>
   );
 }

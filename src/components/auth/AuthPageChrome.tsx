@@ -4,6 +4,7 @@ import type {
   Ref,
   MouseEventHandler,
 } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { Loader2 } from "lucide-react";
@@ -22,6 +23,11 @@ interface AuthPageChromeProps {
   desktopLocation: string;
   mobileTestimonialQuote: ReactNode;
   mobileTestimonialAttribution: string;
+  mobileVariant?: "default" | "login";
+  mobileHeroImageSrc?: string;
+  desktopHeroImageSrc?: string;
+  desktopHeroImageAlt?: string;
+  desktopAvatarTone?: "glass" | "solid";
   rightPanelClassName?: string;
   stackClassName?: string;
   children: ReactNode;
@@ -40,6 +46,7 @@ interface AuthFieldProps extends Omit<
   inputClassName?: string;
   inputWrapperClassName?: string;
   labelClassName?: string;
+  iconClassName?: string;
   children?: ReactNode;
 }
 
@@ -49,6 +56,7 @@ interface AuthGoogleButtonProps {
   disabled?: boolean;
   onClick: MouseEventHandler<HTMLButtonElement>;
   label?: string;
+  className?: string;
 }
 
 export const authPrimaryButtonClassName =
@@ -72,73 +80,247 @@ export function AuthPageChrome({
   desktopLocation,
   mobileTestimonialQuote,
   mobileTestimonialAttribution,
+  mobileVariant = "default",
+  mobileHeroImageSrc,
+  desktopHeroImageSrc,
+  desktopHeroImageAlt,
+  desktopAvatarTone = "glass",
   rightPanelClassName,
   stackClassName,
   children,
 }: AuthPageChromeProps) {
+  const isLoginMobileVariant = mobileVariant === "login";
+  const hasDesktopHeroImage = Boolean(desktopHeroImageSrc);
+  const isSolidAvatar = desktopAvatarTone === "solid";
+
   return (
-    <div className="min-h-screen flex bg-surface-canvas font-body selection:bg-primary selection:text-surface-container-lowest">
-      <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-primary to-primary-container relative flex-col justify-between p-8 xl:p-12 text-on-primary">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-primary/80 to-primary-container opacity-50"></div>
+    <div
+      className={cn(
+        "min-h-svh flex font-body selection:bg-primary selection:text-surface-container-lowest",
+        "bg-surface-canvas"
+      )}
+    >
+      <div
+        className={cn(
+          "hidden lg:flex w-1/2 relative flex-col justify-between p-8 xl:p-12 text-on-primary overflow-hidden",
+          !hasDesktopHeroImage &&
+            "bg-gradient-to-br from-primary to-primary-container"
+        )}
+      >
+        {hasDesktopHeroImage ? (
+          <>
+            <Image
+              src={desktopHeroImageSrc!}
+              alt={desktopHeroImageAlt ?? ""}
+              fill
+              priority
+              quality={85}
+              sizes="50vw"
+              className="object-cover"
+            />
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 bg-gradient-to-b from-[#3a1408]/20 via-transparent to-[#3a1408]/30"
+            />
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 bg-gradient-to-r from-[#9a4027]/10 via-transparent to-transparent"
+            />
+          </>
+        ) : (
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-primary/80 to-primary-container opacity-50"></div>
+        )}
         <div className="relative z-10">
-          <Link
-            href="/"
-            className="text-xl font-display font-semibold tracking-tighter hover:opacity-80 transition-opacity"
-          >
-            RoomShare<span className="text-on-primary/70">.</span>
-          </Link>
+          {hasDesktopHeroImage ? (
+            <Link
+              href="/"
+              aria-label="RoomShare home"
+              className="inline-flex items-center transition-opacity hover:opacity-85"
+            >
+              <Image
+                src="/images/auth/rs-logo-light.svg"
+                alt="RoomShare"
+                width={166}
+                height={40}
+                priority
+                className="h-9 w-auto drop-shadow-[0_2px_8px_rgba(58,20,8,0.35)]"
+              />
+            </Link>
+          ) : (
+            <Link
+              href="/"
+              className="text-xl font-display font-semibold tracking-tighter hover:opacity-80 transition-opacity"
+            >
+              RoomShare<span className="text-on-primary/70">.</span>
+            </Link>
+          )}
         </div>
-        <div className="relative z-10 max-w-md">
-          <h2 className="font-display text-2xl xl:text-3xl font-medium leading-tight">
+        <div
+          className={cn(
+            "relative z-10",
+            hasDesktopHeroImage ? "max-w-[22rem]" : "max-w-md"
+          )}
+        >
+          {hasDesktopHeroImage && (
+            <span
+              aria-hidden="true"
+              className="block font-display text-4xl leading-none text-on-primary/60"
+            >
+              &ldquo;
+            </span>
+          )}
+          <h2
+            className={cn(
+              "font-display font-medium leading-tight",
+              hasDesktopHeroImage
+                ? "mt-2 text-3xl leading-[1.18] xl:text-[2rem] xl:leading-[1.18] drop-shadow-[0_2px_12px_rgba(58,20,8,0.45)]"
+                : "text-2xl xl:text-3xl"
+            )}
+          >
             {desktopQuote}
           </h2>
-          <div className="mt-8 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-surface-container-lowest/12 flex items-center justify-center border border-surface-container-lowest/20">
-              <span className="font-medium text-sm">{desktopInitials}</span>
+          {hasDesktopHeroImage && (
+            <span
+              aria-hidden="true"
+              className="mt-7 block h-px w-12 bg-on-primary/40"
+            />
+          )}
+          <div
+            className={cn(
+              "mt-8 flex items-center gap-4",
+              hasDesktopHeroImage && "mt-5"
+            )}
+          >
+            <div
+              className={cn(
+                "w-10 h-10 rounded-full flex items-center justify-center border",
+                isSolidAvatar
+                  ? "bg-primary border-on-primary/30 shadow-[0_4px_14px_rgba(58,20,8,0.35)]"
+                  : "bg-surface-container-lowest/12 border-surface-container-lowest/20"
+              )}
+            >
+              <span
+                className={cn(
+                  "font-medium text-sm",
+                  isSolidAvatar ? "text-on-primary" : ""
+                )}
+              >
+                {desktopInitials}
+              </span>
             </div>
             <div>
-              <p className="font-medium text-on-primary">{desktopName}</p>
-              <p className="text-sm text-on-primary/70">{desktopLocation}</p>
+              <p
+                className={cn(
+                  "font-medium text-on-primary",
+                  hasDesktopHeroImage &&
+                    "drop-shadow-[0_1px_6px_rgba(58,20,8,0.5)]"
+                )}
+              >
+                {desktopName}
+              </p>
+              <p
+                className={cn(
+                  "text-sm text-on-primary/75",
+                  hasDesktopHeroImage &&
+                    "drop-shadow-[0_1px_6px_rgba(58,20,8,0.5)]"
+                )}
+              >
+                {desktopLocation}
+              </p>
             </div>
           </div>
         </div>
-        <p className="relative z-10 text-sm text-on-primary/70">
+        <p
+          className={cn(
+            "relative z-10 text-sm text-on-primary/75",
+            hasDesktopHeroImage &&
+              "drop-shadow-[0_1px_6px_rgba(58,20,8,0.5)]"
+          )}
+        >
           © {new Date().getFullYear()} RoomShare Inc.
         </p>
       </div>
 
       <div
         className={cn(
-          "w-full lg:w-1/2 flex justify-center p-4 sm:p-6 pb-6",
+          isLoginMobileVariant
+            ? "w-full lg:w-1/2 flex justify-center px-5 pt-8 pb-6 md:p-4 md:pb-6 lg:p-4 xl:p-6"
+            : "w-full lg:w-1/2 flex justify-center p-4 sm:p-6 pb-6",
           rightPanelClassName
         )}
       >
-        <div className="w-full max-w-[420px] rounded-[2.5rem] border border-outline-variant/15 bg-surface-container-lowest/88 px-6 py-10 shadow-ambient sm:px-8 sm:py-12 md:max-w-[440px] md:rounded-[2rem] md:bg-surface-container-lowest/78 md:px-8 md:py-10 md:shadow-ambient-lg md:backdrop-blur-[18px]">
+        <div
+          className={cn(
+            "w-full max-w-[420px] rounded-[2.5rem] border border-outline-variant/15 bg-surface-container-lowest/88 px-6 py-10 shadow-ambient sm:px-8 sm:py-12 md:max-w-[440px] md:rounded-[2rem] md:bg-surface-container-lowest/78 md:px-8 md:py-10 md:shadow-ambient-lg md:backdrop-blur-[18px] lg:bg-surface-container-lowest lg:backdrop-blur-0",
+            isLoginMobileVariant &&
+              "relative flex h-auto flex-col overflow-visible rounded-none border-0 bg-transparent px-1 pb-6 pt-2 shadow-none sm:px-2 md:h-auto md:overflow-visible md:rounded-[2rem] md:border md:border-outline-variant/15 md:bg-surface-container-lowest/78 md:px-8 md:py-10 md:shadow-ambient-lg"
+          )}
+        >
+          {isLoginMobileVariant && mobileHeroImageSrc && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -right-6 top-[4.5rem] z-0 block h-[18rem] w-[64%] overflow-hidden md:hidden"
+            >
+              <div
+                className="absolute inset-0 bg-no-repeat"
+                style={{
+                  backgroundImage: `url(${mobileHeroImageSrc})`,
+                  backgroundPosition: "center right",
+                  backgroundSize: "cover",
+                  WebkitMaskImage:
+                    "radial-gradient(ellipse 78% 70% at 78% 48%, rgba(0,0,0,1) 28%, rgba(0,0,0,0.7) 55%, rgba(0,0,0,0.25) 80%, rgba(0,0,0,0) 100%)",
+                  maskImage:
+                    "radial-gradient(ellipse 78% 70% at 78% 48%, rgba(0,0,0,1) 28%, rgba(0,0,0,0.7) 55%, rgba(0,0,0,0.25) 80%, rgba(0,0,0,0) 100%)",
+                }}
+              />
+              <div className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-surface-canvas via-surface-canvas/40 to-transparent" />
+              <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-surface-canvas via-surface-canvas/35 to-transparent" />
+              <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-surface-canvas via-surface-canvas/25 to-transparent" />
+            </div>
+          )}
           <div
             className={cn(
-              "flex flex-col gap-8 md:gap-6 lg:gap-8",
+              "relative z-10 flex flex-col gap-8 md:gap-6 lg:gap-8",
+              isLoginMobileVariant &&
+                "gap-6 md:h-auto md:gap-6 lg:gap-8",
               stackClassName
             )}
           >
             <div className="flex flex-col items-center text-center md:items-stretch">
-              <div className="mb-8 flex items-center gap-2.5 md:hidden">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-on-surface font-display text-xl font-bold text-surface-container-lowest shadow-ambient">
-                  R
-                </div>
-                <span className="font-display text-2xl font-bold tracking-tight text-on-surface">
-                  RoomShare<span className="text-primary">.</span>
-                </span>
-              </div>
+              <AuthPageLogo
+                className={cn(
+                  "md:hidden",
+                  isLoginMobileVariant && "mb-2 justify-center"
+                )}
+                imageClassName={cn(isLoginMobileVariant && "h-10")}
+              />
 
               <div className="hidden md:block">
                 <AuthPageLogo />
               </div>
 
-              <div className="text-center lg:text-left">
-                <h1 className="font-display text-4xl font-semibold leading-none tracking-tight text-on-surface md:text-3xl md:leading-tight">
+              <div
+                className={cn(
+                  "text-center lg:text-left",
+                  isLoginMobileVariant && "text-left lg:text-left"
+                )}
+              >
+                <h1
+                  className={cn(
+                    "font-display text-4xl font-semibold leading-none tracking-tight text-on-surface md:text-3xl md:leading-tight",
+                    isLoginMobileVariant &&
+                      "text-[2.75rem] leading-[1.05] md:text-3xl md:leading-tight"
+                  )}
+                >
                   {title}
                 </h1>
-                <p className="mt-3 max-w-[260px] text-[15px] leading-relaxed text-on-surface-variant sm:text-base md:mt-2 md:max-w-none">
+                <p
+                  className={cn(
+                    "mt-3 max-w-[260px] text-[15px] leading-relaxed text-on-surface-variant sm:text-base md:mt-2 md:max-w-none",
+                    isLoginMobileVariant &&
+                      "mt-3 max-w-[280px] text-[0.95rem] leading-6 md:max-w-none md:text-base md:leading-relaxed"
+                  )}
+                >
                   {subtitle}
                 </p>
               </div>
@@ -146,8 +328,18 @@ export function AuthPageChrome({
 
             {children}
 
-            <div className="mt-2 flex flex-col gap-8 text-center md:mt-0 md:gap-0">
-              <p className="text-[15px] text-on-surface-variant md:text-sm">
+            <div
+              className={cn(
+                "mt-2 flex flex-col gap-8 text-center md:mt-0 md:gap-0",
+                isLoginMobileVariant && "mt-10 gap-3 md:mt-0 md:gap-0"
+              )}
+            >
+              <p
+                className={cn(
+                  "text-[15px] text-on-surface-variant md:text-sm",
+                  isLoginMobileVariant && "text-[0.78rem] leading-4 md:text-sm"
+                )}
+              >
                 {footerPrompt}{" "}
                 <Link
                   href={footerLinkHref}
@@ -157,16 +349,23 @@ export function AuthPageChrome({
                 </Link>
               </p>
 
-              <div className="flex flex-col items-center gap-3 md:hidden">
-                <p className="font-display text-[15px] italic text-on-surface-variant">
-                  {mobileTestimonialQuote}
-                </p>
-                <span className="text-xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/80">
-                  {mobileTestimonialAttribution}
-                </span>
-              </div>
+              {!isLoginMobileVariant && (
+                <div className="flex flex-col items-center gap-3 md:hidden">
+                  <p className="font-display text-[15px] italic text-on-surface-variant">
+                    {mobileTestimonialQuote}
+                  </p>
+                  <span className="text-xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/80">
+                    {mobileTestimonialAttribution}
+                  </span>
+                </div>
+              )}
 
-              <p className="text-xs text-on-surface-variant/80 md:hidden">
+              <p
+                className={cn(
+                  "text-xs text-on-surface-variant/80 md:hidden",
+                  isLoginMobileVariant && "text-[0.72rem] leading-4"
+                )}
+              >
                 &copy; {new Date().getFullYear()} RoomShare Inc.
               </p>
             </div>
@@ -177,9 +376,32 @@ export function AuthPageChrome({
   );
 }
 
-export function AuthDivider({ label = "Or continue with email" }) {
+export function AuthDivider({
+  label = "Or continue with email",
+  variant = "pill",
+  className,
+}: {
+  label?: string;
+  variant?: "pill" | "line";
+  className?: string;
+}) {
+  if (variant === "line") {
+    return (
+      <div
+        className={cn(
+          "flex items-center gap-4 text-center text-[0.7rem] font-bold uppercase tracking-[0.26em] text-on-surface-variant",
+          className
+        )}
+      >
+        <span className="h-px flex-1 bg-outline-variant/45" aria-hidden />
+        <span>{label}</span>
+        <span className="h-px flex-1 bg-outline-variant/45" aria-hidden />
+      </div>
+    );
+  }
+
   return (
-    <div className="flex justify-center">
+    <div className={cn("flex justify-center", className)}>
       <div className="inline-flex items-center gap-3 rounded-full bg-surface-container-high/55 px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.2em] text-on-surface-variant md:text-xs md:font-medium md:tracking-wider">
         <span className="h-1.5 w-1.5 rounded-full bg-primary/35" aria-hidden />
         <span>{label}</span>
@@ -199,6 +421,7 @@ export function AuthField({
   inputClassName,
   inputWrapperClassName,
   labelClassName,
+  iconClassName,
   children,
   ...inputProps
 }: AuthFieldProps) {
@@ -232,7 +455,12 @@ export function AuthField({
       )}
 
       <div className={cn("group relative", inputWrapperClassName)}>
-        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-on-surface-variant transition-colors group-focus-within:text-primary md:pl-3 md:group-focus-within:text-on-surface">
+        <div
+          className={cn(
+            "pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-on-surface-variant transition-colors group-focus-within:text-primary md:pl-3 md:group-focus-within:text-on-surface",
+            iconClassName
+          )}
+        >
           <Icon className="h-[18px] w-[18px] md:h-5 md:w-5" strokeWidth={2.1} />
         </div>
         <input
@@ -258,13 +486,17 @@ export function AuthGoogleButton({
   disabled,
   onClick,
   label = "Continue with Google",
+  className,
 }: AuthGoogleButtonProps) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex w-full items-center justify-center gap-3 rounded-2xl border border-outline-variant/20 bg-surface-container-lowest py-3.5 font-semibold text-on-surface shadow-ambient-sm transition-all duration-300 hover:bg-surface-container-high/45 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 md:h-12 md:rounded-full md:py-0 md:font-medium md:shadow-ambient-sm md:transition-colors md:hover:bg-surface-container-high md:active:scale-[0.97]"
+      className={cn(
+        "flex w-full items-center justify-center gap-3 rounded-2xl border border-outline-variant/20 bg-surface-container-lowest py-3.5 font-semibold text-on-surface shadow-ambient-sm transition-all duration-300 hover:bg-surface-container-high/45 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 md:h-12 md:rounded-full md:py-0 md:font-medium md:shadow-ambient-sm md:transition-colors md:hover:bg-surface-container-high md:active:scale-[0.97]",
+        className
+      )}
     >
       {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <GoogleMark />}
       {loading ? loadingLabel : label}
