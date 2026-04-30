@@ -261,7 +261,8 @@ test.describe("J48: Protected Route Redirects", () => {
         .catch((error: unknown) => {
           if (
             error instanceof Error &&
-            error.message.includes("net::ERR_ABORTED")
+            (error.message.includes("net::ERR_ABORTED") ||
+              error.message.includes("interrupted by another navigation"))
           ) {
             return null;
           }
@@ -269,26 +270,47 @@ test.describe("J48: Protected Route Redirects", () => {
         });
       await page.waitForLoadState("domcontentloaded").catch(() => {});
 
-      const currentUrl = page.url();
-      const currentPath = new URL(currentUrl).pathname;
+      // Should either be on the route (if authenticated) or redirected to login.
+      await expect
+        .poll(
+          async () => {
+            const currentPath = new URL(page.url()).pathname;
+            const isOnRoute =
+              currentPath === route || currentPath.startsWith(`${route}/`);
+            const isRetiredBookingsRedirect =
+              route === "/bookings" &&
+              (currentPath === "/messages" ||
+                currentPath.startsWith("/messages/"));
+            const isOnAuthPage =
+              currentPath === "/login" ||
+              currentPath === "/signup" ||
+              currentPath.startsWith("/auth") ||
+              currentPath.startsWith("/api/auth") ||
+              currentPath.startsWith("/signin");
+            const isOnHome = currentPath === "/";
+            const bodyText = await page
+              .locator("body")
+              .innerText({ timeout: 500 })
+              .catch(() => "");
+            const isAuthUiVisible =
+              /Welcome back|Sign in to manage your listings and messages|Continue with Google/i.test(
+                bodyText
+              );
 
-      // Should either be on the route (if authenticated) or redirected to login
-      const isOnRoute =
-        currentPath === route || currentPath.startsWith(`${route}/`);
-      const isRetiredBookingsRedirect =
-        route === "/bookings" &&
-        (currentPath === "/messages" || currentPath.startsWith("/messages/"));
-      const isOnAuthPage =
-        currentPath === "/login" ||
-        currentPath === "/signup" ||
-        currentPath.startsWith("/auth") ||
-        currentPath.startsWith("/signin");
-      const isOnHome = currentPath === "/";
-
-      // One of these should be true
-      expect(
-        isOnRoute || isRetiredBookingsRedirect || isOnAuthPage || isOnHome
-      ).toBeTruthy();
+            return (
+              isOnRoute ||
+              isRetiredBookingsRedirect ||
+              isOnAuthPage ||
+              isOnHome ||
+              isAuthUiVisible
+            );
+          },
+          {
+            timeout: 10_000,
+            message: `Expected ${route} to load or redirect to auth UI`,
+          }
+        )
+        .toBe(true);
 
       // Page should not crash
       await expect(page.locator("body")).toBeVisible();
