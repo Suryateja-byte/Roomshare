@@ -76,11 +76,13 @@ test.describe("J35: View Public User Profile", () => {
     await expect(heading).toBeVisible({ timeout: 10000 });
 
     // Step 5: Verify no private data exposed
-    const privateData = page.getByText(
-      /password|ssn|social security|credit card/i
-    );
-    const hasPrivate = await privateData.isVisible().catch(() => false);
-    expect(hasPrivate).toBeFalsy();
+    await expect(
+      page
+        .locator("main")
+        .getByText(
+          /password|ssn|social security|credit card number|card number|cvv|cvc/i
+        )
+    ).toHaveCount(0);
   });
 });
 
@@ -183,14 +185,15 @@ test.describe("J36: Block a User", () => {
           .waitFor({ state: "visible", timeout: 10_000 })
           .then(() => true)
           .catch(() => false);
-    const hasBlockedText = (isBlocked || hasToast)
-      ? false
-      : await page
-          .getByText(/blocked|block successful/i)
-          .first()
-          .waitFor({ state: "visible", timeout: 5_000 })
-          .then(() => true)
-          .catch(() => false);
+    const hasBlockedText =
+      isBlocked || hasToast
+        ? false
+        : await page
+            .getByText(/blocked|block successful/i)
+            .first()
+            .waitFor({ state: "visible", timeout: 5_000 })
+            .then(() => true)
+            .catch(() => false);
     expect(
       hasToast || isBlocked || hasBlockedText,
       "Block action did not produce any visible feedback (unblock button, toast, or blocked text)"

@@ -122,7 +122,7 @@ export default function FeaturedListingsClient({
           </div>
           <Link
             href="/search"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-on-surface underline-offset-4 hover:text-primary hover:underline"
+            className="inline-flex min-h-8 items-center gap-2 text-sm font-semibold text-on-surface underline-offset-4 hover:text-primary hover:underline"
           >
             Browse the full atlas
             <ArrowRight className="h-4 w-4" />
@@ -220,6 +220,8 @@ function EditorialListingCard({
 
   return (
     <article
+      data-testid="listing-card"
+      data-listing-id={listing.id}
       className={`group ${big ? "md:col-span-6" : "md:col-span-3"} col-span-1`}
     >
       <div
@@ -279,7 +281,10 @@ function EditorialListingCard({
       <div className="pt-4">
         <div className="flex items-baseline justify-between gap-4">
           <h3 className="line-clamp-1 text-base font-semibold text-on-surface">
-            <Link href={`/listings/${listing.id}`} className="hover:underline">
+            <Link
+              href={`/listings/${listing.id}`}
+              className="inline-flex min-h-8 items-center hover:underline"
+            >
               {listing.title}
             </Link>
           </h3>

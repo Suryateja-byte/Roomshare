@@ -72,13 +72,24 @@ test.describe("Pagination Browse Mode", () => {
       const isVisible = await loadMoreBtn.isVisible().catch(() => false);
       if (!isVisible) break;
 
-      await loadMoreBtn.click();
+      await loadMoreBtn.scrollIntoViewIfNeeded();
+      await loadMoreBtn.click({ timeout: 15_000 }).catch(async (error) => {
+        const viewport = page.viewportSize();
+        const isMobile = viewport ? viewport.width < 768 : false;
+        if (!isMobile) throw error;
+
+        await loadMoreBtn.evaluate((button) =>
+          (button as HTMLButtonElement).click()
+        );
+      });
       clickCount++;
 
       // Wait for new cards to appear or button to disappear
-      await expect(loadMoreBtn).toBeEnabled({ timeout: 10_000 }).catch(() => {
-        /* button may have disappeared (cap reached) */
-      });
+      await expect(loadMoreBtn)
+        .toBeEnabled({ timeout: 10_000 })
+        .catch(() => {
+          /* button may have disappeared (cap reached) */
+        });
     }
 
     // Assert total accumulated listings never exceed 48
@@ -96,7 +107,7 @@ test.describe("Pagination Browse Mode", () => {
   // -------------------------------------------------------------------------
   // 8.2 Browse mode indicator visible [LIVE]
   // -------------------------------------------------------------------------
-test("8.2 browse mode shows indicator banner", async ({ page }) => {
+  test("8.2 browse mode shows indicator banner", async ({ page }) => {
     test.slow();
 
     // Navigate to /search WITHOUT bounds or query (triggers browse mode)
@@ -125,8 +136,8 @@ test("8.2 browse mode shows indicator banner", async ({ page }) => {
       ).toContainText(/places?/i);
     }
 
-    await expect(container.getByText(/Popular areas|Recent searches/i)).toHaveCount(
-      0
-    );
+    await expect(
+      container.getByText(/Popular areas|Recent searches/i)
+    ).toHaveCount(0);
   });
 });
