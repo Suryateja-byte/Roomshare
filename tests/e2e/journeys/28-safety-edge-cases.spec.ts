@@ -234,6 +234,8 @@ test.describe("J47: Rate Limit Feedback", () => {
 
 // ─── J48: Protected Route Redirects (Anon) ───────────────────────────────────
 test.describe("J48: Protected Route Redirects", () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
   test("visit protected routes without auth → verify redirect to login", async ({
     page,
   }, testInfo) => {
@@ -268,20 +270,24 @@ test.describe("J48: Protected Route Redirects", () => {
       await page.waitForLoadState("domcontentloaded").catch(() => {});
 
       const currentUrl = page.url();
+      const currentPath = new URL(currentUrl).pathname;
 
       // Should either be on the route (if authenticated) or redirected to login
-      const isOnRoute = currentUrl.includes(route);
+      const isOnRoute =
+        currentPath === route || currentPath.startsWith(`${route}/`);
       const isRetiredBookingsRedirect =
-        route === "/bookings" && currentUrl.includes("/messages");
-      const isOnLogin =
-        currentUrl.includes("/login") ||
-        currentUrl.includes("/auth") ||
-        currentUrl.includes("/signin");
-      const isOnHome = currentUrl.endsWith("/");
+        route === "/bookings" &&
+        (currentPath === "/messages" || currentPath.startsWith("/messages/"));
+      const isOnAuthPage =
+        currentPath === "/login" ||
+        currentPath === "/signup" ||
+        currentPath.startsWith("/auth") ||
+        currentPath.startsWith("/signin");
+      const isOnHome = currentPath === "/";
 
       // One of these should be true
       expect(
-        isOnRoute || isRetiredBookingsRedirect || isOnLogin || isOnHome
+        isOnRoute || isRetiredBookingsRedirect || isOnAuthPage || isOnHome
       ).toBeTruthy();
 
       // Page should not crash
