@@ -2,7 +2,15 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Loader2, Mail, Lock, ArrowRight, Eye, EyeOff } from "lucide-react";
+import {
+  Loader2,
+  Mail,
+  Lock,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+} from "lucide-react";
 import { signIn, signOut, useSession } from "next-auth/react";
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
@@ -20,6 +28,7 @@ import {
   authTurnstileSlotClassName,
 } from "@/components/auth/AuthPageChrome";
 import { shouldHighlightEmailForm } from "@/lib/auth-errors";
+import { cn } from "@/lib/utils";
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -134,7 +143,10 @@ function LoginForm() {
       desktopLocation="San Francisco"
       mobileTestimonialQuote={<>&ldquo;Verified profiles sold me.&rdquo;</>}
       mobileTestimonialAttribution="Sarah J., San Francisco"
-      rightPanelClassName="items-center"
+      mobileVariant="login"
+      mobileHeroImageSrc="/images/auth/login-living-room.webp"
+      rightPanelClassName="items-start md:items-center"
+      stackClassName="gap-6 md:gap-6 lg:gap-8"
     >
       {registered && (
         <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-center text-sm text-green-700 md:rounded-lg">
@@ -152,6 +164,7 @@ function LoginForm() {
         loading={googleLoading}
         loadingLabel="Signing in..."
         disabled={googleLoading}
+        className="h-11 min-h-[44px] rounded-2xl text-sm font-medium shadow-[0_10px_28px_rgb(27_28_25/0.07)] md:h-12 md:rounded-full md:text-sm md:shadow-ambient-sm"
         onClick={async () => {
           setGoogleLoading(true);
           setError("");
@@ -169,9 +182,17 @@ function LoginForm() {
         }}
       />
 
-      <AuthDivider />
+      <div className="md:hidden">
+        <AuthDivider
+          variant="line"
+          className="gap-3 text-[0.65rem] tracking-[0.2em]"
+        />
+      </div>
+      <div className="hidden md:block">
+        <AuthDivider />
+      </div>
 
-      <form onSubmit={handleSubmit} className="flex flex-col">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4 md:gap-0">
         <AuthField
           label="Email"
           icon={Mail}
@@ -183,6 +204,10 @@ function LoginForm() {
           autoComplete="email"
           aria-describedby={error || urlError ? "form-error" : undefined}
           placeholder="you@example.com"
+          containerClassName="mb-0 md:mb-5"
+          labelClassName="ml-0 text-[0.62rem] tracking-[0.18em] text-[#5a463e] md:ml-0.5 md:text-xs md:tracking-wide md:text-on-surface-variant"
+          iconClassName="pl-4 md:pl-3"
+          inputClassName="h-14 min-h-[56px] rounded-2xl pl-11 text-[0.95rem] font-medium shadow-[0_10px_30px_rgb(27_28_25/0.045)] md:h-auto md:rounded-xl md:pl-10 md:text-sm"
         />
 
         <AuthField
@@ -194,11 +219,14 @@ function LoginForm() {
           required
           autoComplete="current-password"
           placeholder="••••••••"
-          containerClassName="mb-6 md:mb-5"
+          containerClassName="mb-0 md:mb-5"
+          labelClassName="ml-0 text-[0.62rem] tracking-[0.18em] text-[#5a463e] md:ml-0.5 md:text-xs md:tracking-wide md:text-on-surface-variant"
+          iconClassName="pl-4 md:pl-3"
+          inputClassName="h-14 min-h-[56px] rounded-2xl pl-11 text-[0.95rem] font-medium shadow-[0_10px_30px_rgb(27_28_25/0.045)] md:h-auto md:rounded-xl md:pl-10 md:text-sm"
           labelAccessory={
             <Link
               href="/forgot-password"
-              className="min-h-[44px] inline-flex items-center text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8A3D26] transition-colors hover:text-[#73321f] md:text-xs md:font-normal md:normal-case md:tracking-normal md:text-on-surface-variant md:hover:text-on-surface"
+              className="inline-flex min-h-8 items-center text-xs font-medium tracking-normal text-primary transition-colors hover:text-primary-container md:min-h-[44px] md:text-xs md:font-normal md:normal-case md:text-on-surface-variant md:hover:text-on-surface"
             >
               Forgot password?
             </Link>
@@ -225,41 +253,13 @@ function LoginForm() {
           }
         />
 
-        {isTurnstileEnabled && (
-          <div className={authTurnstileSlotClassName}>
-            <TurnstileWidget
-              ref={turnstileRef}
-              className="flex justify-center overflow-hidden"
-              onToken={(token) => {
-                setTurnstileToken(token);
-                setTurnstileError(false);
-              }}
-              onExpire={() => setTurnstileToken("")}
-              onError={() => setTurnstileError(true)}
-            />
-          </div>
-        )}
-
-        {turnstileError && (
-          <p className="mb-6 text-sm text-red-600 md:mb-5">
-            Security check failed.{" "}
-            <button
-              type="button"
-              className="font-medium underline underline-offset-2"
-              onClick={() => {
-                turnstileRef.current?.reset();
-                setTurnstileError(false);
-              }}
-            >
-              Try again
-            </button>
-          </p>
-        )}
-
         <Button
           type="submit"
           disabled={loading || (isTurnstileEnabled && !turnstileToken)}
-          className={authPrimaryButtonClassName}
+          className={cn(
+            authPrimaryButtonClassName,
+            "h-14 min-h-[56px] rounded-2xl text-sm shadow-[0_14px_30px_rgb(154_64_39/0.2)] md:h-12 md:rounded-full md:text-sm md:shadow-ambient-sm"
+          )}
         >
           {loading ? (
             <>
@@ -274,10 +274,55 @@ function LoginForm() {
             </>
           ) : (
             <>
-              Sign in <ArrowRight className="ml-2 h-4 w-4" />
+              Sign in <ArrowRight className="ml-2 hidden h-4 w-4 md:block" />
             </>
           )}
         </Button>
+
+        <div className="my-1 flex items-center justify-center gap-1.5 text-[0.72rem] leading-4 text-on-surface-variant md:hidden">
+          <ShieldCheck
+            className="h-4 w-4 text-primary"
+            strokeWidth={1.8}
+            aria-hidden="true"
+          />
+          <span>Your data is secure with us.</span>
+        </div>
+
+        {isTurnstileEnabled && (
+          <div
+            className={cn(
+              authTurnstileSlotClassName,
+              "mb-0 h-[78px] max-w-none rounded-2xl border border-outline-variant/25 bg-surface-container-lowest p-2 shadow-ambient-sm md:mb-5 md:h-auto md:rounded-xl md:border-0 md:p-0 md:shadow-none"
+            )}
+          >
+            <TurnstileWidget
+              ref={turnstileRef}
+              className="flex justify-center overflow-hidden"
+              onToken={(token) => {
+                setTurnstileToken(token);
+                setTurnstileError(false);
+              }}
+              onExpire={() => setTurnstileToken("")}
+              onError={() => setTurnstileError(true)}
+            />
+          </div>
+        )}
+
+        {turnstileError && (
+          <p className="mt-4 text-sm text-red-600 md:mt-0 md:mb-5">
+            Security check failed.{" "}
+            <button
+              type="button"
+              className="font-medium underline underline-offset-2"
+              onClick={() => {
+                turnstileRef.current?.reset();
+                setTurnstileError(false);
+              }}
+            >
+              Try again
+            </button>
+          </p>
+        )}
       </form>
     </AuthPageChrome>
   );
