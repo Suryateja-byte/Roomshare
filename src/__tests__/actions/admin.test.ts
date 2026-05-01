@@ -85,7 +85,7 @@ jest.mock("@/lib/listings/canonical-lifecycle", () => ({
   syncListingLifecycleProjectionInTx: jest.fn().mockResolvedValue({
     action: "synced",
   }),
-  tombstoneListingInventoryInTx: jest.fn().mockResolvedValue({
+  tombstoneCanonicalInventoryInTx: jest.fn().mockResolvedValue({
     action: "tombstoned",
   }),
 }));
@@ -117,7 +117,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 import {
   syncListingLifecycleProjectionInTx,
-  tombstoneListingInventoryInTx,
+  tombstoneCanonicalInventoryInTx,
 } from "@/lib/listings/canonical-lifecycle";
 
 describe("admin actions", () => {
@@ -935,13 +935,13 @@ describe("admin actions", () => {
       expect(listingDelete).toHaveBeenCalledWith({
         where: { id: "listing-123" },
       });
-      expect(tombstoneListingInventoryInTx).toHaveBeenCalledWith(
+      expect(tombstoneCanonicalInventoryInTx).toHaveBeenCalledWith(
         expect.any(Object),
         "listing-123",
         "TOMBSTONE"
       );
       expect(
-        (tombstoneListingInventoryInTx as jest.Mock).mock
+        (tombstoneCanonicalInventoryInTx as jest.Mock).mock
           .invocationCallOrder[0]
       ).toBeLessThan(listingDelete.mock.invocationCallOrder[0]);
       expect(listingUpdate).not.toHaveBeenCalled();

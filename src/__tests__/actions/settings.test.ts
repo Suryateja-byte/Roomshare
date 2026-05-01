@@ -86,7 +86,7 @@ jest.mock("@/lib/listings/canonical-lifecycle", () => ({
   syncListingLifecycleProjectionInTx: jest.fn().mockResolvedValue({
     action: "synced",
   }),
-  tombstoneListingInventoryInTx: jest.fn().mockResolvedValue({
+  tombstoneCanonicalInventoryInTx: jest.fn().mockResolvedValue({
     action: "tombstoned",
   }),
 }));
@@ -106,7 +106,7 @@ import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 import { Prisma } from "@prisma/client";
 import {
   syncListingLifecycleProjectionInTx,
-  tombstoneListingInventoryInTx,
+  tombstoneCanonicalInventoryInTx,
 } from "@/lib/listings/canonical-lifecycle";
 
 describe("settings actions", () => {
@@ -533,7 +533,7 @@ describe("settings actions", () => {
       expect(prisma.listing.deleteMany).toHaveBeenCalledWith({
         where: { id: { in: ["clean-listing"] } },
       });
-      expect(tombstoneListingInventoryInTx).toHaveBeenCalledWith(
+      expect(tombstoneCanonicalInventoryInTx).toHaveBeenCalledWith(
         prisma,
         "clean-listing",
         "TOMBSTONE"
@@ -559,12 +559,12 @@ describe("settings actions", () => {
       expect(result).toEqual({ success: true });
       expect(prisma.listing.update).not.toHaveBeenCalled();
       expect(markListingDirtyInTx).not.toHaveBeenCalled();
-      expect(tombstoneListingInventoryInTx).toHaveBeenCalledWith(
+      expect(tombstoneCanonicalInventoryInTx).toHaveBeenCalledWith(
         prisma,
         "clean-listing-1",
         "TOMBSTONE"
       );
-      expect(tombstoneListingInventoryInTx).toHaveBeenCalledWith(
+      expect(tombstoneCanonicalInventoryInTx).toHaveBeenCalledWith(
         prisma,
         "clean-listing-2",
         "TOMBSTONE"

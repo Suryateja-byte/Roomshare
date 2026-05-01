@@ -10,7 +10,7 @@ import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 import { requireAdminAuth } from "@/lib/admin-auth";
 import {
   syncListingLifecycleProjectionInTx,
-  tombstoneListingInventoryInTx,
+  tombstoneCanonicalInventoryInTx,
 } from "@/lib/listings/canonical-lifecycle";
 import { getModerationWriteLockReason } from "@/lib/listings/moderation-write-lock";
 import {
@@ -703,7 +703,7 @@ export async function deleteListing(listingId: string) {
         } as const;
       }
 
-      await tombstoneListingInventoryInTx(tx, listingId, "TOMBSTONE");
+      await tombstoneCanonicalInventoryInTx(tx, listingId, "TOMBSTONE");
       await tx.listing.delete({ where: { id: listingId } });
 
       return { action: "deleted", listing, reportCount } as const;

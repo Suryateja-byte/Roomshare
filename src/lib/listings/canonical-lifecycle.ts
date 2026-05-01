@@ -70,7 +70,7 @@ async function tombstoneExistingInventoryInTx(
   return { action: "tombstoned", tombstone } as const;
 }
 
-export async function tombstoneListingInventoryInTx(
+export async function tombstoneCanonicalInventoryInTx(
   tx: TransactionClient,
   listingId: string,
   reason: TombstoneReason = "TOMBSTONE"

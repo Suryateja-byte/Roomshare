@@ -30,7 +30,7 @@ jest.mock("@/lib/listings/canonical-lifecycle", () => ({
   syncListingLifecycleProjectionInTx: jest.fn().mockResolvedValue({
     action: "synced",
   }),
-  tombstoneListingInventoryInTx: jest.fn().mockResolvedValue({
+  tombstoneCanonicalInventoryInTx: jest.fn().mockResolvedValue({
     action: "tombstoned",
   }),
 }));

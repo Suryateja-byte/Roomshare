@@ -16,7 +16,7 @@ import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 import { Prisma } from "@prisma/client";
 import {
   syncListingLifecycleProjectionInTx,
-  tombstoneListingInventoryInTx,
+  tombstoneCanonicalInventoryInTx,
 } from "@/lib/listings/canonical-lifecycle";
 
 export interface NotificationPreferences {
@@ -363,7 +363,7 @@ export async function deleteAccount(
 
       if (unreportedListingIds.length > 0) {
         for (const listingId of unreportedListingIds) {
-          await tombstoneListingInventoryInTx(tx, listingId, "TOMBSTONE");
+          await tombstoneCanonicalInventoryInTx(tx, listingId, "TOMBSTONE");
         }
 
         await tx.listing.deleteMany({

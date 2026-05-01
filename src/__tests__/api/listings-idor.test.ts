@@ -122,7 +122,7 @@ jest.mock("@/lib/listings/canonical-lifecycle", () => ({
   syncListingLifecycleProjectionInTx: jest.fn().mockResolvedValue({
     action: "synced",
   }),
-  tombstoneListingInventoryInTx: jest.fn().mockResolvedValue({
+  tombstoneCanonicalInventoryInTx: jest.fn().mockResolvedValue({
     action: "tombstoned",
   }),
 }));
@@ -156,7 +156,7 @@ import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 import { logger } from "@/lib/logger";
 import {
   syncListingLifecycleProjectionInTx,
-  tombstoneListingInventoryInTx,
+  tombstoneCanonicalInventoryInTx,
 } from "@/lib/listings/canonical-lifecycle";
 import {
   getAvailability,
@@ -1062,7 +1062,7 @@ describe("Listings API IDOR Protection", () => {
       expect(listingDelete).toHaveBeenCalledWith({
         where: { id: "listing-abc" },
       });
-      expect(tombstoneListingInventoryInTx).toHaveBeenCalledWith(
+      expect(tombstoneCanonicalInventoryInTx).toHaveBeenCalledWith(
         expect.any(Object),
         "listing-abc",
         "TOMBSTONE"

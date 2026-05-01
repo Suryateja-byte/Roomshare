@@ -34,7 +34,7 @@ import { normalizeAddress } from "@/lib/search/normalize-address";
 import { syncCanonicalAvailability } from "@/lib/listings/canonical-sync";
 import {
   syncListingLifecycleProjectionInTx,
-  tombstoneListingInventoryInTx,
+  tombstoneCanonicalInventoryInTx,
 } from "@/lib/listings/canonical-lifecycle";
 import {
   isStrictDateOnly,
@@ -436,7 +436,7 @@ export async function DELETE(
         }
 
         // Delete listing; contact-first tables are independent projections/ledgers.
-        await tombstoneListingInventoryInTx(tx, id, "TOMBSTONE");
+        await tombstoneCanonicalInventoryInTx(tx, id, "TOMBSTONE");
         await tx.listing.delete({ where: { id } });
         return {
           action: "deleted",
