@@ -9,6 +9,7 @@ export type RoomCategory = z.infer<typeof RoomCategory>;
 
 const forcedNull = z
   .union([z.null(), z.undefined()])
+  .optional()
   .transform(() => null as null);
 
 const requiredPositiveInt = z.coerce.number().int().positive();

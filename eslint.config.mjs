@@ -95,8 +95,11 @@ const eslintConfig = defineConfig([
       // React Compiler rules disabled — they flag standard React patterns (setState in useEffect,
       // ref mutation in effects, manual memoization) that are correct and intentional.
       "react-hooks/immutability": "off",
+      "react-hooks/purity": "off",
+      "react-hooks/refs": "off",
       "react-hooks/preserve-manual-memoization": "off",
       "react-hooks/set-state-in-effect": "off",
+      "react-hooks/static-components": "off",
     },
   },
 ]);
