@@ -431,14 +431,17 @@ describe("private feedback no-public-bleed contract", () => {
   it("does not leak any report rows from GET /api/map-listings", async () => {
     mockNextResponseModule();
     jest.doMock("@/lib/data", () => {
-      const {
-        sanitizeMapListings,
-      } = jest.requireActual("@/lib/maps/sanitize-map-listings");
+      const { sanitizeMapListings } = jest.requireActual(
+        "@/lib/maps/sanitize-map-listings"
+      );
+      const listings = sanitizeMapListings([createMapSqlRow()]);
 
       return {
-        getMapListings: jest.fn().mockResolvedValue(
-          sanitizeMapListings([createMapSqlRow()])
-        ),
+        getMapListingsResult: jest.fn().mockResolvedValue({
+          listings,
+          truncated: false,
+          totalCandidates: listings.length,
+        }),
       };
     });
     jest.doMock("@/lib/search/search-doc-queries", () => ({

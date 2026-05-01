@@ -7,6 +7,7 @@ process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test";
 // Supabase config for storage tests
 process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test-project.supabase.co";
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-anon-key";
+process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
 
 // Disable Turnstile bot protection in tests (matches CI behavior).
 // Without this, next/jest loads .env which may have TURNSTILE_ENABLED=true,

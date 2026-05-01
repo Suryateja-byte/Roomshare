@@ -456,7 +456,7 @@ export function InlineFilterStrip({
       }
       role="region"
       aria-label="Applied filters"
-      className="hide-scrollbar flex items-center gap-2 overflow-x-auto"
+      className="hide-scrollbar flex min-w-fit shrink-0 items-center gap-2 overflow-x-auto"
     >
       {!separatedFromPrimary ? (
         <div className="h-6 w-px shrink-0 bg-outline-variant/40" />

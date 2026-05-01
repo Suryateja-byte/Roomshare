@@ -1183,7 +1183,6 @@ export default function CreateListingForm({
               aria-describedby={
                 fieldErrors.moveInDate ? "moveInDate-error" : undefined
               }
-              aria-required
               className={fieldErrors.moveInDate ? "border-red-500" : ""}
             />
             <FieldError field="moveInDate" fieldErrors={fieldErrors} />

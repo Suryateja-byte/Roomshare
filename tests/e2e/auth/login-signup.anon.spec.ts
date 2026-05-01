@@ -210,8 +210,10 @@ test.describe("Signup Form", () => {
     expect([201, 400, 403, 429]).toContain(registerResponse.status());
   });
 
-  // LS-07: Signup with existing email shows error message
-  test("LS-07: existing email shows error message", async ({ page }) => {
+  // LS-07: Signup with existing email does not reveal account existence
+  test("LS-07: existing email follows non-enumerating registration flow", async ({
+    page,
+  }) => {
     // Use the known seeded test user email
     const existingEmail = "e2e-test@roomshare.dev";
 
@@ -226,19 +228,33 @@ test.describe("Signup Form", () => {
 
     await waitForTurnstileIfPresent(page);
 
+    const registerResponsePromise = page.waitForResponse(
+      (resp) => resp.url().includes("/api/register"),
+      { timeout: 30_000 }
+    );
+
     await page.getByRole("button", { name: /join roomshare/i }).click();
 
-    // Server returns generic error to prevent enumeration:
-    // "Registration failed. Please try again or use forgot password..."
-    // Or Turnstile may block in CI — either way, an error should appear.
-    await expect(
-      page
-        .getByText(/registration failed/i)
-        .or(page.getByText(/bot verification failed/i))
-        .or(page.getByText(/failed to register/i))
-        .or(page.getByRole("alert"))
-        .first()
-    ).toBeVisible({ timeout: 15_000 });
+    const registerResponse = await registerResponsePromise;
+
+    if (registerResponse.status() === 201) {
+      await expect(page).toHaveURL(/\/login\?registered=true/, {
+        timeout: 15_000,
+      });
+    } else {
+      // Turnstile or rate limiting may block in CI before the anti-enumeration
+      // response path. Either way, the test must not require duplicate-email
+      // disclosure.
+      expect([400, 403, 429]).toContain(registerResponse.status());
+      await expect(
+        page
+          .getByText(/registration failed/i)
+          .or(page.getByText(/bot verification failed/i))
+          .or(page.getByText(/failed to register/i))
+          .or(page.getByRole("alert"))
+          .first()
+      ).toBeVisible({ timeout: 15_000 });
+    }
   });
 
   // LS-08: Signup with weak password shows validation error

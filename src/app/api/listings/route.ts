@@ -41,7 +41,7 @@ import {
   recordListingCreateCollisionModerationGated,
   recordListingCreateCollisionResolved,
 } from "@/lib/search/search-telemetry";
-import { syncCanonicalListingInventory } from "@/lib/listings/canonical-inventory";
+import { syncCanonicalAvailability } from "@/lib/listings/canonical-sync";
 
 class ListingCollisionCandidatesError extends Error {
   readonly siblings: CollisionSibling[];
@@ -522,7 +522,7 @@ export async function POST(request: Request) {
                 WHERE id = ${location.id}
             `;
 
-      await syncCanonicalListingInventory(tx, {
+      await syncCanonicalAvailability(tx, {
         listing: { ...listing, bookingMode },
         address: { address, city, state, zip },
         actor: { role: "host", id: userId },

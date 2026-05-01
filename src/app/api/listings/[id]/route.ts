@@ -31,7 +31,7 @@ import { features } from "@/lib/env";
 import { syncListingEmbedding } from "@/lib/embeddings/sync";
 import { getHostModerationWriteLockResult } from "@/lib/listings/moderation-write-lock";
 import { normalizeAddress } from "@/lib/search/normalize-address";
-import { syncCanonicalListingInventory } from "@/lib/listings/canonical-inventory";
+import { syncCanonicalAvailability } from "@/lib/listings/canonical-sync";
 import {
   isStrictDateOnly,
   parseStrictDateOnlyToUtcDate,
@@ -743,7 +743,7 @@ export async function PATCH(
             if (!listing.location) {
               throw new Error("LISTING_LOCATION_MISSING");
             }
-            await syncCanonicalListingInventory(tx, {
+            await syncCanonicalAvailability(tx, {
               listing: updatedListing,
               address: {
                 address: listing.location.address,
@@ -1093,7 +1093,7 @@ export async function PATCH(
 
           await markListingDirtyInTx(tx, id, "listing_updated");
 
-          const canonicalSync = await syncCanonicalListingInventory(tx, {
+          const canonicalSync = await syncCanonicalAvailability(tx, {
             listing: updatedListing,
             address: { address, city, state, zip },
             actor: { role: "host", id: userId },

@@ -254,7 +254,8 @@ describe("CreateListingForm", () => {
       render(<CreateListingForm />);
 
       const moveInDateControl = document.getElementById("moveInDate");
-      expect(moveInDateControl).toHaveAttribute("aria-required", "true");
+      expect(screen.getByLabelText(/move-in date/i)).toBe(moveInDateControl);
+      expect(moveInDateControl).not.toHaveAttribute("aria-required");
       expect(screen.getByText("When tenants can move in.")).toBeInTheDocument();
       expect(
         screen.queryByText("When can tenants move in? (Optional)")

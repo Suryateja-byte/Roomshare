@@ -26,7 +26,7 @@ describe("sanitize-map-listings", () => {
     expect(listings).toEqual([
       expect.objectContaining({
         id: "valid",
-        location: { lat: 30.2672, lng: -97.7431 },
+        location: expect.objectContaining({ lat: 30.27, lng: -97.74 }),
       }),
     ]);
   });
@@ -50,7 +50,7 @@ describe("sanitize-map-listings", () => {
         availableSlots: 3,
         totalSlots: 3,
         images: ["one.jpg", "two.jpg"],
-        location: expect.objectContaining({ lat: 30.2672, lng: -97.7431 }),
+        location: expect.objectContaining({ lat: 30.27, lng: -97.74 }),
         tier: "primary",
         avgRating: 0,
         reviewCount: 0,

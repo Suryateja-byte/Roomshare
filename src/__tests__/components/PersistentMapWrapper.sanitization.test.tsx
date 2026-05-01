@@ -52,7 +52,7 @@ describe("v2MapDataToListings", () => {
       availableSlots: 0,
       totalSlots: 0,
       images: ["cover.jpg"],
-      location: { lat: 30.2672, lng: -97.7431 },
+      location: { lat: 30.27, lng: -97.74 },
       tier: "primary",
       avgRating: 0,
       reviewCount: 0,

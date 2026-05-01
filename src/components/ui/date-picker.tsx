@@ -15,7 +15,6 @@ interface DatePickerProps {
   id?: string;
   "aria-describedby"?: string;
   "aria-invalid"?: boolean;
-  "aria-required"?: boolean;
 }
 
 const DAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
@@ -44,7 +43,6 @@ export function DatePicker({
   id,
   "aria-describedby": ariaDescribedBy,
   "aria-invalid": ariaInvalid,
-  "aria-required": ariaRequired,
 }: DatePickerProps) {
   const [mounted, setMounted] = React.useState(false);
   const [open, setOpen] = React.useState(false);
@@ -224,7 +222,6 @@ export function DatePicker({
         disabled={disabled}
         aria-describedby={ariaDescribedBy}
         aria-invalid={ariaInvalid}
-        aria-required={ariaRequired}
         className={cn(
           "w-full flex items-center justify-between gap-2 p-2.5 sm:p-3 rounded-lg",
           "border border-outline-variant/20",
