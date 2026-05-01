@@ -95,15 +95,23 @@ test.describe("J31: Edit Listing and Verify", () => {
     }
 
     // Step 6: Verify changes
-    const hasToast = await page
-      .locator(selectors.toast)
-      .isVisible()
-      .catch(() => false);
     const updatedTitle = page.getByText(/Sunny Mission Room Updated/i);
-    const hasUpdated = await updatedTitle.isVisible().catch(() => false);
-    expect(hasToast || hasUpdated).toBeTruthy();
+    await expect
+      .poll(
+        async () => {
+          const hasToast = await page
+            .locator(selectors.toast)
+            .isVisible()
+            .catch(() => false);
+          const hasUpdated = await updatedTitle.isVisible().catch(() => false);
+          return hasToast || hasUpdated;
+        },
+        { timeout: 15000 }
+      )
+      .toBe(true);
 
     // Restore original title for future test runs
+    const hasUpdated = await updatedTitle.isVisible().catch(() => false);
     if (hasUpdated) {
       const editAgain = page
         .getByRole("link", { name: /edit|manage/i })
@@ -263,6 +271,37 @@ test.describe("J33: Delete Listing with Confirmation", () => {
       .last();
     if (await confirmBtn.isVisible().catch(() => false)) {
       await confirmBtn.click({ force: true });
+
+      const passwordDialog = page.getByRole("dialog", {
+        name: /delete listing/i,
+      });
+      await passwordDialog
+        .waitFor({ state: "visible", timeout: 10000 })
+        .catch(() => {});
+
+      if (await passwordDialog.isVisible().catch(() => false)) {
+        const passwordInput = passwordDialog.locator("#confirm-password");
+        if (await passwordInput.isVisible().catch(() => false)) {
+          await passwordInput.fill(
+            process.env.E2E_TEST_PASSWORD || "TestPassword123!"
+          );
+        }
+
+        const deleteResponsePromise = page
+          .waitForResponse(
+            (resp) =>
+              resp.url().includes("/api/listings/") &&
+              resp.request().method() === "DELETE",
+            { timeout: 15000 }
+          )
+          .catch(() => null);
+
+        await passwordDialog
+          .getByRole("button", { name: /delete listing/i })
+          .click({ force: true });
+        await deleteResponsePromise;
+      }
+
       await Promise.race([
         page.waitForURL((url) => !url.pathname.startsWith("/listings/"), {
           timeout: 15_000,
@@ -296,8 +335,8 @@ test.describe("J34: Form Validation Errors", () => {
 
     // Step 2: Try submitting empty form
     const submitBtn = page
-      .getByRole("button", { name: /create|submit|publish|save|next/i })
-      .or(page.locator('button[type="submit"]'));
+      .locator('form[novalidate] button[type="submit"]')
+      .or(page.getByRole("button", { name: /publish listing/i }));
     const canSubmit = await submitBtn
       .first()
       .isVisible()
@@ -309,12 +348,12 @@ test.describe("J34: Form Validation Errors", () => {
 
     // Step 3: Verify validation errors appear
     const errors = page
-      .locator('[aria-invalid="true"]')
+      .getByTestId("form-error-banner")
+      .or(page.locator('[aria-invalid="true"]'))
       .or(page.locator('[class*="error"]'))
       .or(page.locator('[role="alert"]').filter({ hasText: /.+/ }));
 
-    const errorCount = await errors.count();
-    expect(errorCount).toBeGreaterThan(0);
+    await expect(errors.first()).toBeVisible({ timeout: 10000 });
 
     // Step 4: Fill title only
     const titleField = page

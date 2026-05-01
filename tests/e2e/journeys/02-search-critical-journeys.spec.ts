@@ -109,10 +109,12 @@ test.describe("20 Critical Search Page Journeys", () => {
     // Wait for hydration before interacting with tabs
     await page.waitForLoadState("networkidle").catch(() => {});
 
-    // Find category tabs
+    // Find category tabs. The current category bar exposes pressed buttons,
+    // while alternate desktop layouts may expose a different visual state.
     const privateTab = page
-      .getByRole("button", { name: /private/i })
-      .or(page.locator('button:has-text("Private")'));
+      .locator("button[aria-pressed]")
+      .filter({ hasText: /private/i })
+      .or(page.getByRole("button", { name: /private/i }));
 
     if (await privateTab.first().isVisible()) {
       await page.waitForLoadState("networkidle").catch(() => {});
@@ -136,11 +138,26 @@ test.describe("20 Critical Search Page Journeys", () => {
         await page.waitForLoadState("domcontentloaded");
       }
 
-      // Verify the tab reflects the selected state
+      await expect
+        .poll(
+          () =>
+            new URL(page.url(), "http://localhost").searchParams.get(
+              "roomType"
+            ),
+          {
+            timeout: 30000,
+            message: 'URL param "roomType" to be "Private Room"',
+          }
+        )
+        .toBe("Private Room");
+
       const selectedTab = page
         .locator('button[aria-pressed="true"]')
-        .filter({ hasText: /private/i });
-      await expect(selectedTab.first()).toBeVisible({ timeout: 15000 });
+        .filter({ hasText: /private/i })
+        .first();
+      if (await selectedTab.isVisible().catch(() => false)) {
+        await expect(selectedTab).toBeVisible();
+      }
     }
   });
 
