@@ -19,6 +19,7 @@ import { rebuildUnitPublicProjection } from "@/lib/projections/unit-projection";
 import { handleTombstone } from "@/lib/projections/tombstone";
 import {
   __resetEmbeddingTokenBudgetForTesting,
+  buildSemanticProjectionText,
   EmbeddingBudgetExceededError,
   getSemanticInventoryCandidates,
   rebuildSemanticInventoryProjection,
@@ -123,6 +124,35 @@ async function getInventoryStatus(inventoryId: string): Promise<{
 }
 
 describe("Phase 03 semantic projection", () => {
+  it("excludes sensitive housing attributes from semantic projection text", () => {
+    const text = buildSemanticProjectionText({
+      inventory_id: "inv-1",
+      unit_id: "unit-1",
+      unit_identity_epoch_written_at: 1,
+      room_category: "PRIVATE_ROOM",
+      capacity_guests: 2,
+      total_beds: 3,
+      open_beds: 1,
+      price: "1200",
+      available_from: "2026-05-01",
+      available_until: null,
+      lease_min_months: null,
+      lease_max_months: null,
+      lease_negotiable: false,
+      gender_preference: "ANY",
+      household_gender: "MIXED",
+      public_cell_id: "cell-1",
+      public_area_name: "Austin",
+      projection_source_version: BigInt(1),
+      matching_inventory_count: 2,
+    });
+
+    expect(text).not.toContain("Gender preference");
+    expect(text).not.toContain("Household gender");
+    expect(text).not.toContain("ANY");
+    expect(text).not.toContain("MIXED");
+  });
+
   it("moves filter-published inventory to PENDING_EMBEDDING and enqueues EMBED_NEEDED", async () => {
     const { unitId, inventoryId } = await seedInventory();
 
@@ -175,6 +205,36 @@ describe("Phase 03 semantic projection", () => {
     const inventory = await getInventoryStatus(inventoryId);
     expect(inventory.publishStatus).toBe("PUBLISHED");
     expect(inventory.lastEmbeddedVersion).toBe("v-test");
+  });
+
+  it("passes the stored embedding version into the embedding provider", async () => {
+    const { unitId, inventoryId } = await seedInventory();
+    await projectFilterRows(unitId, inventoryId);
+    const generate = jest.fn(async () => [0.1, 0.2, 0.3]);
+
+    await withTx((tx) =>
+      rebuildSemanticInventoryProjection(
+        tx,
+        {
+          unitId,
+          inventoryId,
+          sourceVersion: BigInt(1),
+          unitIdentityEpoch: 1,
+          embeddingVersion: "v-provider",
+        },
+        { generateEmbedding: generate }
+      )
+    );
+
+    expect(generate).toHaveBeenCalledWith(
+      expect.stringContaining("Room category:"),
+      "RETRIEVAL_DOCUMENT",
+      { embeddingVersion: "v-provider" }
+    );
+
+    const semanticRows = await fixture.getSemanticInventoryProjections();
+    const row = semanticRows.find((item) => item.inventoryId === inventoryId);
+    expect(row?.embeddingVersion).toBe("v-provider");
   });
 
   it("does not let stale source_version overwrite semantic projection", async () => {

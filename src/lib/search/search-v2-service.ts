@@ -80,6 +80,7 @@ import {
 } from "@/lib/search/public-availability";
 import type { FilterParams } from "@/lib/search-types";
 import { isPhase04ProjectionReadsEnabled } from "@/lib/flags/phase04";
+import { getReadEmbeddingVersion } from "@/lib/embeddings/version";
 import { executeProjectionSearchV2 } from "@/lib/search/projection-search";
 import {
   getProjectionReadEligibility,
@@ -575,6 +576,18 @@ export async function executeSearchV2(
       };
     }
 
+    // Get sort option from parsed params (default to recommended)
+    const sortOption: SortOption =
+      (parsed.filterParams.sort as SortOption) || "recommended";
+    const hashVibeQuery = parsed.filterParams.vibeQuery?.trim();
+    const hashEmbeddingVersion =
+      features.semanticSearch &&
+      hashVibeQuery &&
+      hashVibeQuery.length >= 3 &&
+      sortOption === "recommended"
+        ? getReadEmbeddingVersion()
+        : undefined;
+
     const queryHash = generateQueryHash({
       query: parsed.filterParams.query,
       vibeQuery: parsed.filterParams.vibeQuery,
@@ -587,13 +600,16 @@ export async function executeSearchV2(
       leaseDuration: parsed.filterParams.leaseDuration,
       moveInDate: parsed.filterParams.moveInDate,
       endDate: parsed.filterParams.endDate,
+      genderPreference: parsed.filterParams.genderPreference,
+      householdGender: parsed.filterParams.householdGender,
+      bookingMode: parsed.filterParams.bookingMode,
+      minAvailableSlots: parsed.filterParams.minAvailableSlots,
       bounds: parsed.filterParams.bounds,
       nearMatches: parsed.filterParams.nearMatches,
+      ...(hashEmbeddingVersion
+        ? { embeddingVersion: hashEmbeddingVersion }
+        : {}),
     });
-
-    // Get sort option from parsed params (default to recommended)
-    const sortOption: SortOption =
-      (parsed.filterParams.sort as SortOption) || "recommended";
 
     if (isPhase04ProjectionReadsEnabled()) {
       const projectionEligibility = getProjectionReadEligibility(parsed);

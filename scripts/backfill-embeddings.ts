@@ -9,12 +9,21 @@
  */
 import { prisma } from "../src/lib/prisma";
 import pgvector from "pgvector";
-import { generateEmbedding, generateMultimodalEmbedding, EMBEDDING_MODEL } from "../src/lib/embeddings/gemini";
+import {
+  generateEmbedding,
+  generateMultimodalEmbedding,
+  EMBEDDING_MODEL,
+} from "../src/lib/embeddings/gemini";
 import { composeListingText } from "../src/lib/embeddings/compose";
-import { fetchAndProcessListingImages, computeImageHash } from "../src/lib/embeddings/images";
+import {
+  fetchAndProcessListingImages,
+  computeImageHash,
+  type ImagePart,
+} from "../src/lib/embeddings/images";
+import { resolveEmbeddingStatus } from "../src/lib/embeddings/status";
 
 const BATCH_SIZE = 20;
-const DELAY_MS = 1500; // ~40 RPM, safe for free tier (100 RPM limit)
+const DELAY_MS = Number(process.env.EMBEDDING_BACKFILL_DELAY_MS ?? 15000);
 const IMAGE_EMBEDDINGS = process.env.ENABLE_IMAGE_EMBEDDINGS === "true";
 
 interface BackfillRow {
@@ -41,7 +50,9 @@ interface BackfillRow {
 }
 
 async function main() {
-  console.log(`Starting embedding backfill (model: ${EMBEDDING_MODEL}, images: ${IMAGE_EMBEDDINGS})...\n`);
+  console.log(
+    `Starting embedding backfill (model: ${EMBEDDING_MODEL}, images: ${IMAGE_EMBEDDINGS})...\n`
+  );
 
   let lastId: string | null = null;
   let processed = 0;
@@ -105,10 +116,11 @@ async function main() {
         });
 
         const imageUrls: string[] = (row.images as string[]) || [];
-        const imageHash = imageUrls.length > 0 ? computeImageHash(imageUrls) : null;
+        const imageHash =
+          imageUrls.length > 0 ? computeImageHash(imageUrls) : null;
 
         // Fetch and process images if enabled
-        let imageParts: { base64: string; mimeType: string }[] = [];
+        let imageParts: ImagePart[] = [];
         if (IMAGE_EMBEDDINGS && imageUrls.length > 0) {
           try {
             imageParts = await fetchAndProcessListingImages(imageUrls);
@@ -118,12 +130,25 @@ async function main() {
         }
 
         // Generate embedding
-        const embedding = imageParts.length > 0
-          ? await generateMultimodalEmbedding(text, imageParts)
-          : await generateEmbedding(text, "RETRIEVAL_DOCUMENT");
+        const embedding =
+          imageParts.length > 0
+            ? await generateMultimodalEmbedding(
+                text,
+                imageParts,
+                "RETRIEVAL_DOCUMENT",
+                { title: row.title }
+              )
+            : await generateEmbedding(text, "RETRIEVAL_DOCUMENT", {
+                title: row.title,
+              });
 
         const vecSql = pgvector.toSql(embedding);
         const imageCount = imageParts.length;
+        const embeddingStatus = resolveEmbeddingStatus({
+          imageEmbeddingsEnabled: IMAGE_EMBEDDINGS,
+          imageUrlCount: imageUrls.length,
+          processedImageCount: imageCount,
+        });
 
         await prisma.$executeRaw`
           UPDATE listing_search_docs
@@ -132,7 +157,7 @@ async function main() {
               embedding_image_hash = ${imageHash},
               embedding_image_count = ${imageCount},
               embedding_model = ${EMBEDDING_MODEL},
-              embedding_status = 'COMPLETED',
+              embedding_status = ${embeddingStatus},
               embedding_updated_at = NOW(),
               embedding_attempts = 0
           WHERE id = ${row.id}
@@ -141,7 +166,10 @@ async function main() {
         processed++;
         if (imageCount > 0) withImages++;
       } catch (err) {
-        console.error(`Failed for listing ${row.id}:`, err instanceof Error ? err.message : err);
+        console.error(
+          `Failed for listing ${row.id}:`,
+          err instanceof Error ? err.message : err
+        );
         await prisma.$executeRaw`
           UPDATE listing_search_docs
           SET embedding_status = 'FAILED',
@@ -166,9 +194,9 @@ async function main() {
 
   // Rebuild HNSW index for optimal recall with new vector distribution
   if (processed > 0) {
-    console.log("\nRebuilding HNSW index (CONCURRENTLY — non-blocking)...");
+    console.log("\nRebuilding GA HNSW index (CONCURRENTLY — non-blocking)...");
     await prisma.$executeRawUnsafe(
-      `REINDEX INDEX CONCURRENTLY idx_search_docs_embedding_hnsw`
+      `REINDEX INDEX CONCURRENTLY idx_search_docs_embedding_ga_hnsw`
     );
     console.log("HNSW index rebuild complete.");
   }

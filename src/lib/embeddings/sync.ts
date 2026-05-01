@@ -21,6 +21,10 @@ import {
   computeImageHash,
   type ImagePart,
 } from "./images";
+import {
+  isPublishedEmbeddingStatus,
+  resolveEmbeddingStatus,
+} from "./status";
 import { features } from "@/lib/env";
 import { logger } from "@/lib/logger";
 
@@ -49,6 +53,7 @@ interface SearchDocRow {
   embedding_text: string | null;
   embedding_status: string | null;
   embedding_image_hash: string | null;
+  embedding_model: string | null;
 }
 
 /** Add Sentry breadcrumb (lazy import, no-op in test) */
@@ -79,7 +84,8 @@ export async function syncListingEmbedding(listingId: string): Promise<void> {
              house_rules, lease_duration, gender_preference, household_gender,
              household_languages, primary_home_language, available_slots,
              total_slots, city, state, address, move_in_date, booking_mode,
-             images, embedding_text, embedding_status, embedding_image_hash
+             images, embedding_text, embedding_status, embedding_image_hash,
+             embedding_model
       FROM listing_search_docs
       WHERE id = ${listingId}
     `;
@@ -114,10 +120,12 @@ export async function syncListingEmbedding(listingId: string): Promise<void> {
     const newImageHash =
       imageUrls.length > 0 ? computeImageHash(imageUrls) : null;
 
-    // Skip if BOTH text AND images unchanged (dedup)
+    // Skip only when content, images, version, and published status are current.
     if (
       doc.embedding_text === embeddingText &&
-      doc.embedding_image_hash === newImageHash
+      doc.embedding_image_hash === newImageHash &&
+      doc.embedding_model === EMBEDDING_MODEL &&
+      isPublishedEmbeddingStatus(doc.embedding_status)
     )
       return;
 
@@ -145,18 +153,22 @@ export async function syncListingEmbedding(listingId: string): Promise<void> {
     // Generate embedding (multimodal if images available, text-only otherwise)
     const embedding =
       imageParts.length > 0
-        ? await generateMultimodalEmbedding(embeddingText, imageParts)
-        : await generateEmbedding(embeddingText, "RETRIEVAL_DOCUMENT");
+        ? await generateMultimodalEmbedding(
+            embeddingText,
+            imageParts,
+            "RETRIEVAL_DOCUMENT",
+            { title: doc.title }
+          )
+        : await generateEmbedding(embeddingText, "RETRIEVAL_DOCUMENT", {
+            title: doc.title,
+          });
     const vecSql = pgvector.toSql(embedding);
 
-    // Determine status: COMPLETED if all images processed (or no images), PARTIAL if some failed
-    const expectedImages = features.imageEmbeddings
-      ? Math.min(imageUrls.length, 5)
-      : 0;
-    const embeddingStatus =
-      expectedImages > 0 && imageParts.length < expectedImages
-        ? "PARTIAL"
-        : "COMPLETED";
+    const embeddingStatus = resolveEmbeddingStatus({
+      imageEmbeddingsEnabled: features.imageEmbeddings,
+      imageUrlCount: imageUrls.length,
+      processedImageCount: imageParts.length,
+    });
 
     // Store embedding with metadata
     await prisma.$executeRaw`

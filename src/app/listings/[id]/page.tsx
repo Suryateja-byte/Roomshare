@@ -12,6 +12,7 @@ import { resolveListingDetailDateParams } from "@/lib/search/listing-detail-link
 import { resolvePublicAvailability } from "@/lib/search/public-availability";
 import { toPublicCoordinates } from "@/lib/search/public-coordinates";
 import { getPublicListingDetail } from "@/lib/listings/public-detail";
+import { getReadEmbeddingVersion } from "@/lib/embeddings/version";
 import ListingPageClient from "./ListingPageClient";
 
 const getListingWithLocation = cache(async (id: string) => {
@@ -58,9 +59,12 @@ const getSimilarListings = cache(async function getSimilarListings(
 ): Promise<SimilarListingRow[]> {
   if (!features.semanticSearch) return [];
   try {
+    const embeddingVersion = getReadEmbeddingVersion();
     const rows = await prisma.$queryRaw<
       SimilarListingRow[]
-    >`SELECT * FROM get_similar_listings(${listingId}, 4, 0.3)`;
+    >`SELECT * FROM get_similar_listings(
+        ${listingId}, ${embeddingVersion}, 4, 0.3
+      )`;
     return rows;
   } catch (err) {
     logger.sync.error("Failed to fetch similar listings", {
