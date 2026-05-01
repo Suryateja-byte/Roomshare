@@ -238,9 +238,19 @@ test.describe("Signup Form", () => {
     const registerResponse = await registerResponsePromise;
 
     if (registerResponse.status() === 201) {
-      await expect(page).toHaveURL(/\/login\?registered=true/, {
-        timeout: 15_000,
-      });
+      await expect
+        .poll(
+          () => {
+            const url = new URL(page.url());
+            return `${url.pathname}${url.search}`;
+          },
+          {
+            timeout: 15_000,
+            message:
+              "Expected accepted duplicate signup to leave signup without disclosing account state",
+          }
+        )
+        .toMatch(/^(\/|\/login\?registered=true)$/);
     } else {
       // Turnstile or rate limiting may block in CI before the anti-enumeration
       // response path. Either way, the test must not require duplicate-email
