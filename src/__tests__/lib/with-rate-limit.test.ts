@@ -10,6 +10,7 @@ jest.mock("@/lib/rate-limit", () => ({
   RATE_LIMITS: {
     register: { limit: 5, windowMs: 3600000 },
     forgotPassword: { limit: 3, windowMs: 3600000 },
+    forgotPasswordByIp: { limit: 10, windowMs: 3600000 },
     login: { limit: 10, windowMs: 900000 },
     search: { limit: 60, windowMs: 60000 },
   },

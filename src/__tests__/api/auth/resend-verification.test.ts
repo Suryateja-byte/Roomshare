@@ -7,10 +7,6 @@ jest.mock("@/lib/prisma", () => ({
     user: {
       findUnique: jest.fn(),
     },
-    verificationToken: {
-      deleteMany: jest.fn(),
-      create: jest.fn(),
-    },
   },
 }));
 
@@ -24,6 +20,12 @@ jest.mock("@/lib/email", () => ({
 
 jest.mock("@/lib/with-rate-limit", () => ({
   withRateLimit: jest.fn(() => null),
+}));
+
+jest.mock("@/lib/verification-token-store", () => ({
+  clearPendingVerificationToken: jest.fn(),
+  prepareVerificationTokenRotation: jest.fn(),
+  promotePendingVerificationToken: jest.fn(),
 }));
 
 jest.mock("next/server", () => ({
@@ -41,11 +43,25 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { sendNotificationEmail } from "@/lib/email";
 import { withRateLimit } from "@/lib/with-rate-limit";
+import {
+  clearPendingVerificationToken,
+  prepareVerificationTokenRotation,
+  promotePendingVerificationToken,
+} from "@/lib/verification-token-store";
 import type { NextRequest } from "next/server";
 
 describe("Resend Verification API", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (prepareVerificationTokenRotation as jest.Mock).mockResolvedValue({
+      status: "prepared",
+      token: "prepared-token",
+      tokenHash: "prepared-token-hash",
+      expires: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    });
+    (promotePendingVerificationToken as jest.Mock).mockResolvedValue(true);
+    (clearPendingVerificationToken as jest.Mock).mockResolvedValue(true);
+    (sendNotificationEmail as jest.Mock).mockResolvedValue({ success: true });
   });
 
   const createRequest = () =>
@@ -64,9 +80,6 @@ describe("Resend Verification API", () => {
 
     (auth as jest.Mock).mockResolvedValue(mockSession);
     (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
-    (prisma.verificationToken.deleteMany as jest.Mock).mockResolvedValue({});
-    (prisma.verificationToken.create as jest.Mock).mockResolvedValue({});
-    (sendNotificationEmail as jest.Mock).mockResolvedValue({ success: true });
 
     const request = createRequest();
     const response = await POST(request);
@@ -74,14 +87,45 @@ describe("Resend Verification API", () => {
 
     expect(response.status).toBe(200);
     expect(data.message).toBe("Verification email sent successfully");
+    expect(prepareVerificationTokenRotation).toHaveBeenCalledWith(
+      "test@example.com"
+    );
     expect(sendNotificationEmail).toHaveBeenCalledWith(
       "emailVerification",
       "test@example.com",
       expect.objectContaining({
         userName: "Test User",
-        verificationUrl: expect.stringContaining("token="),
+        verificationUrl: expect.stringContaining(
+          "/verify-email?token=prepared-token"
+        ),
       })
     );
+    expect(promotePendingVerificationToken).toHaveBeenCalledWith(
+      "test@example.com",
+      "prepared-token-hash"
+    );
+  });
+
+  it("returns 409 when another resend is already in flight", async () => {
+    (auth as jest.Mock).mockResolvedValue({
+      user: { email: "test@example.com" },
+    });
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+      id: "user-123",
+      email: "test@example.com",
+      emailVerified: null,
+    });
+    (prepareVerificationTokenRotation as jest.Mock).mockResolvedValue({
+      status: "conflict",
+    });
+
+    const response = await POST(createRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(data.error).toContain("already being prepared");
+    expect(sendNotificationEmail).not.toHaveBeenCalled();
+    expect(promotePendingVerificationToken).not.toHaveBeenCalled();
   });
 
   it("returns 401 when user is not authenticated", async () => {
@@ -143,67 +187,6 @@ describe("Resend Verification API", () => {
     expect(data.error).toBe("Email is already verified");
   });
 
-  it("deletes existing verification tokens before creating new one", async () => {
-    const mockSession = { user: { email: "test@example.com" } };
-    const mockUser = {
-      id: "user-123",
-      name: "Test",
-      email: "test@example.com",
-      emailVerified: null,
-    };
-
-    (auth as jest.Mock).mockResolvedValue(mockSession);
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
-    (prisma.verificationToken.deleteMany as jest.Mock).mockResolvedValue({});
-    (prisma.verificationToken.create as jest.Mock).mockResolvedValue({});
-    (sendNotificationEmail as jest.Mock).mockResolvedValue({ success: true });
-
-    const request = createRequest();
-    await POST(request);
-
-    expect(prisma.verificationToken.deleteMany).toHaveBeenCalledWith({
-      where: { identifier: "test@example.com" },
-    });
-  });
-
-  it("creates token with 24 hour expiration", async () => {
-    const mockSession = { user: { email: "test@example.com" } };
-    const mockUser = {
-      id: "user-123",
-      name: "Test",
-      email: "test@example.com",
-      emailVerified: null,
-    };
-
-    (auth as jest.Mock).mockResolvedValue(mockSession);
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
-    (prisma.verificationToken.deleteMany as jest.Mock).mockResolvedValue({});
-    (prisma.verificationToken.create as jest.Mock).mockResolvedValue({});
-    (sendNotificationEmail as jest.Mock).mockResolvedValue({ success: true });
-
-    const request = createRequest();
-    await POST(request);
-
-    expect(prisma.verificationToken.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        identifier: "test@example.com",
-        tokenHash: expect.any(String),
-        expires: expect.any(Date),
-      }),
-    });
-
-    const createCall = (prisma.verificationToken.create as jest.Mock).mock
-      .calls[0][0];
-    const expires = createCall.data.expires;
-    const now = Date.now();
-    const twentyFourHoursFromNow = now + 24 * 60 * 60 * 1000;
-
-    expect(expires.getTime()).toBeGreaterThan(now);
-    expect(expires.getTime()).toBeLessThanOrEqual(
-      twentyFourHoursFromNow + 1000
-    );
-  });
-
   it("uses default user name when user has no name", async () => {
     const mockSession = { user: { email: "test@example.com" } };
     const mockUser = {
@@ -215,9 +198,6 @@ describe("Resend Verification API", () => {
 
     (auth as jest.Mock).mockResolvedValue(mockSession);
     (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
-    (prisma.verificationToken.deleteMany as jest.Mock).mockResolvedValue({});
-    (prisma.verificationToken.create as jest.Mock).mockResolvedValue({});
-    (sendNotificationEmail as jest.Mock).mockResolvedValue({ success: true });
 
     const request = createRequest();
     await POST(request);
@@ -240,9 +220,6 @@ describe("Resend Verification API", () => {
       email: "test@example.com",
       emailVerified: null,
     });
-    (prisma.verificationToken.deleteMany as jest.Mock).mockResolvedValue({});
-    (prisma.verificationToken.create as jest.Mock).mockResolvedValue({});
-    (sendNotificationEmail as jest.Mock).mockResolvedValue({ success: true });
 
     const request = createRequest();
     await POST(request);
@@ -283,7 +260,7 @@ describe("Resend Verification API", () => {
     expect(data.error).toBe("Failed to send verification email");
   });
 
-  it("handles email sending errors gracefully", async () => {
+  it("clears pending token and returns 503 when email sending fails", async () => {
     const mockSession = { user: { email: "test@example.com" } };
     const mockUser = {
       id: "user-123",
@@ -295,8 +272,6 @@ describe("Resend Verification API", () => {
     (withRateLimit as jest.Mock).mockResolvedValue(null);
     (auth as jest.Mock).mockResolvedValue(mockSession);
     (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
-    (prisma.verificationToken.deleteMany as jest.Mock).mockResolvedValue({});
-    (prisma.verificationToken.create as jest.Mock).mockResolvedValue({});
     (sendNotificationEmail as jest.Mock).mockResolvedValue({
       success: false,
       error: "Email Error",
@@ -308,5 +283,32 @@ describe("Resend Verification API", () => {
 
     expect(response.status).toBe(503);
     expect(data.error).toBe("Email service temporarily unavailable");
+    expect(clearPendingVerificationToken).toHaveBeenCalledWith(
+      "test@example.com",
+      "prepared-token-hash"
+    );
+    expect(promotePendingVerificationToken).not.toHaveBeenCalled();
+  });
+
+  it("returns success even if promotion fails after email send", async () => {
+    const mockSession = { user: { email: "test@example.com" } };
+    const mockUser = {
+      id: "user-123",
+      name: "Test",
+      email: "test@example.com",
+      emailVerified: null,
+    };
+
+    (auth as jest.Mock).mockResolvedValue(mockSession);
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
+    (promotePendingVerificationToken as jest.Mock).mockRejectedValue(
+      new Error("promotion failed")
+    );
+
+    const response = await POST(createRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.message).toBe("Verification email sent successfully");
   });
 });

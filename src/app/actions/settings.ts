@@ -5,6 +5,11 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { logger } from "@/lib/logger";
+import {
+  invalidatePasswordState,
+  preparePasswordUpdate,
+  updateUserPassword,
+} from "@/lib/password-security";
 import { z } from "zod";
 import {
   checkRateLimit,
@@ -140,7 +145,7 @@ export async function changePassword(
   try {
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { password: true },
+      select: { password: true, email: true },
     });
 
     if (!user?.password) {
@@ -155,11 +160,19 @@ export async function changePassword(
       return { success: false, error: "Current password is incorrect" };
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 12);
-    await prisma.user.update({
-      where: { id: session.user.id },
-      data: { password: hashedPassword, passwordChangedAt: new Date() },
+    const passwordUpdate = await preparePasswordUpdate(newPassword);
+
+    await prisma.$transaction(async (tx) => {
+      if (user.email) {
+        await tx.passwordResetToken.deleteMany({
+          where: { email: user.email },
+        });
+      }
+
+      await updateUserPassword(tx, session.user.id, passwordUpdate);
     });
+
+    invalidatePasswordState(session.user.id);
 
     return { success: true };
   } catch (error: unknown) {

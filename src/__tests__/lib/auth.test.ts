@@ -66,6 +66,15 @@ describe("auth.ts NextAuth configuration", () => {
   // ── Session callback ──
 
   describe("session callback", () => {
+    it("clears the authenticated user when token is passwordInvalidated", async () => {
+      const session = { user: { id: "user-123" } as any };
+      const token = { passwordInvalidated: true };
+
+      const result = await config.callbacks.session({ session, token });
+
+      expect(result.user).toBeUndefined();
+    });
+
     it("enriches session.user with token data", async () => {
       const session = { user: {} as any };
       const token = {
@@ -210,6 +219,42 @@ describe("auth.ts NextAuth configuration", () => {
 
       expect(prisma.user.findUnique).not.toHaveBeenCalled();
       expect(result.isAdmin).toBe(false);
+    });
+
+    it("invalidates the token immediately when passwordChangedAt is newer than authTime", async () => {
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        passwordChangedAt: new Date(200 * 1000),
+      });
+
+      const token = {
+        sub: "user-123",
+        authTime: 100,
+      } as any;
+      const result = await config.callbacks.jwt({ token });
+
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { id: "user-123" },
+        select: { passwordChangedAt: true },
+      });
+      expect(result.passwordInvalidated).toBe(true);
+    });
+
+    it("preserves the token when password revocation lookup errors", async () => {
+      (prisma.user.findUnique as jest.Mock).mockRejectedValue(
+        new Error("DB Error")
+      );
+
+      const token = {
+        sub: "user-123",
+        authTime: 100,
+      } as any;
+      const result = await config.callbacks.jwt({ token });
+
+      expect(result.passwordInvalidated).toBeUndefined();
+      expect(logger.sync.error).toHaveBeenCalledWith(
+        "JWT passwordChangedAt check failed",
+        expect.objectContaining({ error: "DB Error" })
+      );
     });
 
     it("keeps existing token values on DB error", async () => {

@@ -351,58 +351,27 @@ describe("Auth Edge Cases - Category A", () => {
 
   // A6: Password reset with recently changed password
   describe("A6: Password reset security constraints", () => {
-    it("rejects password reset token after password was already changed", async () => {
-      const token = {
-        token: "reset-token",
-        userId: "user-123",
-        expires: new Date(Date.now() + 3600000),
-        createdAt: new Date(Date.now() - 7200000), // 2 hours ago
-      };
-
-      const user = {
-        id: "user-123",
-        passwordChangedAt: new Date(Date.now() - 1800000), // 30 min ago (after token)
-      };
-
-      (prisma.passwordResetToken.findUnique as jest.Mock).mockResolvedValue(
-        token
-      );
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue(user);
-
-      const foundToken = await prisma.passwordResetToken.findUnique({
-        where: { tokenHash: "reset-token" },
-      });
-      // PasswordResetToken uses email, not userId - cast for test mocking
-      const foundUser = await prisma.user.findUnique({
-        where: { id: (foundToken as unknown as { userId: string })?.userId },
-      });
-
-      // Token should be rejected if password changed after token creation
-      const tokenCreatedAt = token.createdAt.getTime();
-      const passwordChangedAt =
-        (foundUser as any)?.passwordChangedAt?.getTime() || 0;
-
-      expect(passwordChangedAt).toBeGreaterThan(tokenCreatedAt);
-    });
-
     it("prevents reuse of password reset token", async () => {
       (prisma.passwordResetToken.findUnique as jest.Mock)
-        .mockResolvedValueOnce({ token: "reset-token", userId: "user-123" })
+        .mockResolvedValueOnce({
+          tokenHash: "reset-token-hash",
+          email: "test@example.com",
+        })
         .mockResolvedValueOnce(null); // Second attempt returns null
 
       (prisma.passwordResetToken.delete as jest.Mock).mockResolvedValue({});
 
       const firstAttempt = await prisma.passwordResetToken.findUnique({
-        where: { tokenHash: "reset-token" },
+        where: { tokenHash: "reset-token-hash" },
       });
       expect(firstAttempt).not.toBeNull();
 
       await prisma.passwordResetToken.delete({
-        where: { tokenHash: "reset-token" },
+        where: { tokenHash: "reset-token-hash" },
       });
 
       const secondAttempt = await prisma.passwordResetToken.findUnique({
-        where: { tokenHash: "reset-token" },
+        where: { tokenHash: "reset-token-hash" },
       });
       expect(secondAttempt).toBeNull();
     });
@@ -821,28 +790,24 @@ describe("Auth Edge Cases - Category A", () => {
     });
   });
 
-  // A20: Secure logout across devices
-  describe("A20: Cross-device logout", () => {
-    it("logs out from all devices when requested", async () => {
-      (prisma.session.deleteMany as jest.Mock).mockResolvedValue({ count: 4 });
+  // A20: JWT revocation after password change
+  describe("A20: Password-change security stamp", () => {
+    it("treats an older JWT as stale when passwordChangedAt is newer than authTime", () => {
+      const authTime = Math.floor(Date.now() / 1000) - 300;
+      const passwordChangedAt = new Date((authTime + 60) * 1000);
 
-      const result = await prisma.session.deleteMany({
-        where: { userId: "user-123" },
-      });
+      const isStale = Math.floor(passwordChangedAt.getTime() / 1000) > authTime;
 
-      expect(result.count).toBe(4);
+      expect(isStale).toBe(true);
     });
 
-    it("logs out only current session by default", async () => {
-      (prisma.session.delete as jest.Mock).mockResolvedValue({
-        id: "current-session",
-      });
+    it("keeps a JWT valid when passwordChangedAt is older than authTime", () => {
+      const authTime = Math.floor(Date.now() / 1000);
+      const passwordChangedAt = new Date((authTime - 60) * 1000);
 
-      const result = await prisma.session.delete({
-        where: { id: "current-session" },
-      });
+      const isStale = Math.floor(passwordChangedAt.getTime() / 1000) > authTime;
 
-      expect(result.id).toBe("current-session");
+      expect(isStale).toBe(false);
     });
   });
 });

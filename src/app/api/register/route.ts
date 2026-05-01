@@ -1,4 +1,5 @@
 import { after, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
@@ -54,8 +55,48 @@ async function registrationAcceptedAfterTiming(
   return registrationAcceptedResponse();
 }
 
-function isPrismaUniqueConstraintError(error: unknown) {
-  return (error as { code?: unknown })?.code === "P2002";
+function isDuplicateRegistrationUniqueConstraintError(error: unknown) {
+  const code =
+    error instanceof Prisma.PrismaClientKnownRequestError
+      ? error.code
+      : (error as { code?: unknown })?.code;
+
+  if (code !== "P2002") {
+    return false;
+  }
+
+  const meta =
+    error instanceof Prisma.PrismaClientKnownRequestError
+      ? error.meta
+      : (error as { meta?: { target?: unknown; modelName?: unknown } })?.meta;
+  const target = meta?.target;
+  const rawTargets = (
+    Array.isArray(target) ? target : typeof target === "string" ? [target] : []
+  ).map((value) => String(value).toLowerCase());
+  const targetTokens = rawTargets.flatMap((value) =>
+    value.split(/[^a-z0-9]+/).filter(Boolean)
+  );
+  const tokenSet = new Set(targetTokens);
+  const modelName =
+    typeof meta?.modelName === "string"
+      ? meta.modelName.toLowerCase()
+      : undefined;
+
+  if (!modelName && rawTargets.length === 0) {
+    return true;
+  }
+
+  const isUserEmailConstraint =
+    tokenSet.has("email") &&
+    (!modelName || modelName === "user" || tokenSet.has("user"));
+
+  const isVerificationIdentifierConstraint =
+    tokenSet.has("identifier") &&
+    (modelName === "verificationtoken" ||
+      tokenSet.has("verificationtoken") ||
+      rawTargets.every((value) => value === "identifier"));
+
+  return isUserEmailConstraint || isVerificationIdentifierConstraint;
 }
 
 export async function POST(request: Request) {
@@ -147,7 +188,7 @@ export async function POST(request: Request) {
         }),
       ]);
     } catch (error) {
-      if (isPrismaUniqueConstraintError(error)) {
+      if (isDuplicateRegistrationUniqueConstraintError(error)) {
         return registrationAcceptedAfterTiming(
           acceptedStartedAt,
           acceptedDelayMs
@@ -161,7 +202,7 @@ export async function POST(request: Request) {
       process.env.AUTH_URL ||
       process.env.NEXTAUTH_URL ||
       "http://localhost:3000";
-    const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${verificationToken}`;
+    const verificationUrl = `${baseUrl}/verify-email?token=${verificationToken}`;
 
     after(async () => {
       try {

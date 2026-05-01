@@ -35,6 +35,9 @@ function LoginForm() {
   const { data: existingSession } = useSession();
   const registered = searchParams.get("registered");
   const urlError = searchParams.get("error");
+  const reason = searchParams.get("reason");
+  const authAlertCode =
+    reason === "password_changed" ? "PasswordChanged" : urlError;
   const emailInputRef = useRef<HTMLInputElement>(null);
   const isTurnstileEnabled = Boolean(
     process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
@@ -55,14 +58,14 @@ function LoginForm() {
 
   // Focus email input when OAuth error suggests using email form
   useEffect(() => {
-    if (urlError && shouldHighlightEmailForm(urlError)) {
+    if (authAlertCode && shouldHighlightEmailForm(authAlertCode)) {
       // Small delay to ensure DOM is ready
       const timer = setTimeout(() => {
         emailInputRef.current?.focus();
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [urlError]);
+  }, [authAlertCode]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -158,8 +161,8 @@ function LoginForm() {
       )}
 
       <div id="form-error" role="alert" aria-atomic="true">
-        {(error || urlError) && (
-          <AuthErrorAlert errorCode={urlError} customError={error} />
+        {(error || authAlertCode) && (
+          <AuthErrorAlert errorCode={authAlertCode} customError={error} />
         )}
       </div>
 

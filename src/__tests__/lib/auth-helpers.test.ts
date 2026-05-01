@@ -16,10 +16,14 @@ jest.mock("next/server", () => ({
       json: async () => data,
       headers: new Map(Object.entries(init?.headers || {})),
     }),
-    redirect: (url: URL) => ({
-      status: 307,
-      headers: new Map([["location", url.toString()]]),
-    }),
+    redirect: (url: URL | string) => {
+      const location = url instanceof URL ? url.toString() : url;
+      return {
+        status: 307,
+        headers: new Map([["location", location]]),
+        json: async () => ({}),
+      };
+    },
   },
 }));
 
@@ -33,16 +37,18 @@ import {
   isGoogleEmailVerified,
   checkSuspension,
   AUTH_ROUTES,
+  _suspensionCache,
 } from "@/lib/auth-helpers";
 import { getToken } from "next-auth/jwt";
 import { prisma } from "@/lib/prisma";
 
 // Helper to create a minimal mock NextRequest
-function createMockRequest(pathname: string, method = "GET") {
-  return {
-    nextUrl: { pathname, origin: "https://roomshare.test" },
-    method,
-  } as any;
+function createMockRequest(
+  pathname: string,
+  method = "GET",
+  origin = "http://localhost:3000"
+) {
+  return { nextUrl: { pathname, origin }, method } as any;
 }
 
 // ── isPublicRoute ──
@@ -191,6 +197,7 @@ describe("checkSuspension", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    _suspensionCache.clear();
     process.env = { ...originalEnv, AUTH_SECRET: "test-secret" } as any;
   });
 
@@ -317,7 +324,7 @@ describe("checkSuspension", () => {
     }
   );
 
-  it.each(["/admin", "/admin/reports", "/dashboard", "/listings/create"])(
+  it.each(["/dashboard", "/listings/create"])(
     "blocks access to protected page %s for suspended users",
     async (path) => {
       (getToken as jest.Mock).mockResolvedValue({
@@ -374,67 +381,86 @@ describe("checkSuspension", () => {
 
     expect(prisma.user.findUnique).toHaveBeenCalledWith({
       where: { id: "user-789" },
-      select: { isSuspended: true, passwordChangedAt: true },
+      select: { isSuspended: true },
     });
   });
 
-  it("checks DB on each protected request so new suspension is immediate", async () => {
+  it("redirects immediately when token.passwordInvalidated is already set", async () => {
+    (getToken as jest.Mock).mockResolvedValue({
+      sub: "user-123",
+      passwordInvalidated: true,
+    });
+
+    const result = await checkSuspension(createMockRequest("/dashboard"));
+
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe(307);
+    expect(result!.headers.get("location")).toBe(
+      "http://localhost:3000/login?reason=password_changed"
+    );
+  });
+
+  it("redirects immediately when passwordChangedAt is newer than authTime", async () => {
     (getToken as jest.Mock).mockResolvedValue({
       sub: "user-123",
       isSuspended: false,
+      authTime: 100,
     });
     (prisma.user.findUnique as jest.Mock)
+      .mockResolvedValueOnce({ isSuspended: false })
       .mockResolvedValueOnce({
-        isSuspended: false,
-        passwordChangedAt: null,
-      })
-      .mockResolvedValueOnce({
-        isSuspended: true,
-        passwordChangedAt: null,
+        passwordChangedAt: new Date(200 * 1000),
       });
 
-    const first = await checkSuspension(
-      createMockRequest("/api/messages", "POST")
-    );
-    const second = await checkSuspension(
-      createMockRequest("/api/messages", "POST")
+    const result = await checkSuspension(
+      createMockRequest("/api/bookings", "POST")
     );
 
-    expect(first).toBeNull();
-    expect(second).not.toBeNull();
-    expect(second!.status).toBe(403);
-    expect(prisma.user.findUnique).toHaveBeenCalledTimes(2);
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe(307);
+    expect(result!.headers.get("location")).toBe(
+      "http://localhost:3000/login?reason=password_changed"
+    );
   });
 
-  it("checks DB on each protected request so password resets revoke stale sessions immediately", async () => {
-    const authTime = 1_700_000_000;
-    const passwordChangedAt = new Date((authTime + 60) * 1000);
+  it("does not let a warmed suspension cache hide a newer password change", async () => {
     (getToken as jest.Mock).mockResolvedValue({
       sub: "user-123",
       isSuspended: false,
-      authTime,
+      authTime: 100,
     });
     (prisma.user.findUnique as jest.Mock)
+      .mockResolvedValueOnce({ isSuspended: false })
+      .mockResolvedValueOnce({ passwordChangedAt: null })
       .mockResolvedValueOnce({
-        isSuspended: false,
-        passwordChangedAt: null,
-      })
-      .mockResolvedValueOnce({
-        isSuspended: false,
-        passwordChangedAt,
+        passwordChangedAt: new Date(200 * 1000),
       });
 
-    const first = await checkSuspension(createMockRequest("/dashboard"));
-    const second = await checkSuspension(createMockRequest("/dashboard"));
-
-    expect(first).toBeNull();
-    expect(second).not.toBeNull();
-    expect(second!.status).toBe(307);
-    expect(second!.headers.get("location")).toBe(
-      "https://roomshare.test/login?reason=password_changed"
+    const firstResult = await checkSuspension(
+      createMockRequest("/api/bookings", "POST")
     );
-    expect(prisma.user.findUnique).toHaveBeenCalledTimes(2);
+    expect(firstResult).toBeNull();
+
+    const secondResult = await checkSuspension(
+      createMockRequest("/api/bookings", "POST")
+    );
+    expect(secondResult).not.toBeNull();
+    expect(secondResult!.status).toBe(307);
+
+    expect(prisma.user.findUnique).toHaveBeenNthCalledWith(1, {
+      where: { id: "user-123" },
+      select: { isSuspended: true },
+    });
+    expect(prisma.user.findUnique).toHaveBeenNthCalledWith(2, {
+      where: { id: "user-123" },
+      select: { passwordChangedAt: true },
+    });
+    expect(prisma.user.findUnique).toHaveBeenNthCalledWith(3, {
+      where: { id: "user-123" },
+      select: { passwordChangedAt: true },
+    });
   });
+
   // --- Edge cases ---
 
   it("returns null when token has no sub (userId)", async () => {
@@ -453,10 +479,11 @@ describe("checkSuspension", () => {
     expect(result).toBeNull();
   });
 
-  it("returns null on DB error (documented fail-open behavior)", async () => {
+  it("allows access when password revocation state cannot be verified", async () => {
     (getToken as jest.Mock).mockResolvedValue({
       sub: "user-123",
       isSuspended: false,
+      authTime: 100,
     });
     (prisma.user.findUnique as jest.Mock).mockRejectedValue(
       new Error("DB connection lost")

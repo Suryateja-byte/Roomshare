@@ -53,11 +53,11 @@ export async function POST(request: NextRequest) {
   const csrfResponse = validateCsrf(request);
   if (csrfResponse) return csrfResponse;
 
-  // Rate limit: 3 password reset requests per hour per IP
-  const rateLimitResponse = await withRateLimit(request, {
-    type: "forgotPassword",
+  const ipRateLimitResponse = await withRateLimit(request, {
+    type: "forgotPasswordByIp",
+    endpoint: "forgotPasswordByIp",
   });
-  if (rateLimitResponse) return rateLimitResponse;
+  if (ipRateLimitResponse) return ipRateLimitResponse;
 
   if (process.env.NODE_ENV === "production" && !process.env.RESEND_API_KEY) {
     return NextResponse.json(
@@ -73,8 +73,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid input" }, { status: 400 });
     }
     const { email, turnstileToken } = parsed.data;
+    const normalizedEmail = normalizeEmail(email);
 
-    // Verify Turnstile token before processing
     const turnstileResult = await verifyTurnstileToken(turnstileToken);
     if (!turnstileResult.success) {
       return NextResponse.json(
@@ -83,7 +83,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const normalizedEmail = normalizeEmail(email);
+    const emailRateLimitResponse = await withRateLimit(request, {
+      type: "forgotPassword",
+      getIdentifier: () => normalizedEmail,
+      endpoint: "forgotPasswordByEmail",
+    });
+    if (emailRateLimitResponse) return emailRateLimitResponse;
+
     const acceptedStartedAt = Date.now();
     const acceptedDelayMs = getPasswordResetAcceptedDelayMs();
 
