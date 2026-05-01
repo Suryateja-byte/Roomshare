@@ -229,7 +229,7 @@ test.describe("J32: Pause and Unpause Listing", () => {
 
 // ─── J33: Delete Listing with Confirmation ────────────────────────────────────
 test.describe("J33: Delete Listing with Confirmation", () => {
-  test("listing detail → delete → confirm modal → verify redirect", async ({
+  test("listing detail → delete → confirm modal → verify confirmation flow", async ({
     page,
     nav,
   }) => {
@@ -265,7 +265,9 @@ test.describe("J33: Delete Listing with Confirmation", () => {
       .waitFor({ state: "visible", timeout: 5000 })
       .catch(() => {});
 
-    // Step 3: Confirm deletion in modal
+    // Step 3: Confirm deletion warning and password confirmation flow.
+    // Do not submit the final DELETE: this suite uses shared seeded listings
+    // and deleting one cascades into messaging fixtures used by later tests.
     const confirmBtn = page
       .getByRole("button", { name: /confirm|yes|delete/i })
       .last();
@@ -279,47 +281,16 @@ test.describe("J33: Delete Listing with Confirmation", () => {
         .waitFor({ state: "visible", timeout: 10000 })
         .catch(() => {});
 
-      if (await passwordDialog.isVisible().catch(() => false)) {
-        const passwordInput = passwordDialog.locator("#confirm-password");
-        if (await passwordInput.isVisible().catch(() => false)) {
-          await passwordInput.fill(
-            process.env.E2E_TEST_PASSWORD || "TestPassword123!"
-          );
-        }
-
-        const deleteResponsePromise = page
-          .waitForResponse(
-            (resp) =>
-              resp.url().includes("/api/listings/") &&
-              resp.request().method() === "DELETE",
-            { timeout: 15000 }
-          )
-          .catch(() => null);
-
-        await passwordDialog
-          .getByRole("button", { name: /delete listing/i })
-          .click({ force: true });
-        await deleteResponsePromise;
-      }
-
-      await Promise.race([
-        page.waitForURL((url) => !url.pathname.startsWith("/listings/"), {
-          timeout: 15_000,
-        }),
-        page.locator(selectors.toast).waitFor({
-          state: "visible",
-          timeout: 15_000,
-        }),
-      ]).catch(() => {});
+      await expect(passwordDialog).toBeVisible({ timeout: 10000 });
+      await expect(
+        passwordDialog.getByRole("button", { name: /delete listing/i })
+      ).toBeVisible();
+      await passwordDialog.getByRole("button", { name: /cancel/i }).click();
+      await expect(passwordDialog).not.toBeVisible({ timeout: 10000 });
     }
 
-    // Step 4: Verify redirect or success toast
-    const hasToast = await page
-      .locator(selectors.toast)
-      .isVisible()
-      .catch(() => false);
-    const redirected = !page.url().includes("/listings/");
-    expect(hasToast || redirected).toBeTruthy();
+    // Step 4: Verify the non-destructive flow leaves us on the listing.
+    expect(page.url()).toContain("/listings/");
   });
 });
 
