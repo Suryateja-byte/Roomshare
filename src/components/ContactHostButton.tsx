@@ -31,6 +31,7 @@ interface PaywallSummary {
 
 interface ContactHostButtonProps {
   listingId: string;
+  unitIdentityEpochObserved?: number | null;
   paywallSummary?: PaywallSummary | null;
   requiresUnlock?: boolean;
   className?: string;
@@ -40,6 +41,7 @@ interface ContactHostButtonProps {
 
 export default function ContactHostButton({
   listingId,
+  unitIdentityEpochObserved = null,
   paywallSummary = null,
   requiresUnlock = false,
   className,
@@ -116,6 +118,9 @@ export default function ContactHostButton({
       const result = await startConversation({
         listingId,
         clientIdempotencyKey: idempotencyKeyRef.current,
+        ...(unitIdentityEpochObserved
+          ? { unitIdentityEpochObserved }
+          : {}),
       });
 
       if ("error" in result && result.error) {

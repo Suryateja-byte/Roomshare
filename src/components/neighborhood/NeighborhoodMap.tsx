@@ -94,6 +94,62 @@ const clusterCountLayerDark: LayerProps = {
   paint: { "text-color": "#18181b" },
 };
 
+const unclusteredPoiLayer: LayerProps = {
+  id: "poi-unclustered",
+  type: "circle",
+  filter: ["!", ["has", "point_count"]],
+  paint: {
+    "circle-color": [
+      "case",
+      ["boolean", ["get", "isSelected"], false],
+      "#9a4027",
+      ["boolean", ["get", "isHovered"], false],
+      "#9a4027",
+      "#ef4444",
+    ],
+    "circle-radius": [
+      "case",
+      [
+        "any",
+        ["boolean", ["get", "isSelected"], false],
+        ["boolean", ["get", "isHovered"], false],
+      ],
+      8,
+      6,
+    ],
+    "circle-stroke-width": 2,
+    "circle-stroke-color": "#ffffff",
+  },
+};
+
+const unclusteredPoiLayerDark: LayerProps = {
+  id: "poi-unclustered-dark",
+  type: "circle",
+  filter: ["!", ["has", "point_count"]],
+  paint: {
+    "circle-color": [
+      "case",
+      ["boolean", ["get", "isSelected"], false],
+      "#f5ebe3",
+      ["boolean", ["get", "isHovered"], false],
+      "#f5ebe3",
+      "#f87171",
+    ],
+    "circle-radius": [
+      "case",
+      [
+        "any",
+        ["boolean", ["get", "isSelected"], false],
+        ["boolean", ["get", "isHovered"], false],
+      ],
+      8,
+      6,
+    ],
+    "circle-stroke-width": 2,
+    "circle-stroke-color": "#18181b",
+  },
+};
+
 // Walkability ring layer styles
 const walkabilityRingLayer: LayerProps = {
   id: "walkability-rings",
@@ -215,10 +271,12 @@ export function NeighborhoodMap({
           walkMins: poi.walkMins,
           rating: poi.rating,
           openNow: poi.openNow,
+          isSelected: selectedPlaceId === poi.placeId,
+          isHovered: hoveredPlaceId === poi.placeId,
         },
       })),
     }),
-    [pois]
+    [hoveredPlaceId, pois, selectedPlaceId]
   );
 
   // Create walkability ring GeoJSON (circles around center)
@@ -266,14 +324,23 @@ export function NeighborhoodMap({
     return map;
   }, [pois]);
 
-  // Handle cluster click to zoom
+  // Handle clustered-layer clicks to zoom clusters or select unclustered POIs
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- react-map-gl MapLayerMouseEvent type is complex and version-dependent
-  const onClusterClick = useCallback(async (event: any) => {
+  const onClusterLayerClick = useCallback(async (event: any) => {
     const feature = event.features?.[0];
     if (!feature || !mapRef.current) return;
 
     const clusterId = feature.properties?.cluster_id;
-    if (!clusterId) return;
+    if (clusterId == null) {
+      const placeId = feature.properties?.placeId;
+      if (typeof placeId !== "string") return;
+      const poi = poiLookup.get(placeId);
+      if (!poi) return;
+
+      setPopupPoi(poi);
+      onPoiClick?.(poi);
+      return;
+    }
 
     const mapboxSource = mapRef.current.getSource("pois") as
       | GeoJSONSource
@@ -291,7 +358,31 @@ export function NeighborhoodMap({
     } catch (error) {
       console.warn("Cluster expansion failed", error);
     }
-  }, []);
+  }, [onPoiClick, poiLookup]);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- react-map-gl MapLayerMouseEvent type is complex and version-dependent
+  const onClusterLayerMouseMove = useCallback(
+    (event: any) => {
+      const feature = event.features?.[0];
+      const placeId = feature?.properties?.placeId;
+      const poi = typeof placeId === "string" ? poiLookup.get(placeId) : null;
+
+      onPoiHover?.(poi ?? null);
+      const canvas = mapRef.current?.getCanvas?.();
+      if (canvas) {
+        canvas.style.cursor = feature ? "pointer" : "";
+      }
+    },
+    [onPoiHover, poiLookup]
+  );
+
+  const onClusterLayerMouseLeave = useCallback(() => {
+    onPoiHover?.(null);
+    const canvas = mapRef.current?.getCanvas?.();
+    if (canvas) {
+      canvas.style.cursor = "";
+    }
+  }, [onPoiHover]);
 
   // Fly to selected POI
   useEffect(() => {
@@ -316,6 +407,15 @@ export function NeighborhoodMap({
   }, [selectedPlaceId]);
 
   const useClustering = pois.length >= 15;
+  const clusterCircleLayerId = isDarkMode
+    ? "poi-clusters-dark"
+    : "poi-clusters";
+  const clusterCountLayerId = isDarkMode
+    ? "poi-cluster-count-dark"
+    : "poi-cluster-count";
+  const unclusteredLayerId = isDarkMode
+    ? "poi-unclustered-dark"
+    : "poi-unclustered";
 
   return (
     <div
@@ -347,10 +447,12 @@ export function NeighborhoodMap({
         {...viewState}
         onMove={(evt) => setViewState(evt.viewState)}
         onLoad={() => setIsMapLoaded(true)}
-        onClick={useClustering ? onClusterClick : undefined}
+        onClick={useClustering ? onClusterLayerClick : undefined}
+        onMouseMove={useClustering ? onClusterLayerMouseMove : undefined}
+        onMouseLeave={useClustering ? onClusterLayerMouseLeave : undefined}
         interactiveLayerIds={
           useClustering
-            ? [isDarkMode ? "poi-clusters-dark" : "poi-clusters"]
+            ? [clusterCircleLayerId, clusterCountLayerId, unclusteredLayerId]
             : []
         }
         style={{ width: "100%", height: "100%" }}
@@ -382,18 +484,20 @@ export function NeighborhoodMap({
               <>
                 <Layer {...clusterLayerDark} />
                 <Layer {...clusterCountLayerDark} />
+                <Layer {...unclusteredPoiLayerDark} />
               </>
             ) : (
               <>
                 <Layer {...clusterLayer} />
                 <Layer {...clusterCountLayer} />
+                <Layer {...unclusteredPoiLayer} />
               </>
             )}
           </Source>
         )}
 
-        {/* Individual POI markers (when not clustered or unclustered points) */}
-        {pois.map((poi) => (
+        {/* Individual POI markers for the non-clustered path only. */}
+        {!useClustering && pois.map((poi) => (
           <Marker
             key={poi.placeId}
             longitude={poi.lng}

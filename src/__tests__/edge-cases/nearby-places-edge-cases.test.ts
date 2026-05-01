@@ -51,7 +51,7 @@ describe("Category E: Nearby Places Cross-Feature Edge Cases", () => {
         listingLat: 37.7749,
         listingLng: -122.4194,
         query: "organic",
-        categories: ["grocery"],
+        categories: ["food-grocery"],
         radiusMeters: 1609,
       };
 
@@ -213,8 +213,8 @@ describe("Category E: Nearby Places Cross-Feature Edge Cases", () => {
 
     it("should handle exact category matches first", () => {
       // Exact match should take priority
-      const groceryColors = getCategoryColors("grocery");
-      expect(groceryColors).toEqual(CATEGORY_COLORS["grocery"]);
+      const groceryColors = getCategoryColors("food-grocery");
+      expect(groceryColors).toEqual(CATEGORY_COLORS["food-grocery"]);
 
       const gymColors = getCategoryColors("gym");
       expect(gymColors).toEqual(CATEGORY_COLORS["gym"]);
@@ -325,7 +325,7 @@ describe("Category E: Nearby Places Cross-Feature Edge Cases", () => {
 
       const fitnessChip = CATEGORY_CHIPS.find((c) => c.label === "Fitness");
       expect(fitnessChip?.categories).toContain("gym");
-      expect(fitnessChip?.categories).toContain("fitness-recreation");
+      expect(fitnessChip?.categories).toEqual(["gym"]);
     });
 
     it("should provide color mappings for all chip categories", () => {

@@ -41,7 +41,7 @@ const PROTECTED_API_PATHS = [
 /**
  * Protected page paths that require suspension check.
  */
-const PROTECTED_PAGE_PATHS = ["/dashboard", "/listings/create"];
+const PROTECTED_PAGE_PATHS = ["/admin", "/dashboard", "/listings/create"];
 
 /**
  * Read-only public API endpoints.
@@ -128,54 +128,26 @@ function buildSuspensionBlockedResponse(): NextResponse {
  * Host header) and sending NEXTAUTH_SECRET in a custom header. Replaced with
  * direct Prisma query to eliminate the secret exfiltration attack surface.
  *
- * @returns true if suspended, false if not, undefined on error (graceful degradation)
+ * @returns live security status; fields are undefined on error (graceful degradation)
  */
-// In-memory cache for suspension status — reduces DB queries on warm instances.
-// In Edge Runtime this cache is per-invocation (no benefit); in Node.js Runtime
-// it persists across warm invocations within the same function instance.
-// H-1: Extended security status (suspension + password change) with shared cache
 interface LiveUserSecurityStatus {
   isSuspended: boolean | undefined;
   passwordChangedAt: Date | null | undefined;
 }
 
-/** @internal Exported for test cleanup only */
-export const _suspensionCache = new Map<
-  string,
-  { value: LiveUserSecurityStatus; expiresAt: number }
->();
-const SUSPENSION_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
 async function getLiveSecurityStatus(
   userId: string
 ): Promise<LiveUserSecurityStatus> {
-  const cached = _suspensionCache.get(userId);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.value;
-  }
-
   try {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { isSuspended: true, passwordChangedAt: true },
     });
 
-    const value: LiveUserSecurityStatus = {
+    return {
       isSuspended: user?.isSuspended === true,
       passwordChangedAt: user?.passwordChangedAt ?? null,
     };
-    _suspensionCache.set(userId, {
-      value,
-      expiresAt: Date.now() + SUSPENSION_CACHE_TTL,
-    });
-
-    // Prevent unbounded cache growth
-    if (_suspensionCache.size > 1000) {
-      const oldestKey = _suspensionCache.keys().next().value;
-      if (oldestKey) _suspensionCache.delete(oldestKey);
-    }
-
-    return value;
   } catch {
     return { isSuspended: undefined, passwordChangedAt: undefined };
   }
@@ -235,7 +207,7 @@ export async function checkSuspension(
     return buildSuspensionBlockedResponse();
   }
 
-  // H-1: Password change invalidation (piggyback on existing DB query, zero new cost)
+  // H-1: Password change invalidation using the live security-status query.
   if (securityStatus.passwordChangedAt && token.authTime) {
     const changedAtEpoch = Math.floor(
       securityStatus.passwordChangedAt.getTime() / 1000

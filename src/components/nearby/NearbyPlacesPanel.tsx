@@ -692,22 +692,22 @@ export default function NearbyPlacesPanel({
  * Handles valid Radar API category names
  */
 function getIconForCategory(category: string) {
-  // Grocery - Radar API uses 'grocery'
+  // Grocery
   if (category.includes("grocery")) return ShoppingCart;
-  // Restaurants - Radar API uses 'restaurant' and 'food-beverage'
+  // Restaurants
   if (category.includes("restaurant") || category.includes("food-beverage"))
     return Utensils;
-  // Shopping - Radar API uses 'shopping'
+  // Shopping
   if (category.includes("shopping")) return ShoppingBag;
-  // Gas stations - Radar API uses 'gas-station'
+  // Gas stations
   if (category.includes("gas") || category.includes("fuel")) return Fuel;
-  // Fitness - Radar API uses 'gym' and 'fitness-recreation'
+  // Fitness
   if (category.includes("gym") || category.includes("fitness")) return Dumbbell;
-  // Pharmacy - Radar API uses 'health-medicine' and 'drugstore'
+  // Pharmacy / health
   if (
     category.includes("pharmacy") ||
     category.includes("drugstore") ||
-    category.includes("health-medicine")
+    category.includes("medical-health")
   )
     return Pill;
   return MapPin;

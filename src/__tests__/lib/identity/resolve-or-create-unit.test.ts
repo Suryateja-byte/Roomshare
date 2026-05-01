@@ -4,10 +4,14 @@ function makeTx(sourceVersion: bigint) {
   return {
     $executeRawUnsafe: jest.fn().mockResolvedValue(undefined),
     $executeRaw: jest.fn().mockResolvedValue(0),
+    $queryRaw: jest.fn().mockResolvedValue([]),
     physicalUnit: {
       upsert: jest.fn().mockResolvedValue({
         id: "unit-1",
         unitIdentityEpoch: 1,
+        canonicalUnit: "_none_",
+        canonicalizerVersion: "v1",
+        geocodeStatus: "PENDING",
         sourceVersion,
       }),
     },
@@ -42,6 +46,17 @@ describe("resolveOrCreateUnit", () => {
     // 1. UNIT_UPSERTED (always)
     // 2. GEOCODE_NEEDED (only for newly created units, so geocoder can resolve lat/lng)
     expect(tx.outboxEvent.create).toHaveBeenCalledTimes(2);
+    expect(tx.outboxEvent.create).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          kind: "GEOCODE_NEEDED",
+          payload: expect.objectContaining({
+            address: "123 Main Street, Austin, tx 73301",
+            canonicalAddressHash: result.canonicalAddressHash,
+          }),
+        }),
+      })
+    );
     expect(tx.auditEvent.create).toHaveBeenCalledTimes(1);
   });
 
@@ -65,6 +80,33 @@ describe("resolveOrCreateUnit", () => {
           sourceVersion: { increment: BigInt(1) },
           rowVersion: { increment: BigInt(1) },
         }),
+      })
+    );
+    expect(tx.outboxEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ kind: "GEOCODE_NEEDED" }),
+      })
+    );
+  });
+
+  it("does not enqueue duplicate geocode work for an existing active geocode event", async () => {
+    const tx = makeTx(BigInt(2));
+    tx.$queryRaw.mockResolvedValueOnce([{ id: "geocode-active" }]);
+
+    await resolveOrCreateUnit(tx as never, {
+      actor: { role: "system", id: null },
+      address: {
+        address: "123 Main St",
+        city: "Austin",
+        state: "TX",
+        zip: "73301",
+      },
+    });
+
+    expect(tx.outboxEvent.create).toHaveBeenCalledTimes(1);
+    expect(tx.outboxEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ kind: "UNIT_UPSERTED" }),
       })
     );
   });

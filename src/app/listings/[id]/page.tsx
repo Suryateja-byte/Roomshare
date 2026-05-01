@@ -10,6 +10,7 @@ import { features } from "@/lib/env";
 import { generateViewToken } from "@/app/api/metrics/hmac";
 import { resolveListingDetailDateParams } from "@/lib/search/listing-detail-link";
 import { resolvePublicAvailability } from "@/lib/search/public-availability";
+import { toPublicCoordinates } from "@/lib/search/public-coordinates";
 import { getPublicListingDetail } from "@/lib/listings/public-detail";
 import ListingPageClient from "./ListingPageClient";
 
@@ -204,9 +205,9 @@ export default async function ListingPage({ params, searchParams }: PageProps) {
   // Start similar listings fetch early (runs in parallel with remaining queries)
   const similarListingsPromise = getSimilarListings(id);
 
-  const [coordinates, reviews] = await Promise.all([
+  const [rawCoordinates, reviews] = await Promise.all([
     (async () => {
-      if (!canViewExactLocation || !listing.location) {
+      if (!listing.location) {
         return null;
       }
 
@@ -221,14 +222,15 @@ export default async function ListingPage({ params, searchParams }: PageProps) {
                     WHERE "listingId" = ${listing.id}
                     AND coords IS NOT NULL
                 `;
-        if (
-          coordsResult.length > 0 &&
-          coordsResult[0].lat &&
-          coordsResult[0].lng
-        ) {
+        if (coordsResult.length > 0) {
+          const lat = Number(coordsResult[0].lat);
+          const lng = Number(coordsResult[0].lng);
+          if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+            return null;
+          }
           return {
-            lat: Number(coordsResult[0].lat),
-            lng: Number(coordsResult[0].lng),
+            lat,
+            lng,
           };
         }
       } catch (error) {
@@ -242,6 +244,12 @@ export default async function ListingPage({ params, searchParams }: PageProps) {
     })(),
     getReviews(listing.id),
   ]);
+  const coordinates = canViewExactLocation ? rawCoordinates : null;
+  const nearbyCoordinates = rawCoordinates
+    ? canViewExactLocation
+      ? rawCoordinates
+      : toPublicCoordinates(rawCoordinates)
+    : null;
 
   const resolvedAvailability = resolvePublicAvailability(listing);
   const availability = {
@@ -378,6 +386,7 @@ export default async function ListingPage({ params, searchParams }: PageProps) {
         userExistingReview={null}
         holdEnabled={features.softHoldsEnabled}
         coordinates={coordinates}
+        nearbyCoordinates={nearbyCoordinates}
         canViewExactLocation={canViewExactLocation}
         similarListings={similarListings}
         viewToken={generateViewToken(listing.id)}

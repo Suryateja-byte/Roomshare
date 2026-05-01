@@ -158,6 +158,7 @@ export class CreateListingPage {
   async fillRequiredFields(data: CreateListingData) {
     await this.fillBasics(data);
     await this.fillLocation(data);
+    await this.selectMoveInDate();
   }
 
   async fillOptionalFields(data: Partial<CreateListingData>) {
@@ -183,16 +184,19 @@ export class CreateListingPage {
       );
     }
     if (data.moveInDate) {
-      // DatePicker is a Radix Popover button trigger — cannot use .fill()
-      // Click trigger to open calendar, then click "Today" to set a date
-      // Wait for the element to be stable before scrolling (may detach during re-render)
-      await this.moveInDateInput.waitFor({ state: "visible", timeout: 5000 });
-      await this.moveInDateInput.scrollIntoViewIfNeeded();
-      await this.moveInDateInput.click();
-      const todayButton = this.page.getByRole("button", { name: "Today" });
-      await todayButton.waitFor({ state: "visible", timeout: 5000 });
-      await todayButton.click();
+      await this.selectMoveInDate();
     }
+  }
+
+  private async selectMoveInDate() {
+    // DatePicker is a Radix Popover button trigger; select "Today" as a valid
+    // required date without relying on a text input.
+    await this.moveInDateInput.waitFor({ state: "visible", timeout: 5000 });
+    await this.moveInDateInput.scrollIntoViewIfNeeded();
+    await this.moveInDateInput.click();
+    const todayButton = this.page.getByRole("button", { name: "Today" });
+    await todayButton.waitFor({ state: "visible", timeout: 5000 });
+    await todayButton.click();
   }
 
   async fillAllFields(data: CreateListingData) {

@@ -33,7 +33,7 @@ async function getAdminStats() {
     prisma.listing.count(),
     prisma.listing.count({ where: { status: "ACTIVE" } }),
     prisma.verificationRequest.count({ where: { status: "PENDING" } }),
-    prisma.report.count(),
+    prisma.report.count({ where: { status: "OPEN" } }),
     prisma.message.count(),
     prisma.user.count({ where: { isVerified: true } }),
   ]);

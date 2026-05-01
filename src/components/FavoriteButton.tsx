@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Heart } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -21,7 +21,23 @@ export default function FavoriteButton({
   const [isSaved, setIsSaved] = useState(initialIsSaved);
   const [isLoading, setIsLoading] = useState(false);
   const [animating, setAnimating] = useState(false);
+  const userTouchedRef = useRef(false);
+  const previousListingIdRef = useRef(listingId);
   const router = useRouter();
+
+  useEffect(() => {
+    if (previousListingIdRef.current !== listingId) {
+      previousListingIdRef.current = listingId;
+      userTouchedRef.current = false;
+      setIsSaved(initialIsSaved);
+      setAnimating(false);
+      return;
+    }
+
+    if (!userTouchedRef.current) {
+      setIsSaved(initialIsSaved);
+    }
+  }, [initialIsSaved, listingId]);
 
   // P2-3: Memoize handler to improve INP by preventing function recreation on each render
   const toggleFavorite = useCallback(
@@ -32,6 +48,7 @@ export default function FavoriteButton({
       if (isLoading) return;
 
       setIsLoading(true);
+      userTouchedRef.current = true;
       triggerLightHaptic();
       // Optimistic update with bounce animation on save
       const previousState = isSaved;

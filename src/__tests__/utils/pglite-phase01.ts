@@ -32,10 +32,7 @@ import type { ActorContext } from "@/lib/db/with-actor";
 // Migration paths
 // ---------------------------------------------------------------------------
 
-const MIGRATIONS_DIR = path.resolve(
-  __dirname,
-  "../../../prisma/migrations"
-);
+const MIGRATIONS_DIR = path.resolve(__dirname, "../../../prisma/migrations");
 
 const MIGRATION_SQL_FILES = [
   path.join(
@@ -169,6 +166,9 @@ function buildClient(handle: QueryHandle): PrismaShapedClient {
         select: {
           id: boolean;
           unitIdentityEpoch: boolean;
+          canonicalUnit?: boolean;
+          canonicalizerVersion?: boolean;
+          geocodeStatus?: boolean;
           sourceVersion: boolean;
         };
       }) => {
@@ -187,7 +187,8 @@ function buildClient(handle: QueryHandle): PrismaShapedClient {
              source_version = physical_units.source_version + $5,
              row_version = physical_units.row_version + $6,
              updated_at = NOW()
-           RETURNING id, unit_identity_epoch, source_version`,
+           RETURNING id, unit_identity_epoch, canonical_unit, canonicalizer_version,
+             geocode_status, source_version`,
           [
             id,
             canonicalAddressHash,
@@ -202,6 +203,9 @@ function buildClient(handle: QueryHandle): PrismaShapedClient {
         return {
           id: String(row.id),
           unitIdentityEpoch: Number(row.unit_identity_epoch),
+          canonicalUnit: String(row.canonical_unit),
+          canonicalizerVersion: String(row.canonicalizer_version),
+          geocodeStatus: String(row.geocode_status),
           sourceVersion: toBigInt(row.source_version),
         };
       },
@@ -296,8 +300,12 @@ function buildClient(handle: QueryHandle): PrismaShapedClient {
             args.data.unitIdentityEpochWrittenAt ??
               args.data.unit_identity_epoch_written_at ??
               1,
-            args.data.canonicalAddressHash ?? args.data.canonical_address_hash ?? "",
-            args.data.canonicalizerVersion ?? args.data.canonicalizer_version ?? "v1",
+            args.data.canonicalAddressHash ??
+              args.data.canonical_address_hash ??
+              "",
+            args.data.canonicalizerVersion ??
+              args.data.canonicalizer_version ??
+              "v1",
           ]
         );
         return { id };
@@ -348,14 +356,17 @@ function buildClient(handle: QueryHandle): PrismaShapedClient {
           [
             id,
             data.unitId ?? data.unit_id,
-            data.unitIdentityEpochWrittenAt ?? data.unit_identity_epoch_written_at ?? 1,
+            data.unitIdentityEpochWrittenAt ??
+              data.unit_identity_epoch_written_at ??
+              1,
             data.inventoryKey ?? data.inventory_key ?? randomUUID(),
             data.roomCategory ?? data.room_category ?? "PRIVATE_ROOM",
             data.capacityGuests ?? data.capacity_guests ?? null,
             data.totalBeds ?? data.total_beds ?? null,
             data.openBeds ?? data.open_beds ?? null,
             data.availableFrom ?? data.available_from ?? "2026-05-01",
-            data.availabilityRange ?? data.availability_range ??
+            data.availabilityRange ??
+              data.availability_range ??
               "[2026-05-01T00:00:00Z,2026-06-01T00:00:00Z)",
             data.price ?? 1000,
             data.canonicalizerVersion ?? data.canonicalizer_version ?? "v1",
@@ -499,8 +510,14 @@ function buildClient(handle: QueryHandle): PrismaShapedClient {
  */
 export interface PrismaShapedClient {
   $executeRawUnsafe: (sql: string) => Promise<number>;
-  $executeRaw: (strings: TemplateStringsArray, ...values: unknown[]) => Promise<number>;
-  $queryRaw: <T>(strings: TemplateStringsArray, ...values: unknown[]) => Promise<T>;
+  $executeRaw: (
+    strings: TemplateStringsArray,
+    ...values: unknown[]
+  ) => Promise<number>;
+  $queryRaw: <T>(
+    strings: TemplateStringsArray,
+    ...values: unknown[]
+  ) => Promise<T>;
   $transaction: <T>(
     fn: (tx: PrismaShapedClient) => Promise<T>,
     options?: Record<string, unknown>
@@ -526,22 +543,55 @@ export interface PrismaShapedClient {
       select: {
         id: boolean;
         unitIdentityEpoch: boolean;
+        canonicalUnit?: boolean;
+        canonicalizerVersion?: boolean;
+        geocodeStatus?: boolean;
         sourceVersion: boolean;
       };
-    }) => Promise<{ id: string; unitIdentityEpoch: number; sourceVersion: bigint }>;
+    }) => Promise<{
+      id: string;
+      unitIdentityEpoch: number;
+      canonicalUnit: string;
+      canonicalizerVersion: string;
+      geocodeStatus: string;
+      sourceVersion: bigint;
+    }>;
     findMany: (args: {
       where: { id: { in: string[] } };
-      select: { id: boolean; unitIdentityEpoch: boolean; supersedesUnitIds: boolean };
-    }) => Promise<Array<{ id: string; unitIdentityEpoch: number; supersedesUnitIds: string[] }>>;
-    update: (args: { where: { id: string }; data: Record<string, unknown> }) => Promise<void>;
+      select: {
+        id: boolean;
+        unitIdentityEpoch: boolean;
+        supersedesUnitIds: boolean;
+      };
+    }) => Promise<
+      Array<{
+        id: string;
+        unitIdentityEpoch: number;
+        supersedesUnitIds: string[];
+      }>
+    >;
+    update: (args: {
+      where: { id: string };
+      data: Record<string, unknown>;
+    }) => Promise<void>;
   };
   hostUnitClaim: {
-    create: (args: { data: Record<string, unknown> }) => Promise<{ id: string }>;
-    update: (args: { where: { id: string }; data: Record<string, unknown> }) => Promise<void>;
+    create: (args: {
+      data: Record<string, unknown>;
+    }) => Promise<{ id: string }>;
+    update: (args: {
+      where: { id: string };
+      data: Record<string, unknown>;
+    }) => Promise<void>;
   };
   listingInventory: {
-    create: (args: { data: Record<string, unknown> }) => Promise<{ id: string }>;
-    update: (args: { where: { id: string }; data: Record<string, unknown> }) => Promise<void>;
+    create: (args: {
+      data: Record<string, unknown>;
+    }) => Promise<{ id: string }>;
+    update: (args: {
+      where: { id: string };
+      data: Record<string, unknown>;
+    }) => Promise<void>;
   };
   identityMutation: {
     create: (args: {
@@ -682,8 +732,12 @@ export async function createPGliteFixture(): Promise<PGliteFixture> {
   const pg = new PGlite();
 
   // Create stub tables needed by FK constraints in the migrations.
-  await pg.query(`CREATE TABLE IF NOT EXISTS "User" (id TEXT PRIMARY KEY, email TEXT)`);
-  await pg.query(`CREATE TABLE IF NOT EXISTS "Listing" (id TEXT PRIMARY KEY, title TEXT)`);
+  await pg.query(
+    `CREATE TABLE IF NOT EXISTS "User" (id TEXT PRIMARY KEY, email TEXT)`
+  );
+  await pg.query(
+    `CREATE TABLE IF NOT EXISTS "Listing" (id TEXT PRIMARY KEY, title TEXT)`
+  );
 
   // Apply each Phase 01 migration in order.
   for (const filePath of MIGRATION_SQL_FILES) {

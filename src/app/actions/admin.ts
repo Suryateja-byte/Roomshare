@@ -30,13 +30,22 @@ export async function requireAdmin() {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { isAdmin: true },
+    select: { isAdmin: true, isSuspended: true },
   });
 
   if (!user?.isAdmin) {
     return {
       error: "Unauthorized",
       code: "NOT_ADMIN",
+      isAdmin: false,
+      userId: session.user.id,
+    };
+  }
+
+  if (user.isSuspended) {
+    return {
+      error: "Account suspended",
+      code: "ACCOUNT_SUSPENDED",
       isAdmin: false,
       userId: session.user.id,
     };
@@ -434,7 +443,7 @@ export async function updateListingStatus(
     // Audit log
     await logAdminAction({
       adminId: adminCheck.userId!,
-        action:
+      action:
         result.status === "PAUSED"
           ? "LISTING_HIDDEN"
           : result.status === "RENTED"
@@ -494,7 +503,8 @@ export async function reviewListingMigration(
   void expectedVersion;
 
   return {
-    error: "Listing migration review was retired with the contact-first cutover.",
+    error:
+      "Listing migration review was retired with the contact-first cutover.",
     code: "MIGRATION_REVIEW_RETIRED",
   };
 }
@@ -519,34 +529,94 @@ export async function deleteListing(listingId: string) {
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      // Lock listing row to prevent concurrent modifications (TOCTOU fix)
+      // Lock listing row to prevent concurrent modifications and report races.
       const [listing] = await tx.$queryRaw<
-        { id: string; title: string; ownerId: string; status: string }[]
-      >`SELECT "id", "title", "ownerId", "status" FROM "Listing" WHERE "id" = ${listingId} FOR UPDATE`;
+        {
+          id: string;
+          title: string;
+          ownerId: string;
+          status: ListingStatus;
+          statusReason: string | null;
+          version: number;
+        }[]
+      >`
+        SELECT "id", "title", "ownerId", "status", "statusReason", "version"
+        FROM "Listing"
+        WHERE "id" = ${listingId}
+        FOR UPDATE
+      `;
 
       if (!listing) throw new Error("NOT_FOUND");
 
-      // Delete the listing
+      const reportCount = await tx.report.count({ where: { listingId } });
+      if (reportCount > 0) {
+        const newVersion = listing.version + 1;
+        await tx.listing.update({
+          where: { id: listingId },
+          data: {
+            status: "PAUSED",
+            statusReason: "SUPPRESSED",
+            version: newVersion,
+          },
+        });
+        await markListingDirtyInTx(tx, listingId, "status_changed");
+
+        return {
+          action: "suppressed",
+          listing,
+          reportCount,
+          newVersion,
+        } as const;
+      }
+
       await tx.listing.delete({ where: { id: listingId } });
 
-      return { listing };
+      return { action: "deleted", listing, reportCount } as const;
     });
 
     // Audit log AFTER successful transaction
-    await logAdminAction({
-      adminId: adminCheck.userId!,
-      action: "LISTING_DELETED",
-      targetType: "Listing",
-      targetId: listingId,
-      details: {
-        listingTitle: result.listing.title,
-        ownerId: result.listing.ownerId,
-        previousStatus: result.listing.status,
-      },
-    });
+    if (result.action === "suppressed") {
+      await logAdminAction({
+        adminId: adminCheck.userId!,
+        action: "LISTING_HIDDEN",
+        targetType: "Listing",
+        targetId: listingId,
+        details: {
+          listingTitle: result.listing.title,
+          ownerId: result.listing.ownerId,
+          previousStatus: result.listing.status,
+          previousStatusReason: result.listing.statusReason,
+          newStatus: "PAUSED",
+          newStatusReason: "SUPPRESSED",
+          reportCount: result.reportCount,
+          suppressedDueToAdminDelete: true,
+          version: result.newVersion,
+        },
+      });
+    } else {
+      await logAdminAction({
+        adminId: adminCheck.userId!,
+        action: "LISTING_DELETED",
+        targetType: "Listing",
+        targetId: listingId,
+        details: {
+          listingTitle: result.listing.title,
+          ownerId: result.listing.ownerId,
+          previousStatus: result.listing.status,
+        },
+      });
+    }
 
     revalidatePath("/admin/listings");
-    return { success: true, notifiedTenants: 0 };
+    return result.action === "suppressed"
+      ? {
+          success: true,
+          action: result.action,
+          notifiedTenants: 0,
+          status: "PAUSED" as const,
+          version: result.newVersion,
+        }
+      : { success: true, action: result.action, notifiedTenants: 0 };
   } catch (error) {
     if (error instanceof Error) {
       if (error.message === "NOT_FOUND") return { error: "Listing not found" };
@@ -659,24 +729,49 @@ export async function resolveReport(
   }
 
   try {
-    const report = await prisma.report.findUnique({
-      where: { id: reportId },
-      select: { status: true, reason: true, listingId: true, reporterId: true },
+    const reviewedAt = new Date();
+    const result = await prisma.$transaction(async (tx) => {
+      const [report] = await tx.$queryRaw<
+        Array<{
+          status: ReportStatus;
+          reason: string;
+          listingId: string;
+          reporterId: string;
+        }>
+      >`
+        SELECT status, reason, "listingId", "reporterId"
+        FROM "Report"
+        WHERE id = ${reportId}
+        FOR UPDATE
+      `;
+
+      if (!report) {
+        return { error: "Report not found", code: "NOT_FOUND" } as const;
+      }
+
+      if (report.status !== "OPEN") {
+        return {
+          error: "This report has already been reviewed.",
+          code: "STATE_CONFLICT",
+        } as const;
+      }
+
+      await tx.report.update({
+        where: { id: reportId },
+        data: {
+          status: action,
+          adminNotes: notes,
+          reviewedBy: adminCheck.userId,
+          resolvedAt: reviewedAt,
+        },
+      });
+
+      return { success: true, report } as const;
     });
 
-    if (!report) {
-      return { error: "Report not found" };
+    if ("error" in result) {
+      return result;
     }
-
-    await prisma.report.update({
-      where: { id: reportId },
-      data: {
-        status: action,
-        adminNotes: notes,
-        reviewedBy: adminCheck.userId,
-        resolvedAt: new Date(),
-      },
-    });
 
     // Audit log
     await logAdminAction({
@@ -685,11 +780,11 @@ export async function resolveReport(
       targetType: "Report",
       targetId: reportId,
       details: {
-        previousStatus: report.status,
+        previousStatus: result.report.status,
         newStatus: action,
-        reason: report.reason,
-        listingId: report.listingId,
-        reporterId: report.reporterId,
+        reason: result.report.reason,
+        listingId: result.report.listingId,
+        reporterId: result.report.reporterId,
         adminNotes: notes,
       },
     });
@@ -731,45 +826,85 @@ export async function resolveReportAndRemoveListing(
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      // Fetch and validate report
-      const report = await tx.report.findUnique({
-        where: { id: reportId },
-        select: {
-          listingId: true,
-          reason: true,
-          reporterId: true,
-          status: true,
-        },
-      });
+      const [report] = await tx.$queryRaw<
+        Array<{
+          listingId: string;
+          reason: string;
+          reporterId: string;
+          status: ReportStatus;
+        }>
+      >`
+        SELECT "listingId", reason, "reporterId", status
+        FROM "Report"
+        WHERE id = ${reportId}
+        FOR UPDATE
+      `;
 
-      if (!report) throw new Error("REPORT_NOT_FOUND");
+      if (!report) {
+        return { error: "Report not found", code: "NOT_FOUND" } as const;
+      }
 
-      // Lock listing row to prevent concurrent modifications (TOCTOU fix)
+      if (report.status !== "OPEN") {
+        return {
+          error: "This report has already been reviewed.",
+          code: "STATE_CONFLICT",
+        } as const;
+      }
+
+      // Lock listing row to prevent concurrent moderation races.
       const [listing] = await tx.$queryRaw<
-        { id: string; title: string; ownerId: string }[]
-      >`SELECT "id", "title", "ownerId" FROM "Listing" WHERE "id" = ${report.listingId} FOR UPDATE`;
+        {
+          id: string;
+          title: string;
+          ownerId: string;
+          status: ListingStatus;
+          statusReason: string | null;
+          version: number;
+        }[]
+      >`
+        SELECT "id", "title", "ownerId", status, "statusReason", version
+        FROM "Listing"
+        WHERE "id" = ${report.listingId}
+        FOR UPDATE
+      `;
 
-      if (!listing) throw new Error("LISTING_NOT_FOUND");
+      if (!listing) {
+        return { error: "Listing not found", code: "NOT_FOUND" } as const;
+      }
 
       // Update report status
       await tx.report.update({
         where: { id: reportId },
         data: {
           status: "RESOLVED",
-          adminNotes: notes || "Listing removed due to policy violation",
+          adminNotes: notes || "Listing suppressed due to policy violation",
           reviewedBy: adminCheck.userId,
           resolvedAt: new Date(),
         },
       });
 
-      // Delete the listing
-      await tx.listing.delete({ where: { id: report.listingId } });
+      await tx.listing.update({
+        where: { id: report.listingId },
+        data: {
+          status: "PAUSED",
+          statusReason: "SUPPRESSED",
+          version: listing.version + 1,
+        },
+      });
+
+      await markListingDirtyInTx(tx, report.listingId, "status_changed");
 
       return {
+        success: true,
         report,
         listing,
-      };
+        newVersion: listing.version + 1,
+      } as const;
     });
+
+    if ("error" in result) {
+      return result;
+    }
 
     // Audit log for report resolution (AFTER successful transaction)
     await logAdminAction({
@@ -783,22 +918,27 @@ export async function resolveReportAndRemoveListing(
         reason: result.report.reason,
         listingId: result.report.listingId,
         reporterId: result.report.reporterId,
-        adminNotes: notes || "Listing removed due to policy violation",
-        listingRemoved: true,
+        adminNotes: notes || "Listing suppressed due to policy violation",
+        listingSuppressed: true,
       },
     });
 
-    // Audit log for listing deletion
+    // Audit log for listing suppression
     await logAdminAction({
       adminId: adminCheck.userId!,
-      action: "LISTING_DELETED",
+      action: "LISTING_HIDDEN",
       targetType: "Listing",
       targetId: result.report.listingId,
       details: {
         listingTitle: result.listing.title,
         ownerId: result.listing.ownerId,
-        deletedDueToReport: reportId,
-        adminNotes: notes || "Listing removed due to policy violation",
+        previousStatus: result.listing.status,
+        previousStatusReason: result.listing.statusReason,
+        newStatus: "PAUSED",
+        newStatusReason: "SUPPRESSED",
+        version: result.newVersion,
+        suppressedDueToReport: reportId,
+        adminNotes: notes || "Listing suppressed due to policy violation",
       },
     });
 
@@ -806,13 +946,7 @@ export async function resolveReportAndRemoveListing(
     revalidatePath("/admin/listings");
     return { success: true, affectedBookings: 0 };
   } catch (error) {
-    if (error instanceof Error) {
-      if (error.message === "REPORT_NOT_FOUND")
-        return { error: "Report not found" };
-      if (error.message === "LISTING_NOT_FOUND")
-        return { error: "Listing not found" };
-    }
-    logger.sync.error("Failed to resolve report with listing removal", {
+    logger.sync.error("Failed to resolve report with listing suppression", {
       action: "resolveReportAndRemoveListing",
       adminId: adminCheck.userId,
       reportId,

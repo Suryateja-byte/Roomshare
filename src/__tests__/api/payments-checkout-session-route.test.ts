@@ -269,4 +269,45 @@ describe("GET /api/payments/checkout-session", () => {
       requiresViewerStateRefresh: false,
     });
   });
+
+  it("supports phone reveal checkout-session polling by context", async () => {
+    (prisma.payment.findUnique as jest.Mock).mockResolvedValue({
+      id: "payment-123",
+      userId: "user-123",
+      productCode: "CONTACT_PACK_3",
+      status: "SUCCEEDED",
+      metadata: {
+        purchaseContext: "PHONE_REVEAL",
+        userId: "user-123",
+        listingId: "listing-123",
+        unitId: "unit-123",
+        unitIdentityEpoch: 3,
+        productCode: "CONTACT_PACK_3",
+        contactKind: "REVEAL_PHONE",
+      },
+    });
+    (prisma.entitlementGrant.findUnique as jest.Mock).mockResolvedValue({
+      id: "grant-123",
+      status: "ACTIVE",
+    });
+
+    const response = await GET(
+      new Request(
+        "http://localhost/api/payments/checkout-session?session_id=cs_test_123&listing_id=listing-123&context=PHONE_REVEAL"
+      )
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      sessionId: "cs_test_123",
+      purchaseContext: "PHONE_REVEAL",
+      listingId: "listing-123",
+      productCode: "CONTACT_PACK_3",
+      checkoutStatus: "COMPLETE",
+      paymentStatus: "PAID",
+      fulfillmentStatus: "FULFILLED",
+      requiresViewerStateRefresh: true,
+    });
+    expect(mockRetrieveCheckoutSession).not.toHaveBeenCalled();
+  });
 });

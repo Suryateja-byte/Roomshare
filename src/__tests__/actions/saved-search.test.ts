@@ -5,10 +5,12 @@
 jest.mock("@/lib/prisma", () => {
   const prisma: {
     $transaction: jest.Mock;
+    $executeRaw: jest.Mock;
     savedSearch: Record<string, jest.Mock>;
     alertSubscription: Record<string, jest.Mock>;
   } = {
     $transaction: jest.fn(),
+    $executeRaw: jest.fn(),
     savedSearch: {
       count: jest.fn(),
       create: jest.fn(),
@@ -44,6 +46,11 @@ jest.mock("@/lib/payments/search-alert-paywall", () => ({
   ).resolveSavedSearchEffectiveAlertState,
 }));
 
+const mockCheckSuspension = jest.fn();
+jest.mock("@/app/actions/suspension", () => ({
+  checkSuspension: (...args: unknown[]) => mockCheckSuspension(...args),
+}));
+
 import {
   saveSearch,
   getMySavedSearches,
@@ -54,6 +61,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
+import { buildSearchUrl } from "@/lib/search-utils";
 
 describe("Saved Search Actions", () => {
   const mockSession = {
@@ -77,6 +85,7 @@ describe("Saved Search Actions", () => {
       requiresPurchase: false,
       offers: [],
     });
+    mockCheckSuspension.mockResolvedValue({ suspended: false });
   });
 
   describe("saveSearch", () => {
@@ -89,7 +98,14 @@ describe("Saved Search Actions", () => {
     });
 
     it("returns error when user has 10 saved searches", async () => {
-      (prisma.savedSearch.count as jest.Mock).mockResolvedValue(10);
+      const order: string[] = [];
+      (prisma.$executeRaw as jest.Mock).mockImplementation(() => {
+        order.push("lock");
+      });
+      (prisma.savedSearch.count as jest.Mock).mockImplementation(() => {
+        order.push("count");
+        return 10;
+      });
 
       const result = await saveSearch({ name: "Test", filters: mockFilters });
 
@@ -97,6 +113,10 @@ describe("Saved Search Actions", () => {
         error:
           "You can only save up to 10 searches. Please delete some to save new ones.",
       });
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
+      expect(order).toEqual(["lock", "count"]);
+      expect(prisma.savedSearch.create).not.toHaveBeenCalled();
     });
 
     it("saves search successfully", async () => {
@@ -160,6 +180,55 @@ describe("Saved Search Actions", () => {
         searchId: "search-123",
         effectiveAlertState: "ACTIVE",
       });
+      expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
+    });
+
+    it("persists endDate in filters and canonical search spec", async () => {
+      (prisma.savedSearch.count as jest.Mock).mockResolvedValue(0);
+      (prisma.savedSearch.create as jest.Mock).mockResolvedValue({
+        id: "search-123",
+        alertEnabled: true,
+      });
+
+      await saveSearch({
+        name: "Date Range",
+        filters: {
+          query: "apartment",
+          moveInDate: "2026-05-01",
+          endDate: "2026-07-01",
+        },
+      });
+
+      const createArgs = (prisma.savedSearch.create as jest.Mock).mock
+        .calls[0][0];
+      expect(createArgs.data.filters).toEqual(
+        expect.objectContaining({
+          moveInDate: "2026-05-01",
+          endDate: "2026-07-01",
+        })
+      );
+      expect(createArgs.data.searchSpecJson.filters).toEqual(
+        expect.objectContaining({
+          moveInDate: "2026-05-01",
+          endDate: "2026-07-01",
+        })
+      );
+      expect(buildSearchUrl(createArgs.data.filters)).toContain(
+        "endDate=2026-07-01"
+      );
+    });
+
+    it("blocks suspended users before locking or creating", async () => {
+      mockCheckSuspension.mockResolvedValue({
+        suspended: true,
+        error: "Account suspended",
+      });
+
+      const result = await saveSearch({ name: "Test", filters: mockFilters });
+
+      expect(result).toEqual({ error: "Account suspended" });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.savedSearch.create).not.toHaveBeenCalled();
     });
 
     it("defaults alertEnabled to true", async () => {
@@ -287,6 +356,18 @@ describe("Saved Search Actions", () => {
       expect(result).toEqual({ success: true });
     });
 
+    it("blocks suspended users from deleting saved searches", async () => {
+      mockCheckSuspension.mockResolvedValue({
+        suspended: true,
+        error: "Account suspended",
+      });
+
+      const result = await deleteSavedSearch("search-123");
+
+      expect(result).toEqual({ error: "Account suspended" });
+      expect(prisma.savedSearch.delete).not.toHaveBeenCalled();
+    });
+
     it("handles database errors", async () => {
       (prisma.savedSearch.delete as jest.Mock).mockRejectedValue(
         new Error("DB Error")
@@ -347,6 +428,19 @@ describe("Saved Search Actions", () => {
         success: true,
         effectiveAlertState: "ACTIVE",
       });
+    });
+
+    it("blocks suspended users from toggling saved-search alerts", async () => {
+      mockCheckSuspension.mockResolvedValue({
+        suspended: true,
+        error: "Account suspended",
+      });
+
+      const result = await toggleSearchAlert("search-123", true);
+
+      expect(result).toEqual({ error: "Account suspended" });
+      expect(prisma.savedSearch.update).not.toHaveBeenCalled();
+      expect(prisma.alertSubscription.upsert).not.toHaveBeenCalled();
     });
 
     it("disables alert", async () => {
@@ -447,6 +541,18 @@ describe("Saved Search Actions", () => {
       });
       expect(revalidatePath).toHaveBeenCalledWith("/saved-searches");
       expect(result).toEqual({ success: true });
+    });
+
+    it("blocks suspended users from renaming saved searches", async () => {
+      mockCheckSuspension.mockResolvedValue({
+        suspended: true,
+        error: "Account suspended",
+      });
+
+      const result = await updateSavedSearchName("search-123", "Updated Name");
+
+      expect(result).toEqual({ error: "Account suspended" });
+      expect(prisma.savedSearch.update).not.toHaveBeenCalled();
     });
 
     it("handles database errors", async () => {

@@ -41,6 +41,13 @@ global.fetch = mockFetch;
 
 import { POST } from "@/app/api/nearby/route";
 import { auth } from "@/auth";
+import {
+  ALLOWED_RADAR_CATEGORIES,
+  CATEGORY_CHIPS,
+  DEFAULT_NEARBY_CATEGORIES,
+  KEYWORD_CATEGORY_MAP,
+  VERIFIED_RADAR_CATEGORY_SLUGS,
+} from "@/lib/nearby-categories";
 
 describe("POST /api/nearby - Input Validation", () => {
   const mockSession = {
@@ -84,6 +91,16 @@ describe("POST /api/nearby - Input Validation", () => {
       headers: new Headers(),
     } as unknown as Request;
   };
+
+  const createRealRequest = (
+    body: unknown,
+    headers: HeadersInit = { "Content-Type": "application/json" }
+  ): Request =>
+    new Request("http://localhost:3000/api/nearby", {
+      method: "POST",
+      headers,
+      body: typeof body === "string" ? body : JSON.stringify(body),
+    });
 
   describe("null and undefined coordinates", () => {
     it("rejects null listingLat with 400", async () => {
@@ -453,6 +470,35 @@ describe("POST /api/nearby - Input Validation", () => {
   });
 
   describe("categories validation", () => {
+    it("keeps all exported categories inside the verified Radar catalog", () => {
+      const verified = new Set<string>(VERIFIED_RADAR_CATEGORY_SLUGS);
+      const exportedCategories = [
+        ...ALLOWED_RADAR_CATEGORIES,
+        ...DEFAULT_NEARBY_CATEGORIES,
+        ...CATEGORY_CHIPS.flatMap((chip) => chip.categories),
+        ...Object.values(KEYWORD_CATEGORY_MAP).flat(),
+      ];
+
+      expect(ALLOWED_RADAR_CATEGORIES).toEqual(
+        [...VERIFIED_RADAR_CATEGORY_SLUGS].sort()
+      );
+      exportedCategories.forEach((category) => {
+        expect(verified.has(category)).toBe(true);
+      });
+      [
+        "fitness-recreation",
+        "health-medicine",
+        "financial-service",
+        "lodging",
+        "grocery",
+        "shopping",
+        "coffee-shop",
+        "burger-joint",
+      ].forEach((unsupportedCategory) => {
+        expect(ALLOWED_RADAR_CATEGORIES).not.toContain(unsupportedCategory);
+      });
+    });
+
     it("accepts empty categories array (uses defaults)", async () => {
       const response = await POST(
         createRequest({
@@ -490,6 +536,106 @@ describe("POST /api/nearby - Input Validation", () => {
       );
 
       expect(response.status).toBe(200);
+    });
+
+    it("rejects unsupported categories with 400", async () => {
+      const response = await POST(
+        createRequest({
+          listingLat: 37.7749,
+          listingLng: -122.4194,
+          categories: ["food-grocery", "arbitrary-proxy-category"],
+          radiusMeters: 1609,
+        })
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Invalid request");
+    });
+
+    it("rejects excessive category arrays with 400", async () => {
+      const response = await POST(
+        createRequest({
+          listingLat: 37.7749,
+          listingLng: -122.4194,
+          categories: [
+            "food-grocery",
+            "supermarket",
+            "restaurant",
+            "food-beverage",
+            "shopping-retail",
+            "gas-station",
+            "gym",
+            "gym",
+            "pharmacy",
+          ],
+          radiusMeters: 1609,
+        })
+      );
+
+      expect(response.status).toBe(400);
+    });
+
+    it("dedupes supported categories before forwarding to Radar", async () => {
+      mockFetch.mockClear();
+
+      const response = await POST(
+        createRequest({
+          listingLat: 37.7749,
+          listingLng: -122.4194,
+          categories: ["food-grocery", "food-grocery", "pharmacy"],
+          radiusMeters: 1609,
+        })
+      );
+
+      expect(response.status).toBe(200);
+      const fetchUrl = new URL(mockFetch.mock.calls[0][0]);
+      expect(fetchUrl.searchParams.get("categories")).toBe(
+        "food-grocery,pharmacy"
+      );
+    });
+  });
+
+  describe("request body guards", () => {
+    it("rejects non-json content type with 400", async () => {
+      const response = await POST(
+        createRealRequest(validRequestBody, {
+          "Content-Type": "text/plain",
+        })
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Invalid request body");
+      expect(data.details).toBe("Content-Type must be application/json");
+    });
+
+    it("rejects oversized request bodies with 400", async () => {
+      const response = await POST(
+        createRealRequest({
+          ...validRequestBody,
+          extra: "x".repeat(11 * 1024),
+        })
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Invalid request body");
+      expect(data.details).toBe("Request body is too large");
+    });
+
+    it("rejects request bodies that exceed the UTF-8 byte limit", async () => {
+      const response = await POST(
+        createRealRequest({
+          ...validRequestBody,
+          extra: "\u{1F525}".repeat(3 * 1024),
+        })
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe("Invalid request body");
+      expect(data.details).toBe("Request body is too large");
     });
   });
 });

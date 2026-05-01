@@ -85,42 +85,11 @@ export interface RadarAutocompleteResponse {
   addresses: RadarAutocompleteAddress[];
 }
 
-// Category chip configuration
-export interface CategoryChip {
-  label: string;
-  categories: string[];
-  query?: string; // Optional text filter (e.g., "indian" for Indian grocery)
-  icon:
-    | "ShoppingCart"
-    | "Utensils"
-    | "ShoppingBag"
-    | "Fuel"
-    | "Dumbbell"
-    | "Pill";
-}
-
-// Predefined category chips per plan
-// Uses valid Radar API categories: https://radar.com/documentation/places/categories
-export const CATEGORY_CHIPS: CategoryChip[] = [
-  {
-    label: "Grocery",
-    categories: ["food-grocery", "supermarket"],
-    icon: "ShoppingCart",
-  },
-  {
-    label: "Restaurants",
-    categories: ["restaurant", "food-beverage"],
-    icon: "Utensils",
-  },
-  { label: "Shopping", categories: ["shopping-retail"], icon: "ShoppingBag" },
-  { label: "Gas Stations", categories: ["gas-station"], icon: "Fuel" },
-  {
-    label: "Fitness",
-    categories: ["gym", "fitness-recreation"],
-    icon: "Dumbbell",
-  },
-  { label: "Pharmacy", categories: ["pharmacy"], icon: "Pill" },
-];
+export {
+  CATEGORY_CHIPS,
+  type CategoryChip,
+  type RadarCategorySlug,
+} from "@/lib/nearby-categories";
 
 // Radius options in meters
 export const RADIUS_OPTIONS = [
@@ -139,15 +108,6 @@ export interface CategoryColorConfig {
 }
 
 export const CATEGORY_COLORS: Record<string, CategoryColorConfig> = {
-  // Grocery stores (valid Radar API category)
-  grocery: {
-    bg: "bg-orange-50",
-    icon: "text-orange-600",
-    accent: "bg-orange-500",
-    markerBg: "#fff7ed",
-    markerBorder: "#ea580c",
-  },
-  // Food-Grocery (valid Radar API category, same colors as grocery)
   "food-grocery": {
     bg: "bg-orange-50",
     icon: "text-orange-600",
@@ -179,15 +139,6 @@ export const CATEGORY_COLORS: Record<string, CategoryColorConfig> = {
     markerBg: "#fff1f2",
     markerBorder: "#e11d48",
   },
-  // Shopping (valid Radar API category)
-  shopping: {
-    bg: "bg-purple-50",
-    icon: "text-purple-600",
-    accent: "bg-purple-500",
-    markerBg: "#faf5ff",
-    markerBorder: "#9333ea",
-  },
-  // Shopping-Retail (valid Radar API category, same colors as shopping)
   "shopping-retail": {
     bg: "bg-purple-50",
     icon: "text-purple-600",
@@ -203,7 +154,6 @@ export const CATEGORY_COLORS: Record<string, CategoryColorConfig> = {
     markerBg: "#fffbeb",
     markerBorder: "#d97706",
   },
-  // Gym (valid Radar API category)
   gym: {
     bg: "bg-primary/10",
     icon: "text-primary",
@@ -211,32 +161,14 @@ export const CATEGORY_COLORS: Record<string, CategoryColorConfig> = {
     markerBg: "#f5ebe3",
     markerBorder: "#9a4027",
   },
-  // Fitness & Recreation (valid Radar API category, same colors as gym)
-  "fitness-recreation": {
-    bg: "bg-primary/10",
-    icon: "text-primary",
-    accent: "bg-primary",
-    markerBg: "#f5ebe3",
-    markerBorder: "#9a4027",
-  },
-  // Health & Medicine (valid Radar API category)
-  "health-medicine": {
+  "medical-health": {
     bg: "bg-emerald-50",
     icon: "text-emerald-600",
     accent: "bg-emerald-500",
     markerBg: "#ecfdf5",
     markerBorder: "#059669",
   },
-  // Pharmacy (valid Radar API category, same colors as health-medicine)
   pharmacy: {
-    bg: "bg-emerald-50",
-    icon: "text-emerald-600",
-    accent: "bg-emerald-500",
-    markerBg: "#ecfdf5",
-    markerBorder: "#059669",
-  },
-  // Drugstore (valid Radar API category, same colors as health-medicine)
-  drugstore: {
     bg: "bg-emerald-50",
     icon: "text-emerald-600",
     accent: "bg-emerald-500",

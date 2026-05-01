@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { checkSuspension } from "@/app/actions/suspension";
 import { createClient } from "@supabase/supabase-js";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { captureApiError } from "@/lib/api-error-handler";
@@ -62,6 +63,14 @@ export async function POST(request: NextRequest) {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const suspension = await checkSuspension(session.user.id);
+    if (suspension.suspended) {
+      return NextResponse.json(
+        { error: suspension.error || "Account suspended" },
+        { status: 403 }
+      );
     }
 
     // Per-user rate limiting (after auth, complements IP-based rate limit above)
@@ -275,6 +284,14 @@ export async function DELETE(request: NextRequest) {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const suspension = await checkSuspension(session.user.id);
+    if (suspension.suspended) {
+      return NextResponse.json(
+        { error: suspension.error || "Account suspended" },
+        { status: 403 }
+      );
     }
 
     if (!supabaseUrl || !supabaseServiceKey) {

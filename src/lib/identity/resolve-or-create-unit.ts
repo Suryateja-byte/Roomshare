@@ -22,6 +22,66 @@ export interface ResolveOrCreateUnitResult {
   unitIdentityEpoch: number;
   created: boolean;
   canonicalAddressHash: string;
+  canonicalUnit: string;
+  canonicalizerVersion: string;
+  geocodeStatus: string;
+  sourceVersion: bigint;
+}
+
+function formatGeocodeAddress(address: RawAddressInput): string {
+  return [
+    address.address,
+    address.unit?.trim() ? address.unit.trim() : null,
+    address.city,
+    [address.state, address.zip].filter(Boolean).join(" "),
+    address.country,
+  ]
+    .filter(
+      (part): part is string =>
+        typeof part === "string" && part.trim().length > 0
+    )
+    .map((part) => part.trim().replace(/\s+/g, " "))
+    .join(", ");
+}
+
+async function enqueueGeocodeNeededIfAbsent(
+  tx: TransactionClient,
+  input: {
+    unitId: string;
+    address: string;
+    canonicalAddressHash: string;
+    sourceVersion: bigint;
+    unitIdentityEpoch: number;
+    requestId?: string;
+  }
+): Promise<void> {
+  const activeRows = await tx.$queryRaw<{ id: string }[]>`
+    SELECT id
+    FROM outbox_events
+    WHERE aggregate_type = 'PHYSICAL_UNIT'
+      AND aggregate_id = ${input.unitId}
+      AND kind = 'GEOCODE_NEEDED'
+      AND status IN ('PENDING', 'IN_FLIGHT')
+    LIMIT 1
+  `;
+
+  if (activeRows.length > 0) {
+    return;
+  }
+
+  await appendOutboxEvent(tx, {
+    aggregateType: "PHYSICAL_UNIT",
+    aggregateId: input.unitId,
+    kind: "GEOCODE_NEEDED",
+    payload: {
+      address: input.address,
+      canonicalAddressHash: input.canonicalAddressHash,
+      requestId: input.requestId ?? null,
+    },
+    sourceVersion: input.sourceVersion,
+    unitIdentityEpoch: input.unitIdentityEpoch,
+    priority: 100,
+  });
 }
 
 /**
@@ -72,6 +132,9 @@ export async function resolveOrCreateUnit(
     select: {
       id: true,
       unitIdentityEpoch: true,
+      canonicalUnit: true,
+      canonicalizerVersion: true,
+      geocodeStatus: true,
       sourceVersion: true,
     },
   });
@@ -95,29 +158,15 @@ export async function resolveOrCreateUnit(
     unitIdentityEpoch: unit.unitIdentityEpoch,
   });
 
-  // Phase 02 addition: on new unit creation, enqueue GEOCODE_NEEDED so the
-  // geocode worker resolves lat/lng and transitions inventories from
-  // PENDING_GEOCODE → PENDING_PROJECTION. This is additive — Phase 01 tests
-  // still pass because UNIT_UPSERTED is always appended first.
-  if (created) {
-    const fullAddress = [
-      canonical.canonicalAddressHash,
-      canonical.canonicalUnit !== "_none_" ? canonical.canonicalUnit : null,
-    ]
-      .filter(Boolean)
-      .join(" ");
-    await appendOutboxEvent(tx, {
-      aggregateType: "PHYSICAL_UNIT",
-      aggregateId: unit.id,
-      kind: "GEOCODE_NEEDED",
-      payload: {
-        address: fullAddress,
-        canonicalAddressHash: canonical.canonicalAddressHash,
-        requestId: input.requestId ?? null,
-      },
+  const geocodeAddress = formatGeocodeAddress(input.address);
+  if (unit.geocodeStatus !== "COMPLETE") {
+    await enqueueGeocodeNeededIfAbsent(tx, {
+      unitId: unit.id,
+      address: geocodeAddress,
+      canonicalAddressHash: canonical.canonicalAddressHash,
       sourceVersion: unit.sourceVersion,
       unitIdentityEpoch: unit.unitIdentityEpoch,
-      priority: 100,
+      requestId: input.requestId,
     });
   }
 
@@ -139,5 +188,9 @@ export async function resolveOrCreateUnit(
     unitIdentityEpoch: unit.unitIdentityEpoch,
     created,
     canonicalAddressHash: canonical.canonicalAddressHash,
+    canonicalUnit: unit.canonicalUnit,
+    canonicalizerVersion: unit.canonicalizerVersion,
+    geocodeStatus: unit.geocodeStatus,
+    sourceVersion: unit.sourceVersion,
   };
 }

@@ -1142,8 +1142,8 @@ async function main() {
       data: {
         userId: thirdUser.id,
         documentType: 'driver_license',
-        documentUrl: 'https://example.com/fake-doc.jpg',
-        selfieUrl: 'https://example.com/fake-selfie.jpg',
+        documentUrl: null,
+        selfieUrl: null,
         status: 'PENDING',
       },
     });

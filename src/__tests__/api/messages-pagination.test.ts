@@ -26,6 +26,12 @@ jest.mock("@/lib/prisma", () => {
     conversationDeletion: {
       deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
+    user: {
+      findMany: jest.fn(),
+    },
+    blockedUser: {
+      findFirst: jest.fn(),
+    },
     $transaction: jest.fn(),
   };
   mockPrisma.$transaction.mockImplementation((fn: any) => fn(mockPrisma));
@@ -64,6 +70,23 @@ jest.mock("next/server", () => ({
 // Mock rate limiting to allow all requests
 jest.mock("@/lib/with-rate-limit", () => ({
   withRateLimit: jest.fn().mockResolvedValue(null),
+}));
+
+const mockCreateInternalNotification = jest.fn();
+jest.mock("@/lib/notifications", () => ({
+  createInternalNotification: (...args: unknown[]) =>
+    mockCreateInternalNotification(...args),
+}));
+
+const mockSendNotificationEmailWithPreference = jest.fn();
+jest.mock("@/lib/email", () => ({
+  sendNotificationEmailWithPreference: (...args: unknown[]) =>
+    mockSendNotificationEmailWithPreference(...args),
+}));
+
+jest.mock("@/lib/messaging/outbound-content-guard", () => ({
+  scanOutboundMessageContent: jest.fn(() => []),
+  recordOutboundContentSoftFlag: jest.fn(),
 }));
 
 import { GET, POST } from "@/app/api/messages/route";
@@ -163,6 +186,14 @@ describe("Messages Pagination (P1-03)", () => {
     // Default: authenticated user
     (auth as jest.Mock).mockResolvedValue({
       user: { id: "user-123", email: "test@example.com" },
+    });
+    (prisma.blockedUser.findFirst as jest.Mock).mockResolvedValue(null);
+    (prisma.user.findMany as jest.Mock).mockResolvedValue([
+      { id: "other-user", email: "other@example.com" },
+    ]);
+    mockCreateInternalNotification.mockResolvedValue({ success: true });
+    mockSendNotificationEmailWithPreference.mockResolvedValue({
+      success: true,
     });
     // Rate limiting is mocked at module level via jest.mock('@/lib/with-rate-limit')
   });

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { geocodeAddress } from "@/lib/geocoding";
 import { createClient } from "@supabase/supabase-js";
+import bcrypt from "bcryptjs";
 import {
   householdLanguagesSchema,
   supabaseImageUrlSchema,
@@ -28,10 +29,17 @@ import { normalizeStringList } from "@/lib/utils";
 import { z } from "zod";
 import { features } from "@/lib/env";
 import { syncListingEmbedding } from "@/lib/embeddings/sync";
-import { getModerationWriteLockResult } from "@/lib/listings/moderation-write-lock";
+import { getHostModerationWriteLockResult } from "@/lib/listings/moderation-write-lock";
+import { normalizeAddress } from "@/lib/search/normalize-address";
+import { syncCanonicalAvailability } from "@/lib/listings/canonical-sync";
+import {
+  isStrictDateOnly,
+  parseStrictDateOnlyToUtcDate,
+} from "@/lib/date-only";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SESSION_FRESHNESS_SECONDS = 5 * 60;
 
 // Extract storage path from Supabase public URL
 function extractStoragePath(publicUrl: string): string | null {
@@ -39,97 +47,233 @@ function extractStoragePath(publicUrl: string): string | null {
   return match ? match[1] : null;
 }
 
-const updateListingSchema = z.object({
-  title: z
-    .string()
-    .trim()
-    .min(1)
-    .max(100)
-    .transform(sanitizeUnicode)
-    .refine(noHtmlTags, NO_HTML_MSG),
-  description: z
-    .string()
-    .trim()
-    .min(1)
-    .max(1000)
-    .transform(sanitizeUnicode)
-    .refine(noHtmlTags, NO_HTML_MSG),
-  price: z.coerce.number().positive().multipleOf(0.01),
-  amenities: z
-    .union([
-      z.array(z.string().max(50).transform(sanitizeUnicode)).max(20),
-      z.string().transform((s) => [sanitizeUnicode(s)]),
-    ])
-    .optional()
-    .default([]),
-  houseRules: z
-    .union([
-      z.array(z.string().max(50).transform(sanitizeUnicode)).max(20),
-      z.string().transform((s) => [sanitizeUnicode(s)]),
-    ])
-    .optional()
-    .default([]),
-  totalSlots: z.coerce.number().int().min(1).max(20),
-  address: z
-    .string()
-    .trim()
-    .min(1)
-    .max(200)
-    .transform(sanitizeUnicode)
-    .refine(noHtmlTags, NO_HTML_MSG),
-  city: z
-    .string()
-    .trim()
-    .min(1)
-    .max(100)
-    .transform(sanitizeUnicode)
-    .refine(noHtmlTags, NO_HTML_MSG),
-  state: z
-    .string()
-    .trim()
-    .min(1)
-    .max(100)
-    .transform(sanitizeUnicode)
-    .refine(noHtmlTags, NO_HTML_MSG),
-  zip: z.string().trim().min(1).max(20),
-  moveInDate: z
-    .union([
-      z
-        .string()
-        .trim()
-        .refine((value) => !Number.isNaN(Date.parse(value)), {
-          message: "Invalid date format",
-        }),
-      z.null(),
-    ])
-    .optional(),
-  availableUntil: z
-    .union([
-      z
-        .string()
-        .trim()
-        .refine((value) => !Number.isNaN(Date.parse(value)), {
-          message: "Invalid date format",
-        }),
-      z.null(),
-    ])
-    .optional(),
-  minStayMonths: z.coerce.number().int().min(1).optional(),
-  leaseDuration: listingLeaseDurationSchema,
-  roomType: listingRoomTypeSchema,
-  householdLanguages: z
-    .array(z.string().trim().toLowerCase().transform(sanitizeUnicode))
-    .max(20)
-    .optional(),
-  genderPreference: listingGenderPreferenceSchema,
-  householdGender: listingHouseholdGenderSchema,
-  primaryHomeLanguage: z
-    .string()
-    .refine(isValidLanguageCode, { message: "Invalid language code" })
-    .nullable()
-    .optional(),
-  images: z.array(supabaseImageUrlSchema).max(10).optional(),
-});
+async function readDeletePayload(
+  request: Request
+): Promise<{ password?: string } | null> {
+  const body = await request.text();
+  if (!body.trim()) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(body);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return null;
+    }
+    const password = (parsed as { password?: unknown }).password;
+    return typeof password === "string" ? { password } : {};
+  } catch {
+    return null;
+  }
+}
+
+const expectedVersionSchema = z.coerce.number().int().min(1);
+
+const dateOnlySchema = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD format")
+  .refine((value) => isStrictDateOnly(value), {
+    message: "Invalid calendar date",
+  });
+
+const nullableDateOnlySchema = z.union([dateOnlySchema, z.null()]);
+
+function toUtcDateOnly(value: string): Date {
+  const parsed = parseStrictDateOnlyToUtcDate(value);
+  if (!parsed) {
+    throw new Error("Invalid date-only value");
+  }
+  return parsed;
+}
+
+function todayUtcDateOnly(): Date {
+  const now = new Date();
+  return new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  );
+}
+
+const listingProfilePatchSchema = z
+  .object({
+    expectedVersion: expectedVersionSchema,
+    title: z
+      .string()
+      .trim()
+      .min(1)
+      .max(100)
+      .transform(sanitizeUnicode)
+      .refine(noHtmlTags, NO_HTML_MSG),
+    description: z
+      .string()
+      .trim()
+      .min(1)
+      .max(1000)
+      .transform(sanitizeUnicode)
+      .refine(noHtmlTags, NO_HTML_MSG),
+    price: z.coerce.number().positive().multipleOf(0.01),
+    amenities: z
+      .union([
+        z.array(z.string().max(50).transform(sanitizeUnicode)).max(20),
+        z.string().transform((s) => [sanitizeUnicode(s)]),
+      ])
+      .optional()
+      .default([]),
+    houseRules: z
+      .union([
+        z.array(z.string().max(50).transform(sanitizeUnicode)).max(20),
+        z.string().transform((s) => [sanitizeUnicode(s)]),
+      ])
+      .optional()
+      .default([]),
+    address: z
+      .string()
+      .trim()
+      .min(1)
+      .max(200)
+      .transform(sanitizeUnicode)
+      .refine(noHtmlTags, NO_HTML_MSG),
+    city: z
+      .string()
+      .trim()
+      .min(1)
+      .max(100)
+      .transform(sanitizeUnicode)
+      .refine(noHtmlTags, NO_HTML_MSG),
+    state: z
+      .string()
+      .trim()
+      .min(1)
+      .max(100)
+      .transform(sanitizeUnicode)
+      .refine(noHtmlTags, NO_HTML_MSG),
+    zip: z.string().trim().min(1).max(20),
+    leaseDuration: listingLeaseDurationSchema,
+    roomType: listingRoomTypeSchema,
+    householdLanguages: z
+      .array(z.string().trim().toLowerCase().transform(sanitizeUnicode))
+      .max(20)
+      .optional(),
+    genderPreference: listingGenderPreferenceSchema,
+    householdGender: listingHouseholdGenderSchema,
+    primaryHomeLanguage: z
+      .string()
+      .refine(isValidLanguageCode, { message: "Invalid language code" })
+      .nullable()
+      .optional(),
+    images: z.array(supabaseImageUrlSchema).max(10).optional(),
+  })
+  .strict();
+
+const hostManagedAvailabilityPatchSchema = z
+  .object({
+    expectedVersion: expectedVersionSchema,
+    openSlots: z.coerce.number().int().min(0).max(20),
+    totalSlots: z.coerce.number().int().min(1).max(20),
+    moveInDate: nullableDateOnlySchema,
+    availableUntil: nullableDateOnlySchema.optional(),
+    minStayMonths: z.coerce.number().int().min(1),
+    status: z.enum(["ACTIVE", "PAUSED", "RENTED"]),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.openSlots > value.totalSlots) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["openSlots"],
+        message: "Open slots cannot exceed total slots",
+      });
+    }
+
+    if (value.status === "ACTIVE") {
+      if (value.openSlots <= 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["openSlots"],
+          message: "Active listings require at least one open slot",
+        });
+      }
+      if (!value.moveInDate) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["moveInDate"],
+          message: "Move-in date is required for active listings",
+        });
+      }
+    }
+
+    if (value.availableUntil) {
+      const availableUntil = toUtcDateOnly(value.availableUntil);
+      const today = todayUtcDateOnly();
+      if (availableUntil < today) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["availableUntil"],
+          message: "Available until date cannot be in the past",
+        });
+      }
+      if (
+        value.moveInDate &&
+        availableUntil < toUtcDateOnly(value.moveInDate)
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["availableUntil"],
+          message: "Available until date cannot be before move-in date",
+        });
+      }
+    }
+  });
+
+type ListingProfilePatch = z.infer<typeof listingProfilePatchSchema>;
+type HostManagedAvailabilityPatch = z.infer<
+  typeof hostManagedAvailabilityPatchSchema
+>;
+
+function isHostManagedAvailabilityPatch(rawBody: unknown): boolean {
+  return (
+    !!rawBody &&
+    typeof rawBody === "object" &&
+    !Array.isArray(rawBody) &&
+    ("openSlots" in rawBody || "status" in rawBody)
+  );
+}
+
+function hasRetiredAvailabilityKeys(rawBody: unknown): boolean {
+  return (
+    !!rawBody &&
+    typeof rawBody === "object" &&
+    !Array.isArray(rawBody) &&
+    ("totalSlots" in rawBody ||
+      "moveInDate" in rawBody ||
+      "availableUntil" in rawBody ||
+      "minStayMonths" in rawBody)
+  );
+}
+
+function getHostManagedDateOnlyErrors(
+  rawBody: unknown
+): Record<string, string[]> {
+  if (!rawBody || typeof rawBody !== "object" || Array.isArray(rawBody)) {
+    return {};
+  }
+
+  const body = rawBody as Record<string, unknown>;
+  const fieldErrors: Record<string, string[]> = {};
+  if (
+    typeof body.moveInDate === "string" &&
+    !parseStrictDateOnlyToUtcDate(body.moveInDate.trim())
+  ) {
+    fieldErrors.moveInDate = ["Invalid calendar date"];
+  }
+  if (
+    typeof body.availableUntil === "string" &&
+    !parseStrictDateOnlyToUtcDate(body.availableUntil.trim())
+  ) {
+    fieldErrors.availableUntil = ["Invalid calendar date"];
+  }
+  return fieldErrors;
+}
 
 type LockedListingRow = {
   id: string;
@@ -137,6 +281,8 @@ type LockedListingRow = {
   version: number;
   status: string;
   statusReason: string | null;
+  normalizedAddress: string | null;
+  physicalUnitId: string | null;
   openSlots: number | null;
   availableSlots: number;
   totalSlots: number;
@@ -175,20 +321,85 @@ export async function DELETE(
     });
     if (userDeleteRateLimit) return userDeleteRateLimit;
 
+    const deletePayload = await readDeletePayload(request);
+    if (!deletePayload) {
+      return NextResponse.json(
+        { error: "Invalid JSON payload" },
+        { status: 400 }
+      );
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { password: true },
+    });
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (user.password) {
+      if (!deletePayload.password) {
+        return NextResponse.json(
+          {
+            error: "Password is required to delete this listing",
+            code: "PASSWORD_REQUIRED",
+          },
+          { status: 403 }
+        );
+      }
+
+      const passwordValid = await bcrypt.compare(
+        deletePayload.password,
+        user.password
+      );
+      if (!passwordValid) {
+        return NextResponse.json(
+          { error: "Password is incorrect", code: "PASSWORD_INVALID" },
+          { status: 403 }
+        );
+      }
+    } else {
+      const authTime = session.authTime;
+      if (
+        !authTime ||
+        Math.floor(Date.now() / 1000) - authTime > SESSION_FRESHNESS_SECONDS
+      ) {
+        return NextResponse.json(
+          {
+            error: "Please sign in again to confirm listing deletion.",
+            code: "SESSION_FRESHNESS_REQUIRED",
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     const { id } = await params;
 
-    // Wrap ownership check + delete in interactive transaction with FOR UPDATE
-    // to prevent TOCTOU race between check and delete
-    let _listingTitle: string | null = null;
-    let listingImages: string[] = [];
+    // Wrap ownership check + delete/suppression in interactive transaction with
+    // FOR UPDATE to prevent TOCTOU races between ownership, reports, and writes.
+    let deleteResult:
+      | {
+          action: "deleted";
+          listingImages: string[];
+        }
+      | {
+          action: "suppressed";
+          ownerId: string;
+          reportCount: number;
+        };
 
     try {
-      await prisma.$transaction(async (tx) => {
+      deleteResult = await prisma.$transaction(async (tx) => {
         // Lock the listing row to prevent concurrent modifications
         const [listing] = await tx.$queryRaw<
-          Array<{ ownerId: string; title: string; images: string[] }>
+          Array<{
+            ownerId: string;
+            images: string[];
+            version: number;
+          }>
         >`
-                    SELECT "ownerId", "title", "images" FROM "Listing"
+                    SELECT "ownerId", "images", "version" FROM "Listing"
                     WHERE "id" = ${id}
                     FOR UPDATE
                 `;
@@ -197,11 +408,31 @@ export async function DELETE(
           throw new Error("NOT_FOUND_OR_UNAUTHORIZED");
         }
 
-        _listingTitle = listing.title;
-        listingImages = listing.images || [];
+        const reportCount = await tx.report.count({ where: { listingId: id } });
+        if (reportCount > 0) {
+          await tx.listing.update({
+            where: { id },
+            data: {
+              status: "PAUSED",
+              statusReason: "SUPPRESSED",
+              version: listing.version + 1,
+            },
+          });
+          await markListingDirtyInTx(tx, id, "status_changed");
+
+          return {
+            action: "suppressed",
+            ownerId: listing.ownerId,
+            reportCount,
+          } as const;
+        }
 
         // Delete listing; contact-first tables are independent projections/ledgers.
         await tx.listing.delete({ where: { id } });
+        return {
+          action: "deleted",
+          listingImages: listing.images || [],
+        } as const;
       });
     } catch (error) {
       if (error instanceof Error) {
@@ -215,14 +446,40 @@ export async function DELETE(
       throw error;
     }
 
-    // Search doc cleanup handled by ON DELETE CASCADE FK on listing_search_docs
-    // and listing_search_doc_dirty (migration 20260110000000_search_doc).
+    if (deleteResult.action === "suppressed") {
+      try {
+        await logger.info("Owner listing delete suppressed", {
+          action: "ownerDeleteListingSuppressed",
+          route: "/api/listings/[id]",
+          method: "DELETE",
+          listingId: id,
+          ownerId: deleteResult.ownerId,
+          reportCount: deleteResult.reportCount,
+        });
+      } catch (logError) {
+        logger.sync.error("Failed to log owner listing suppression", {
+          action: "ownerDeleteListingSuppressed",
+          listingId: id,
+          error:
+            logError instanceof Error ? logError.message : "Unknown error",
+        });
+      }
+    }
+
+    // Hard-delete search doc cleanup is handled by ON DELETE CASCADE FK on
+    // listing_search_docs and listing_search_doc_dirty. Suppressed listings are
+    // marked dirty in the transaction above.
 
     // Clean up images from Supabase storage (outside transaction — best-effort)
-    if (listingImages.length > 0 && supabaseUrl && supabaseServiceKey) {
+    if (
+      deleteResult.action === "deleted" &&
+      deleteResult.listingImages.length > 0 &&
+      supabaseUrl &&
+      supabaseServiceKey
+    ) {
       try {
         const supabase = createClient(supabaseUrl, supabaseServiceKey);
-        const paths = listingImages
+        const paths = deleteResult.listingImages
           .map(extractStoragePath)
           .filter((p): p is string => p !== null);
 
@@ -332,11 +589,19 @@ export async function PATCH(
       return NextResponse.json({ error: "Listing not found" }, { status: 404 });
     }
 
-    let result;
+    let result: unknown;
     let removedImageUrls: string[] = [];
 
-    {
-      const parsed = updateListingSchema.safeParse(rawBody);
+    if (isHostManagedAvailabilityPatch(rawBody)) {
+      const dateOnlyErrors = getHostManagedDateOnlyErrors(rawBody);
+      if (Object.keys(dateOnlyErrors).length > 0) {
+        return NextResponse.json(
+          { error: "Validation failed", fields: dateOnlyErrors },
+          { status: 400 }
+        );
+      }
+
+      const parsed = hostManagedAvailabilityPatchSchema.safeParse(rawBody);
       if (!parsed.success) {
         return NextResponse.json(
           {
@@ -347,20 +612,226 @@ export async function PATCH(
         );
       }
 
+      const availabilityPatch: HostManagedAvailabilityPatch = parsed.data;
+
+      try {
+        const availabilityPatchResult = await prisma.$transaction(
+          async (tx) => {
+            const [lockedListing] = await tx.$queryRaw<LockedListingRow[]>`
+            SELECT
+              id,
+              "ownerId",
+              version,
+              status,
+              "statusReason",
+              "normalizedAddress",
+              "physicalUnitId",
+              "openSlots",
+              "availableSlots",
+              "totalSlots",
+              "moveInDate",
+              "availableUntil",
+              "minStayMonths",
+              "lastConfirmedAt",
+              "freshnessReminderSentAt",
+              "freshnessWarningSentAt",
+              "autoPausedAt"
+            FROM "Listing"
+            WHERE "id" = ${id}
+            FOR UPDATE
+          `;
+
+            if (!lockedListing || lockedListing.ownerId !== userId) {
+              throw new Error("NOT_FOUND");
+            }
+
+            const writeLock = getHostModerationWriteLockResult({
+              statusReason: lockedListing.statusReason,
+              moderationWriteLocksEnabled: features.moderationWriteLocks,
+            });
+
+            if (writeLock) {
+              return {
+                ok: false,
+                error: writeLock.error,
+                code: writeLock.code,
+                lockReason: writeLock.lockReason,
+                httpStatus: writeLock.httpStatus,
+              } as const;
+            }
+
+            if (lockedListing.version !== availabilityPatch.expectedVersion) {
+              return {
+                ok: false,
+                error:
+                  "This listing changed while you were editing it. Refresh and try again.",
+                code: "VERSION_CONFLICT",
+                httpStatus: 409,
+              } as const;
+            }
+
+            const nextMoveInDate = availabilityPatch.moveInDate
+              ? toUtcDateOnly(availabilityPatch.moveInDate)
+              : null;
+            const nextAvailableUntil =
+              availabilityPatch.availableUntil === undefined
+                ? lockedListing.availableUntil
+                : availabilityPatch.availableUntil
+                  ? toUtcDateOnly(availabilityPatch.availableUntil)
+                  : null;
+
+            if (nextAvailableUntil && nextAvailableUntil < todayUtcDateOnly()) {
+              return {
+                ok: false,
+                error: "Validation failed",
+                fields: {
+                  availableUntil: [
+                    "Available until date cannot be in the past",
+                  ],
+                },
+                httpStatus: 400,
+              } as const;
+            }
+            if (
+              nextAvailableUntil &&
+              nextMoveInDate &&
+              nextAvailableUntil < nextMoveInDate
+            ) {
+              return {
+                ok: false,
+                error: "Validation failed",
+                fields: {
+                  availableUntil: [
+                    "Available until date cannot be before move-in date",
+                  ],
+                },
+                httpStatus: 400,
+              } as const;
+            }
+
+            const clearsHostReason =
+              lockedListing.statusReason === "HOST_PAUSED" ||
+              lockedListing.statusReason === "STALE_AUTO_PAUSE" ||
+              lockedListing.statusReason === "FRESHNESS_WARNING";
+            const nextStatusReason =
+              availabilityPatch.status === "PAUSED"
+                ? "HOST_PAUSED"
+                : clearsHostReason
+                  ? null
+                  : lockedListing.statusReason;
+            const nextVersion = lockedListing.version + 1;
+
+            const updatedListing = await tx.listing.update({
+              where: { id },
+              data: {
+                status: availabilityPatch.status,
+                statusReason: nextStatusReason,
+                totalSlots: availabilityPatch.totalSlots,
+                openSlots: availabilityPatch.openSlots,
+                availableSlots: availabilityPatch.openSlots,
+                moveInDate: nextMoveInDate,
+                availableUntil: nextAvailableUntil,
+                minStayMonths: availabilityPatch.minStayMonths,
+                lastConfirmedAt: new Date(),
+                freshnessReminderSentAt: null,
+                freshnessWarningSentAt: null,
+                autoPausedAt: null,
+                version: nextVersion,
+              },
+            });
+
+            if (!listing.location) {
+              throw new Error("LISTING_LOCATION_MISSING");
+            }
+            await syncCanonicalAvailability(tx, {
+              listing: updatedListing,
+              address: {
+                address: listing.location.address,
+                city: listing.location.city,
+                state: listing.location.state,
+                zip: listing.location.zip,
+              },
+              actor: { role: "host", id: userId },
+            });
+
+            await markListingDirtyInTx(tx, id, "listing_updated");
+
+            return { ok: true, updatedListing } as const;
+          }
+        );
+
+        if (!availabilityPatchResult.ok) {
+          const body =
+            "fields" in availabilityPatchResult
+              ? {
+                  error: availabilityPatchResult.error,
+                  fields: availabilityPatchResult.fields,
+                }
+              : {
+                  error: availabilityPatchResult.error,
+                  code: availabilityPatchResult.code,
+                  ...("lockReason" in availabilityPatchResult
+                    ? { lockReason: availabilityPatchResult.lockReason }
+                    : {}),
+                };
+          return NextResponse.json(body, {
+            status: availabilityPatchResult.httpStatus,
+          });
+        }
+
+        result = availabilityPatchResult.updatedListing;
+      } catch (error) {
+        if (error instanceof Error) {
+          if (error.message === "NOT_FOUND") {
+            return NextResponse.json(
+              { error: "Listing not found" },
+              { status: 404 }
+            );
+          }
+          if (error.message === "LISTING_LOCATION_MISSING") {
+            return NextResponse.json(
+              { error: "Listing location is missing" },
+              { status: 409 }
+            );
+          }
+        }
+        throw error;
+      }
+    } else {
+      if (hasRetiredAvailabilityKeys(rawBody)) {
+        return NextResponse.json(
+          {
+            error:
+              "Availability is managed by the contact-first inventory editor. Reload and use the availability editor.",
+            code: "HOST_MANAGED_WRITE_PATH_REQUIRED",
+          },
+          { status: 409 }
+        );
+      }
+
+      const parsed = listingProfilePatchSchema.safeParse(rawBody);
+      if (!parsed.success) {
+        return NextResponse.json(
+          {
+            error: "Validation failed",
+            fields: parsed.error.flatten().fieldErrors,
+          },
+          { status: 400 }
+        );
+      }
+
+      const profilePatch: ListingProfilePatch = parsed.data;
       const {
+        expectedVersion,
         title,
         description,
         price,
         amenities,
         houseRules,
-        totalSlots,
         address,
         city,
         state,
         zip,
-        moveInDate,
-        availableUntil,
-        minStayMonths,
         leaseDuration,
         roomType,
         householdLanguages,
@@ -368,10 +839,11 @@ export async function PATCH(
         householdGender,
         primaryHomeLanguage,
         images,
-      } = parsed.data;
+      } = profilePatch;
 
       if (householdLanguages && householdLanguages.length > 0) {
-        const langResult = householdLanguagesSchema.safeParse(householdLanguages);
+        const langResult =
+          householdLanguagesSchema.safeParse(householdLanguages);
         if (!langResult.success) {
           return NextResponse.json(
             { error: "Invalid language codes" },
@@ -396,42 +868,38 @@ export async function PATCH(
         }
       }
 
-      if (title) {
-        const titleCheck = checkListingLanguageCompliance(title);
-        if (!titleCheck.allowed) {
-          await logger.warn("Listing title failed compliance check", {
-            route: "/api/listings/[id]",
-            method: "PATCH",
-            userId: userId.slice(0, 8) + "...",
+      const titleCheck = checkListingLanguageCompliance(title);
+      if (!titleCheck.allowed) {
+        await logger.warn("Listing title failed compliance check", {
+          route: "/api/listings/[id]",
+          method: "PATCH",
+          userId: userId.slice(0, 8) + "...",
+          field: "title",
+        });
+        return NextResponse.json(
+          {
+            error: titleCheck.message ?? "Content policy violation",
             field: "title",
-          });
-          return NextResponse.json(
-            {
-              error: titleCheck.message ?? "Content policy violation",
-              field: "title",
-            },
-            { status: 400 }
-          );
-        }
+          },
+          { status: 400 }
+        );
       }
 
-      if (description) {
-        const complianceCheck = checkListingLanguageCompliance(description);
-        if (!complianceCheck.allowed) {
-          await logger.warn("Listing description failed compliance check", {
-            route: "/api/listings/[id]",
-            method: "PATCH",
-            userId: userId.slice(0, 8) + "...",
+      const complianceCheck = checkListingLanguageCompliance(description);
+      if (!complianceCheck.allowed) {
+        await logger.warn("Listing description failed compliance check", {
+          route: "/api/listings/[id]",
+          method: "PATCH",
+          userId: userId.slice(0, 8) + "...",
+          field: "description",
+        });
+        return NextResponse.json(
+          {
+            error: complianceCheck.message ?? "Content policy violation",
             field: "description",
-          });
-          return NextResponse.json(
-            {
-              error: complianceCheck.message ?? "Content policy violation",
-              field: "description",
-            },
-            { status: 400 }
-          );
-        }
+          },
+          { status: 400 }
+        );
       }
 
       const addressChanged =
@@ -440,6 +908,12 @@ export async function PATCH(
           listing.location.city !== city ||
           listing.location.state !== state ||
           listing.location.zip !== zip);
+      const nextNormalizedAddress = normalizeAddress({
+        address,
+        city,
+        state,
+        zip,
+      });
 
       let coords: { lat: number; lng: number } | null = null;
       if (addressChanged && listing.location) {
@@ -456,7 +930,8 @@ export async function PATCH(
             });
             return NextResponse.json(
               {
-                error: "Could not find this address. Please check and try again.",
+                error:
+                  "Could not find this address. Please check and try again.",
               },
               { status: 400 }
             );
@@ -516,7 +991,7 @@ export async function PATCH(
       }
 
       try {
-        const genericPatchResult = await prisma.$transaction(async (tx) => {
+        const profilePatchResult = await prisma.$transaction(async (tx) => {
           const [lockedListing] = await tx.$queryRaw<LockedListingRow[]>`
             SELECT
               id,
@@ -524,6 +999,8 @@ export async function PATCH(
               version,
               status,
               "statusReason",
+              "normalizedAddress",
+              "physicalUnitId",
               "openSlots",
               "availableSlots",
               "totalSlots",
@@ -543,12 +1020,10 @@ export async function PATCH(
             throw new Error("NOT_FOUND");
           }
 
-          const writeLock = features.moderationWriteLocks
-            ? getModerationWriteLockResult({
-                actor: "host",
-                statusReason: lockedListing.statusReason,
-              })
-            : null;
+          const writeLock = getHostModerationWriteLockResult({
+            statusReason: lockedListing.statusReason,
+            moderationWriteLocksEnabled: features.moderationWriteLocks,
+          });
 
           if (writeLock) {
             return {
@@ -560,31 +1035,14 @@ export async function PATCH(
             } as const;
           }
 
-          const nextMoveInDate = moveInDate ? new Date(moveInDate) : null;
-          const nextAvailableUntil =
-            availableUntil === undefined
-              ? lockedListing.availableUntil
-              : availableUntil
-                ? new Date(availableUntil)
-                : null;
-          const moveInDateChanged =
-            (lockedListing.moveInDate?.toISOString().slice(0, 10) ?? null) !==
-            (nextMoveInDate?.toISOString().slice(0, 10) ?? null);
-          const availableUntilChanged =
-            availableUntil !== undefined &&
-            (lockedListing.availableUntil?.toISOString().slice(0, 10) ?? null) !==
-              (nextAvailableUntil?.toISOString().slice(0, 10) ?? null);
-          const minStayMonthsChanged =
-            minStayMonths !== undefined &&
-            minStayMonths !== lockedListing.minStayMonths;
-
-          if (
-            moveInDateChanged ||
-            totalSlots !== lockedListing.totalSlots ||
-            availableUntilChanged ||
-            minStayMonthsChanged
-          ) {
-            throw new Error("HOST_MANAGED_WRITE_PATH_REQUIRED");
+          if (lockedListing.version !== expectedVersion) {
+            return {
+              ok: false,
+              error:
+                "This listing changed while you were editing it. Refresh and try again.",
+              code: "VERSION_CONFLICT",
+              httpStatus: 409,
+            } as const;
           }
 
           const updatedListing = await tx.listing.update({
@@ -607,12 +1065,11 @@ export async function PATCH(
               }),
               leaseDuration: leaseDuration || null,
               roomType: roomType || null,
-              totalSlots,
-              availableSlots: totalSlots,
-              moveInDate: nextMoveInDate,
-              availableUntil: nextAvailableUntil,
-              ...(minStayMonths !== undefined && { minStayMonths }),
+              ...(addressChanged && {
+                normalizedAddress: nextNormalizedAddress,
+              }),
               ...(Array.isArray(images) && { images }),
+              version: lockedListing.version + 1,
             },
           });
 
@@ -636,23 +1093,35 @@ export async function PATCH(
 
           await markListingDirtyInTx(tx, id, "listing_updated");
 
-          return { ok: true, updatedListing } as const;
+          const canonicalSync = await syncCanonicalAvailability(tx, {
+            listing: updatedListing,
+            address: { address, city, state, zip },
+            actor: { role: "host", id: userId },
+          });
+
+          return {
+            ok: true,
+            updatedListing: {
+              ...updatedListing,
+              physicalUnitId: canonicalSync.unitId,
+            },
+          } as const;
         });
 
-        if (!genericPatchResult.ok) {
+        if (!profilePatchResult.ok) {
           return NextResponse.json(
             {
-              error: genericPatchResult.error,
-              code: genericPatchResult.code,
-              ...("lockReason" in genericPatchResult
-                ? { lockReason: genericPatchResult.lockReason }
+              error: profilePatchResult.error,
+              code: profilePatchResult.code,
+              ...("lockReason" in profilePatchResult
+                ? { lockReason: profilePatchResult.lockReason }
                 : {}),
             },
-            { status: genericPatchResult.httpStatus }
+            { status: profilePatchResult.httpStatus }
           );
         }
 
-        result = genericPatchResult.updatedListing;
+        result = profilePatchResult.updatedListing;
       } catch (error) {
         if (error instanceof Error) {
           if (error.message === "NOT_FOUND") {
@@ -661,13 +1130,9 @@ export async function PATCH(
               { status: 404 }
             );
           }
-          if (error.message === "HOST_MANAGED_WRITE_PATH_REQUIRED") {
+          if (error.message === "LISTING_LOCATION_MISSING") {
             return NextResponse.json(
-              {
-                error:
-                  "Availability is managed by the contact-first inventory editor. Reload and use the availability editor.",
-                code: "HOST_MANAGED_WRITE_PATH_REQUIRED",
-              },
+              { error: "Listing location is missing" },
               { status: 409 }
             );
           }

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
@@ -19,6 +19,44 @@ const registerSchema = z.object({
     .min(12, "Password must be at least 12 characters")
     .max(128),
 });
+
+const REGISTRATION_ACCEPTED_MIN_RESPONSE_MS = 1000;
+const REGISTRATION_ACCEPTED_JITTER_MS = 250;
+
+const registrationAcceptedResponse = () =>
+  NextResponse.json(
+    { success: true, verificationEmailSent: true },
+    { status: 201 }
+  );
+
+function getRegistrationAcceptedDelayMs() {
+  return (
+    REGISTRATION_ACCEPTED_MIN_RESPONSE_MS +
+    Math.floor(Math.random() * (REGISTRATION_ACCEPTED_JITTER_MS + 1))
+  );
+}
+
+async function waitForRegistrationAcceptedTiming(
+  startedAt: number,
+  delayMs: number
+) {
+  const remainingMs = delayMs - (Date.now() - startedAt);
+  if (remainingMs > 0) {
+    await new Promise((resolve) => setTimeout(resolve, remainingMs));
+  }
+}
+
+async function registrationAcceptedAfterTiming(
+  startedAt: number,
+  delayMs: number
+) {
+  await waitForRegistrationAcceptedTiming(startedAt, delayMs);
+  return registrationAcceptedResponse();
+}
+
+function isPrismaUniqueConstraintError(error: unknown) {
+  return (error as { code?: unknown })?.code === "P2002";
+}
 
 export async function POST(request: Request) {
   const csrfResponse = validateCsrf(request);
@@ -64,30 +102,24 @@ export async function POST(request: Request) {
 
     const { name, password } = result.data;
     const email = normalizeEmail(result.data.email);
+    const acceptedStartedAt = Date.now();
+    const acceptedDelayMs = getRegistrationAcceptedDelayMs();
 
     // Check if user exists
     const existingUser = await prisma.user.findUnique({
       where: { email },
+      select: { id: true },
     });
 
-    // P1-06/P1-07 FIX: Prevent user enumeration with generic error message
-    // and timing-safe delay to prevent timing attacks
-    if (existingUser) {
-      // Add artificial delay to match successful registration timing
-      await new Promise((resolve) =>
-        setTimeout(resolve, 100 + Math.random() * 50)
-      );
-      return NextResponse.json(
-        {
-          error:
-            "Registration failed. Please try again or use forgot password if you already have an account.",
-        },
-        { status: 400 }
-      );
-    }
-
-    // Hash password
+    // Hash for every valid accepted attempt so existing-account requests do
+    // comparable CPU work without creating users, tokens, or emails.
     const hashedPassword = await bcrypt.hash(password, 12);
+
+    // Prevent user enumeration: valid existing and new emails get the same
+    // accepted response shape/status. Do not churn tokens or send email here.
+    if (existingUser) {
+      return registrationAcceptedAfterTiming(acceptedStartedAt, acceptedDelayMs);
+    }
 
     // Generate token pair before transaction (pure computation)
     const { token: verificationToken, tokenHash: verificationTokenHash } =
@@ -96,23 +128,33 @@ export async function POST(request: Request) {
 
     // Atomic: create user + verification token in single transaction
     // Prevents orphaned users who can't verify email on partial failure
-    await prisma.$transaction([
-      prisma.user.create({
-        data: {
-          name,
-          email,
-          password: hashedPassword,
-          emailVerified: null,
-        },
-      }),
-      prisma.verificationToken.create({
-        data: {
-          identifier: email,
-          tokenHash: verificationTokenHash,
-          expires,
-        },
-      }),
-    ]);
+    try {
+      await prisma.$transaction([
+        prisma.user.create({
+          data: {
+            name,
+            email,
+            password: hashedPassword,
+            emailVerified: null,
+          },
+        }),
+        prisma.verificationToken.create({
+          data: {
+            identifier: email,
+            tokenHash: verificationTokenHash,
+            expires,
+          },
+        }),
+      ]);
+    } catch (error) {
+      if (isPrismaUniqueConstraintError(error)) {
+        return registrationAcceptedAfterTiming(
+          acceptedStartedAt,
+          acceptedDelayMs
+        );
+      }
+      throw error;
+    }
 
     // Build verification URL
     const baseUrl =
@@ -121,23 +163,27 @@ export async function POST(request: Request) {
       "http://localhost:3000";
     const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${verificationToken}`;
 
-    const emailResult = await sendNotificationEmail("welcomeEmail", email, {
-      userName: name,
-      verificationUrl,
-    });
-    const verificationEmailSent = Boolean(emailResult?.success);
-    if (!verificationEmailSent) {
+    after(async () => {
+      try {
+        const emailResult = await sendNotificationEmail("welcomeEmail", email, {
+          userName: name,
+          verificationUrl,
+        });
+        if (emailResult?.success) {
+          return;
+        }
+      } catch {
+        // Background email failures must not affect the accepted response.
+      }
       logger.sync.error("Failed to send welcome email", {
         route: "/api/register",
         method: "POST",
       });
-    }
+    });
 
-    // Return minimal response — do not leak user object fields to the client
-    return NextResponse.json(
-      { success: true, verificationEmailSent },
-      { status: 201 }
-    );
+    // Return a generic accepted response — do not leak account existence or
+    // email delivery state to the client.
+    return registrationAcceptedAfterTiming(acceptedStartedAt, acceptedDelayMs);
   } catch (error) {
     return captureApiError(error, { route: "/api/register", method: "POST" });
   }

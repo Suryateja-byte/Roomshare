@@ -14,6 +14,20 @@ let isLoaded = false;
 
 // Callback name for Google Maps API
 const CALLBACK_NAME = "__googleMapsCallback";
+const GOOGLE_MAPS_SCRIPT_SELECTOR =
+  'script[src*="maps.googleapis.com/maps/api/js"]';
+
+function clearGoogleMapsCallback(): void {
+  delete (window as unknown as { [key: string]: unknown })[CALLBACK_NAME];
+}
+
+function removeGoogleMapsScript(script: Element | null | undefined): void {
+  if (!script || !script.getAttribute("src")?.includes("maps.googleapis.com")) {
+    return;
+  }
+
+  script.parentNode?.removeChild(script);
+}
 
 /**
  * Loads the Google Maps JavaScript API with Places library.
@@ -43,17 +57,54 @@ export async function loadPlacesUiKit(): Promise<void> {
   }
 
   loadPromise = new Promise<void>((resolve, reject) => {
+    let settled = false;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let activeScript: Element | null = null;
+
+    const clearPendingTimers = () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+    };
+
+    const resolveOnce = () => {
+      if (settled) return;
+      settled = true;
+      clearPendingTimers();
+      isLoaded = true;
+      resolve();
+    };
+
+    const rejectAndReset = (
+      error: Error,
+      options?: { removeScript?: Element | null }
+    ) => {
+      if (settled) return;
+      settled = true;
+      clearPendingTimers();
+      removeGoogleMapsScript(options?.removeScript);
+      loadPromise = null;
+      isLoaded = false;
+      clearGoogleMapsCallback();
+      reject(error);
+    };
+
     // Check if already loaded by another script
     if (window.google?.maps?.importLibrary) {
       // Already loaded, just import places
       window.google.maps
         .importLibrary("places")
         .then(() => {
-          isLoaded = true;
-          resolve();
+          resolveOnce();
         })
         .catch((error: Error) => {
-          reject(
+          rejectAndReset(
             new Error(`Failed to import Places library: ${error.message}`)
           );
         });
@@ -61,22 +112,20 @@ export async function loadPlacesUiKit(): Promise<void> {
     }
 
     // Check if script tag already exists but API not ready yet
-    const existingScript = document.querySelector(
-      'script[src*="maps.googleapis.com/maps/api/js"]'
-    );
+    const existingScript = document.querySelector(GOOGLE_MAPS_SCRIPT_SELECTOR);
     if (existingScript) {
+      activeScript = existingScript;
       // Poll for google.maps to be ready
-      const checkReady = setInterval(() => {
+      intervalId = setInterval(() => {
         if (window.google?.maps?.importLibrary) {
-          clearInterval(checkReady);
+          clearPendingTimers();
           window.google.maps
             .importLibrary("places")
             .then(() => {
-              isLoaded = true;
-              resolve();
+              resolveOnce();
             })
             .catch((error: Error) => {
-              reject(
+              rejectAndReset(
                 new Error(`Failed to import Places library: ${error.message}`)
               );
             });
@@ -84,10 +133,12 @@ export async function loadPlacesUiKit(): Promise<void> {
       }, 100);
 
       // Timeout after 10 seconds
-      setTimeout(() => {
-        clearInterval(checkReady);
-        if (!isLoaded) {
-          reject(new Error("Timeout waiting for Google Maps API to load"));
+      timeoutId = setTimeout(() => {
+        if (!settled) {
+          rejectAndReset(
+            new Error("Timeout waiting for Google Maps API to load"),
+            { removeScript: activeScript }
+          );
         }
       }, 10000);
       return;
@@ -105,18 +156,18 @@ export async function loadPlacesUiKit(): Promise<void> {
 
           // Import the places library
           await window.google.maps.importLibrary("places");
-          isLoaded = true;
-          resolve();
+          resolveOnce();
         } catch (error) {
           const errorMessage =
             error instanceof Error ? error.message : String(error);
           console.error("Google Places API error:", error);
-          reject(new Error(`Failed to load Places library: ${errorMessage}`));
+          rejectAndReset(
+            new Error(`Failed to load Places library: ${errorMessage}`),
+            { removeScript: activeScript }
+          );
         } finally {
           // Clean up callback
-          delete (window as unknown as { [key: string]: unknown })[
-            CALLBACK_NAME
-          ];
+          clearGoogleMapsCallback();
         }
       };
 
@@ -125,15 +176,15 @@ export async function loadPlacesUiKit(): Promise<void> {
     script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=beta&callback=${CALLBACK_NAME}`;
     script.async = true;
     script.defer = true;
+    activeScript = script;
 
     script.onerror = () => {
-      loadPromise = null;
-      delete (window as unknown as { [key: string]: unknown })[CALLBACK_NAME];
-      reject(
+      rejectAndReset(
         new Error(
           "Failed to load Google Maps API script. " +
             "Check your API key and network connection."
-        )
+        ),
+        { removeScript: script }
       );
     };
 
@@ -156,4 +207,7 @@ export function isPlacesUiKitLoaded(): boolean {
 export function resetPlacesLoader(): void {
   loadPromise = null;
   isLoaded = false;
+  if (typeof window !== "undefined") {
+    clearGoogleMapsCallback();
+  }
 }

@@ -89,7 +89,7 @@ test.describe("Authentication Journeys", () => {
       ).toBeTruthy();
     });
 
-    test(`${tags.auth} - Signup with existing email shows error`, async ({
+    test(`${tags.auth} - Signup with existing email follows non-enumerating flow`, async ({
       page,
       auth,
     }) => {
@@ -123,18 +123,36 @@ test.describe("Authentication Journeys", () => {
         await termsCheckbox.check();
       }
 
+      const registerResponsePromise = page.waitForResponse(
+        (resp) => resp.url().includes("/api/register"),
+        { timeout: 30000 }
+      );
+
       await page
         .getByRole("button", { name: /sign up|create|join/i })
         .first()
         .click();
 
-      // Should show error about existing email
-      await expect(
-        page
-          .getByText(/already exists|already registered|account exists/i)
-          .first()
-          .or(page.locator('[role="alert"]').first())
-      ).toBeVisible({ timeout: 30000 });
+      const registerResponse = await registerResponsePromise;
+
+      if (registerResponse.status() === 201) {
+        await expect(page).toHaveURL(/\/login\?registered=true/, {
+          timeout: 15000,
+        });
+      } else {
+        // CI may hit Turnstile or rate limits before the anti-enumeration path.
+        // The important contract is that duplicate-email disclosure is not
+        // required or asserted.
+        expect([400, 403, 429]).toContain(registerResponse.status());
+        await expect(
+          page
+            .getByText(/registration failed/i)
+            .or(page.getByText(/bot verification failed/i))
+            .or(page.getByText(/failed to register/i))
+            .or(page.getByRole("alert"))
+            .first()
+        ).toBeVisible({ timeout: 15000 });
+      }
     });
 
     test(`${tags.auth} - Weak password validation`, async ({ page }) => {

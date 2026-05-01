@@ -95,19 +95,23 @@ test.describe("J31: Edit Listing and Verify", () => {
     }
 
     // Step 6: Verify changes
-    const hasToast = await page
-      .locator(selectors.toast)
-      .isVisible()
-      .catch(() => false);
     const updatedTitle = page.getByText(/Sunny Mission Room Updated/i);
-    const hasUpdated = await updatedTitle.isVisible().catch(() => false);
-    const stayedOnEditSurface = await page
-      .getByRole("heading", { name: /edit listing/i })
-      .isVisible()
-      .catch(() => false);
-    expect(hasToast || hasUpdated || stayedOnEditSurface).toBeTruthy();
+    await expect
+      .poll(
+        async () => {
+          const hasToast = await page
+            .locator(selectors.toast)
+            .isVisible()
+            .catch(() => false);
+          const hasUpdated = await updatedTitle.isVisible().catch(() => false);
+          return hasToast || hasUpdated;
+        },
+        { timeout: 15000 }
+      )
+      .toBe(true);
 
     // Restore original title for future test runs
+    const hasUpdated = await updatedTitle.isVisible().catch(() => false);
     if (hasUpdated) {
       const editAgain = page
         .getByRole("link", { name: /edit|manage/i })
@@ -225,7 +229,7 @@ test.describe("J32: Pause and Unpause Listing", () => {
 
 // ─── J33: Delete Listing with Confirmation ────────────────────────────────────
 test.describe("J33: Delete Listing with Confirmation", () => {
-  test("listing detail → delete → confirm modal → verify redirect", async ({
+  test("listing detail → delete → confirm modal → verify confirmation flow", async ({
     page,
     nav,
   }) => {
@@ -261,33 +265,32 @@ test.describe("J33: Delete Listing with Confirmation", () => {
       .waitFor({ state: "visible", timeout: 5000 })
       .catch(() => {});
 
-    // Step 3: Confirm deletion in modal
+    // Step 3: Confirm deletion warning and password confirmation flow.
+    // Do not submit the final DELETE: this suite uses shared seeded listings
+    // and deleting one cascades into messaging fixtures used by later tests.
     const confirmBtn = page
       .getByRole("button", { name: /confirm|yes|delete/i })
       .last();
     if (await confirmBtn.isVisible().catch(() => false)) {
       await confirmBtn.click({ force: true });
-      await Promise.race([
-        page.waitForURL((url) => !url.pathname.startsWith("/listings/"), {
-          timeout: 15_000,
-        }),
-        page.locator(selectors.toast).waitFor({
-          state: "visible",
-          timeout: 15_000,
-        }),
-      ]).catch(() => {});
+
+      const passwordDialog = page.getByRole("dialog", {
+        name: /delete listing/i,
+      });
+      await passwordDialog
+        .waitFor({ state: "visible", timeout: 10000 })
+        .catch(() => {});
+
+      await expect(passwordDialog).toBeVisible({ timeout: 10000 });
+      await expect(
+        passwordDialog.getByRole("button", { name: /delete listing/i })
+      ).toBeVisible();
+      await passwordDialog.getByRole("button", { name: /cancel/i }).click();
+      await expect(passwordDialog).not.toBeVisible({ timeout: 10000 });
     }
 
-    // Step 4: Verify redirect or success toast
-    const hasToast = await page
-      .locator(selectors.toast)
-      .isVisible()
-      .catch(() => false);
-    const redirected = !page.url().includes("/listings/");
-    test.skip(
-      !(hasToast || redirected),
-      "Delete confirmation did not complete before the E2E timeout"
-    );
+    // Step 4: Verify the non-destructive flow leaves us on the listing.
+    expect(page.url()).toContain("/listings/");
   });
 });
 
@@ -303,8 +306,8 @@ test.describe("J34: Form Validation Errors", () => {
 
     // Step 2: Try submitting empty form
     const submitBtn = page
-      .getByRole("button", { name: /create|submit|publish|save|next/i })
-      .or(page.locator('button[type="submit"]'));
+      .locator('form[novalidate] button[type="submit"]')
+      .or(page.getByRole("button", { name: /publish listing/i }));
     const canSubmit = await submitBtn
       .first()
       .isVisible()
@@ -316,13 +319,12 @@ test.describe("J34: Form Validation Errors", () => {
 
     // Step 3: Verify validation errors appear
     const errors = page
-      .locator('[aria-invalid="true"]')
+      .getByTestId("form-error-banner")
+      .or(page.locator('[aria-invalid="true"]'))
       .or(page.locator('[class*="error"]'))
       .or(page.locator('[role="alert"]').filter({ hasText: /.+/ }));
 
-    const errorCount = await errors.count();
-    // There should be at least one validation error
-    expect(errorCount).toBeGreaterThanOrEqual(0); // Soft — some forms use HTML5 validation
+    await expect(errors.first()).toBeVisible({ timeout: 10000 });
 
     // Step 4: Fill title only
     const titleField = page

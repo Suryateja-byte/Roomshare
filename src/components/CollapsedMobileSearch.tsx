@@ -125,24 +125,26 @@ export default function CollapsedMobileSearch({
   }, [activeFilterCount, moveInSummary, priceDisplay, roomTypeSummary]);
 
   return (
-    <div className="md:hidden flex items-center gap-2 w-full max-w-md mx-auto px-3">
+    <div className="mx-auto flex w-full max-w-md items-center gap-2 px-3 md:hidden">
       {/* Main search area - tap to expand */}
       <button
         ref={expandButtonRef}
         onClick={onExpand}
-        className="flex-1 flex items-center gap-3 min-h-[52px] px-4 py-2 bg-surface-container-lowest rounded-full shadow-ambient-sm border border-outline-variant/20 hover:shadow-ambient transition-shadow"
+        className="flex min-h-[50px] flex-1 items-center gap-3 rounded-full border border-outline-variant/25 bg-surface-container-lowest/95 px-4 py-2 shadow-ambient-sm shadow-on-surface/5 backdrop-blur-xl transition-all hover:border-outline-variant/60 hover:shadow-ambient"
         aria-label="Expand search"
       >
-        <Search className="w-5 h-5 text-on-surface-variant flex-shrink-0" />
+        <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-surface-canvas text-on-surface shadow-[inset_0_0_0_1px_rgba(220,193,185,0.45)]">
+          <Search className="h-4 w-4" />
+        </span>
         <div className="flex-1 min-w-0 text-left">
           <div
-            className={`text-sm font-medium truncate ${
+            className={`truncate text-[15px] font-semibold leading-tight ${
               location ? "text-on-surface" : "text-on-surface-variant"
             }`}
           >
             {displayText}
           </div>
-          <div className="text-xs text-on-surface-variant truncate">
+          <div className="mt-0.5 truncate text-xs leading-tight text-on-surface-variant">
             {secondaryText}
           </div>
         </div>
@@ -152,11 +154,11 @@ export default function CollapsedMobileSearch({
       {onOpenFilters && (
         <button
           onClick={onOpenFilters}
-          className="relative flex items-center justify-center size-[52px] bg-surface-container-lowest rounded-full shadow-ambient-sm border border-outline-variant/20 hover:shadow-ambient transition-shadow"
+          className="relative flex size-[50px] items-center justify-center rounded-full border border-outline-variant/25 bg-surface-container-lowest/95 text-on-surface shadow-ambient-sm shadow-on-surface/5 backdrop-blur-xl transition-all hover:border-outline-variant/60 hover:shadow-ambient"
           aria-label={`Filters${activeFilterCount > 0 ? ` (${activeFilterCount} active)` : ""}`}
           data-testid="mobile-filter-button"
         >
-          <SlidersHorizontal className="w-5 h-5 text-on-surface-variant" />
+          <SlidersHorizontal className="h-5 w-5 text-on-surface-variant" />
           {activeFilterCount > 0 && (
             <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold rounded-full bg-on-surface text-surface-container-lowest">
               {activeFilterCount}

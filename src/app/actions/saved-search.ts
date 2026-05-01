@@ -15,6 +15,7 @@ import {
 import { z } from "zod";
 import { headers } from "next/headers";
 import { checkServerComponentRateLimit } from "@/lib/with-rate-limit";
+import { checkSuspension } from "./suspension";
 
 type AlertFrequency = "INSTANT" | "DAILY" | "WEEKLY";
 
@@ -26,6 +27,8 @@ interface SaveSearchInput {
 }
 
 const savedSearchNameSchema = z.string().trim().min(1).max(100);
+const SAVED_SEARCH_LIMIT_ERROR =
+  "You can only save up to 10 searches. Please delete some to save new ones.";
 
 /**
  * Write-path schema: strips unknown fields to prevent arbitrary JSON from persisting.
@@ -43,6 +46,7 @@ const savedSearchFiltersWriteSchema = z
     houseRules: z.array(z.string()).optional(),
     languages: z.array(z.string()).optional(),
     moveInDate: z.string().optional(),
+    endDate: z.string().optional(),
     leaseDuration: z.string().optional(),
     genderPreference: z.string().optional(),
     householdGender: z.string().optional(),
@@ -75,11 +79,30 @@ async function enforceSavedSearchMutationRateLimit(action: string) {
   return null;
 }
 
+async function enforceSavedSearchMutationAccess(userId: string) {
+  const suspension = await checkSuspension(userId);
+  if (suspension.suspended) {
+    return { error: suspension.error || "Account suspended" };
+  }
+
+  return null;
+}
+
+async function acquireSavedSearchLimitLock(
+  tx: Pick<Prisma.TransactionClient, "$executeRaw">,
+  userId: string
+) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('saved-search-limit'), hashtext(${userId}))`;
+}
+
 export async function saveSearch(input: SaveSearchInput) {
   const session = await auth();
   if (!session?.user?.id) {
     return { error: "Unauthorized" };
   }
+
+  const accessDenied = await enforceSavedSearchMutationAccess(session.user.id);
+  if (accessDenied) return accessDenied;
 
   const rateLimited = await enforceSavedSearchMutationRateLimit("save");
   if (rateLimited) return rateLimited;
@@ -88,18 +111,6 @@ export async function saveSearch(input: SaveSearchInput) {
     const nameValidation = savedSearchNameSchema.safeParse(input.name);
     if (!nameValidation.success) {
       return { error: "Invalid search name" };
-    }
-
-    // Check if user already has 10 saved searches (limit)
-    const existingCount = await prisma.savedSearch.count({
-      where: { userId: session.user.id },
-    });
-
-    if (existingCount >= 10) {
-      return {
-        error:
-          "You can only save up to 10 searches. Please delete some to save new ones.",
-      };
     }
 
     // Canonicalize filters before storing so saved-search reopen flows always
@@ -111,35 +122,55 @@ export async function saveSearch(input: SaveSearchInput) {
     const alertEnabled = input.alertEnabled ?? true;
     const alertFrequency = input.alertFrequency ?? "DAILY";
 
-    const savedSearch = await prisma.savedSearch.create({
-      data: {
-        userId: session.user.id,
-        name: nameValidation.data,
-        query: normalizedFilters.query,
-        filters: strippedFilters as Prisma.InputJsonValue,
-        searchSpecJson:
-          canonical.searchSpecJson as unknown as Prisma.InputJsonValue,
-        searchSpecHash: canonical.searchSpecHash,
-        embeddingVersionAtSave: canonical.embeddingVersionAtSave,
-        rankerProfileVersionAtSave: canonical.rankerProfileVersionAtSave,
-        unitIdentityEpochFloor: canonical.unitIdentityEpochFloor,
-        active: true,
-        alertEnabled,
-        alertFrequency,
-        alertSubscriptions: {
-          create: {
-            user: { connect: { id: session.user.id } },
-            channel: "EMAIL",
-            frequency: alertFrequency,
-            active: alertEnabled,
+    const saveResult = await prisma.$transaction(async (tx) => {
+      await acquireSavedSearchLimitLock(tx, session.user.id);
+
+      const existingCount = await tx.savedSearch.count({
+        where: { userId: session.user.id },
+      });
+
+      if (existingCount >= 10) {
+        return { kind: "limit" as const };
+      }
+
+      const savedSearch = await tx.savedSearch.create({
+        data: {
+          userId: session.user.id,
+          name: nameValidation.data,
+          query: normalizedFilters.query,
+          filters: strippedFilters as Prisma.InputJsonValue,
+          searchSpecJson:
+            canonical.searchSpecJson as unknown as Prisma.InputJsonValue,
+          searchSpecHash: canonical.searchSpecHash,
+          embeddingVersionAtSave: canonical.embeddingVersionAtSave,
+          rankerProfileVersionAtSave: canonical.rankerProfileVersionAtSave,
+          unitIdentityEpochFloor: canonical.unitIdentityEpochFloor,
+          active: true,
+          alertEnabled,
+          alertFrequency,
+          alertSubscriptions: {
+            create: {
+              user: { connect: { id: session.user.id } },
+              channel: "EMAIL",
+              frequency: alertFrequency,
+              active: alertEnabled,
+            },
           },
         },
-      },
-      select: {
-        id: true,
-        alertEnabled: true,
-      },
+        select: {
+          id: true,
+          alertEnabled: true,
+        },
+      });
+
+      return { kind: "created" as const, savedSearch };
     });
+
+    if (saveResult.kind === "limit") {
+      return { error: SAVED_SEARCH_LIMIT_ERROR };
+    }
+
+    const { savedSearch } = saveResult;
     const paywallSummary = await evaluateSavedSearchAlertPaywall({
       userId: session.user.id,
     });
@@ -208,6 +239,9 @@ export async function deleteSavedSearch(searchId: string) {
     return { error: "Unauthorized" };
   }
 
+  const accessDenied = await enforceSavedSearchMutationAccess(session.user.id);
+  if (accessDenied) return accessDenied;
+
   const rateLimited = await enforceSavedSearchMutationRateLimit("delete");
   if (rateLimited) return rateLimited;
 
@@ -237,6 +271,9 @@ export async function toggleSearchAlert(searchId: string, enabled: boolean) {
   if (!session?.user?.id) {
     return { error: "Unauthorized" };
   }
+
+  const accessDenied = await enforceSavedSearchMutationAccess(session.user.id);
+  if (accessDenied) return accessDenied;
 
   const rateLimited = await enforceSavedSearchMutationRateLimit("toggle-alert");
   if (rateLimited) return rateLimited;
@@ -303,6 +340,9 @@ export async function updateSavedSearchName(searchId: string, name: string) {
   if (!session?.user?.id) {
     return { error: "Unauthorized" };
   }
+
+  const accessDenied = await enforceSavedSearchMutationAccess(session.user.id);
+  if (accessDenied) return accessDenied;
 
   const rateLimited = await enforceSavedSearchMutationRateLimit("rename");
   if (rateLimited) return rateLimited;

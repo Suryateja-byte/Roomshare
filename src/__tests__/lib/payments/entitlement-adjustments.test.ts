@@ -67,6 +67,10 @@ describe("entitlement adjustments", () => {
     jest.clearAllMocks();
   });
 
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it("reduces only unused pack credits on a partial refund", () => {
     expect(
       calculatePackGrantAfterRefund({
@@ -245,6 +249,10 @@ describe("entitlement adjustments", () => {
   });
 
   it("freezes, restores, and revokes grants across dispute lifecycle events", async () => {
+    jest.useFakeTimers({
+      now: new Date("2026-04-15T00:00:00.000Z"),
+    });
+
     const tx = buildTx();
     tx.payment.findFirst.mockResolvedValue({
       id: "payment-123",

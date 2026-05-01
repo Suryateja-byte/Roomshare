@@ -2,10 +2,11 @@
  * Daily Maintenance Cron Route
  *
  * Consolidates background maintenance work into a single dispatcher route
- * to fit within Vercel Hobby plan's 2-cron limit. Each task runs independently
- * with its own try/catch, so one failure does not block others.
+ * to stay within the app's Vercel cron-entry budget and Hobby-plan daily
+ * cadence limit. Each task runs independently with its own try/catch, so one
+ * failure does not block others.
  *
- * Schedule: 2,17,32,47 * * * * (every 15 minutes)
+ * Vercel schedule: 2 9 * * * (daily at 09:02 UTC)
  *
  * Every invocation:
  * 1. Refresh dirty search documents
@@ -17,13 +18,14 @@
  * 6. Process search alerts (email notifications)
  * 7. Process listing freshness reminders and stale warnings
  * 8. Auto-pause day-30 stale listings after warnings have been emitted
+ * 9. Delete expired private verification documents
  *
  * Delegated tasks are called via internal fetch to avoid duplicating complex
  * logic (SQL, geospatial, etc.). Simple DB cleanup tasks stay inlined here.
  *
  * The daily-only gate is time-based rather than persisted. That keeps the
- * dispatcher within the 2-cron budget while preserving a once-daily cadence
- * for low-priority maintenance tasks.
+ * dispatcher compatible with Vercel Hobby while preserving a once-daily
+ * cadence for low-priority maintenance tasks.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -36,6 +38,7 @@ import { validateCronAuth } from "@/lib/cron-auth";
 import { headers } from "next/headers";
 import { isPhase02ProjectionWritesEnabled } from "@/lib/flags/phase02";
 import { drainOutboxOnce } from "@/lib/outbox/drain";
+import { cleanupExpiredVerificationDocumentsOnce } from "@/lib/verification/retention";
 
 interface TaskResult {
   task: string;
@@ -163,7 +166,7 @@ export async function GET(request: NextRequest) {
   const startTime = Date.now();
   const results: TaskResult[] = [];
 
-  // --- Fast cadence tasks ---
+  // --- Dispatcher tasks ---
   await runDelegatedTask(
     results,
     "refresh-search-docs",
@@ -171,15 +174,26 @@ export async function GET(request: NextRequest) {
     cronSecret
   );
 
-  // Phase 02: outbox drain — all priority lanes every 15 min
+  // Phase 02: outbox drain — all priority lanes on each dispatcher tick
   if (isPhase02ProjectionWritesEnabled()) {
     await runTask(results, "outbox-drain", async () => {
-      const result = await drainOutboxOnce({ maxBatch: 50, maxTickMs: 9000, priorityMax: 100 });
+      const result = await drainOutboxOnce({
+        maxBatch: 50,
+        maxTickMs: 9000,
+        priorityMax: 100,
+      });
       return result as unknown as Record<string, unknown>;
     });
   } else {
     markSkippedTask(results, "outbox-drain", "phase02_disabled");
   }
+
+  await runDelegatedTask(
+    results,
+    "payments-refund-queue",
+    "/api/cron/payments-refund-queue",
+    cronSecret
+  );
 
   if (features.contactRestorationAutomation) {
     await runDelegatedTask(
@@ -246,6 +260,11 @@ export async function GET(request: NextRequest) {
       return { deleted: result.count };
     });
 
+    await runTask(results, "cleanup-verification-documents", async () => {
+      const result = await cleanupExpiredVerificationDocumentsOnce();
+      return result;
+    });
+
     await runDelegatedTask(
       results,
       "search-alerts",
@@ -282,6 +301,11 @@ export async function GET(request: NextRequest) {
       "outside_daily_window"
     );
     markSkippedTask(results, "cleanup-typing-status", "outside_daily_window");
+    markSkippedTask(
+      results,
+      "cleanup-verification-documents",
+      "outside_daily_window"
+    );
     markSkippedTask(results, "search-alerts", "outside_daily_window");
     markSkippedTask(results, "freshness-reminders", "outside_daily_window");
     markSkippedTask(results, "stale-auto-pause", "outside_daily_window");

@@ -77,6 +77,10 @@ jest.mock("@/lib/search/search-doc-dirty", () => ({
   markListingDirtyInTx: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock("@/lib/listings/canonical-sync", () => ({
+  syncCanonicalAvailability: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock("@/lib/profile-completion", () => ({
   calculateProfileCompletion: jest.fn().mockReturnValue({
     percentage: 100,
@@ -95,6 +99,7 @@ jest.mock("@/lib/listings/collision-detector", () => ({
 
 jest.mock("@/lib/search/search-telemetry", () => ({
   getOwnerHashPrefix8: jest.fn().mockReturnValue("deadbeef"),
+  recordListingCreateCollisionBlocked: jest.fn(),
   recordListingCreateCollisionDetected: jest.fn(),
   recordListingCreateCollisionResolved: jest.fn(),
   recordListingCreateCollisionModerationGated: jest.fn(),
@@ -134,6 +139,7 @@ import {
   findCollisions,
 } from "@/lib/listings/collision-detector";
 import {
+  recordListingCreateCollisionBlocked,
   recordListingCreateCollisionDetected,
   recordListingCreateCollisionModerationGated,
   recordListingCreateCollisionResolved,
@@ -290,7 +296,7 @@ describe("POST /api/listings collision flow", () => {
     expect(tx.listing.create).not.toHaveBeenCalled();
   });
 
-  it("persists normalizedAddress when ack=1 and the create proceeds", async () => {
+  it("persists host-managed availability fields and normalizedAddress when create proceeds", async () => {
     process.env.FEATURE_LISTING_CREATE_COLLISION_WARN = "true";
     const { tx, getCreatePayload } = createTx();
     (prisma.$transaction as jest.Mock).mockImplementation(async (callback) =>
@@ -323,6 +329,12 @@ describe("POST /api/listings collision flow", () => {
           state: validBody.state,
           zip: validBody.zip,
         }),
+        openSlots: 1,
+        availableSlots: 1,
+        minStayMonths: 1,
+        status: "ACTIVE",
+        statusReason: null,
+        lastConfirmedAt: expect.any(Date),
       })
     );
     expect(recordListingCreateCollisionResolved).toHaveBeenCalledWith({
@@ -331,7 +343,7 @@ describe("POST /api/listings collision flow", () => {
     });
   });
 
-  it("records moderation-gated telemetry on the fourth acked collision in 24 hours", async () => {
+  it("blocks the fourth acked collision in 24 hours", async () => {
     process.env.FEATURE_LISTING_CREATE_COLLISION_WARN = "true";
     const { tx, getCreatePayload } = createTx();
     (prisma.$transaction as jest.Mock).mockImplementation(async (callback) =>
@@ -348,16 +360,20 @@ describe("POST /api/listings collision flow", () => {
       })
     );
 
-    expect(response.status).toBe(201);
-    expect(getCreatePayload()).not.toHaveProperty("needsMigrationReview");
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "LISTING_CREATE_COLLISION_RATE_LIMITED",
+    });
+    expect(getCreatePayload()).toBeNull();
     expect(recordListingCreateCollisionModerationGated).toHaveBeenCalledWith({
       ownerHashPrefix8: "deadbeef",
       windowCount24h: 3,
     });
-    expect(recordListingCreateCollisionResolved).toHaveBeenCalledWith({
+    expect(recordListingCreateCollisionBlocked).toHaveBeenCalledWith({
       ownerHashPrefix8: "deadbeef",
-      action: "moderation_gated",
+      windowCount24h: 3,
     });
+    expect(recordListingCreateCollisionResolved).not.toHaveBeenCalled();
   });
 
   it("proceeds normally when the detector reports no same-owner collision", async () => {

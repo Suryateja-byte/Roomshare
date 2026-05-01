@@ -31,7 +31,7 @@ const variantClasses = {
   "ghost-inverse":
     "text-surface-container-high hover:text-white hover:bg-white/10 focus-visible:ring-white/30",
   filter:
-    "border border-outline-variant/20 bg-surface-container-lowest text-on-surface-variant data-[active=true]:bg-primary data-[active=true]:text-on-primary focus-visible:ring-primary/30",
+    "border border-outline-variant/35 bg-surface-container-lowest text-on-surface-variant shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] hover:border-on-surface-variant hover:bg-surface-canvas data-[active=true]:border-on-surface data-[active=true]:bg-on-surface data-[active=true]:text-on-primary data-[active=true]:shadow-ambient-sm focus-visible:ring-primary/30",
 };
 
 const sizeClasses = {

@@ -31,6 +31,10 @@ jest.mock("@/lib/prisma", () => {
       findFirst: jest.fn(),
       findMany: jest.fn(),
     },
+    entitlementState: {
+      findUnique: jest.fn(),
+      upsert: jest.fn(),
+    },
     auditEvent: {
       create: jest.fn(),
     },
@@ -60,11 +64,13 @@ describe("contact paywall evaluator", () => {
   const originalPaywall = process.env.ENABLE_CONTACT_PAYWALL;
   const originalEnforcement = process.env.ENABLE_CONTACT_PAYWALL_ENFORCEMENT;
   const originalEmergency = process.env.KILL_SWITCH_EMERGENCY_OPEN_PAYWALL;
+  const originalEntitlementState = process.env.ENABLE_ENTITLEMENT_STATE;
 
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.ENABLE_CONTACT_PAYWALL = "true";
     process.env.ENABLE_CONTACT_PAYWALL_ENFORCEMENT = "true";
+    process.env.ENABLE_ENTITLEMENT_STATE = "false";
     process.env.KILL_SWITCH_EMERGENCY_OPEN_PAYWALL = "false";
     (prisma.physicalUnit.findUnique as jest.Mock).mockResolvedValue({
       id: "unit-123",
@@ -84,6 +90,8 @@ describe("contact paywall evaluator", () => {
     });
     (prisma.entitlementGrant.findFirst as jest.Mock).mockResolvedValue(null);
     (prisma.entitlementGrant.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.entitlementState.findUnique as jest.Mock).mockResolvedValue(null);
+    (prisma.entitlementState.upsert as jest.Mock).mockResolvedValue(undefined);
   });
 
   afterAll(() => {
@@ -101,6 +109,11 @@ describe("contact paywall evaluator", () => {
       delete process.env.KILL_SWITCH_EMERGENCY_OPEN_PAYWALL;
     } else {
       process.env.KILL_SWITCH_EMERGENCY_OPEN_PAYWALL = originalEmergency;
+    }
+    if (originalEntitlementState === undefined) {
+      delete process.env.ENABLE_ENTITLEMENT_STATE;
+    } else {
+      process.env.ENABLE_ENTITLEMENT_STATE = originalEntitlementState;
     }
   });
 
@@ -166,6 +179,40 @@ describe("contact paywall evaluator", () => {
           contactKind: "REVEAL_PHONE",
           grantType: "PASS",
         }),
+      })
+    );
+  });
+
+  it("reads entitlement state with the requested contact kind", async () => {
+    process.env.ENABLE_ENTITLEMENT_STATE = "true";
+    (prisma.entitlementState.findUnique as jest.Mock).mockResolvedValue({
+      userId: "user-123",
+      contactKind: "REVEAL_PHONE",
+      creditsFreeRemaining: 0,
+      creditsPaidRemaining: 1,
+      activePassWindowStart: null,
+      activePassWindowEnd: null,
+      freezeReason: "NONE",
+      fraudFlag: false,
+      sourceVersion: BigInt(2),
+      lastRecomputedAt: new Date(),
+    });
+
+    const result = await evaluateContactPaywall({
+      userId: "user-123",
+      physicalUnitId: "unit-123",
+      contactKind: "REVEAL_PHONE",
+    });
+
+    expect(result.summary.requiresPurchase).toBe(false);
+    expect(prisma.entitlementState.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          userId_contactKind: {
+            userId: "user-123",
+            contactKind: "REVEAL_PHONE",
+          },
+        },
       })
     );
   });

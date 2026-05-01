@@ -16,7 +16,7 @@ import { verifyPassword } from "@/app/actions/settings";
 interface PasswordConfirmationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => void | Promise<void>;
+  onConfirm: (password?: string) => void | Promise<void>;
   title: string;
   description: string;
   confirmText?: string;
@@ -69,7 +69,7 @@ export function PasswordConfirmationModal({
     }
 
     // Password verified (or not required), proceed with action
-    await onConfirm();
+    await onConfirm(hasPassword ? password : undefined);
   };
 
   const isLoading = isVerifying || externalLoading;

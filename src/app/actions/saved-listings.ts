@@ -179,6 +179,11 @@ export async function removeSavedListing(listingId: string) {
     return { error: "Unauthorized" };
   }
 
+  const suspension = await checkSuspension(session.user.id);
+  if (suspension.suspended) {
+    return { error: suspension.error || "Account suspended" };
+  }
+
   try {
     await prisma.savedListing.delete({
       where: {

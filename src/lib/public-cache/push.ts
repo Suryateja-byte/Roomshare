@@ -15,6 +15,7 @@ import { logger } from "@/lib/logger";
 import { buildPublicCacheInvalidationEvent } from "@/lib/public-cache/events";
 
 const MAX_FANOUT_ATTEMPTS = 5;
+const FANOUT_CLAIM_LEASE_MS = 10 * 60 * 1000;
 
 const PushSubscriptionSchema = z.object({
   endpoint: z.string().url().max(2048),
@@ -43,6 +44,7 @@ interface CacheInvalidationFanoutRow {
   reason: string;
   enqueued_at: Date;
   fanout_attempt_count: number;
+  fanout_claimed_at: Date;
 }
 
 export interface PublicCacheFanoutResult {
@@ -247,6 +249,26 @@ function safePushError(error: unknown): string {
   return error instanceof Error ? error.name : "web_push_error";
 }
 
+async function markClaimedRowsSkipped(
+  rows: CacheInvalidationFanoutRow[],
+  reason: string
+): Promise<number> {
+  let skipped = 0;
+  for (const row of rows) {
+    const updated = await prisma.$executeRaw`
+      UPDATE cache_invalidations
+      SET fanout_status = 'SKIPPED',
+          fanout_completed_at = NOW(),
+          fanout_last_error = ${reason}
+      WHERE id = ${row.id}
+        AND fanout_status = 'PENDING'
+        AND fanout_last_attempt_at = ${row.fanout_claimed_at}
+    `;
+    if (updated > 0) skipped += 1;
+  }
+  return skipped;
+}
+
 export async function drainPublicCacheFanoutOnce(
   limit = 20
 ): Promise<PublicCacheFanoutResult> {
@@ -254,14 +276,36 @@ export async function drainPublicCacheFanoutOnce(
     return { processed: 0, delivered: 0, skipped: 0, failed: 0 };
   }
 
+  const claimLimit = Math.min(Math.max(limit, 1), 100);
   const rows = await prisma.$queryRaw<CacheInvalidationFanoutRow[]>`
+    WITH due AS (
+      SELECT id
+      FROM cache_invalidations
+      WHERE fanout_status = 'PENDING'
+        AND fanout_next_attempt_at <= NOW()
+      ORDER BY fanout_next_attempt_at ASC, enqueued_at ASC
+      LIMIT ${claimLimit}
+      FOR UPDATE SKIP LOCKED
+    ),
+    claimed AS (
+      UPDATE cache_invalidations ci
+      SET fanout_last_attempt_at = NOW(),
+          fanout_next_attempt_at = NOW() + (${FANOUT_CLAIM_LEASE_MS} * INTERVAL '1 millisecond')
+      FROM due
+      WHERE ci.id = due.id
+      RETURNING
+        ci.id,
+        ci.unit_id,
+        ci.projection_epoch,
+        ci.unit_identity_epoch,
+        ci.reason,
+        ci.enqueued_at,
+        ci.fanout_attempt_count,
+        ci.fanout_last_attempt_at AS fanout_claimed_at
+    )
     SELECT id, unit_id, projection_epoch, unit_identity_epoch, reason,
-           enqueued_at, fanout_attempt_count
-    FROM cache_invalidations
-    WHERE fanout_status = 'PENDING'
-      AND fanout_next_attempt_at <= NOW()
-    ORDER BY fanout_next_attempt_at ASC, enqueued_at ASC
-    LIMIT ${Math.min(Math.max(limit, 1), 100)}
+           enqueued_at, fanout_attempt_count, fanout_claimed_at
+    FROM claimed
   `;
 
   if (rows.length === 0) {
@@ -270,15 +314,8 @@ export async function drainPublicCacheFanoutOnce(
 
   const config = getPushConfig();
   if (!config) {
-    const ids = rows.map((row) => row.id);
-    await prisma.$executeRaw`
-      UPDATE cache_invalidations
-      SET fanout_status = 'SKIPPED',
-          fanout_completed_at = NOW(),
-          fanout_last_error = 'push_not_configured'
-      WHERE id = ANY(${ids}::TEXT[])
-    `;
-    return { processed: rows.length, delivered: 0, skipped: rows.length, failed: 0 };
+    const skipped = await markClaimedRowsSkipped(rows, "push_not_configured");
+    return { processed: rows.length, delivered: 0, skipped, failed: 0 };
   }
 
   webpush.setVapidDetails(
@@ -296,15 +333,8 @@ export async function drainPublicCacheFanoutOnce(
   `;
 
   if (subscriptions.length === 0) {
-    const ids = rows.map((row) => row.id);
-    await prisma.$executeRaw`
-      UPDATE cache_invalidations
-      SET fanout_status = 'SKIPPED',
-          fanout_completed_at = NOW(),
-          fanout_last_error = 'no_active_subscriptions'
-      WHERE id = ANY(${ids}::TEXT[])
-    `;
-    return { processed: rows.length, delivered: 0, skipped: rows.length, failed: 0 };
+    const skipped = await markClaimedRowsSkipped(rows, "no_active_subscriptions");
+    return { processed: rows.length, delivered: 0, skipped, failed: 0 };
   }
 
   let delivered = 0;
@@ -369,21 +399,23 @@ export async function drainPublicCacheFanoutOnce(
     }
 
     if (transientFailures === 0) {
-      await prisma.$executeRaw`
+      const updatedCount = await prisma.$executeRaw`
         UPDATE cache_invalidations
         SET fanout_status = 'DELIVERED',
             fanout_completed_at = NOW(),
             fanout_last_attempt_at = NOW(),
             fanout_last_error = NULL
         WHERE id = ${row.id}
+          AND fanout_status = 'PENDING'
+          AND fanout_last_attempt_at = ${row.fanout_claimed_at}
       `;
-      delivered += 1;
+      if (updatedCount > 0) delivered += 1;
       continue;
     }
 
     const nextAttemptCount = Number(row.fanout_attempt_count) + 1;
     if (nextAttemptCount >= MAX_FANOUT_ATTEMPTS) {
-      await prisma.$executeRaw`
+      const updatedCount = await prisma.$executeRaw`
         UPDATE cache_invalidations
         SET fanout_status = 'FAILED',
             fanout_last_attempt_at = NOW(),
@@ -391,18 +423,22 @@ export async function drainPublicCacheFanoutOnce(
             fanout_completed_at = NOW(),
             fanout_last_error = ${`max_attempts_exhausted:${lastTransientError}`}
         WHERE id = ${row.id}
+          AND fanout_status = 'PENDING'
+          AND fanout_last_attempt_at = ${row.fanout_claimed_at}
       `;
-      failed += 1;
+      if (updatedCount > 0) failed += 1;
     } else {
-      await prisma.$executeRaw`
+      const updatedCount = await prisma.$executeRaw`
         UPDATE cache_invalidations
         SET fanout_attempt_count = ${nextAttemptCount},
             fanout_last_attempt_at = NOW(),
             fanout_next_attempt_at = NOW() + (${retryDelayMs(nextAttemptCount)} * INTERVAL '1 millisecond'),
             fanout_last_error = ${lastTransientError}
         WHERE id = ${row.id}
+          AND fanout_status = 'PENDING'
+          AND fanout_last_attempt_at = ${row.fanout_claimed_at}
       `;
-      failed += 1;
+      if (updatedCount > 0) failed += 1;
     }
   }
 

@@ -33,7 +33,7 @@ jest.mock("next/server", () => ({
 }));
 
 jest.mock("@/lib/data", () => ({
-  getMapListings: jest.fn(),
+  getMapListingsResult: jest.fn(),
 }));
 
 jest.mock("@/lib/search/search-doc-queries", () => ({
@@ -133,7 +133,7 @@ jest.mock("@/lib/search/search-telemetry", () => ({
 // --- Imports (after mocks) ---
 
 import { GET } from "@/app/api/map-listings/route";
-import { getMapListings } from "@/lib/data";
+import { getMapListingsResult as getMapListings } from "@/lib/data";
 import {
   isSearchDocEnabled,
   getSearchDocMapListings,
@@ -195,8 +195,11 @@ describe("GET /api/map-listings (C2.2)", () => {
       valid: true,
       bounds: VALID_BOUNDS,
     });
-    // Default: getMapListings returns sample data (V1 path)
-    (getMapListings as jest.Mock).mockResolvedValue(SAMPLE_MAP_LISTINGS);
+    // Default: getMapListingsResult returns sample data (V1 path)
+    (getMapListings as jest.Mock).mockResolvedValue({
+      listings: SAMPLE_MAP_LISTINGS,
+      truncated: false,
+    });
     // Default: getSearchDocMapListings returns sample data (V2 path)
     (getSearchDocMapListings as jest.Mock).mockResolvedValue({
       listings: SAMPLE_MAP_LISTINGS,
@@ -262,6 +265,33 @@ describe("GET /api/map-listings (C2.2)", () => {
     expect(cacheControl).toContain("s-maxage");
     expect(cacheControl).toContain("public");
     expect(cacheControl).toContain("stale-while-revalidate");
+  });
+
+  it("preserves legacy map truncation metadata", async () => {
+    (getMapListings as jest.Mock).mockResolvedValueOnce({
+      listings: SAMPLE_MAP_LISTINGS,
+      truncated: true,
+      totalCandidates: 201,
+    });
+
+    const req = createGetRequest({
+      minLng: "-122.5",
+      maxLng: "-122.0",
+      minLat: "37.5",
+      maxLat: "38.0",
+    });
+
+    const res = await GET(req);
+    const body = await res.json();
+
+    expect(body.kind).toBe("ok");
+    expect(body.data).toEqual(
+      expect.objectContaining({
+        listings: SAMPLE_MAP_LISTINGS,
+        truncated: true,
+        totalCandidates: 201,
+      })
+    );
   });
 
   it("uses withTimeout for database timeout enforcement", async () => {
@@ -345,6 +375,33 @@ describe("GET /api/map-listings (C2.2)", () => {
       // SearchDoc path should be called, not legacy path
       expect(getSearchDocMapListings).toHaveBeenCalledTimes(1);
       expect(getMapListings).not.toHaveBeenCalled();
+    });
+
+    it("preserves SearchDoc map truncation metadata", async () => {
+      (getSearchDocMapListings as jest.Mock).mockResolvedValueOnce({
+        listings: SAMPLE_MAP_LISTINGS,
+        truncated: true,
+        totalCandidates: 240,
+      });
+
+      const req = createGetRequest({
+        minLng: "-122.5",
+        maxLng: "-122.0",
+        minLat: "37.5",
+        maxLat: "38.0",
+      });
+
+      const res = await GET(req);
+      const body = await res.json();
+
+      expect(body.kind).toBe("ok");
+      expect(body.data).toEqual(
+        expect.objectContaining({
+          listings: SAMPLE_MAP_LISTINGS,
+          truncated: true,
+          totalCandidates: 240,
+        })
+      );
     });
 
     it("passes filter params including bounds to getSearchDocMapListings", async () => {

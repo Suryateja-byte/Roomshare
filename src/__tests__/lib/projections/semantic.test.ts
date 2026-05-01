@@ -23,6 +23,7 @@ import {
   getSemanticInventoryCandidates,
   rebuildSemanticInventoryProjection,
   swapSemanticProjectionVersion,
+  tombstoneSemanticProjectionRows,
 } from "@/lib/projections/semantic";
 import { __setProjectionEpochForTesting } from "@/lib/projections/epoch";
 import type { TransactionClient } from "@/lib/db/with-actor";
@@ -331,6 +332,34 @@ describe("Phase 03 semantic projection", () => {
     expect(result.deletedSemanticRows).toBe(2);
     const remainingRows = await fixture.getSemanticInventoryProjections();
     expect(remainingRows.filter((row) => row.inventoryId === inventoryId)).toEqual([]);
+  });
+
+  it("does not tombstone newer semantic rows with stale source versions", async () => {
+    const { unitId, inventoryId } = await seedInventory();
+    await fixture.insertSemanticInventoryProjection({
+      inventoryId,
+      unitId,
+      embeddingVersion: "v-newer",
+      publishStatus: "PUBLISHED",
+      sourceVersion: BigInt(10),
+    });
+
+    const deleted = await withTx((tx) =>
+      tombstoneSemanticProjectionRows(tx, {
+        unitId,
+        inventoryId,
+        sourceVersion: BigInt(9),
+      })
+    );
+
+    expect(deleted).toBe(0);
+    const remainingRows = await fixture.getSemanticInventoryProjections();
+    expect(
+      remainingRows.find(
+        (row) =>
+          row.inventoryId === inventoryId && row.embeddingVersion === "v-newer"
+      )
+    ).toBeDefined();
   });
 
   it("shadow swap publishes target version and stales the prior version", async () => {

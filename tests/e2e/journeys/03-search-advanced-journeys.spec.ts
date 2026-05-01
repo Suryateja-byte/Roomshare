@@ -8,36 +8,16 @@
  * These extend the 21 journeys in 02-search-critical-journeys.spec.ts.
  */
 
-import {
-  test,
-  expect,
-  selectors,
-  tags,
-  SF_BOUNDS,
-
-} from "../helpers";
+import { test, expect, selectors, tags, SF_BOUNDS } from "../helpers";
 import {
   openFilterModal,
   openFilterModalAndWaitForFacets,
   applyFilters,
   closeFilterModal,
+  selectDropdownOption,
 } from "../helpers/filter-helpers";
 
 const BOUNDS_PARAMS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
-
-// Helper: select a Radix Select option (combobox, not native <select>)
-async function selectRadixOption(
-  page: import("@playwright/test").Page,
-  triggerId: string,
-  optionText: RegExp | string
-) {
-  const trigger = page.locator(`#${triggerId}`);
-  await trigger.click();
-  // Radix portals options to body
-  const option = page.getByRole("option", { name: optionText });
-  await expect(option).toBeVisible({ timeout: 3000 });
-  await option.click();
-}
 
 test.describe("30 Advanced Search Page Journeys", () => {
   test.beforeEach(async () => {
@@ -77,7 +57,7 @@ test.describe("30 Advanced Search Page Journeys", () => {
     // Select a lease duration (Radix Select combobox)
     const leaseSelect = modal.locator("#filter-lease");
     if (await leaseSelect.isVisible()) {
-      await selectRadixOption(page, "filter-lease", /6 months/i);
+      await selectDropdownOption(page, "filter-lease", /6 months/i);
     }
 
     // Toggle an amenity
@@ -143,7 +123,7 @@ test.describe("30 Advanced Search Page Journeys", () => {
     // Set gender preference (Radix Select)
     const genderSelect = modal.locator("#filter-gender-pref");
     if (await genderSelect.isVisible()) {
-      await selectRadixOption(
+      await selectDropdownOption(
         page,
         "filter-gender-pref",
         /female identifying/i
@@ -153,7 +133,11 @@ test.describe("30 Advanced Search Page Journeys", () => {
     // Set household gender (Radix Select)
     const householdSelect = modal.locator("#filter-household-gender");
     if (await householdSelect.isVisible()) {
-      await selectRadixOption(page, "filter-household-gender", /all female/i);
+      await selectDropdownOption(
+        page,
+        "filter-household-gender",
+        /all female/i
+      );
     }
 
     await applyFilters(page);
@@ -169,6 +153,19 @@ test.describe("30 Advanced Search Page Journeys", () => {
         }
       )
       .not.toBeNull();
+
+    await expect
+      .poll(
+        () =>
+          new URL(page.url(), "http://localhost").searchParams.get(
+            "householdGender"
+          ),
+        {
+          timeout: 30000,
+          message: 'URL param "householdGender" to be "ALL_FEMALE"',
+        }
+      )
+      .toBe("ALL_FEMALE");
 
     const url = new URL(page.url());
     expect(url.searchParams.get("genderPreference")).toBe("FEMALE_ONLY");

@@ -38,7 +38,7 @@ export interface TombstoneInput {
  *
  * @returns deletedInventoryRows  Number of inventory_search_projection rows deleted (0 or 1)
  * @returns unitRowDeleted        Whether the unit_public_projection row was also deleted
- * @returns cacheInvalidationId   ID of the newly inserted cache_invalidations row
+ * @returns cacheInvalidationId   ID of the newly inserted cache_invalidations row, or null for stale skips
  */
 export async function handleTombstone(
   tx: TransactionClient,
@@ -46,24 +46,60 @@ export async function handleTombstone(
 ): Promise<{
   deletedInventoryRows: number;
   unitRowDeleted: boolean;
-  cacheInvalidationId: string;
+  cacheInvalidationId: string | null;
   deletedSemanticRows: number;
+  skippedStale: boolean;
 }> {
   const { unitId, inventoryId, reason, unitIdentityEpoch, sourceVersion } = input;
 
-  // 1. Delete from inventory_search_projection
+  // 1. Delete from inventory_search_projection, preserving source-version ordering.
   let deletedInventoryRows = 0;
   if (inventoryId) {
+    const currentRows = await tx.$queryRaw<{ source_version: bigint | number | string }[]>`
+      SELECT source_version
+      FROM inventory_search_projection
+      WHERE inventory_id = ${inventoryId}
+      LIMIT 1
+    `;
+    const currentSourceVersion = currentRows[0]?.source_version;
+    if (
+      currentSourceVersion !== undefined &&
+      BigInt(currentSourceVersion) > sourceVersion
+    ) {
+      return {
+        deletedInventoryRows: 0,
+        unitRowDeleted: false,
+        cacheInvalidationId: null,
+        deletedSemanticRows: 0,
+        skippedStale: true,
+      };
+    }
+
     deletedInventoryRows = await tx.$executeRaw`
       DELETE FROM inventory_search_projection
       WHERE inventory_id = ${inventoryId}
+        AND source_version <= ${sourceVersion}::BIGINT
     `;
+
+    if (currentSourceVersion !== undefined && deletedInventoryRows === 0) {
+      return {
+        deletedInventoryRows: 0,
+        unitRowDeleted: false,
+        cacheInvalidationId: null,
+        deletedSemanticRows: 0,
+        skippedStale: true,
+      };
+    }
   }
 
   // Phase 03 dark semantic projection fan-out. Gated so Phase 02 fixtures that
   // do not have the semantic table continue to exercise the older slice.
   const deletedSemanticRows = features.phase03SemanticProjectionWrites
-    ? await tombstoneSemanticProjectionRows(tx, { unitId, inventoryId })
+    ? await tombstoneSemanticProjectionRows(tx, {
+        unitId,
+        inventoryId,
+        sourceVersion,
+      })
     : 0;
 
   // 2. Regroup unit_public_projection (will DELETE if no visible inventory left)
@@ -106,5 +142,6 @@ export async function handleTombstone(
     unitRowDeleted: unitResult.deleted,
     cacheInvalidationId,
     deletedSemanticRows,
+    skippedStale: false,
   };
 }

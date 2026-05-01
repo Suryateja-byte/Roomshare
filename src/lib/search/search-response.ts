@@ -31,6 +31,7 @@ export interface SearchListPayload {
 export interface SearchMapPayload {
   listings: MapListingData[];
   truncated?: boolean;
+  totalCandidates?: number;
 }
 
 export type SearchPayload = SearchListPayload | SearchMapPayload;

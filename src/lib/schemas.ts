@@ -9,6 +9,7 @@ import {
   VALID_HOUSE_RULES,
   VALID_BOOKING_MODES,
 } from "./filter-schema";
+import { isStrictDateOnly } from "./date-only";
 
 /**
  * Language code validation schema
@@ -113,29 +114,6 @@ export const supabaseImageUrlSchema = z
     }
   }, "Image must be from this project's Supabase storage");
 
-// ============================================
-// Storage URL Validation Schema (verification docs, etc.)
-// ============================================
-// Broader than supabaseImageUrlSchema: allows any bucket, image + PDF extensions
-const SUPABASE_STORAGE_URL_PATTERN =
-  /^https:\/\/[a-z0-9-]+\.supabase\.co\/storage\/v1\/object\/public\/[\w-]+\/[\w./-]+\.(jpg|jpeg|png|gif|webp|pdf)$/i;
-
-export const supabaseStorageUrlSchema = z
-  .string()
-  .url("Invalid document URL")
-  .max(2048)
-  .regex(SUPABASE_STORAGE_URL_PATTERN, "Document must be from Supabase storage")
-  .refine((url) => {
-    const expectedHost = getExpectedSupabaseHost();
-    if (!expectedHost) return false;
-    try {
-      const parsed = new URL(url);
-      return parsed.host === expectedHost;
-    } catch {
-      return false;
-    }
-  }, "Document must be from this project's Supabase storage");
-
 export const listingImagesSchema = z
   .array(supabaseImageUrlSchema)
   .min(1, "At least one image is required")
@@ -144,13 +122,10 @@ export const listingImagesSchema = z
 // ============================================
 // Move-in Date Validation Schema
 // ============================================
-export const moveInDateSchema = z
+const moveInDateValueSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD format")
-  .refine((dateStr) => {
-    const date = new Date(dateStr + "T00:00:00Z");
-    return !isNaN(date.getTime());
-  }, "Invalid calendar date")
+  .refine(isStrictDateOnly, "Invalid calendar date")
   .refine((dateStr) => {
     const date = new Date(dateStr + "T00:00:00Z");
     const today = new Date();
@@ -162,9 +137,13 @@ export const moveInDateSchema = z
     const maxDate = new Date();
     maxDate.setFullYear(maxDate.getFullYear() + 2);
     return date <= maxDate;
-  }, "Move-in date cannot be more than 2 years in the future")
+  }, "Move-in date cannot be more than 2 years in the future");
+
+export const moveInDateSchema = moveInDateValueSchema
   .optional()
   .nullable();
+
+export const requiredMoveInDateSchema = moveInDateValueSchema;
 
 /** Strip zero-width and invisible Unicode characters, NFC-normalize */
 export function sanitizeUnicode(str: string): string {
@@ -298,7 +277,7 @@ export const createListingApiSchema = createListingSchema.extend({
   householdGender: listingHouseholdGenderSchema,
   householdLanguages: householdLanguagesSchema.optional().default([]),
   primaryHomeLanguage: primaryHomeLanguageSchema,
-  moveInDate: moveInDateSchema,
+  moveInDate: requiredMoveInDateSchema,
   bookingMode: listingBookingModeSchema,
 });
 
@@ -314,6 +293,7 @@ export const createListingClientSchema = createListingSchema.extend({
   roomType: listingRoomTypeSchema,
   genderPreference: listingGenderPreferenceSchema,
   householdGender: listingHouseholdGenderSchema,
+  moveInDate: requiredMoveInDateSchema,
   bookingMode: listingBookingModeSchema,
 });
 

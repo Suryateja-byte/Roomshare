@@ -351,7 +351,11 @@ async function evaluateContactPaywallWithClient(
     return directEvaluation;
   }
 
-  const stateResult = await getFreshEntitlementState(client, input.userId);
+  const stateResult = await getFreshEntitlementState(
+    client,
+    input.userId,
+    input.contactKind
+  );
   if (!stateResult.ok) {
     return {
       ...directEvaluation,
@@ -404,7 +408,7 @@ async function createConsumption(
   });
 
   if (features.entitlementState) {
-    await recomputeEntitlementState(client, input.userId);
+    await recomputeEntitlementState(client, input.userId, input.contactKind);
   }
 
   return consumption.id;

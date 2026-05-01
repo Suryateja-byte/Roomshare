@@ -37,7 +37,10 @@ jest.mock("bcryptjs", () => ({
   hash: jest.fn().mockResolvedValue("hashed_password"),
 }));
 
+const mockAfter = jest.fn();
+
 jest.mock("next/server", () => ({
+  after: (task: unknown) => mockAfter(task),
   NextResponse: {
     json: (data: any, init?: { status?: number }) => {
       return {
@@ -53,9 +56,29 @@ import { POST } from "@/app/api/register/route";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
+async function flushMicrotasks() {
+  for (let i = 0; i < 10; i++) {
+    await Promise.resolve();
+  }
+}
+
+async function resolveAcceptedRegistration<T>(promise: Promise<T>): Promise<T> {
+  await flushMicrotasks();
+  await jest.advanceTimersByTimeAsync(1000);
+  return promise;
+}
+
 describe("Register API", () => {
   beforeEach(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
     jest.clearAllMocks();
+    jest.spyOn(Math, "random").mockReturnValue(0);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
   });
 
   describe("POST", () => {
@@ -100,7 +123,7 @@ describe("Register API", () => {
       expect(response.status).toBe(400);
     });
 
-    it("returns 400 when user already exists", async () => {
+    it("returns accepted response when user already exists", async () => {
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         id: "existing-user",
       });
@@ -113,14 +136,16 @@ describe("Register API", () => {
           password: "password12345",
         }),
       });
-      const response = await POST(request);
+      const response = await resolveAcceptedRegistration(POST(request));
 
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(201);
       const data = await response.json();
-      // P1-06/P1-07: Generic message prevents user enumeration
-      expect(data.error).toBe(
-        "Registration failed. Please try again or use forgot password if you already have an account."
-      );
+      expect(data).toEqual({ success: true, verificationEmailSent: true });
+      expect(bcrypt.hash).toHaveBeenCalledWith("password12345", 12);
+      expect(prisma.user.create).not.toHaveBeenCalled();
+      expect(prisma.verificationToken.create).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(mockAfter).not.toHaveBeenCalled();
     });
 
     it("creates user successfully", async () => {
@@ -141,11 +166,12 @@ describe("Register API", () => {
           password: "password12345",
         }),
       });
-      const response = await POST(request);
+      const response = await resolveAcceptedRegistration(POST(request));
 
       expect(response.status).toBe(201);
       expect(bcrypt.hash).toHaveBeenCalledWith("password12345", 12);
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(mockAfter).toHaveBeenCalledTimes(1);
 
       // Verify password is not in response
       const data = await response.json();

@@ -144,7 +144,7 @@
 | `src/lib/email.ts` / `email-templates.ts` | library | notification | notification | 8, 9 | done_needs_audit | Templates for freshness (CFM-801) + review (CFM-702). |
 | `src/app/notifications/NotificationsClient.tsx` | client component | reader | notification | 9 | done_needs_audit | Inbox. |
 | `src/app/api/cron/sweep-expired-holds/route.ts` | cron | repair-loop | hold | 1, 9 | done | CFM-904 (`09dba2b0`) flag-gate via `ENABLE_LEGACY_CRONS`; route retained per CFM-1003. Runbook: `docs/migration/cfm-904-cron-retirement-runbook.md`. |
-| `src/app/api/cron/reconcile-slots/route.ts` | cron | repair-loop | inventory | 4, 9 | done | CFM-904 (`09dba2b0`) flag-gate via `ENABLE_LEGACY_CRONS`; route retained per CFM-1003. Invoked by `daily-maintenance` every 15 min. Runbook: `docs/migration/cfm-904-cron-retirement-runbook.md`. |
+| `src/app/api/cron/reconcile-slots/route.ts` | cron | repair-loop | inventory | 4, 9 | done | CFM-904 (`09dba2b0`) flag-gate via `ENABLE_LEGACY_CRONS`; route retained per CFM-1003 with no dedicated Vercel schedule. Runbook: `docs/migration/cfm-904-cron-retirement-runbook.md`. |
 | `src/app/api/cron/refresh-search-docs/route.ts` | cron | repair-loop | search-doc | 4, 8 | done_needs_audit | CFM-405/CFM-803 backstop refresh. |
 | `src/app/api/cron/search-alerts/route.ts` | cron | notification | search | 8 | done_needs_audit | Saved-search notifications. |
 | `src/app/api/cron/daily-maintenance/route.ts` | cron | repair-loop | cleanup | — | done_needs_audit | General cleanup; no CFM semantics. |

@@ -403,7 +403,7 @@ describe("POST /api/nearby", () => {
               _id: "place-2",
               name: "Starbucks",
               location: { type: "Point", coordinates: [-122.418, 37.776] },
-              categories: ["coffee-shop"],
+              categories: ["cafe"],
               chain: { name: "Starbucks", slug: "starbucks" },
               formattedAddress: "456 Oak St",
             },

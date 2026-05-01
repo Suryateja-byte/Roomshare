@@ -52,6 +52,77 @@ describe("FavoriteButton", () => {
       );
       expect(screen.getByRole("button")).toHaveClass("custom-class");
     });
+
+    it("hydrates saved state when initialIsSaved changes after results load", async () => {
+      const { rerender } = render(
+        <FavoriteButton listingId="listing-123" initialIsSaved={false} />
+      );
+
+      expect(screen.getByRole("button")).toHaveClass(
+        "text-on-surface-variant"
+      );
+
+      rerender(
+        <FavoriteButton listingId="listing-123" initialIsSaved={true} />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole("button")).toHaveClass("text-primary");
+      });
+    });
+
+    it("does not let stale parent props overwrite a user toggle", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ saved: true }),
+      });
+
+      const { rerender } = render(
+        <FavoriteButton listingId="listing-123" initialIsSaved={false} />
+      );
+      const button = screen.getByRole("button");
+
+      await userEvent.click(button);
+
+      await waitFor(() => {
+        expect(button).toHaveClass("text-primary");
+      });
+
+      rerender(
+        <FavoriteButton listingId="listing-123" initialIsSaved={false} />
+      );
+
+      expect(button).toHaveClass("text-primary");
+    });
+
+    it("resets prop hydration guard when listingId changes", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ saved: true }),
+      });
+
+      const { rerender } = render(
+        <FavoriteButton listingId="listing-123" initialIsSaved={false} />
+      );
+      const button = screen.getByRole("button");
+
+      await userEvent.click(button);
+      await waitFor(() => {
+        expect(button).toHaveClass("text-primary");
+      });
+
+      rerender(
+        <FavoriteButton listingId="listing-456" initialIsSaved={false} />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole("button")).toHaveClass(
+          "text-on-surface-variant"
+        );
+      });
+    });
   });
 
   describe("toggle behavior", () => {

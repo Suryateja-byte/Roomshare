@@ -120,7 +120,7 @@ describe("POST /api/nearby - Autocomplete Mode (Text Search)", () => {
       const categorySearchRequest = {
         listingLat: 37.7749,
         listingLng: -122.4194,
-        categories: ["grocery"],
+        categories: ["food-grocery"],
         radiusMeters: 1609,
       };
 
@@ -134,7 +134,7 @@ describe("POST /api/nearby - Autocomplete Mode (Text Search)", () => {
               _id: "place-1",
               name: "Whole Foods",
               location: { type: "Point", coordinates: [-122.418, 37.776] },
-              categories: ["grocery"],
+              categories: ["food-grocery"],
               formattedAddress: "123 Main St",
             },
           ],
@@ -146,7 +146,7 @@ describe("POST /api/nearby - Autocomplete Mode (Text Search)", () => {
       expect(mockFetch).toHaveBeenCalledTimes(1);
       const fetchUrl = mockFetch.mock.calls[0][0];
       expect(fetchUrl).toContain("https://api.radar.io/v1/search/places");
-      expect(fetchUrl).toContain("categories=grocery");
+      expect(fetchUrl).toContain("categories=food-grocery");
     });
 
     it("uses Places Search API when both query and categories are provided", async () => {
@@ -154,7 +154,7 @@ describe("POST /api/nearby - Autocomplete Mode (Text Search)", () => {
         listingLat: 37.7749,
         listingLng: -122.4194,
         query: "organic",
-        categories: ["grocery"],
+        categories: ["food-grocery"],
         radiusMeters: 1609,
       };
 
@@ -168,7 +168,7 @@ describe("POST /api/nearby - Autocomplete Mode (Text Search)", () => {
               _id: "place-1",
               name: "Organic Grocery",
               location: { type: "Point", coordinates: [-122.418, 37.776] },
-              categories: ["grocery"],
+              categories: ["food-grocery"],
               formattedAddress: "123 Main St",
             },
           ],

@@ -2,10 +2,11 @@
  * Outbox Drain Cron Route (Phase 02)
  *
  * Internal endpoint invoked by:
- *   - daily-maintenance (every 15 min) for all priority lanes
+ *   - daily-maintenance dispatcher for all priority lanes
  *   - direct operator/test invocation for priority=0 tombstone fast-lane drains
  *
- * NOT registered as a dedicated Vercel cron (would exceed Hobby plan 2-cron limit).
+ * NOT registered as a dedicated Vercel cron; the Hobby project schedule stays
+ * daily and fans out through daily-maintenance.
  * See spec §(A) for the fan-out rationale.
  *
  * When phase02_projection_writes_enabled === false, returns { skipped: true }.

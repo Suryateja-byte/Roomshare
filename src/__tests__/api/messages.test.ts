@@ -22,6 +22,10 @@ jest.mock("@/lib/prisma", () => {
     },
     user: {
       findUnique: jest.fn(),
+      findMany: jest.fn(),
+    },
+    blockedUser: {
+      findFirst: jest.fn(),
     },
     conversationDeletion: {
       deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
@@ -42,10 +46,6 @@ jest.mock("@/app/actions/suspension", () => ({
   checkEmailVerified: jest.fn().mockResolvedValue({ verified: true }),
 }));
 
-jest.mock("@/app/actions/block", () => ({
-  checkBlockBeforeAction: jest.fn().mockResolvedValue({ allowed: true }),
-}));
-
 jest.mock("next/server", () => ({
   NextResponse: {
     json: (data: any, init?: { status?: number }) => {
@@ -63,11 +63,31 @@ jest.mock("@/lib/with-rate-limit", () => ({
   withRateLimit: jest.fn().mockResolvedValue(null),
 }));
 
+const mockCreateInternalNotification = jest.fn();
+jest.mock("@/lib/notifications", () => ({
+  createInternalNotification: (...args: unknown[]) =>
+    mockCreateInternalNotification(...args),
+}));
+
+const mockSendNotificationEmailWithPreference = jest.fn();
+jest.mock("@/lib/email", () => ({
+  sendNotificationEmailWithPreference: (...args: unknown[]) =>
+    mockSendNotificationEmailWithPreference(...args),
+}));
+
+const mockScanOutboundMessageContent = jest.fn();
+const mockRecordOutboundContentSoftFlag = jest.fn();
+jest.mock("@/lib/messaging/outbound-content-guard", () => ({
+  scanOutboundMessageContent: (...args: unknown[]) =>
+    mockScanOutboundMessageContent(...args),
+  recordOutboundContentSoftFlag: (...args: unknown[]) =>
+    mockRecordOutboundContentSoftFlag(...args),
+}));
+
 import { GET, POST } from "@/app/api/messages/route";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { checkEmailVerified } from "@/app/actions/suspension";
-import { checkBlockBeforeAction } from "@/app/actions/block";
 import { withRateLimit } from "@/lib/with-rate-limit";
 
 describe("Messages API", () => {
@@ -83,6 +103,15 @@ describe("Messages API", () => {
       id: "user-123",
       isSuspended: false,
     });
+    (prisma.user.findMany as jest.Mock).mockResolvedValue([
+      { id: "user-456", email: "recipient@example.com" },
+    ]);
+    (prisma.blockedUser.findFirst as jest.Mock).mockResolvedValue(null);
+    mockCreateInternalNotification.mockResolvedValue({ success: true });
+    mockSendNotificationEmailWithPreference.mockResolvedValue({
+      success: true,
+    });
+    mockScanOutboundMessageContent.mockReturnValue([]);
   });
 
   describe("GET", () => {
@@ -322,9 +351,8 @@ describe("Messages API", () => {
           lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
         },
       });
-      (checkBlockBeforeAction as jest.Mock).mockResolvedValueOnce({
-        allowed: false,
-        message: "This user has blocked you",
+      (prisma.blockedUser.findFirst as jest.Mock).mockResolvedValueOnce({
+        blockerId: "user-456",
       });
 
       const request = new Request("http://localhost/api/messages", {
@@ -354,9 +382,8 @@ describe("Messages API", () => {
           lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
         },
       });
-      (checkBlockBeforeAction as jest.Mock).mockResolvedValueOnce({
-        allowed: false,
-        message: "You have blocked this user. Unblock them to interact.",
+      (prisma.blockedUser.findFirst as jest.Mock).mockResolvedValueOnce({
+        blockerId: "user-123",
       });
 
       const request = new Request("http://localhost/api/messages", {
@@ -370,6 +397,44 @@ describe("Messages API", () => {
       expect(data.error).toBe(
         "You have blocked this user. Unblock them to interact."
       );
+    });
+
+    it("returns 403 when an existing thread targets a suspended host", async () => {
+      (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
+        id: "conv-123",
+        participants: [
+          { id: "user-123", isSuspended: false },
+          { id: "user-456", isSuspended: true },
+        ],
+        listing: {
+          ownerId: "user-456",
+          status: "ACTIVE",
+          statusReason: null,
+          availableSlots: 1,
+          totalSlots: 1,
+          openSlots: 1,
+          moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+          availableUntil: null,
+          minStayMonths: 1,
+          lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
+          owner: { isSuspended: true },
+        },
+      });
+
+      const request = new Request("http://localhost/api/messages", {
+        method: "POST",
+        body: JSON.stringify({ conversationId: "conv-123", content: "Hello" }),
+      });
+      const response = await POST(request);
+
+      expect(response.status).toBe(403);
+      const data = await response.json();
+      expect(data).toEqual({
+        error: "This host is not accepting contact right now.",
+        code: "HOST_NOT_ACCEPTING_CONTACT",
+      });
+      expect(prisma.blockedUser.findFirst).not.toHaveBeenCalled();
+      expect(prisma.message.create).not.toHaveBeenCalled();
     });
 
     it("creates message successfully", async () => {
@@ -409,6 +474,72 @@ describe("Messages API", () => {
       expect(response.status).toBe(201);
       expect(prisma.message.create).toHaveBeenCalled();
       expect(prisma.conversation.update).toHaveBeenCalled();
+      expect(mockRecordOutboundContentSoftFlag).toHaveBeenCalledWith({
+        conversationId: "conv-123",
+        userId: "user-123",
+        flagKinds: [],
+      });
+      expect(mockCreateInternalNotification).toHaveBeenCalledWith({
+        userId: "user-456",
+        type: "NEW_MESSAGE",
+        title: "New Message",
+        message: "Test User: Hello",
+        link: "/messages/conv-123",
+      });
+      expect(mockSendNotificationEmailWithPreference).toHaveBeenCalledWith(
+        "newMessage",
+        "user-456",
+        "recipient@example.com",
+        {
+          recipientName: "User",
+          senderName: "Test User",
+          conversationId: "conv-123",
+        }
+      );
+    });
+
+    it("records outbound soft flags for direct API sends", async () => {
+      mockScanOutboundMessageContent.mockReturnValueOnce(["email", "phone"]);
+      (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
+        id: "conv-123",
+        participants: [{ id: "user-123" }, { id: "user-456" }],
+        listing: {
+          status: "ACTIVE",
+          statusReason: null,
+          availableSlots: 1,
+          totalSlots: 1,
+          openSlots: 1,
+          moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+          availableUntil: null,
+          minStayMonths: 1,
+          lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
+        },
+      });
+      (prisma.message.create as jest.Mock).mockResolvedValue({
+        id: "msg-new",
+        content: "Email me at host@example.com or call 555-555-5555",
+        senderId: "user-123",
+      });
+      (prisma.conversation.update as jest.Mock).mockResolvedValue({});
+
+      const request = new Request("http://localhost/api/messages", {
+        method: "POST",
+        body: JSON.stringify({
+          conversationId: "conv-123",
+          content: "Email me at host@example.com or call 555-555-5555",
+        }),
+      });
+      const response = await POST(request);
+
+      expect(response.status).toBe(201);
+      expect(mockScanOutboundMessageContent).toHaveBeenCalledWith(
+        "Email me at host@example.com or call 555-555-5555"
+      );
+      expect(mockRecordOutboundContentSoftFlag).toHaveBeenCalledWith({
+        conversationId: "conv-123",
+        userId: "user-123",
+        flagKinds: ["email", "phone"],
+      });
     });
 
     it.each(["PAUSED", "RENTED"] as const)(

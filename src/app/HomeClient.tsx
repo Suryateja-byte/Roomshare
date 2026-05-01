@@ -87,83 +87,90 @@ function HeroSection() {
   return (
     <section
       aria-label="Search for rooms"
-      className="relative isolate flex min-h-[100dvh] flex-col justify-center overflow-hidden bg-surface-canvas pb-14 pt-[5.75rem] md:pb-12 md:pt-28"
+      className="relative isolate flex min-h-[100dvh] flex-col overflow-hidden bg-surface-canvas pb-6 pt-[4.75rem] md:pb-8 md:pt-24"
     >
       <div
         aria-hidden="true"
-        className="home-hero-photo relative order-first h-80 w-screen bg-[url('/images/home/hero-living-room.png')] bg-cover bg-center md:absolute md:inset-0 md:order-none md:h-auto md:w-auto md:bg-[center_right]"
+        className="home-hero-photo absolute inset-0 bg-[url('/images/home/hero-living-room.png')] bg-cover bg-[63%_top] opacity-45 md:bg-[center_right] md:opacity-100"
       />
       <div
         aria-hidden="true"
-        className="absolute inset-0 hidden bg-[linear-gradient(90deg,rgb(251_249_244/0.97)_0%,rgb(251_249_244/0.9)_28%,rgb(251_249_244/0.58)_43%,rgb(251_249_244/0)_56%)] md:block"
+        className="home-hero-wash absolute inset-0 bg-[linear-gradient(180deg,rgb(251_249_244/0.97)_0%,rgb(251_249_244/0.91)_48%,rgb(251_249_244/0.84)_100%)] md:bg-[linear-gradient(90deg,rgb(251_249_244/0.98)_0%,rgb(251_249_244/0.93)_31%,rgb(251_249_244/0.68)_48%,rgb(251_249_244/0.16)_70%,rgb(251_249_244/0.03)_100%)]"
       />
 
-      <div className="container relative z-10 w-full">
-        <div className="grid items-center gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:gap-14">
-          <div className="max-w-[36rem]">
-            <div className="animate-editorial-rise mb-4 text-micro-label text-primary md:mb-5">
-              Find your people
+      <div className="home-hero-frame relative z-10 flex w-full flex-1 flex-col justify-start">
+        <div className="w-full">
+          <div className="grid items-start gap-4 md:grid-cols-[minmax(0,0.56fr)_minmax(0,0.44fr)] md:gap-8 lg:gap-12">
+            <div className="max-w-[34rem] md:max-w-[46rem] lg:max-w-[52rem]">
+              <div className="animate-editorial-rise mb-3 inline-flex items-center gap-2 text-micro-label text-primary md:mb-4">
+                <span
+                  className="hidden h-2 w-2 rounded-full bg-on-surface-variant md:block"
+                  aria-hidden="true"
+                />
+                <span>Find your people</span>
+              </div>
+              <h1
+                className="animate-editorial-rise font-display text-[clamp(2.35rem,11vw,2.85rem)] font-normal leading-[0.98] tracking-normal text-on-surface sm:text-[4rem] md:text-[clamp(4.1rem,6.25vw,6.15rem)]"
+                style={{ animationDelay: "80ms" }}
+              >
+                <span className="block whitespace-nowrap">Better Rooms.</span>
+                <em className="block whitespace-nowrap font-normal text-primary">
+                  Better People.
+                </em>
+              </h1>
+              <p
+                className="animate-editorial-rise mt-4 max-w-md text-base leading-relaxed text-on-surface-variant md:mt-4 md:text-[1.05rem] lg:text-lg"
+                style={{ animationDelay: "150ms" }}
+              >
+                Verified roommates. Real listings.
+                <br className="hidden sm:block" />
+                <span className="sm:hidden"> </span>People who actually show up
+                to the tour.
+              </p>
+              <div
+                className="home-hero-secondary animate-editorial-rise mt-5 grid-cols-1 gap-3 sm:grid-cols-3 md:mt-6 md:max-w-[44rem] md:gap-4"
+                style={{ animationDelay: "220ms" }}
+              >
+                <TrustChip
+                  icon={ShieldCheck}
+                  title="Verified People"
+                  sub="ID & phone checked"
+                />
+                <TrustChip
+                  icon={Home}
+                  title="Quality Listings"
+                  sub="Hand-checked homes"
+                />
+                <TrustChip
+                  icon={Sparkles}
+                  title="Better Matches"
+                  sub="Compatibility first"
+                />
+              </div>
             </div>
-            <h1
-              className="animate-editorial-rise font-display text-[2.75rem] font-normal leading-[0.98] tracking-[-0.03em] text-on-surface sm:text-6xl lg:text-[5.8rem]"
-              style={{ animationDelay: "80ms" }}
-            >
-              Better Rooms. <br />
-              <em className="font-normal text-primary">Better People.</em>
-            </h1>
-            <p
-              className="animate-editorial-rise mt-5 max-w-md text-base leading-relaxed text-on-surface-variant md:text-lg"
-              style={{ animationDelay: "150ms" }}
-            >
-              Verified roommates. Real listings.
-              <br className="hidden sm:block" />
-              <span className="sm:hidden"> </span>People who actually show up to
-              the tour.
-            </p>
-
-            <div
-              className="animate-editorial-rise mt-7 grid grid-cols-1 gap-4 sm:grid-cols-3 md:mt-8"
-              style={{ animationDelay: "210ms" }}
-            >
-              <TrustChip
-                icon={ShieldCheck}
-                title="Verified People"
-                sub="ID & phone checked"
-              />
-              <TrustChip
-                icon={Home}
-                title="Quality Listings"
-                sub="Hand-checked homes"
-              />
-              <TrustChip
-                icon={Sparkles}
-                title="Better Matches"
-                sub="Compatibility first"
-              />
-            </div>
+            <div className="hidden md:block" aria-hidden="true" />
           </div>
-          <div className="hidden md:block" aria-hidden="true" />
-        </div>
 
-        <div
-          className="animate-editorial-rise mt-8 w-full md:mt-9"
-          style={{ animationDelay: "280ms" }}
-        >
-          <SearchFormErrorBoundary>
-            <Suspense
-              fallback={
-                <div className="mx-auto h-[23.5rem] max-w-[22.5rem] rounded-[2rem] bg-surface-container-lowest shadow-ambient md:h-[5.75rem] md:max-w-5xl md:rounded-[1.375rem]">
-                  <div className="h-full animate-shimmer rounded-[inherit] bg-gradient-to-r from-surface-container-high via-surface-canvas to-surface-container-high bg-[length:200%_100%]" />
-                </div>
-              }
-            >
-              <SearchForm variant="home" />
-            </Suspense>
-          </SearchFormErrorBoundary>
-        </div>
+          <div
+            className="home-hero-search-row animate-editorial-rise mt-5 w-full md:mt-8 lg:mt-9"
+            style={{ animationDelay: "280ms" }}
+          >
+            <SearchFormErrorBoundary>
+              <Suspense
+                fallback={
+                  <div className="mx-auto h-[18.5rem] max-w-[22.5rem] rounded-[1.5rem] bg-surface-container-lowest shadow-ambient md:h-[6.25rem] md:max-w-none md:rounded-[1.875rem]">
+                    <div className="h-full animate-shimmer rounded-[inherit] bg-gradient-to-r from-surface-container-high via-surface-canvas to-surface-container-high bg-[length:200%_100%]" />
+                  </div>
+                }
+              >
+                <SearchForm variant="home" />
+              </Suspense>
+            </SearchFormErrorBoundary>
+          </div>
 
-        <div className="mt-6">
-          <AuthCTA />
+          <div className="home-hero-auth mt-4 md:mt-5">
+            <AuthCTA />
+          </div>
         </div>
       </div>
     </section>
@@ -181,11 +188,9 @@ function TrustChip({
 }) {
   return (
     <div className="flex min-w-0 items-center gap-3">
-      <Icon
-        className="h-5 w-5 shrink-0 text-primary"
-        strokeWidth={1.7}
-        aria-hidden="true"
-      />
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-surface-container-lowest/82 text-primary shadow-[inset_0_0_0_1px_rgb(220_193_185/0.36),0_8px_18px_-14px_rgb(27_28_25/0.28)]">
+        <Icon className="h-5 w-5" strokeWidth={1.7} aria-hidden="true" />
+      </span>
       <div className="min-w-0 leading-tight">
         <div className="truncate text-[0.8rem] font-semibold text-on-surface">
           {title}

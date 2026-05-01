@@ -43,7 +43,7 @@ describe("POST /api/nearby - Extended Guest Access Edge Cases", () => {
     listingLat: 37.7749,
     listingLng: -122.4194,
     radiusMeters: 1609,
-    categories: ["test"],
+    categories: ["food-grocery"],
   };
 
   function createRequest(body: any): Request {
