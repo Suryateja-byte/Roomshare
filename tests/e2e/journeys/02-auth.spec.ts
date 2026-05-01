@@ -136,9 +136,19 @@ test.describe("Authentication Journeys", () => {
       const registerResponse = await registerResponsePromise;
 
       if (registerResponse.status() === 201) {
-        await expect(page).toHaveURL(/\/login\?registered=true/, {
-          timeout: 15000,
-        });
+        await expect
+          .poll(
+            () => {
+              const url = new URL(page.url());
+              return `${url.pathname}${url.search}`;
+            },
+            {
+              timeout: 15000,
+              message:
+                "Expected accepted duplicate signup to leave signup without disclosing account state",
+            }
+          )
+          .toMatch(/^(\/|\/login\?registered=true)$/);
       } else {
         // CI may hit Turnstile or rate limits before the anti-enumeration path.
         // The important contract is that duplicate-email disclosure is not

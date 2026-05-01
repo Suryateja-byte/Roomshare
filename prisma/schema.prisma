@@ -82,12 +82,15 @@ model User {
 }
 
 model VerificationToken {
-  identifier String
-  tokenHash  String   @unique @map("token_hash")
-  expires    DateTime
+  identifier        String    @unique
+  tokenHash         String?   @unique @map("token_hash")
+  expires           DateTime?
+  pendingTokenHash  String?   @unique @map("pending_token_hash")
+  pendingExpires    DateTime? @map("pending_expires")
+  pendingPreparedAt DateTime? @map("pending_prepared_at")
 
-  @@unique([identifier, tokenHash])
   @@index([expires])
+  @@index([pendingExpires])
 }
 
 model PasswordResetToken {

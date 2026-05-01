@@ -60,6 +60,11 @@ export const AUTH_ERROR_INFO: Record<string, AuthErrorInfo> = {
     message: "Please sign in to access this page.",
     severity: "info",
   },
+  PasswordChanged: {
+    message: "Your password changed. Sign in again.",
+    hint: "For security, we signed you out on this device.",
+    severity: "info",
+  },
 
   // Account status errors
   AccountSuspended: {

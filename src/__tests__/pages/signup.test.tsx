@@ -178,9 +178,13 @@ describe("SignUpPage", () => {
     });
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith("/login?registered=true");
+      expect(mockSignIn).toHaveBeenCalledWith("credentials", {
+        email: "test@example.com",
+        password: validPassword,
+        redirect: false,
+      });
     });
-    expect(mockSignIn).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalledWith("/login?registered=true");
   });
 
   it("shows error on registration failure", async () => {

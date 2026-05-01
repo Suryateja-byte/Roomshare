@@ -11,6 +11,7 @@ import {
   AUTH_ROUTES,
   normalizeEmail,
 } from "@/lib/auth-helpers";
+import { getPasswordRevocationState } from "@/lib/password-revocation";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 import { checkRateLimit, getClientIP, RATE_LIMITS } from "@/lib/rate-limit";
 
@@ -155,36 +156,28 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
       }
 
-      // H-1: Session invalidation — check passwordChangedAt every 5 minutes.
-      // Fallback for server actions that bypass proxy.ts middleware.
-      // Primary check is in checkSuspension() (auth-helpers.ts) for middleware routes.
-      if (token.authTime && token.sub && !token.passwordInvalidated) {
-        const now = Math.floor(Date.now() / 1000);
-        const lastCheck = (token.lastSecurityCheck as number) || 0;
-        const SECURITY_CHECK_INTERVAL = 5 * 60; // 5 minutes
+      const authTime =
+        typeof token.authTime === "number" ? token.authTime : undefined;
+      const userId = typeof token.sub === "string" ? token.sub : undefined;
 
-        if (now - lastCheck > SECURITY_CHECK_INTERVAL) {
-          try {
-            const secUser = await prisma.user.findUnique({
-              where: { id: token.sub as string },
-              select: { passwordChangedAt: true },
-            });
-            if (secUser?.passwordChangedAt) {
-              const changedAtEpoch = Math.floor(
-                secUser.passwordChangedAt.getTime() / 1000
-              );
-              if (changedAtEpoch > (token.authTime as number)) {
-                token.passwordInvalidated = true;
-                return token;
-              }
-            }
-            token.lastSecurityCheck = now;
-          } catch (error) {
-            // Fail-open: DB unavailability should not mass-logout users.
-            logger.sync.error("JWT passwordChangedAt check failed", {
-              error: sanitizeErrorMessage(error),
-            });
-          }
+      // Check every authenticated JWT round-trip so password changes revoke
+      // stale sessions immediately while DB lookup failures remain fail-open.
+      if (authTime && userId && !token.passwordInvalidated) {
+        const revocationCheck = await getPasswordRevocationState(
+          userId,
+          authTime
+        );
+
+        if (revocationCheck.state === "revoked") {
+          token.passwordInvalidated = true;
+          return token;
+        }
+
+        if (revocationCheck.state === "unknown") {
+          logger.sync.error("JWT passwordChangedAt check failed", {
+            error:
+              revocationCheck.error || "Password revocation state unavailable",
+          });
         }
       }
 

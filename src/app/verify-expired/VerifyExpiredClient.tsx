@@ -31,6 +31,11 @@ export default function VerifyExpiredClient() {
       if (!response.ok) {
         if (response.status === 429) {
           toast.error("Too many requests. Please try again later.");
+        } else if (response.status === 409) {
+          toast.error(
+            data.error ||
+              "A verification email is already being prepared. Please wait a moment and try again if it doesn't arrive."
+          );
         } else {
           toast.error(data.error || "Failed to send verification email");
         }

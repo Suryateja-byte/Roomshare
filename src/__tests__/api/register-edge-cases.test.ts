@@ -249,7 +249,7 @@ describe("POST /api/register — edge cases", () => {
       expect.objectContaining({
         userName: "Test User",
         verificationUrl: expect.stringContaining(
-          "/api/auth/verify-email?token=mock-token"
+          "/verify-email?token=mock-token"
         ),
       })
     );

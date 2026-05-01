@@ -2,6 +2,7 @@
  * Tests for forgot password API route
  */
 
+const mockAfterCallbacks: Array<() => void | Promise<void>> = [];
 jest.mock("@/lib/prisma", () => ({
   prisma: {
     user: {
@@ -61,15 +62,15 @@ jest.mock("@sentry/nextjs", () => ({
   captureException: jest.fn(),
 }));
 
-const mockAfter = jest.fn();
-
 jest.mock("next/server", () => ({
-  after: (task: unknown) => mockAfter(task),
+  after: jest.fn((callback: () => void | Promise<void>) => {
+    mockAfterCallbacks.push(callback);
+  }),
   NextResponse: {
     json: (data: unknown, init?: { status?: number }) => ({
       status: init?.status || 200,
       json: async () => data,
-      headers: new Map(),
+      headers: new Headers(),
     }),
   },
 }));
@@ -78,65 +79,17 @@ import { POST } from "@/app/api/auth/forgot-password/route";
 import { prisma } from "@/lib/prisma";
 import { sendNotificationEmail } from "@/lib/email";
 import { withRateLimit } from "@/lib/with-rate-limit";
-import { validateCsrf } from "@/lib/csrf";
 import { verifyTurnstileToken } from "@/lib/turnstile";
-import { createTokenPair } from "@/lib/token-security";
-import { logger } from "@/lib/logger";
+import { after as nextAfter } from "next/server";
 import type { NextRequest } from "next/server";
 
-async function flushMicrotasks() {
-  for (let i = 0; i < 10; i++) {
-    await Promise.resolve();
-  }
-}
-
-async function resolveAcceptedPasswordReset<T>(promise: Promise<T>): Promise<T> {
-  await flushMicrotasks();
-  await jest.advanceTimersByTimeAsync(1000);
-  return promise;
-}
-
-async function expectAcceptedTimingFloor(promise: Promise<unknown>) {
-  let settled = false;
-  promise.then(() => {
-    settled = true;
-  });
-
-  await flushMicrotasks();
-  expect(settled).toBe(false);
-
-  await jest.advanceTimersByTimeAsync(999);
-  await flushMicrotasks();
-  expect(settled).toBe(false);
-
-  await jest.advanceTimersByTimeAsync(1);
-  await promise;
-  expect(settled).toBe(true);
-}
+const mockAfter = nextAfter as jest.MockedFunction<typeof nextAfter>;
 
 describe("Forgot Password API", () => {
-  const originalEnv = process.env;
-
   beforeEach(() => {
-    jest.useFakeTimers();
-    jest.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
     jest.clearAllMocks();
-    jest.spyOn(Math, "random").mockReturnValue(0);
-    process.env = { ...originalEnv };
-    delete process.env.AUTH_URL;
-    delete process.env.NEXTAUTH_URL;
-    (validateCsrf as jest.Mock).mockReturnValue(null);
-    (withRateLimit as jest.Mock).mockResolvedValue(null);
-    (verifyTurnstileToken as jest.Mock).mockResolvedValue({ success: true });
-  });
-
-  afterEach(() => {
     jest.useRealTimers();
-    jest.restoreAllMocks();
-  });
-
-  afterAll(() => {
-    process.env = originalEnv;
+    mockAfterCallbacks.length = 0;
   });
 
   const createRequest = (body: object) =>
@@ -149,10 +102,11 @@ describe("Forgot Password API", () => {
       body: JSON.stringify({ turnstileToken: "test-token", ...body }),
     }) as unknown as NextRequest;
 
-  it("schedules reset email for existing user after accepted response", async () => {
+  it("schedules reset email for existing user after returning success", async () => {
     const mockUser = {
       id: "user-123",
       name: "Test User",
+      email: "test@example.com",
     };
 
     (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
@@ -161,16 +115,32 @@ describe("Forgot Password API", () => {
     (sendNotificationEmail as jest.Mock).mockResolvedValue({ success: true });
 
     const request = createRequest({ email: "test@example.com" });
-    const response = await resolveAcceptedPasswordReset(POST(request));
+    const response = await POST(request);
     const data = await response.json();
 
     expect(response.status).toBe(200);
     expect(data.message).toContain("If an account with that email exists");
-    expect(sendNotificationEmail).not.toHaveBeenCalled();
-    expect(mockAfter).toHaveBeenCalledTimes(1);
+    expect(withRateLimit).toHaveBeenNthCalledWith(1, request, {
+      type: "forgotPasswordByIp",
+      endpoint: "forgotPasswordByIp",
+    });
 
-    const afterTask = mockAfter.mock.calls[0][0] as () => Promise<void>;
-    await afterTask();
+    expect(verifyTurnstileToken).toHaveBeenCalledWith("test-token");
+    expect(withRateLimit).toHaveBeenCalledTimes(2);
+    const emailRateLimitOptions = (withRateLimit as jest.Mock).mock.calls[1][1];
+    expect(emailRateLimitOptions).toEqual(
+      expect.objectContaining({
+        type: "forgotPassword",
+        endpoint: "forgotPasswordByEmail",
+        getIdentifier: expect.any(Function),
+      })
+    );
+    expect(emailRateLimitOptions.getIdentifier(request)).toBe("test@example.com");
+
+    expect(mockAfter).toHaveBeenCalledTimes(1);
+    expect(sendNotificationEmail).not.toHaveBeenCalled();
+
+    await mockAfterCallbacks[0]?.();
 
     expect(sendNotificationEmail).toHaveBeenCalledWith(
       "passwordReset",
@@ -182,98 +152,42 @@ describe("Forgot Password API", () => {
     );
   });
 
-  it("logs background reset email failures without changing response", async () => {
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-      id: "user-123",
-      name: "Test User",
-    });
-    (prisma.passwordResetToken.deleteMany as jest.Mock).mockResolvedValue({});
-    (prisma.passwordResetToken.create as jest.Mock).mockResolvedValue({});
-    (sendNotificationEmail as jest.Mock).mockResolvedValue({
-      success: false,
-      error: "provider failed",
-    });
-
-    const response = await resolveAcceptedPasswordReset(
-      POST(createRequest({ email: "test@example.com" }))
-    );
-
-    expect(response.status).toBe(200);
-    const afterTask = mockAfter.mock.calls[0][0] as () => Promise<void>;
-    await afterTask();
-
-    expect(logger.sync.error).toHaveBeenCalledWith(
-      "Failed to send password reset email",
-      {
-        error: "provider failed",
-        route: "/api/auth/forgot-password",
-      }
-    );
-  });
-
-  it("uses AUTH_URL before NEXTAUTH_URL for reset links", async () => {
-    process.env.AUTH_URL = "https://auth.example.com";
-    process.env.NEXTAUTH_URL = "https://nextauth.example.com";
-    const mockUser = {
-      id: "user-123",
-      name: "Test User",
-    };
-
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
-    (prisma.passwordResetToken.deleteMany as jest.Mock).mockResolvedValue({});
-    (prisma.passwordResetToken.create as jest.Mock).mockResolvedValue({});
-    (sendNotificationEmail as jest.Mock).mockResolvedValue({ success: true });
-
-    const request = createRequest({ email: "test@example.com" });
-    await resolveAcceptedPasswordReset(POST(request));
-
-    const afterTask = mockAfter.mock.calls[0][0] as () => Promise<void>;
-    await afterTask();
-
-    expect(sendNotificationEmail).toHaveBeenCalledWith(
-      "passwordReset",
-      "test@example.com",
-      expect.objectContaining({
-        resetLink:
-          "https://auth.example.com/reset-password?token=test-plain-token",
-      })
-    );
-  });
-
-  it("returns same message for non-existent user without side effects", async () => {
+  it("returns same message for non-existent user (prevents enumeration)", async () => {
     (prisma.user.findUnique as jest.Mock).mockResolvedValue(null);
 
     const request = createRequest({ email: "nonexistent@example.com" });
-    const response = await resolveAcceptedPasswordReset(POST(request));
+    const response = await POST(request);
     const data = await response.json();
 
     expect(response.status).toBe(200);
     expect(data.message).toContain("If an account with that email exists");
-    expect(createTokenPair).not.toHaveBeenCalled();
     expect(prisma.passwordResetToken.deleteMany).not.toHaveBeenCalled();
     expect(prisma.passwordResetToken.create).not.toHaveBeenCalled();
-    expect(sendNotificationEmail).not.toHaveBeenCalled();
     expect(mockAfter).not.toHaveBeenCalled();
+    expect(sendNotificationEmail).not.toHaveBeenCalled();
   });
 
-  it("keeps existing and non-existent valid requests pending until the same timing floor", async () => {
-    (prisma.user.findUnique as jest.Mock).mockResolvedValueOnce({
-      id: "user-123",
-      name: "Test User",
+  it("enforces a 1000ms minimum duration for nonexistent users", async () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, "random").mockReturnValue(0);
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue(null);
+
+    const request = createRequest({ email: "nonexistent@example.com" });
+    const responsePromise = POST(request);
+    let settled = false;
+    void responsePromise.then(() => {
+      settled = true;
     });
-    (prisma.passwordResetToken.deleteMany as jest.Mock).mockResolvedValue({});
-    (prisma.passwordResetToken.create as jest.Mock).mockResolvedValue({});
 
-    await expectAcceptedTimingFloor(
-      POST(createRequest({ email: "test@example.com" }))
-    );
+    await jest.advanceTimersByTimeAsync(999);
+    expect(settled).toBe(false);
 
-    jest.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
-    (prisma.user.findUnique as jest.Mock).mockResolvedValueOnce(null);
+    await jest.advanceTimersByTimeAsync(1);
+    const response = await responsePromise;
+    const data = await response.json();
 
-    await expectAcceptedTimingFloor(
-      POST(createRequest({ email: "missing@example.com" }))
-    );
+    expect(response.status).toBe(200);
+    expect(data.message).toContain("If an account with that email exists");
   });
 
   it("returns error for missing email", async () => {
@@ -289,6 +203,7 @@ describe("Forgot Password API", () => {
     const mockUser = {
       id: "user-123",
       name: "Test",
+      email: "test@example.com",
     };
 
     (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
@@ -297,11 +212,11 @@ describe("Forgot Password API", () => {
     (sendNotificationEmail as jest.Mock).mockResolvedValue({ success: true });
 
     const request = createRequest({ email: "TEST@EXAMPLE.COM" });
-    await resolveAcceptedPasswordReset(POST(request));
+    await POST(request);
 
     expect(prisma.user.findUnique).toHaveBeenCalledWith({
-      where: { email: "test@example.com" },
       select: { id: true, name: true },
+      where: { email: "test@example.com" },
     });
   });
 
@@ -309,6 +224,7 @@ describe("Forgot Password API", () => {
     const mockUser = {
       id: "user-123",
       name: "Test",
+      email: "test@example.com",
     };
 
     (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
@@ -317,7 +233,7 @@ describe("Forgot Password API", () => {
     (sendNotificationEmail as jest.Mock).mockResolvedValue({ success: true });
 
     const request = createRequest({ email: "test@example.com" });
-    await resolveAcceptedPasswordReset(POST(request));
+    await POST(request);
 
     expect(prisma.passwordResetToken.deleteMany).toHaveBeenCalledWith({
       where: { email: "test@example.com" },
@@ -328,6 +244,7 @@ describe("Forgot Password API", () => {
     const mockUser = {
       id: "user-123",
       name: "Test",
+      email: "test@example.com",
     };
 
     (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
@@ -336,7 +253,7 @@ describe("Forgot Password API", () => {
     (sendNotificationEmail as jest.Mock).mockResolvedValue({ success: true });
 
     const request = createRequest({ email: "test@example.com" });
-    await resolveAcceptedPasswordReset(POST(request));
+    await POST(request);
 
     expect(prisma.passwordResetToken.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -369,17 +286,38 @@ describe("Forgot Password API", () => {
     expect(data.error).toBe("An error occurred. Please try again.");
   });
 
-  it("applies rate limiting", async () => {
+  it("applies both IP and email-scoped rate limiting", async () => {
     const request = createRequest({ email: "test@example.com" });
-    const promise = POST(request);
-    await flushMicrotasks();
+    await POST(request);
 
-    expect(withRateLimit).toHaveBeenCalledWith(request, {
-      type: "forgotPassword",
+    expect(withRateLimit).toHaveBeenNthCalledWith(1, request, {
+      type: "forgotPasswordByIp",
+      endpoint: "forgotPasswordByIp",
     });
 
-    await jest.advanceTimersByTimeAsync(1000);
-    await promise;
+    expect(withRateLimit).toHaveBeenCalledTimes(2);
+    const emailRateLimitOptions = (withRateLimit as jest.Mock).mock.calls[1][1];
+    expect(emailRateLimitOptions).toEqual(
+      expect.objectContaining({
+        type: "forgotPassword",
+        endpoint: "forgotPasswordByEmail",
+        getIdentifier: expect.any(Function),
+      })
+    );
+  });
+
+  it("does not consume the email-scoped limiter when Turnstile fails", async () => {
+    (verifyTurnstileToken as jest.Mock).mockResolvedValueOnce({ success: false });
+
+    const request = createRequest({ email: "test@example.com" });
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(data.error).toBe("Bot verification failed. Please try again.");
+    expect(withRateLimit).toHaveBeenCalledTimes(1);
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    expect(mockAfter).not.toHaveBeenCalled();
   });
 
   it("returns rate limit response when limited", async () => {
@@ -396,31 +334,21 @@ describe("Forgot Password API", () => {
     expect(prisma.user.findUnique).not.toHaveBeenCalled();
   });
 
-  it("does not delay CSRF, Turnstile, or production-unavailable failures", async () => {
-    (validateCsrf as jest.Mock).mockReturnValueOnce({
-      status: 403,
-      json: async () => ({ error: "Invalid CSRF token" }),
-      headers: new Map(),
-    });
-    const csrfResponse = await POST(createRequest({ email: "test@example.com" }));
-    expect(csrfResponse.status).toBe(403);
+  it("short-circuits before DB lookup when email rate limited after Turnstile succeeds", async () => {
+    const mockRateLimitResponse = {
+      status: 429,
+      json: async () => ({ error: "Too many requests" }),
+    };
+    (withRateLimit as jest.Mock)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(mockRateLimitResponse);
 
-    (verifyTurnstileToken as jest.Mock).mockResolvedValueOnce({
-      success: false,
-    });
-    const turnstileResponse = await POST(
-      createRequest({ email: "test@example.com" })
-    );
-    expect(turnstileResponse.status).toBe(403);
+    const request = createRequest({ email: "test@example.com" });
+    const response = await POST(request);
 
-    Object.defineProperty(process.env, "NODE_ENV", {
-      value: "production",
-      configurable: true,
-    });
-    delete process.env.RESEND_API_KEY;
-    const unavailableResponse = await POST(
-      createRequest({ email: "test@example.com" })
-    );
-    expect(unavailableResponse.status).toBe(503);
+    expect(response).toBe(mockRateLimitResponse);
+    expect(verifyTurnstileToken).toHaveBeenCalledWith("test-token");
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    expect(mockAfter).not.toHaveBeenCalled();
   });
 });

@@ -6,7 +6,6 @@ jest.mock("@/lib/prisma", () => ({
   prisma: {
     passwordResetToken: {
       findUnique: jest.fn(),
-      delete: jest.fn(),
       deleteMany: jest.fn(),
     },
     user: {
@@ -20,6 +19,7 @@ jest.mock("@/lib/prisma", () => ({
           deleteMany: (prisma as any).passwordResetToken.deleteMany,
         },
         user: {
+          findUnique: (prisma as any).user.findUnique,
           update: (prisma as any).user.update,
         },
       };
@@ -47,18 +47,78 @@ jest.mock("@/lib/with-rate-limit", () => ({
   withRateLimit: jest.fn(() => null),
 }));
 
+jest.mock("@/lib/password-security", () => ({
+  preparePasswordUpdate: jest.fn(async (newPassword: string) => {
+    const bcrypt = require("bcryptjs") as {
+      hash: (password: string, rounds: number) => Promise<string>;
+    };
+    return {
+      hashedPassword: await bcrypt.hash(newPassword, 12),
+      passwordChangedAt: new Date(),
+    };
+  }),
+  updateUserPassword: jest.fn(
+    async (
+      client: {
+        user: {
+          update: (args: unknown) => Promise<unknown>;
+        };
+      },
+      userId: string,
+      passwordUpdate: {
+        hashedPassword: string;
+        passwordChangedAt: Date;
+      }
+    ) => {
+      await client.user.update({
+        where: { id: userId },
+        data: {
+          password: passwordUpdate.hashedPassword,
+          passwordChangedAt: passwordUpdate.passwordChangedAt,
+        },
+      });
+
+      return { passwordChangedAt: passwordUpdate.passwordChangedAt };
+    }
+  ),
+  invalidatePasswordState: jest.fn(),
+}));
+
 import { POST, GET } from "@/app/api/auth/reset-password/route";
 import { prisma } from "@/lib/prisma";
+import {
+  invalidatePasswordState,
+  preparePasswordUpdate,
+} from "@/lib/password-security";
 import { hashToken } from "@/lib/token-security";
 import type { NextRequest } from "next/server";
 
 const VALID_TOKEN = "a".repeat(64);
 const EXPIRED_TOKEN = "b".repeat(64);
 const INVALID_FORMAT_TOKEN = "invalid-token";
+const RESET_LINK_INVALIDATED_ERROR =
+  "This reset link is no longer valid. Please request a new one.";
 
 describe("Reset Password API", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (prisma.$transaction as jest.Mock).mockImplementation(
+      async (fn: (tx: unknown) => Promise<unknown>) => {
+        const tx = {
+          passwordResetToken: {
+            deleteMany: (...args: unknown[]) =>
+              (prisma.passwordResetToken.deleteMany as jest.Mock)(...args),
+          },
+          user: {
+            findUnique: (...args: unknown[]) =>
+              (prisma.user.findUnique as jest.Mock)(...args),
+            update: (...args: unknown[]) =>
+              (prisma.user.update as jest.Mock)(...args),
+          },
+        };
+        return fn(tx);
+      }
+    );
   });
 
   describe("POST /api/auth/reset-password", () => {
@@ -74,8 +134,13 @@ describe("Reset Password API", () => {
         tokenHash: hashToken(VALID_TOKEN),
         email: "test@example.com",
         expires: new Date(Date.now() + 3600000),
+        createdAt: new Date(Date.now() - 3600000),
       };
-      const mockUser = { id: "user-123", email: "test@example.com" };
+      const mockUser = {
+        id: "user-123",
+        email: "test@example.com",
+        passwordChangedAt: null,
+      };
 
       (prisma.passwordResetToken.findUnique as jest.Mock).mockResolvedValue(
         validToken
@@ -108,6 +173,13 @@ describe("Reset Password API", () => {
       });
       // P0-2: Now uses deleteMany inside transaction
       expect(prisma.passwordResetToken.deleteMany).toHaveBeenCalled();
+      expect(preparePasswordUpdate).toHaveBeenCalledWith("newpassword123");
+      expect(invalidatePasswordState).toHaveBeenCalledWith("user-123");
+      expect(
+        (preparePasswordUpdate as jest.Mock).mock.invocationCallOrder[0]
+      ).toBeLessThan(
+        (prisma.$transaction as jest.Mock).mock.invocationCallOrder[0]
+      );
     });
 
     it("returns error for missing token", async () => {
@@ -159,12 +231,15 @@ describe("Reset Password API", () => {
         tokenHash: hashToken(EXPIRED_TOKEN),
         email: "test@example.com",
         expires: new Date(Date.now() - 3600000),
+        createdAt: new Date(Date.now() - 7200000),
       };
 
       (prisma.passwordResetToken.findUnique as jest.Mock).mockResolvedValue(
         expiredToken
       );
-      (prisma.passwordResetToken.delete as jest.Mock).mockResolvedValue({});
+      (prisma.passwordResetToken.deleteMany as jest.Mock).mockResolvedValue({
+        count: 1,
+      });
 
       const request = createRequest({
         token: EXPIRED_TOKEN,
@@ -177,7 +252,9 @@ describe("Reset Password API", () => {
       expect(data.error).toBe(
         "Reset link has expired. Please request a new one."
       );
-      expect(prisma.passwordResetToken.delete).toHaveBeenCalled();
+      expect(prisma.passwordResetToken.deleteMany).toHaveBeenCalledWith({
+        where: { id: "token-123" },
+      });
     });
 
     it("returns error when user not found", async () => {
@@ -186,6 +263,7 @@ describe("Reset Password API", () => {
         tokenHash: hashToken(VALID_TOKEN),
         email: "nonexistent@example.com",
         expires: new Date(Date.now() + 3600000),
+        createdAt: new Date(Date.now() - 3600000),
       };
 
       (prisma.passwordResetToken.findUnique as jest.Mock).mockResolvedValue(
@@ -202,6 +280,36 @@ describe("Reset Password API", () => {
 
       expect(response.status).toBe(404);
       expect(data.error).toBe("User not found");
+    });
+
+    it("rejects stale reset tokens after a newer password change", async () => {
+      const staleToken = {
+        id: "token-123",
+        tokenHash: hashToken(VALID_TOKEN),
+        email: "test@example.com",
+        expires: new Date(Date.now() + 3600000),
+        createdAt: new Date(Date.now() - 7200000),
+      };
+
+      (prisma.passwordResetToken.findUnique as jest.Mock).mockResolvedValue(
+        staleToken
+      );
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        id: "user-123",
+        passwordChangedAt: new Date(Date.now() - 1800000),
+      });
+
+      const request = createRequest({
+        token: VALID_TOKEN,
+        password: "newpassword123",
+      });
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe(RESET_LINK_INVALIDATED_ERROR);
+      expect(prisma.passwordResetToken.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.user.update).not.toHaveBeenCalled();
     });
 
     it("handles database errors gracefully", async () => {
@@ -226,8 +334,13 @@ describe("Reset Password API", () => {
         tokenHash: hashToken(VALID_TOKEN),
         email: "test@example.com",
         expires: new Date(Date.now() + 3600000),
+        createdAt: new Date(Date.now() - 3600000),
       };
-      const mockUser = { id: "user-123", email: "test@example.com" };
+      const mockUser = {
+        id: "user-123",
+        email: "test@example.com",
+        passwordChangedAt: null,
+      };
 
       (prisma.passwordResetToken.findUnique as jest.Mock).mockResolvedValue(
         validToken
@@ -250,6 +363,74 @@ describe("Reset Password API", () => {
         where: { id: "token-123" },
       });
     });
+
+    it("returns a 400 when the token was invalidated after validation but before delete", async () => {
+      const validToken = {
+        id: "token-123",
+        tokenHash: hashToken(VALID_TOKEN),
+        email: "test@example.com",
+        expires: new Date(Date.now() + 3600000),
+        createdAt: new Date(Date.now() - 3600000),
+      };
+
+      (prisma.passwordResetToken.findUnique as jest.Mock).mockResolvedValue(
+        validToken
+      );
+      (prisma.user.findUnique as jest.Mock)
+        .mockResolvedValueOnce({
+          id: "user-123",
+          passwordChangedAt: null,
+        })
+        .mockResolvedValueOnce({
+          passwordChangedAt: new Date(Date.now() - 1800000),
+        });
+      (prisma.passwordResetToken.deleteMany as jest.Mock).mockResolvedValue({
+        count: 0,
+      });
+
+      const request = createRequest({
+        token: VALID_TOKEN,
+        password: "newpassword123",
+      });
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe(RESET_LINK_INVALIDATED_ERROR);
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it("returns a 400 when a newer password change wins during the transaction", async () => {
+      const validToken = {
+        id: "token-123",
+        tokenHash: hashToken(VALID_TOKEN),
+        email: "test@example.com",
+        expires: new Date(Date.now() + 3600000),
+        createdAt: new Date(Date.now() - 3600000),
+      };
+
+      (prisma.passwordResetToken.findUnique as jest.Mock).mockResolvedValue(
+        validToken
+      );
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        id: "user-123",
+        passwordChangedAt: null,
+      });
+      (prisma.passwordResetToken.deleteMany as jest.Mock).mockResolvedValue({
+        count: 1,
+      });
+
+      const request = createRequest({
+        token: VALID_TOKEN,
+        password: "newpassword123",
+      });
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe(RESET_LINK_INVALIDATED_ERROR);
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
   });
 
   describe("GET /api/auth/reset-password", () => {
@@ -262,13 +443,20 @@ describe("Reset Password API", () => {
 
     it("returns valid true for valid token", async () => {
       const validToken = {
+        id: "token-123",
         tokenHash: hashToken(VALID_TOKEN),
         expires: new Date(Date.now() + 3600000),
+        createdAt: new Date(Date.now() - 3600000),
+        email: "test@example.com",
       };
 
       (prisma.passwordResetToken.findUnique as jest.Mock).mockResolvedValue(
         validToken
       );
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        id: "user-123",
+        passwordChangedAt: null,
+      });
 
       const request = createRequest(VALID_TOKEN);
       const response = await GET(request);
@@ -304,8 +492,11 @@ describe("Reset Password API", () => {
 
     it("returns error for expired token", async () => {
       const expiredToken = {
+        id: "token-123",
         tokenHash: hashToken(EXPIRED_TOKEN),
         expires: new Date(Date.now() - 3600000),
+        createdAt: new Date(Date.now() - 7200000),
+        email: "test@example.com",
       };
 
       (prisma.passwordResetToken.findUnique as jest.Mock).mockResolvedValue(
@@ -319,6 +510,32 @@ describe("Reset Password API", () => {
       expect(response.status).toBe(400);
       expect(data.valid).toBe(false);
       expect(data.error).toBe("Reset link has expired");
+    });
+
+    it("returns invalid for stale reset tokens", async () => {
+      const staleToken = {
+        id: "token-123",
+        tokenHash: hashToken(VALID_TOKEN),
+        expires: new Date(Date.now() + 3600000),
+        createdAt: new Date(Date.now() - 7200000),
+        email: "test@example.com",
+      };
+
+      (prisma.passwordResetToken.findUnique as jest.Mock).mockResolvedValue(
+        staleToken
+      );
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        id: "user-123",
+        passwordChangedAt: new Date(Date.now() - 1800000),
+      });
+
+      const request = createRequest(VALID_TOKEN);
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.valid).toBe(false);
+      expect(data.error).toBe(RESET_LINK_INVALIDATED_ERROR);
     });
   });
 });
