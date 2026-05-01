@@ -6,10 +6,10 @@
 
 // Mock dependencies before imports
 jest.mock("@/lib/data", () => ({
-  getMapListings: jest.fn(),
+  getMapListingsResult: jest.fn(),
 }));
 
-// Mock SearchDoc path — default to disabled so tests hit legacy (getMapListings) path
+// Mock SearchDoc path — default to disabled so tests hit legacy map-listings path
 jest.mock("@/lib/search/search-doc-queries", () => ({
   isSearchDocEnabled: jest.fn().mockReturnValue(false),
   getSearchDocMapListings: jest.fn(),
@@ -51,7 +51,7 @@ jest.mock("next/server", () => ({
 }));
 
 import { GET } from "@/app/api/map-listings/route";
-import { getMapListings } from "@/lib/data";
+import { getMapListingsResult } from "@/lib/data";
 import { withRateLimitRedis } from "@/lib/with-rate-limit-redis";
 import { NextRequest } from "next/server";
 
@@ -73,6 +73,12 @@ function createRequest(params: Record<string, string> = {}): NextRequest {
 describe("Map Listings API", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  const mockMapResult = (listings: Array<Record<string, unknown>>) => ({
+    listings,
+    truncated: false,
+    totalCandidates: listings.length,
   });
 
   describe("GET /api/map-listings", () => {
@@ -138,7 +144,9 @@ describe("Map Listings API", () => {
 
       it("clamps oversized viewport bounds instead of rejecting (P1-5)", async () => {
         const mockListings = [{ id: "1", title: "Test Listing" }];
-        (getMapListings as jest.Mock).mockResolvedValue(mockListings);
+        (getMapListingsResult as jest.Mock).mockResolvedValue(
+          mockMapResult(mockListings)
+        );
 
         const request = createRequest({
           minLng: "-135.0",
@@ -153,7 +161,7 @@ describe("Map Listings API", () => {
         expect(response.status).toBe(200);
 
         // Verify bounds were clamped to max span (130 lng / 60 lat)
-        expect(getMapListings).toHaveBeenCalledWith(
+        expect(getMapListingsResult).toHaveBeenCalledWith(
           expect.objectContaining({
             bounds: expect.objectContaining({
               // Center preserved, span reduced to limits
@@ -166,7 +174,7 @@ describe("Map Listings API", () => {
         );
 
         // Verify clamped spans are within limits
-        const call = (getMapListings as jest.Mock).mock.calls[0][0];
+        const call = (getMapListingsResult as jest.Mock).mock.calls[0][0];
         const lngSpan = call.bounds.maxLng - call.bounds.minLng;
         const latSpan = call.bounds.maxLat - call.bounds.minLat;
         expect(lngSpan).toBeLessThanOrEqual(130); // MAP_FETCH_MAX_LNG_SPAN
@@ -236,7 +244,9 @@ describe("Map Listings API", () => {
           { id: "1", title: "Test Listing 1" },
           { id: "2", title: "Test Listing 2" },
         ];
-        (getMapListings as jest.Mock).mockResolvedValue(mockListings);
+        (getMapListingsResult as jest.Mock).mockResolvedValue(
+          mockMapResult(mockListings)
+        );
 
         const request = createRequest({
           minLng: "-122.5",
@@ -261,7 +271,9 @@ describe("Map Listings API", () => {
       });
 
       it("includes x-request-id header in successful response", async () => {
-        (getMapListings as jest.Mock).mockResolvedValue([]);
+        (getMapListingsResult as jest.Mock).mockResolvedValue(
+          mockMapResult([])
+        );
 
         const request = createRequest({
           minLng: "-122.5",
@@ -289,8 +301,10 @@ describe("Map Listings API", () => {
         expect(response.headers.get("x-request-id")).toBe("test-request-id");
       });
 
-      it("passes filter parameters to getMapListings", async () => {
-        (getMapListings as jest.Mock).mockResolvedValue([]);
+      it("passes filter parameters to getMapListingsResult", async () => {
+        (getMapListingsResult as jest.Mock).mockResolvedValue(
+          mockMapResult([])
+        );
 
         // Use sort=newest to prevent semantic query stripping (which strips
         // query when sort=recommended and features.semanticSearch is enabled)
@@ -308,7 +322,7 @@ describe("Map Listings API", () => {
 
         await GET(request);
 
-        expect(getMapListings).toHaveBeenCalledWith(
+        expect(getMapListingsResult).toHaveBeenCalledWith(
           expect.objectContaining({
             query: "cozy room",
             minPrice: 500,
@@ -328,7 +342,9 @@ describe("Map Listings API", () => {
 
     describe("error handling", () => {
       it("returns 500 for database errors", async () => {
-        (getMapListings as jest.Mock).mockRejectedValue(new Error("DB Error"));
+        (getMapListingsResult as jest.Mock).mockRejectedValue(
+          new Error("DB Error")
+        );
 
         const request = createRequest({
           minLng: "-122.5",
@@ -345,7 +361,9 @@ describe("Map Listings API", () => {
       });
 
       it("includes x-request-id in 500 error response", async () => {
-        (getMapListings as jest.Mock).mockRejectedValue(new Error("DB Error"));
+        (getMapListingsResult as jest.Mock).mockRejectedValue(
+          new Error("DB Error")
+        );
 
         const request = createRequest({
           minLng: "-122.5",

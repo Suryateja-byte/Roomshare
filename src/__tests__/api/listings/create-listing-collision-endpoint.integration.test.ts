@@ -77,6 +77,10 @@ jest.mock("@/lib/search/search-doc-dirty", () => ({
   markListingDirtyInTx: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock("@/lib/listings/canonical-sync", () => ({
+  syncCanonicalAvailability: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock("@/lib/profile-completion", () => ({
   calculateProfileCompletion: jest.fn().mockReturnValue({
     percentage: 100,

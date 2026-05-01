@@ -106,6 +106,18 @@ jest.mock("@/lib/search/search-doc-dirty", () => ({
   markListingsDirtyInTx: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock("@/lib/env", () => ({
+  features: {
+    listingCreateCollisionWarn: false,
+    semanticSearch: false,
+    wholeUnitMode: false,
+  },
+}));
+
+jest.mock("@/lib/listings/canonical-sync", () => ({
+  syncCanonicalAvailability: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock("@/lib/schemas", () => {
   const actual = jest.requireActual("@/lib/schemas");
   return actual;
@@ -283,6 +295,7 @@ describe("Listings API", () => {
       zip: "94102",
       roomType: "Private Room",
       totalSlots: "1",
+      moveInDate: "2027-05-01",
       images: [
         "https://test-project.supabase.co/storage/v1/object/public/images/listings/user-123/test.jpg",
       ],
