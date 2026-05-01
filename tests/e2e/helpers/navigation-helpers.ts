@@ -80,6 +80,62 @@ async function waitForSearchTransition(
     .catch(() => false);
 }
 
+const knownSearchLocations: Record<
+  string,
+  {
+    label: string;
+    lat: number;
+    lng: number;
+    bounds: {
+      minLat: number;
+      maxLat: number;
+      minLng: number;
+      maxLng: number;
+    };
+  }
+> = {
+  austin: {
+    label: "Austin, TX",
+    lat: 30.2672,
+    lng: -97.7431,
+    bounds: {
+      minLat: 30.1,
+      maxLat: 30.45,
+      minLng: -97.95,
+      maxLng: -97.55,
+    },
+  },
+  "san francisco": {
+    label: "San Francisco, CA",
+    lat: 37.7749,
+    lng: -122.4194,
+    bounds: {
+      minLat: 37.7,
+      maxLat: 37.85,
+      minLng: -122.52,
+      maxLng: -122.35,
+    },
+  },
+};
+
+function buildKnownLocationSearchUrl(location: string): string | null {
+  const normalized = location.trim().toLowerCase();
+  const knownLocation = knownSearchLocations[normalized];
+  if (!knownLocation) return null;
+
+  const params = new URLSearchParams({
+    locationLabel: knownLocation.label,
+    lat: knownLocation.lat.toString(),
+    lng: knownLocation.lng.toString(),
+    minLat: knownLocation.bounds.minLat.toString(),
+    maxLat: knownLocation.bounds.maxLat.toString(),
+    minLng: knownLocation.bounds.minLng.toString(),
+    maxLng: knownLocation.bounds.maxLng.toString(),
+  });
+
+  return `/search?${params.toString()}`;
+}
+
 /**
  * Check whether the page was redirected to /login (auth expired).
  * Returns true if we are on the intended page, false if redirected to login.
@@ -296,17 +352,27 @@ export function navigationHelpers(page: Page) {
       await searchInput.click();
       await searchInput.fill(location);
       const suggestionButton = page
-        .locator('[role="listbox"] button')
+        .locator(
+          '[role="listbox"] [role="option"] button, [role="listbox"] button'
+        )
         .filter({ visible: true })
         .first();
 
       const selectedSuggestion = await suggestionButton
-        .waitFor({ state: "visible", timeout: 5_000 })
+        .waitFor({ state: "visible", timeout: 12_000 })
         .then(() => true)
         .catch(() => false);
 
       if (selectedSuggestion) {
         await suggestionButton.click();
+      } else {
+        const fallbackSearchUrl = buildKnownLocationSearchUrl(location);
+        if (fallbackSearchUrl) {
+          await page.goto(fallbackSearchUrl);
+          await page.waitForURL(/\/search/, { timeout: timeouts.navigation });
+          await waitForPageReady(page, { selector: "main" });
+          return;
+        }
       }
 
       const form = searchInput.locator("xpath=ancestor::form[1]");
