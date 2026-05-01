@@ -14,20 +14,11 @@
 --   DROP INDEX CONCURRENTLY IF EXISTS idx_search_docs_embedding_ga_hnsw;
 --   DROP INDEX CONCURRENTLY IF EXISTS idx_search_docs_embedding_model_status;
 -- DATA-SAFETY:
---   Additive function overloads and indexes only. Existing overloads are kept
---   for rolling deploy safety and can be removed after old code is retired.
+--   Additive function overloads only. Existing overloads are kept for rolling
+--   deploy safety and can be removed after old code is retired.
+--   Concurrent indexes are split into one-statement follow-up migrations so
+--   Prisma can deploy this migration transactionally.
 -- =============================================================================
-
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_search_docs_embedding_model_status
-  ON listing_search_docs (embedding_model, embedding_status)
-  WHERE embedding IS NOT NULL;
-
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_search_docs_embedding_ga_hnsw
-  ON listing_search_docs
-  USING hnsw (embedding vector_cosine_ops)
-  WHERE embedding IS NOT NULL
-    AND embedding_model = 'gemini-embedding-2.search-result.nosensitive-v1.d768'
-    AND embedding_status IN ('COMPLETED', 'PARTIAL');
 
 CREATE OR REPLACE FUNCTION search_listings_semantic(
   query_embedding vector(768),
