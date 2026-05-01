@@ -26,6 +26,15 @@ jest.mock("@/lib/search/search-doc-dirty", () => ({
     mockMarkListingsDirtyInTx(...args),
 }));
 
+jest.mock("@/lib/listings/canonical-lifecycle", () => ({
+  syncListingLifecycleProjectionInTx: jest.fn().mockResolvedValue({
+    action: "synced",
+  }),
+  tombstoneCanonicalInventoryInTx: jest.fn().mockResolvedValue({
+    action: "tombstoned",
+  }),
+}));
+
 // Mock prisma — tx object for interactive transactions.
 // The tx is passed as the first arg to markListingDirtyInTx, so tests can
 // assert "dirty mark ran inside this tx" via object identity.

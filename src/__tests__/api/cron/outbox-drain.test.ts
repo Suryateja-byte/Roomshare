@@ -32,6 +32,10 @@ jest.mock("@/lib/outbox/drain", () => ({
   drainOutboxOnce: jest.fn(),
 }));
 
+jest.mock("@/lib/public-cache/push", () => ({
+  drainPublicCacheFanoutOnce: jest.fn(),
+}));
+
 jest.mock("@/lib/logger", () => ({
   logger: {
     sync: {
@@ -51,11 +55,26 @@ import {
   isKillSwitchActive,
 } from "@/lib/flags/phase02";
 import { drainOutboxOnce } from "@/lib/outbox/drain";
+import { drainPublicCacheFanoutOnce } from "@/lib/public-cache/push";
 
 const mockValidateCronAuth = validateCronAuth as jest.Mock;
 const mockIsEnabled = isPhase02ProjectionWritesEnabled as jest.Mock;
 const mockIsKillSwitch = isKillSwitchActive as jest.Mock;
 const mockDrainOnce = drainOutboxOnce as jest.Mock;
+const mockDrainPublicCacheFanoutOnce = drainPublicCacheFanoutOnce as jest.Mock;
+
+const PROJECTION_PUBLICATION_KINDS = [
+  "UNIT_UPSERTED",
+  "INVENTORY_UPSERTED",
+  "GEOCODE_NEEDED",
+  "EMBED_NEEDED",
+] as const;
+
+const NON_PROJECTION_KINDS = [
+  "PAYMENT_WEBHOOK",
+  "ALERT_MATCH",
+  "ALERT_DELIVER",
+] as const;
 
 function makeRequest(): NextRequest {
   return new NextRequest("http://localhost/api/cron/outbox-drain");
@@ -65,7 +84,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockValidateCronAuth.mockReturnValue(null); // no auth error
   mockIsEnabled.mockReturnValue(true);
-  mockIsKillSwitch.mockReturnValue(false);
+  mockIsKillSwitch.mockImplementation(() => false);
   mockDrainOnce.mockResolvedValue({
     processed: 0,
     completed: 0,
@@ -74,6 +93,12 @@ beforeEach(() => {
     retryScheduled: 0,
     remainingByPriority: {},
     elapsedMs: 5,
+  });
+  mockDrainPublicCacheFanoutOnce.mockResolvedValue({
+    attempted: 0,
+    delivered: 0,
+    stale: 0,
+    failed: 0,
   });
 });
 
@@ -110,18 +135,51 @@ describe("GET /api/cron/outbox-drain", () => {
         priorityMax: 100,
       })
     );
+    expect(mockDrainOnce.mock.calls[0][0]).not.toHaveProperty("excludedKinds");
   });
 
-  it("restricts to priorityMax=0 when kill switch is active", async () => {
-    mockIsKillSwitch.mockReturnValue(true);
+  it("excludes projection publication work without pausing payments when new publication is disabled", async () => {
+    mockIsKillSwitch.mockImplementation(
+      (name: string) => name === "disable_new_publication"
+    );
 
     await GET(makeRequest());
 
     expect(mockDrainOnce).toHaveBeenCalledWith(
       expect.objectContaining({
-        priorityMax: 0,
+        priorityMax: 100,
+        excludedKinds: PROJECTION_PUBLICATION_KINDS,
       })
     );
+    const excludedKinds = mockDrainOnce.mock.calls[0][0].excludedKinds;
+    for (const kind of NON_PROJECTION_KINDS) {
+      expect(excludedKinds).not.toContain(kind);
+    }
+  });
+
+  it("excludes projection publication work without pausing payments when backfills and repairs are paused", async () => {
+    mockIsKillSwitch.mockImplementation(
+      (name: string) => name === "pause_backfills_and_repairs"
+    );
+
+    const res = await GET(makeRequest());
+    const body = await res.json();
+
+    expect(mockDrainOnce).toHaveBeenCalledWith(
+      expect.objectContaining({
+        priorityMax: 100,
+        excludedKinds: PROJECTION_PUBLICATION_KINDS,
+      })
+    );
+    const excludedKinds = mockDrainOnce.mock.calls[0][0].excludedKinds;
+    for (const kind of NON_PROJECTION_KINDS) {
+      expect(excludedKinds).not.toContain(kind);
+    }
+    expect(body.killSwitchActive).toBe(false);
+    expect(body.killSwitches).toEqual({
+      disableNewPublication: false,
+      pauseBackfillsAndRepairs: true,
+    });
   });
 
   it("returns drain result in response body", async () => {
@@ -156,11 +214,17 @@ describe("GET /api/cron/outbox-drain", () => {
   });
 
   it("includes killSwitchActive in response", async () => {
-    mockIsKillSwitch.mockReturnValue(true);
+    mockIsKillSwitch.mockImplementation(
+      (name: string) => name === "disable_new_publication"
+    );
 
     const res = await GET(makeRequest());
     const body = await res.json();
 
     expect(body.killSwitchActive).toBe(true);
+    expect(body.killSwitches).toEqual({
+      disableNewPublication: true,
+      pauseBackfillsAndRepairs: false,
+    });
   });
 });

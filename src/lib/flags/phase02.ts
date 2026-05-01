@@ -14,6 +14,7 @@ export const PHASE02_KILL_SWITCHES = {
   disable_new_publication: false,
   pause_geocode_publish: false,
   pause_backfills_and_repairs: false,
+  pause_identity_reconcile: false,
 } as const;
 
 export type Phase02KillSwitch = keyof typeof PHASE02_KILL_SWITCHES;
@@ -26,6 +27,8 @@ export function isKillSwitchActive(name: Phase02KillSwitch): boolean {
       return features.pauseGeocodePublish;
     case "pause_backfills_and_repairs":
       return features.pauseBackfillsAndRepairs;
+    case "pause_identity_reconcile":
+      return features.pauseIdentityReconcile;
     default: /* istanbul ignore next */ {
       const _exhaustive: never = name;
       return _exhaustive;

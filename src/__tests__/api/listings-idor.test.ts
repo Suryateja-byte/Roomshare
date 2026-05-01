@@ -118,6 +118,15 @@ jest.mock("@/lib/listings/canonical-inventory", () => ({
     .mockResolvedValue({ unitId: "unit-123" }),
 }));
 
+jest.mock("@/lib/listings/canonical-lifecycle", () => ({
+  syncListingLifecycleProjectionInTx: jest.fn().mockResolvedValue({
+    action: "synced",
+  }),
+  tombstoneCanonicalInventoryInTx: jest.fn().mockResolvedValue({
+    action: "tombstoned",
+  }),
+}));
+
 jest.mock("next/server", () => ({
   NextResponse: {
     json: (
@@ -145,6 +154,10 @@ import bcrypt from "bcryptjs";
 import { createClient } from "@supabase/supabase-js";
 import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 import { logger } from "@/lib/logger";
+import {
+  syncListingLifecycleProjectionInTx,
+  tombstoneCanonicalInventoryInTx,
+} from "@/lib/listings/canonical-lifecycle";
 import {
   getAvailability,
   getFuturePeakReservedLoad,
@@ -985,6 +998,11 @@ describe("Listings API IDOR Protection", () => {
         "listing-abc",
         "status_changed"
       );
+      expect(syncListingLifecycleProjectionInTx).toHaveBeenCalledWith(
+        expect.any(Object),
+        "listing-abc",
+        { role: "host", id: "owner-123" }
+      );
       expect(createClient).not.toHaveBeenCalled();
       expect(logger.info).toHaveBeenCalledWith(
         "Owner listing delete suppressed",
@@ -1044,6 +1062,11 @@ describe("Listings API IDOR Protection", () => {
       expect(listingDelete).toHaveBeenCalledWith({
         where: { id: "listing-abc" },
       });
+      expect(tombstoneCanonicalInventoryInTx).toHaveBeenCalledWith(
+        expect.any(Object),
+        "listing-abc",
+        "TOMBSTONE"
+      );
       expect(markListingDirtyInTx).not.toHaveBeenCalled();
       expect(createClient).toHaveBeenCalled();
     });

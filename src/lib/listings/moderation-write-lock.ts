@@ -6,6 +6,11 @@ export const MODERATION_WRITE_LOCK_REASONS = [
 export type ModerationWriteLockReason =
   (typeof MODERATION_WRITE_LOCK_REASONS)[number];
 
+export const PUBLIC_SEARCH_BLOCKED_STATUS_REASONS = [
+  "MIGRATION_REVIEW",
+  ...MODERATION_WRITE_LOCK_REASONS,
+] as const;
+
 export const LISTING_LOCKED_ERROR_MESSAGE =
   "This listing is locked while under review.";
 
@@ -24,6 +29,21 @@ export function getModerationWriteLockReason(
   }
 
   return null;
+}
+
+export function isModerationLockedStatusReason(
+  statusReason: string | null | undefined
+): boolean {
+  return getModerationWriteLockReason(statusReason) !== null;
+}
+
+export function isPublicSearchBlockedStatusReason(
+  statusReason: string | null | undefined
+): boolean {
+  return (
+    statusReason === "MIGRATION_REVIEW" ||
+    isModerationLockedStatusReason(statusReason)
+  );
 }
 
 export function getModerationWriteLockResult(options: {
@@ -51,10 +71,11 @@ export function getHostModerationWriteLockResult(options: {
   statusReason: string | null | undefined;
   moderationWriteLocksEnabled: boolean;
 }): ModerationWriteLockResult | null {
-  if (options.statusReason === "SUPPRESSED") {
+  const lockReason = getModerationWriteLockReason(options.statusReason);
+  if (lockReason) {
     return getModerationWriteLockResult({
       actor: "host",
-      statusReason: options.statusReason,
+      statusReason: lockReason,
     });
   }
 

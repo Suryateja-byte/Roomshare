@@ -8,6 +8,7 @@ describe("phase01 flags", () => {
     jest.resetModules();
     process.env = { ...originalEnv };
     delete process.env.FEATURE_PHASE01_CANONICAL_WRITES;
+    delete process.env.KILL_SWITCH_PAUSE_IDENTITY_RECONCILE;
   });
 
   afterEach(() => {
@@ -43,5 +44,12 @@ describe("phase01 flags", () => {
     });
     expect(isKillSwitchActive("disable_new_publication")).toBe(false);
     expect(isKillSwitchActive("pause_identity_reconcile")).toBe(false);
+  });
+
+  it("delegates pause_identity_reconcile to the live Phase 02 resolver", async () => {
+    process.env.KILL_SWITCH_PAUSE_IDENTITY_RECONCILE = "true";
+    const { isKillSwitchActive } = await import("@/lib/flags/phase01");
+
+    expect(isKillSwitchActive("pause_identity_reconcile")).toBe(true);
   });
 });

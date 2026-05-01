@@ -35,7 +35,9 @@ describe("buildSearchDocWhereConditions", () => {
     expect(conditions).toContain(
       `COALESCE(FALSE, FALSE) = FALSE`
     );
-    expect(conditions).toContain(`l."statusReason" IS DISTINCT FROM 'MIGRATION_REVIEW'`);
+    expect(conditions).toContain(
+      `COALESCE(l."statusReason", '') NOT IN ('MIGRATION_REVIEW', 'ADMIN_PAUSED', 'SUPPRESSED')`
+    );
     // Verify no other status values are included
     const statusConditions = conditions.filter((c) =>
       c.includes(`l.status = 'ACTIVE'`)
@@ -282,7 +284,9 @@ describe("buildSearchDocListWhereConditions", () => {
     const result = buildSearchDocListWhereConditions({});
 
     expect(result.conditions).toContain(`COALESCE(FALSE, FALSE) = FALSE`);
-    expect(result.conditions).toContain(`l."statusReason" IS DISTINCT FROM 'MIGRATION_REVIEW'`);
+    expect(result.conditions).toContain(
+      `COALESCE(l."statusReason", '') NOT IN ('MIGRATION_REVIEW', 'ADMIN_PAUSED', 'SUPPRESSED')`
+    );
     expect(result.conditions[0]).toContain(`'HOST_MANAGED' = 'HOST_MANAGED'`);
     expect(result.conditions[0]).toContain(`NOW() - INTERVAL '21 days'`);
     expect(result.params).toEqual([1, 1]);

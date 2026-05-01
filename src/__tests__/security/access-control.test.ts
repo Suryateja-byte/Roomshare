@@ -97,6 +97,15 @@ jest.mock("@/lib/search/search-doc-dirty", () => ({
   markListingsDirtyInTx: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock("@/lib/listings/canonical-lifecycle", () => ({
+  syncListingLifecycleProjectionInTx: jest.fn().mockResolvedValue({
+    action: "synced",
+  }),
+  tombstoneCanonicalInventoryInTx: jest.fn().mockResolvedValue({
+    action: "tombstoned",
+  }),
+}));
+
 jest.mock("@/app/actions/suspension", () => ({
   checkSuspension: jest.fn().mockResolvedValue({ suspended: false }),
 }));

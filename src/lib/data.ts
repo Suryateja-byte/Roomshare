@@ -510,7 +510,7 @@ export async function getMapListingsResult(
     slotConditionSql,
     "l.status = 'ACTIVE'",
     `COALESCE(FALSE, FALSE) = FALSE`,
-    `COALESCE(l."statusReason", '') <> 'MIGRATION_REVIEW'`,
+    `COALESCE(l."statusReason", '') NOT IN ('MIGRATION_REVIEW', 'ADMIN_PAUSED', 'SUPPRESSED')`,
     "ST_X(loc.coords::geometry) IS NOT NULL",
     "ST_Y(loc.coords::geometry) IS NOT NULL",
     "NOT (ST_X(loc.coords::geometry) = 0 AND ST_Y(loc.coords::geometry) = 0)",
@@ -886,7 +886,7 @@ export async function getListingsPaginated(
       slotConditionSql,
       "l.status = 'ACTIVE'",
       `COALESCE(FALSE, FALSE) = FALSE`,
-      `COALESCE(l."statusReason", '') <> 'MIGRATION_REVIEW'`,
+      `COALESCE(l."statusReason", '') NOT IN ('MIGRATION_REVIEW', 'ADMIN_PAUSED', 'SUPPRESSED')`,
       // Exclude listings with invalid coordinates (null, zero, or out of range)
       "ST_X(loc.coords::geometry) IS NOT NULL",
       "ST_Y(loc.coords::geometry) IS NOT NULL",
@@ -1279,7 +1279,7 @@ async function getListingsCountEfficient(
     slotConditionSql,
     "l.status = 'ACTIVE'",
     `COALESCE(FALSE, FALSE) = FALSE`,
-    `COALESCE(l."statusReason", '') <> 'MIGRATION_REVIEW'`,
+    `COALESCE(l."statusReason", '') NOT IN ('MIGRATION_REVIEW', 'ADMIN_PAUSED', 'SUPPRESSED')`,
     // Exclude listings with invalid coordinates
     "ST_X(loc.coords::geometry) IS NOT NULL",
     "ST_Y(loc.coords::geometry) IS NOT NULL",

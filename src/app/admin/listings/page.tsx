@@ -85,6 +85,7 @@ export default async function AdminListingsPage({
       title: true,
       price: true,
       status: true,
+      statusReason: true,
       version: true,
       images: true,
       viewCount: true,

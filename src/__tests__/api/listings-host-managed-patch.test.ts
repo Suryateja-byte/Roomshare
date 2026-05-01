@@ -77,6 +77,15 @@ jest.mock("@/lib/listings/canonical-inventory", () => ({
   }),
 }));
 
+jest.mock("@/lib/listings/canonical-lifecycle", () => ({
+  syncListingLifecycleProjectionInTx: jest.fn().mockResolvedValue({
+    action: "synced",
+  }),
+  tombstoneCanonicalInventoryInTx: jest.fn().mockResolvedValue({
+    action: "tombstoned",
+  }),
+}));
+
 jest.mock("@supabase/supabase-js", () => ({
   createClient: jest.fn(() => ({
     storage: {
@@ -466,7 +475,7 @@ describe("PATCH /api/listings/[id] contact-first availability contract", () => {
     expect(createClient).not.toHaveBeenCalled();
   });
 
-  it("keeps admin-paused generic edits feature-gated when locks are disabled", async () => {
+  it("blocks admin-paused generic edits even when locks are disabled", async () => {
     const { update } = mockTransaction({
       lockedRows: [lockedListing({ statusReason: "ADMIN_PAUSED" })],
     });
@@ -479,16 +488,12 @@ describe("PATCH /api/listings/[id] contact-first availability contract", () => {
       { params: Promise.resolve({ id: "listing-abc" }) }
     );
 
-    expect(response.status).toBe(200);
-    expect(update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: "listing-abc" },
-        data: expect.objectContaining({
-          title: "Updated Title",
-          version: 4,
-        }),
-      })
-    );
+    expect(response.status).toBe(423);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "LISTING_LOCKED",
+      lockReason: "ADMIN_PAUSED",
+    });
+    expect(update).not.toHaveBeenCalled();
   });
 
   it("always blocks suppressed availability edits before version checks", async () => {

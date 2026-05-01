@@ -81,6 +81,15 @@ jest.mock("@/lib/search/search-doc-dirty", () => ({
   markListingsDirtyInTx: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock("@/lib/listings/canonical-lifecycle", () => ({
+  syncListingLifecycleProjectionInTx: jest.fn().mockResolvedValue({
+    action: "synced",
+  }),
+  tombstoneCanonicalInventoryInTx: jest.fn().mockResolvedValue({
+    action: "tombstoned",
+  }),
+}));
+
 jest.mock("@/lib/payments/contact-restoration", () => ({
   restoreConsumptionsForHostBan: jest.fn().mockResolvedValue({ restored: 0 }),
 }));
@@ -91,6 +100,7 @@ import {
   suspendUser,
   getListingsForAdmin,
   updateListingStatus,
+  unsuppressListing,
   reviewListingMigration,
   deleteListing,
   getReports,
@@ -105,6 +115,10 @@ import { logAdminAction } from "@/lib/audit";
 import { logger } from "@/lib/logger";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
+import {
+  syncListingLifecycleProjectionInTx,
+  tombstoneCanonicalInventoryInTx,
+} from "@/lib/listings/canonical-lifecycle";
 
 describe("admin actions", () => {
   const mockAdminSession = {
@@ -553,8 +567,17 @@ describe("admin actions", () => {
       expect(result.success).toBe(true);
       expect(update).toHaveBeenCalledWith({
         where: { id: "listing-123" },
-        data: { status: "PAUSED", version: 8 },
+        data: {
+          status: "PAUSED",
+          statusReason: "ADMIN_PAUSED",
+          version: 8,
+        },
       });
+      expect(syncListingLifecycleProjectionInTx).toHaveBeenCalledWith(
+        expect.any(Object),
+        "listing-123",
+        { role: "moderator", id: "admin-123" }
+      );
     });
 
     it("logs action with previous status", async () => {
@@ -627,7 +650,7 @@ describe("admin actions", () => {
       });
     });
 
-    it("uses shared helper for HOST_MANAGED admin writes", async () => {
+    it("requires explicit unsuppress for moderation-locked activation", async () => {
       const { update } = mockListingStatusTx({
         ...makeStatusListing(),
         availabilitySource: "HOST_MANAGED",
@@ -640,11 +663,14 @@ describe("admin actions", () => {
 
       const result = await updateListingStatus("listing-123", "ACTIVE", 7);
 
-      expect(result.success).toBe(true);
-      expect(update).toHaveBeenCalledWith({
-        where: { id: "listing-123" },
-        data: { status: "ACTIVE", version: 8 },
+      expect(result).toEqual({
+        error:
+          "This listing is moderation-locked. Use Unsuppress Listing to restore it.",
+        code: "LISTING_REQUIRES_UNSUPPRESS",
+        lockReason: "ADMIN_PAUSED",
       });
+      expect(update).not.toHaveBeenCalled();
+      expect(syncListingLifecycleProjectionInTx).not.toHaveBeenCalled();
     });
 
     it("ignores retired legacy booking migration flags when activating", async () => {
@@ -657,6 +683,110 @@ describe("admin actions", () => {
       const result = await updateListingStatus("listing-123", "ACTIVE", 7);
 
       expect(result.success).toBe(true);
+    });
+  });
+
+  describe("unsuppressListing", () => {
+    function makeUnsuppressListing(
+      overrides: Partial<{
+        id: string;
+        status: "ACTIVE" | "PAUSED" | "RENTED";
+        title: string;
+        ownerId: string;
+        version: number;
+        statusReason: string | null;
+      }> = {}
+    ) {
+      return {
+        id: "listing-123",
+        status: "PAUSED" as const,
+        title: "Test Listing",
+        ownerId: "owner-123",
+        version: 7,
+        statusReason: "SUPPRESSED",
+        ...overrides,
+      };
+    }
+
+    function mockUnsuppressTx(
+      listingRow: ReturnType<typeof makeUnsuppressListing> | null,
+      overrides?: { update?: jest.Mock }
+    ) {
+      const update = overrides?.update ?? jest.fn().mockResolvedValue({});
+      (prisma.$transaction as jest.Mock).mockImplementation(
+        async (fn: (tx: unknown) => Promise<unknown>) =>
+          fn({
+            $queryRaw: jest
+              .fn()
+              .mockResolvedValue(listingRow ? [listingRow] : []),
+            listing: { update },
+          })
+      );
+      return { update };
+    }
+
+    it("clears moderation lock, restores active status, syncs projections, and audits", async () => {
+      const { update } = mockUnsuppressTx({
+        ...makeUnsuppressListing(),
+        status: "PAUSED",
+        statusReason: "SUPPRESSED",
+      });
+      (logAdminAction as jest.Mock).mockResolvedValue({});
+
+      const result = await unsuppressListing("listing-123", 7);
+
+      expect(result).toEqual({
+        success: true,
+        status: "ACTIVE",
+        statusReason: null,
+        version: 8,
+      });
+      expect(update).toHaveBeenCalledWith({
+        where: { id: "listing-123" },
+        data: {
+          status: "ACTIVE",
+          statusReason: null,
+          version: 8,
+        },
+      });
+      expect(markListingDirtyInTx).toHaveBeenCalledWith(
+        expect.any(Object),
+        "listing-123",
+        "status_changed"
+      );
+      expect(syncListingLifecycleProjectionInTx).toHaveBeenCalledWith(
+        expect.any(Object),
+        "listing-123",
+        { role: "moderator", id: "admin-123" }
+      );
+      expect(logAdminAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "LISTING_RESTORED",
+          details: expect.objectContaining({
+            previousStatusReason: "SUPPRESSED",
+            newStatus: "ACTIVE",
+            newStatusReason: null,
+            restoredLockReason: "SUPPRESSED",
+          }),
+        })
+      );
+    });
+
+    it("does not restore rows without a moderation lock", async () => {
+      const { update } = mockUnsuppressTx({
+        ...makeUnsuppressListing(),
+        status: "PAUSED",
+        statusReason: "HOST_PAUSED",
+      });
+
+      const result = await unsuppressListing("listing-123", 7);
+
+      expect(result).toEqual({
+        error: "This listing is not moderation-locked.",
+        code: "LISTING_NOT_MODERATION_LOCKED",
+      });
+      expect(update).not.toHaveBeenCalled();
+      expect(syncListingLifecycleProjectionInTx).not.toHaveBeenCalled();
     });
   });
 
@@ -805,6 +935,15 @@ describe("admin actions", () => {
       expect(listingDelete).toHaveBeenCalledWith({
         where: { id: "listing-123" },
       });
+      expect(tombstoneCanonicalInventoryInTx).toHaveBeenCalledWith(
+        expect.any(Object),
+        "listing-123",
+        "TOMBSTONE"
+      );
+      expect(
+        (tombstoneCanonicalInventoryInTx as jest.Mock).mock
+          .invocationCallOrder[0]
+      ).toBeLessThan(listingDelete.mock.invocationCallOrder[0]);
       expect(listingUpdate).not.toHaveBeenCalled();
       expect(markListingDirtyInTx).not.toHaveBeenCalled();
     });
@@ -821,6 +960,7 @@ describe("admin actions", () => {
         action: "suppressed",
         notifiedTenants: 0,
         status: "PAUSED",
+        statusReason: "SUPPRESSED",
         version: 4,
       });
       expect(listingUpdate).toHaveBeenCalledWith({
@@ -836,6 +976,11 @@ describe("admin actions", () => {
         expect.any(Object),
         "listing-123",
         "status_changed"
+      );
+      expect(syncListingLifecycleProjectionInTx).toHaveBeenCalledWith(
+        expect.any(Object),
+        "listing-123",
+        { role: "moderator", id: "admin-123" }
       );
     });
 
@@ -1101,6 +1246,11 @@ describe("admin actions", () => {
         expect.any(Object),
         "listing-123",
         "status_changed"
+      );
+      expect(syncListingLifecycleProjectionInTx).toHaveBeenCalledWith(
+        expect.any(Object),
+        "listing-123",
+        { role: "moderator", id: "admin-123" }
       );
       expect(mockReportUpdate).toHaveBeenCalledWith(
         expect.objectContaining({

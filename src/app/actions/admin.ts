@@ -2,12 +2,17 @@
 
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
 import { ListingStatus, ReportStatus } from "@prisma/client";
 import { logAdminAction } from "@/lib/audit";
 import { logger } from "@/lib/logger";
 import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
+import { requireAdminAuth } from "@/lib/admin-auth";
+import {
+  syncListingLifecycleProjectionInTx,
+  tombstoneCanonicalInventoryInTx,
+} from "@/lib/listings/canonical-lifecycle";
+import { getModerationWriteLockReason } from "@/lib/listings/moderation-write-lock";
 import {
   checkRateLimit,
   RATE_LIMITS,
@@ -18,40 +23,7 @@ import { restoreConsumptionsForHostBan } from "@/lib/payments/contact-restoratio
 
 // Helper to check admin status — exported for use in other admin action files (verification.ts etc.)
 export async function requireAdmin() {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return {
-      error: "Unauthorized",
-      code: "SESSION_EXPIRED",
-      isAdmin: false,
-      userId: null,
-    };
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { isAdmin: true, isSuspended: true },
-  });
-
-  if (!user?.isAdmin) {
-    return {
-      error: "Unauthorized",
-      code: "NOT_ADMIN",
-      isAdmin: false,
-      userId: session.user.id,
-    };
-  }
-
-  if (user.isSuspended) {
-    return {
-      error: "Account suspended",
-      code: "ACCOUNT_SUSPENDED",
-      isAdmin: false,
-      userId: session.user.id,
-    };
-  }
-
-  return { error: null, code: null, isAdmin: true, userId: session.user.id };
+  return requireAdminAuth();
 }
 
 // ==================== USER MANAGEMENT ====================
@@ -319,6 +291,7 @@ export async function getListingsForAdmin(options?: {
           title: true,
           price: true,
           status: true,
+          statusReason: true,
           version: true,
           images: true,
           viewCount: true,
@@ -418,20 +391,46 @@ export async function updateListingStatus(
         } as const;
       }
 
+      const lockReason = getModerationWriteLockReason(listing.statusReason);
+      if (status === "ACTIVE" && lockReason) {
+        return {
+          error:
+            "This listing is moderation-locked. Use Unsuppress Listing to restore it.",
+          code: "LISTING_REQUIRES_UNSUPPRESS",
+          lockReason,
+        } as const;
+      }
+
+      const nextStatusReason =
+        status === "PAUSED"
+          ? (lockReason ?? "ADMIN_PAUSED")
+          : lockReason
+            ? listing.statusReason
+            : null;
+
       await tx.listing.update({
         where: { id: listingId },
-        data: { status, version: listing.version + 1 },
+        data: {
+          status,
+          statusReason: nextStatusReason,
+          version: listing.version + 1,
+        },
       });
 
       await markListingDirtyInTx(tx, listingId, "status_changed");
+      await syncListingLifecycleProjectionInTx(tx, listingId, {
+        role: "moderator",
+        id: adminCheck.userId,
+      });
 
       return {
         success: true,
         listingTitle: listing.title,
         ownerId: listing.ownerId,
         previousStatus: listing.status,
+        previousStatusReason: listing.statusReason,
         status,
-        statusReason: listing.statusReason,
+        statusReason: nextStatusReason,
         version: listing.version + 1,
       } as const;
     });
@@ -453,8 +452,9 @@ export async function updateListingStatus(
       targetId: listingId,
       details: {
         previousStatus: result.previousStatus,
+        previousStatusReason: result.previousStatusReason,
         newStatus: result.status,
-        statusReason: result.statusReason,
+        newStatusReason: result.statusReason,
         listingTitle: result.listingTitle,
         ownerId: result.ownerId,
       },
@@ -476,6 +476,136 @@ export async function updateListingStatus(
       error: error instanceof Error ? error.message : "Unknown error",
     });
     return { error: "Failed to update listing status" };
+  }
+}
+
+export async function unsuppressListing(
+  listingId: string,
+  expectedVersion: number
+) {
+  const adminCheck = await requireAdmin();
+  if (adminCheck.error) {
+    return { error: adminCheck.error };
+  }
+
+  const headersList = await headers();
+  const ip = getClientIPFromHeaders(headersList);
+  const rl = await checkRateLimit(
+    `${ip}:${adminCheck.userId}`,
+    "adminWrite",
+    RATE_LIMITS.adminWrite
+  );
+  if (!rl.success) {
+    return { error: "Too many requests. Please slow down." };
+  }
+
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const [listing] = await tx.$queryRaw<
+        Array<{
+          id: string;
+          status: ListingStatus;
+          title: string;
+          ownerId: string;
+          version: number;
+          statusReason: string | null;
+        }>
+      >`
+        SELECT
+          id,
+          status,
+          title,
+          "ownerId",
+          version,
+          "statusReason"
+        FROM "Listing"
+        WHERE id = ${listingId}
+        FOR UPDATE
+      `;
+
+      if (!listing) {
+        return { error: "Listing not found", code: "NOT_FOUND" } as const;
+      }
+
+      if (listing.version !== expectedVersion) {
+        return {
+          error: "This listing was updated elsewhere. Reload and try again.",
+          code: "VERSION_CONFLICT",
+        } as const;
+      }
+
+      const lockReason = getModerationWriteLockReason(listing.statusReason);
+      if (!lockReason) {
+        return {
+          error: "This listing is not moderation-locked.",
+          code: "LISTING_NOT_MODERATION_LOCKED",
+        } as const;
+      }
+
+      const nextVersion = listing.version + 1;
+      await tx.listing.update({
+        where: { id: listingId },
+        data: {
+          status: "ACTIVE",
+          statusReason: null,
+          version: nextVersion,
+        },
+      });
+
+      await markListingDirtyInTx(tx, listingId, "status_changed");
+      await syncListingLifecycleProjectionInTx(tx, listingId, {
+        role: "moderator",
+        id: adminCheck.userId,
+      });
+
+      return {
+        success: true,
+        listingTitle: listing.title,
+        ownerId: listing.ownerId,
+        previousStatus: listing.status,
+        previousStatusReason: listing.statusReason,
+        lockReason,
+        status: "ACTIVE" as const,
+        statusReason: null,
+        version: nextVersion,
+      } as const;
+    });
+
+    if ("error" in result) {
+      return result;
+    }
+
+    await logAdminAction({
+      adminId: adminCheck.userId!,
+      action: "LISTING_RESTORED",
+      targetType: "Listing",
+      targetId: listingId,
+      details: {
+        previousStatus: result.previousStatus,
+        previousStatusReason: result.previousStatusReason,
+        newStatus: result.status,
+        newStatusReason: null,
+        restoredLockReason: result.lockReason,
+        listingTitle: result.listingTitle,
+        ownerId: result.ownerId,
+      },
+    });
+
+    revalidatePath("/admin/listings");
+    return {
+      success: true,
+      status: result.status,
+      statusReason: result.statusReason,
+      version: result.version,
+    };
+  } catch (error) {
+    logger.sync.error("Failed to unsuppress listing (admin)", {
+      action: "unsuppressListing",
+      adminId: adminCheck.userId,
+      listingId,
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+    return { error: "Failed to restore listing" };
   }
 }
 
@@ -560,6 +690,10 @@ export async function deleteListing(listingId: string) {
           },
         });
         await markListingDirtyInTx(tx, listingId, "status_changed");
+        await syncListingLifecycleProjectionInTx(tx, listingId, {
+          role: "moderator",
+          id: adminCheck.userId,
+        });
 
         return {
           action: "suppressed",
@@ -569,6 +703,7 @@ export async function deleteListing(listingId: string) {
         } as const;
       }
 
+      await tombstoneCanonicalInventoryInTx(tx, listingId, "TOMBSTONE");
       await tx.listing.delete({ where: { id: listingId } });
 
       return { action: "deleted", listing, reportCount } as const;
@@ -614,6 +749,7 @@ export async function deleteListing(listingId: string) {
           action: result.action,
           notifiedTenants: 0,
           status: "PAUSED" as const,
+          statusReason: "SUPPRESSED" as const,
           version: result.newVersion,
         }
       : { success: true, action: result.action, notifiedTenants: 0 };
@@ -893,6 +1029,10 @@ export async function resolveReportAndRemoveListing(
       });
 
       await markListingDirtyInTx(tx, report.listingId, "status_changed");
+      await syncListingLifecycleProjectionInTx(tx, report.listingId, {
+        role: "moderator",
+        id: adminCheck.userId,
+      });
 
       return {
         success: true,

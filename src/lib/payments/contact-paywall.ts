@@ -328,6 +328,37 @@ async function evaluateContactPaywallDirectWithClient(
   };
 }
 
+async function evaluateContactPaywallPreflightWithClient(
+  client: ContactPaywallClient,
+  input: {
+    physicalUnitId?: string | null;
+  }
+): Promise<ContactPaywallEvaluation> {
+  if (!features.contactPaywall) {
+    return {
+      summary: buildSummary({ enabled: false, mode: "OPEN" }),
+      unitId: input.physicalUnitId ?? null,
+      unitIdentityEpoch: null,
+    };
+  }
+
+  const unitContext = await resolveUnitContext(client, input.physicalUnitId);
+  if (!unitContext.unitId || unitContext.unitIdentityEpoch === null) {
+    return {
+      summary: buildSummary({
+        mode: "MIGRATION_BYPASS",
+        requiresPurchase: false,
+      }),
+      ...unitContext,
+    };
+  }
+
+  return {
+    summary: buildSummary({ mode: "METERED" }),
+    ...unitContext,
+  };
+}
+
 async function evaluateContactPaywallWithClient(
   client: ContactPaywallClient,
   input: {
@@ -453,6 +484,50 @@ export async function consumeContactEntitlement(
     contactKind: ContactKind;
   }
 ): Promise<ContactConsumptionDecision> {
+  if (!features.contactPaywall || !features.contactPaywallEnforcement) {
+    const evaluation = await evaluateContactPaywallDirectWithClient(tx, input);
+    return {
+      ok: true,
+      ...evaluation,
+      source: "ENFORCEMENT_DISABLED",
+      consumptionId: null,
+    };
+  }
+
+  const preflight = await evaluateContactPaywallPreflightWithClient(tx, input);
+
+  if (!preflight.unitId || preflight.unitIdentityEpoch === null) {
+    recordPaywallBypassMissingUnitId({
+      userId: input.userId,
+      listingId: input.listingId,
+      reason: input.physicalUnitId
+        ? "missing_physical_unit_row"
+        : "missing_physical_unit_id",
+    });
+    return {
+      ok: true,
+      ...preflight,
+      source: "MIGRATION_BYPASS",
+      consumptionId: null,
+    };
+  }
+
+  if (features.emergencyOpenPaywall) {
+    await recordEmergencyOpenGrant(tx, {
+      userId: input.userId,
+      listingId: input.listingId,
+      unitId: preflight.unitId,
+      unitIdentityEpoch: preflight.unitIdentityEpoch,
+      contactKind: input.contactKind,
+    });
+    return {
+      ok: true,
+      ...preflight,
+      source: "EMERGENCY_OPEN",
+      consumptionId: null,
+    };
+  }
+
   const evaluation = await evaluateContactPaywallWithClient(tx, input);
 
   if (evaluation.unavailable) {
@@ -461,15 +536,6 @@ export async function consumeContactEntitlement(
       ...evaluation,
       code: "PAYWALL_UNAVAILABLE",
       message: "Contact is temporarily unavailable. Please try again shortly.",
-    };
-  }
-
-  if (!features.contactPaywall || !features.contactPaywallEnforcement) {
-    return {
-      ok: true,
-      ...evaluation,
-      source: "ENFORCEMENT_DISABLED",
-      consumptionId: null,
     };
   }
 
@@ -485,22 +551,6 @@ export async function consumeContactEntitlement(
       ok: true,
       ...evaluation,
       source: "MIGRATION_BYPASS",
-      consumptionId: null,
-    };
-  }
-
-  if (features.emergencyOpenPaywall) {
-    await recordEmergencyOpenGrant(tx, {
-      userId: input.userId,
-      listingId: input.listingId,
-      unitId: evaluation.unitId,
-      unitIdentityEpoch: evaluation.unitIdentityEpoch,
-      contactKind: input.contactKind,
-    });
-    return {
-      ok: true,
-      ...evaluation,
-      source: "EMERGENCY_OPEN",
       consumptionId: null,
     };
   }

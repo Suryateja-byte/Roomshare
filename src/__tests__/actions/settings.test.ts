@@ -82,6 +82,15 @@ jest.mock("@/lib/search/search-doc-dirty", () => ({
   markListingDirtyInTx: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock("@/lib/listings/canonical-lifecycle", () => ({
+  syncListingLifecycleProjectionInTx: jest.fn().mockResolvedValue({
+    action: "synced",
+  }),
+  tombstoneCanonicalInventoryInTx: jest.fn().mockResolvedValue({
+    action: "tombstoned",
+  }),
+}));
+
 import {
   getNotificationPreferences,
   updateNotificationPreferences,
@@ -95,6 +104,10 @@ import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 import { Prisma } from "@prisma/client";
+import {
+  syncListingLifecycleProjectionInTx,
+  tombstoneCanonicalInventoryInTx,
+} from "@/lib/listings/canonical-lifecycle";
 
 describe("settings actions", () => {
   const mockSession = {
@@ -512,9 +525,19 @@ describe("settings actions", () => {
         "reported-listing",
         "status_changed"
       );
+      expect(syncListingLifecycleProjectionInTx).toHaveBeenCalledWith(
+        prisma,
+        "reported-listing",
+        { role: "host", id: "user-123" }
+      );
       expect(prisma.listing.deleteMany).toHaveBeenCalledWith({
         where: { id: { in: ["clean-listing"] } },
       });
+      expect(tombstoneCanonicalInventoryInTx).toHaveBeenCalledWith(
+        prisma,
+        "clean-listing",
+        "TOMBSTONE"
+      );
     });
 
     it("hard-deletes unreported owner listings", async () => {
@@ -536,6 +559,16 @@ describe("settings actions", () => {
       expect(result).toEqual({ success: true });
       expect(prisma.listing.update).not.toHaveBeenCalled();
       expect(markListingDirtyInTx).not.toHaveBeenCalled();
+      expect(tombstoneCanonicalInventoryInTx).toHaveBeenCalledWith(
+        prisma,
+        "clean-listing-1",
+        "TOMBSTONE"
+      );
+      expect(tombstoneCanonicalInventoryInTx).toHaveBeenCalledWith(
+        prisma,
+        "clean-listing-2",
+        "TOMBSTONE"
+      );
       expect(prisma.listing.deleteMany).toHaveBeenCalledWith({
         where: { id: { in: ["clean-listing-1", "clean-listing-2"] } },
       });
