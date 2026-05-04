@@ -206,12 +206,16 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
         return;
       }
 
-      // Navigate to search page
-      await page.goto(SEARCH_URL, { timeout: 90_000 });
-      await page.waitForLoadState("domcontentloaded");
+      // Navigate to search page without waiting for every throttled asset.
+      await page.goto(SEARCH_URL, {
+        timeout: 90_000,
+        waitUntil: "domcontentloaded",
+      });
 
-      // Look for "Loading map..." placeholder before canvas appears
-      const loadingText = page.getByText("Loading map...");
+      // Look for stable loading UI before canvas appears.
+      const loadingText = page
+        .getByRole("status", { name: /loading map/i })
+        .or(page.getByText("Loading map..."));
       let loadingWasVisible = false;
 
       // Try to catch the loading state (timing-sensitive)

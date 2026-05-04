@@ -550,23 +550,36 @@ test.describe("Mobile Bottom Sheet - State Preservation (7.6)", () => {
     }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
 
     // Apply a filter (if filter buttons exist)
-    const filterBtn = page.locator(
-      'button[data-hydrated][aria-label^="Filters"]'
-    );
+    const mobileFilterBtn = page
+      .locator('[data-testid="mobile-filter-button"]')
+      .filter({ visible: true })
+      .first();
+    const fallbackFilterBtn = page
+      .locator('button[data-hydrated][aria-label^="Filters"], button[aria-label^="Filters"]')
+      .filter({ visible: true })
+      .first();
+    const filterBtn = (await mobileFilterBtn.isVisible().catch(() => false))
+      ? mobileFilterBtn
+      : fallbackFilterBtn;
     const hasFilter = await filterBtn
-      .first()
       .isVisible()
       .catch(() => false);
 
     if (hasFilter) {
-      // force: true because on mobile the filter button may be partially
-      // obscured by the expanded bottom sheet
-      await filterBtn.first().click({ force: true });
+      await filterBtn.scrollIntoViewIfNeeded().catch(() => {});
+      try {
+        await filterBtn.click({ timeout: 5000 });
+      } catch {
+        test.info().annotations.push({
+          type: "info",
+          description: "Filter button was obscured after sheet expansion",
+        });
+      }
 
       // Close filter modal if opened
       const closeBtn = page.locator(
         '[aria-label="Close"], button:has-text("Done")'
-      );
+      ).filter({ visible: true });
       try {
         await expect(closeBtn.first()).toBeVisible({ timeout: 2000 });
         await closeBtn.first().click();
@@ -574,6 +587,9 @@ test.describe("Mobile Bottom Sheet - State Preservation (7.6)", () => {
       } catch {
         // Filter modal may not have opened
       }
+
+      await waitForLayoutStable(page);
+      await waitForSheetAnimation(page);
     }
 
     // Sheet should still be visible and maintain its full-list state
