@@ -210,16 +210,15 @@ export async function expectNoUrlParam(
 
 /**
  * Navigate to the search page and wait for content to attach + hydrate.
- * Waits for domcontentloaded, element attachment, then domcontentloaded
- * to ensure React hydration completes before tests interact with buttons.
+ * Waits for DOM readiness, content attachment, and hydrated controls instead
+ * of full page load so slow images/third-party resources do not block tests.
  */
 export async function waitForSearchReady(
   page: Page,
   extraParams?: string
 ): Promise<void> {
   const url = extraParams ? `${SEARCH_URL}&${extraParams}` : SEARCH_URL;
-  await page.goto(url);
-  await page.waitForLoadState("load");
+  await page.goto(url, { waitUntil: "domcontentloaded" });
   await page
     .locator(`${selectors.listingCard}, ${selectors.emptyState}, h1, h2, h3`)
     .first()
@@ -232,15 +231,15 @@ export async function waitForSearchReady(
 
 /**
  * Navigate to a search URL with specific filter params and wait for readiness.
- * Waits for element attachment + domcontentloaded to ensure React hydration.
+ * Waits for DOM readiness, content attachment, and hydrated controls instead
+ * of full page load so slow images/third-party resources do not block tests.
  */
 export async function gotoSearchWithFilters(
   page: Page,
   params: Record<string, string>
 ): Promise<void> {
   const url = buildSearchUrl(params);
-  await page.goto(url);
-  await page.waitForLoadState("load");
+  await page.goto(url, { waitUntil: "domcontentloaded" });
   await page
     .locator(`${selectors.listingCard}, ${selectors.emptyState}, h1, h2, h3`)
     .first()
