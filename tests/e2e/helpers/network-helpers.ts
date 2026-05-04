@@ -42,6 +42,42 @@ export function networkHelpers(page: Page, context: BrowserContext) {
   let isOffline = false;
   let abortedRequests: string[] = [];
 
+  const dispatchNetworkEvent = async (eventName: "online" | "offline") => {
+    const targetPages = new Set<Page>([page, ...context.pages()]);
+
+    await Promise.all(
+      Array.from(targetPages).map(async (targetPage) => {
+        if (targetPage.isClosed()) return;
+
+        try {
+          await targetPage.evaluate(
+            ({ name, online }) => {
+              try {
+                Object.defineProperty(window.navigator, "onLine", {
+                  configurable: true,
+                  get: () => online,
+                });
+              } catch {
+                // Some browser engines may not allow overriding navigator.onLine.
+              }
+
+              window.dispatchEvent(new Event(name));
+            },
+            { name: eventName, online: eventName === "online" }
+          );
+        } catch {
+          // The page may close or navigate while network state is changing.
+        }
+      })
+    );
+  };
+
+  const applyOfflineState = async (offline: boolean) => {
+    await context.setOffline(offline);
+    isOffline = offline;
+    await dispatchNetworkEvent(offline ? "offline" : "online");
+  };
+
   return {
     /**
      * Set network condition preset
@@ -50,11 +86,9 @@ export function networkHelpers(page: Page, context: BrowserContext) {
       const config = networkConfigs[condition];
 
       if (config.offline) {
-        await context.setOffline(true);
-        isOffline = true;
+        await applyOfflineState(true);
       } else {
-        await context.setOffline(false);
-        isOffline = false;
+        await applyOfflineState(false);
 
         // CDP throttling only works in Chromium
         const cdp = await context.newCDPSession(page);
@@ -71,8 +105,7 @@ export function networkHelpers(page: Page, context: BrowserContext) {
      * Reset to normal network conditions
      */
     async reset() {
-      await context.setOffline(false);
-      isOffline = false;
+      await applyOfflineState(false);
 
       try {
         const cdp = await context.newCDPSession(page);
@@ -91,16 +124,14 @@ export function networkHelpers(page: Page, context: BrowserContext) {
      * Go offline
      */
     async goOffline() {
-      await context.setOffline(true);
-      isOffline = true;
+      await applyOfflineState(true);
     },
 
     /**
      * Go online
      */
     async goOnline() {
-      await context.setOffline(false);
-      isOffline = false;
+      await applyOfflineState(false);
     },
 
     /**

@@ -717,15 +717,6 @@ test.describe("Group 5: Network Resilience", () => {
 
     await network.goOffline();
     try {
-      // Try to trigger a new search (via URL change)
-      try {
-        await page.goto(`/search?sort=newest&${boundsQS}`, {
-          timeout: 30_000,
-        });
-      } catch {
-        // Navigation will likely fail when offline -- this is expected
-      }
-
       const globalOfflineBanner = page
         .locator('[role="alert"]')
         .filter({
