@@ -714,6 +714,10 @@ test.describe("Group 5: Network Resilience", () => {
     await expect(listings.first()).toBeAttached({
       timeout: timeouts.navigation,
     });
+    await page
+      .locator("button[data-hydrated]")
+      .first()
+      .waitFor({ state: "visible", timeout: timeouts.navigation });
 
     await network.goOffline();
     try {

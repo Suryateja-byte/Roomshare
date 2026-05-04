@@ -75,7 +75,12 @@ export function networkHelpers(page: Page, context: BrowserContext) {
   const applyOfflineState = async (offline: boolean) => {
     await context.setOffline(offline);
     isOffline = offline;
-    await dispatchNetworkEvent(offline ? "offline" : "online");
+    const eventName = offline ? "offline" : "online";
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await dispatchNetworkEvent(eventName);
+      await page.waitForTimeout(100).catch(() => {});
+    }
   };
 
   return {
