@@ -75,6 +75,15 @@ describe("Saved Search Actions", () => {
     roomType: "Private Room",
   };
 
+  const futureDateString = (daysFromNow: number) => {
+    const date = new Date();
+    date.setDate(date.getDate() + daysFromNow);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
     (auth as jest.Mock).mockResolvedValue(mockSession);
@@ -184,6 +193,8 @@ describe("Saved Search Actions", () => {
     });
 
     it("persists endDate in filters and canonical search spec", async () => {
+      const moveInDate = futureDateString(30);
+      const endDate = futureDateString(90);
       (prisma.savedSearch.count as jest.Mock).mockResolvedValue(0);
       (prisma.savedSearch.create as jest.Mock).mockResolvedValue({
         id: "search-123",
@@ -194,8 +205,8 @@ describe("Saved Search Actions", () => {
         name: "Date Range",
         filters: {
           query: "apartment",
-          moveInDate: "2026-05-01",
-          endDate: "2026-07-01",
+          moveInDate,
+          endDate,
         },
       });
 
@@ -203,18 +214,18 @@ describe("Saved Search Actions", () => {
         .calls[0][0];
       expect(createArgs.data.filters).toEqual(
         expect.objectContaining({
-          moveInDate: "2026-05-01",
-          endDate: "2026-07-01",
+          moveInDate,
+          endDate,
         })
       );
       expect(createArgs.data.searchSpecJson.filters).toEqual(
         expect.objectContaining({
-          moveInDate: "2026-05-01",
-          endDate: "2026-07-01",
+          moveInDate,
+          endDate,
         })
       );
       expect(buildSearchUrl(createArgs.data.filters)).toContain(
-        "endDate=2026-07-01"
+        `endDate=${endDate}`
       );
     });
 
