@@ -550,11 +550,11 @@ test.describe("Mobile Bottom Sheet - State Preservation (7.6)", () => {
     }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
 
     // Apply a filter (if filter buttons exist)
-    const mobileFilterBtn = page
+    const mobileFilterBtn = sheet
       .locator('[data-testid="mobile-filter-button"]')
       .filter({ visible: true })
       .first();
-    const fallbackFilterBtn = page
+    const fallbackFilterBtn = sheet
       .locator('button[data-hydrated][aria-label^="Filters"], button[aria-label^="Filters"]')
       .filter({ visible: true })
       .first();
