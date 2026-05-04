@@ -285,7 +285,6 @@ function ListingCardInner({
   queryHashPrefix8,
 }: ListingCardProps) {
   const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
-  const [isDragging, setIsDragging] = useState(false);
   const [isGroupDatesOpen, setIsGroupDatesOpen] = useState(false);
   const { setHovered, setActive, hasProvider, focusSourceRef } =
     useListingFocusActions();
@@ -346,6 +345,9 @@ function ListingCardInner({
   );
   const imageAlt = `${displayTitle} in ${formattedLocation}`;
   const listingHref = href ?? `/listings/${listing.id}`;
+  const handleCarouselStaticClick = useCallback(() => {
+    router.push(listingHref);
+  }, [listingHref, router]);
   const extraDateCount = Math.max((groupSummary?.members?.length ?? 0) - 1, 0);
   const isDesktopRow = desktopVariant === "row";
 
@@ -486,13 +488,11 @@ function ListingCardInner({
 
       <Link
         href={listingHref}
-        onClick={isDragging ? (e) => e.preventDefault() : undefined}
         data-testid="listing-card-link"
         className={cn(
           "block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 flex flex-1 flex-col",
           isDesktopRow &&
-            "md:grid md:grid-cols-[168px_minmax(0,1fr)] md:items-stretch md:gap-4",
-          isDragging && "pointer-events-none"
+            "md:grid md:grid-cols-[168px_minmax(0,1fr)] md:items-stretch md:gap-4"
         )}
       >
         <div
@@ -507,7 +507,7 @@ function ListingCardInner({
             priority={priority}
             className="w-full h-full object-cover transition-transform duration-1000 ease-out group-hover:scale-105"
             onImageError={handleImageError}
-            onDragStateChange={setIsDragging}
+            onStaticClick={handleCarouselStaticClick}
           />
 
           <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>

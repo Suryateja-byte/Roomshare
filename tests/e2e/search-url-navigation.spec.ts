@@ -275,7 +275,7 @@ test.describe("Search URL Browser Navigation (P1)", () => {
       return;
     }
 
-    // Click h3 title instead of <a> to avoid ImageCarousel's pointerDown setting isDragging=true
+    // Click the card title to exercise normal Link navigation from inside the card body.
     const firstCard = cards.first();
     const href = await firstCard
       .locator('a[href^="/listings/"]')

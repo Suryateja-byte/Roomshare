@@ -45,7 +45,7 @@ test.describe("Session Expiry: Form Submissions", () => {
       test.skip(true, "No listings found");
       return;
     }
-    // Click h3 title instead of <a> to avoid ImageCarousel's pointerDown setting isDragging=true
+    // Click the title to navigate through the card body link.
     await firstCard.locator("h3").first().click();
     await page.waitForURL(/\/listings\/.+/);
 

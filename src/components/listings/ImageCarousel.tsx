@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState, useCallback, useEffect } from "react";
+import { memo, useState, useCallback, useEffect, useRef } from "react";
 import Image from "next/image";
 import useEmblaCarousel from "embla-carousel-react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -11,8 +11,7 @@ interface ImageCarouselProps {
   priority?: boolean;
   className?: string;
   onImageError?: (index: number) => void;
-  /** Called when drag/swipe state changes — use to block parent click */
-  onDragStateChange?: (isDragging: boolean) => void;
+  onStaticClick?: () => void;
 }
 
 /**
@@ -38,9 +37,11 @@ function areCarouselPropsEqual(
     prev.priority === next.priority &&
     prev.className === next.className &&
     prev.onImageError === next.onImageError &&
-    prev.onDragStateChange === next.onDragStateChange
+    prev.onStaticClick === next.onStaticClick
   );
 }
+
+const CLICK_DRAG_THRESHOLD_PX = 8;
 
 function ImageCarouselInner({
   images,
@@ -48,11 +49,16 @@ function ImageCarouselInner({
   priority = false,
   className = "",
   onImageError,
-  onDragStateChange,
+  onStaticClick,
 }: ImageCarouselProps) {
-  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true });
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    loop: true,
+    dragThreshold: 10,
+  });
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [showControls, setShowControls] = useState(false);
+  const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
+  const suppressNextClickRef = useRef(false);
   const fallbackImage =
     "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80";
 
@@ -97,47 +103,6 @@ function ImageCarouselInner({
     };
   }, [emblaApi, onSelect]);
 
-  // Track drag state to prevent parent link click during swipe.
-  // Only block clicks when an actual pointer-initiated drag occurs — not on
-  // programmatic scrolls from button/dot navigation (which fire 'scroll' events
-  // but never fire 'pointerDown'/'pointerUp' on the Embla viewport).
-  useEffect(() => {
-    if (!emblaApi) return;
-    let hasDragged = false;
-    let isPointerDown = false;
-
-    const onPointerDown = () => {
-      hasDragged = false;
-      isPointerDown = true;
-    };
-
-    // Embla fires 'scroll' when the carousel position changes during a drag
-    const onScroll = () => {
-      if (isPointerDown && !hasDragged) {
-        hasDragged = true;
-        onDragStateChange?.(true);
-      }
-    };
-
-    const onPointerUp = () => {
-      isPointerDown = false;
-      if (hasDragged) {
-        // Small delay so the click event on the parent link is still blocked
-        setTimeout(() => onDragStateChange?.(false), 10);
-      }
-      hasDragged = false;
-    };
-
-    emblaApi.on("pointerDown", onPointerDown);
-    emblaApi.on("scroll", onScroll);
-    emblaApi.on("pointerUp", onPointerUp);
-    return () => {
-      emblaApi.off("pointerDown", onPointerDown);
-      emblaApi.off("scroll", onScroll);
-      emblaApi.off("pointerUp", onPointerUp);
-    };
-  }, [emblaApi, onDragStateChange]);
-
   // Handle keyboard navigation
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -150,6 +115,78 @@ function ImageCarouselInner({
       }
     },
     [emblaApi]
+  );
+
+  const handlePointerDown = useCallback((event: React.PointerEvent) => {
+    pointerStartRef.current = { x: event.clientX, y: event.clientY };
+    suppressNextClickRef.current = false;
+  }, []);
+
+  const handlePointerMove = useCallback((event: React.PointerEvent) => {
+    const start = pointerStartRef.current;
+    if (!start) return;
+
+    const deltaX = event.clientX - start.x;
+    const deltaY = event.clientY - start.y;
+    if (Math.hypot(deltaX, deltaY) > CLICK_DRAG_THRESHOLD_PX) {
+      suppressNextClickRef.current = true;
+    }
+  }, []);
+
+  const handlePointerEnd = useCallback(() => {
+    pointerStartRef.current = null;
+  }, []);
+
+  const handleClickCapture = useCallback(
+    (event: React.MouseEvent) => {
+      if (suppressNextClickRef.current) {
+        event.preventDefault();
+        event.stopPropagation();
+        suppressNextClickRef.current = false;
+        return;
+      }
+
+      const target = event.target;
+      const control =
+        target instanceof Element
+          ? target.closest("[data-carousel-action]")
+          : null;
+
+      if (control) {
+        const action = control.getAttribute("data-carousel-action");
+        if (action) {
+          event.preventDefault();
+          event.stopPropagation();
+
+          if (action === "previous") {
+            emblaApi?.scrollPrev();
+          } else if (action === "next") {
+            emblaApi?.scrollNext();
+          } else if (action === "dot") {
+            const index = Number(control.getAttribute("data-carousel-index"));
+            if (Number.isInteger(index)) {
+              emblaApi?.scrollTo(index);
+            }
+          }
+
+          return;
+        }
+      }
+
+      if (
+        onStaticClick &&
+        event.button === 0 &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.shiftKey &&
+        !event.altKey
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        onStaticClick();
+      }
+    },
+    [emblaApi, onStaticClick]
   );
 
   // Single image - no carousel needed
@@ -180,7 +217,13 @@ function ImageCarouselInner({
           setShowControls(false);
         }
       }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerEnd}
+      onPointerCancel={handlePointerEnd}
+      onClickCapture={handleClickCapture}
       onKeyDown={handleKeyDown}
+      data-carousel-ready={emblaApi ? "true" : "false"}
       tabIndex={0}
       role="region"
       aria-label={`Image carousel for ${alt}`}
@@ -219,6 +262,7 @@ function ImageCarouselInner({
 
       {/* Navigation Arrows - visible on hover */}
       <button
+        data-carousel-action="previous"
         onClick={scrollPrev}
         className={`
           absolute left-1 top-1/2 -translate-y-1/2 z-10
@@ -238,6 +282,7 @@ function ImageCarouselInner({
       </button>
 
       <button
+        data-carousel-action="next"
         onClick={scrollNext}
         className={`
           absolute right-1 top-1/2 -translate-y-1/2 z-10
@@ -300,6 +345,8 @@ function ImageCarouselInner({
           return visibleIndices.map((index) => (
             <button
               key={index}
+              data-carousel-action="dot"
+              data-carousel-index={index}
               onClick={(e) => scrollTo(e, index)}
               className="relative p-3 -m-2.5 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-1"
               role="tab"

@@ -124,6 +124,13 @@ describe("ListingCard", () => {
       expect(screen.getByText("Cozy Room in Downtown")).toBeInTheDocument();
     });
 
+    it("keeps the listing link clickable while the carousel handles its own drag suppression", () => {
+      render(<ListingCard listing={mockListing} />);
+      expect(screen.getByTestId("listing-card-link")).not.toHaveClass(
+        "pointer-events-none"
+      );
+    });
+
     it("renders formatted price", () => {
       render(<ListingCard listing={mockListing} />);
       expect(screen.getByText("$800")).toBeInTheDocument();

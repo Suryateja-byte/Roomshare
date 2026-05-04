@@ -47,7 +47,7 @@ test.describe("Session Expiry: Favorites", () => {
     }
 
     // Click into the first listing detail page
-    // Click h3 title instead of <a> to avoid ImageCarousel's pointerDown setting isDragging=true
+    // Click the title to navigate through the card body link.
     await firstCard.locator("h3").first().click();
     await page.waitForURL(/\/listings\/.+/);
 
@@ -89,7 +89,7 @@ test.describe("Session Expiry: Favorites", () => {
       return;
     }
 
-    // Click h3 title instead of <a> to avoid ImageCarousel's pointerDown setting isDragging=true
+    // Click the title to navigate through the card body link.
     await firstCard.locator("h3").first().click();
     await page.waitForURL(/\/listings\/.+/);
 

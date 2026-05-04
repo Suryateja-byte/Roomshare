@@ -3,6 +3,7 @@ import {
   expect,
   SF_BOUNDS,
   searchResultsContainer,
+  waitForHydration,
   waitForMapReady,
 } from "../helpers";
 
@@ -46,6 +47,7 @@ export const searchUrls = {
 } as const;
 
 export async function waitForVisibleCards(page: Page): Promise<Locator> {
+  await waitForHydration(page, { timeout: 30_000 });
   const cards = searchResultsContainer(page).locator('[data-testid="listing-card"]');
   await expect
     .poll(async () => cards.count(), {
@@ -53,6 +55,7 @@ export async function waitForVisibleCards(page: Page): Promise<Locator> {
       message: "Expected listing cards in the visible search results container",
     })
     .toBeGreaterThan(0);
+  await expect(cards.first()).toBeVisible({ timeout: 30_000 });
   return cards;
 }
 
