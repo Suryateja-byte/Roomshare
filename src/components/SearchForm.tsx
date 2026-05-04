@@ -173,7 +173,10 @@ export default function SearchForm({
   variant?: "default" | "compact" | "home";
 }) {
   const searchParams = useSearchParams();
+  const isCompact = variant === "compact";
+  const isHome = variant === "home";
   const formRef = useRef<HTMLFormElement | null>(null);
+  const locationInputRef = useRef<HTMLInputElement | null>(null);
   const initialIntentState = readSearchIntentState(
     new URLSearchParams(searchParams.toString())
   );
@@ -234,6 +237,9 @@ export default function SearchForm({
     useState<SearchLocationSelection | null>(
       initialIntentState.selectedLocation
     );
+  const [locationValidationAttempted, setLocationValidationAttempted] =
+    useState(false);
+  const [locationWarningPulse, setLocationWarningPulse] = useState(0);
   const [geoLoading, setGeoLoading] = useState(false);
 
   const [hasMounted, setHasMounted] = useState(false);
@@ -538,15 +544,11 @@ export default function SearchForm({
       // Prevent unbounded searches: if user typed location but didn't select from dropdown,
       // don't submit (this prevents full-table scans on the server)
       if (trimmedLocation.length > 2 && !selectedCoords) {
-        // User needs to select a location from dropdown
-        // Scroll the warning into view and briefly shake it for emphasis
-        const warningEl = document.getElementById("location-warning");
-        if (warningEl) {
-          warningEl.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
-          warningEl.classList.remove("animate-shake");
-          // Force reflow to restart animation
-          void warningEl.offsetWidth;
-          warningEl.classList.add("animate-shake");
+        setLocationValidationAttempted(true);
+        setLocationWarningPulse((count) => count + 1);
+        locationInputRef.current?.focus();
+        if (isCompact) {
+          toast.error("Select a location from the dropdown suggestions.");
         }
         return;
       }
@@ -656,6 +658,7 @@ export default function SearchForm({
       whatQuery,
       pending,
       selectedCoords,
+      isCompact,
       router,
       // H4 FIX: isSearching removed — read from isSearchingRef.current instead
       saveRecentSearch,
@@ -856,9 +859,33 @@ export default function SearchForm({
     [setPending]
   );
 
-  // Show warning when user has typed location but not selected from dropdown
-  const showLocationWarning = location.trim().length > 2 && !selectedCoords;
+  // Show warning when user has typed location but not selected from dropdown.
+  const hasUnselectedTypedLocation =
+    location.trim().length > 2 && !selectedCoords;
   const [locationInputFocused, setLocationInputFocused] = useState(false);
+  const showLocationWarning =
+    hasUnselectedTypedLocation &&
+    !isCompact &&
+    (!locationInputFocused || locationValidationAttempted);
+
+  useEffect(() => {
+    if (!hasUnselectedTypedLocation && locationValidationAttempted) {
+      setLocationValidationAttempted(false);
+    }
+  }, [hasUnselectedTypedLocation, locationValidationAttempted]);
+
+  useEffect(() => {
+    if (!showLocationWarning || locationWarningPulse === 0) return;
+
+    const warningEl = document.getElementById("location-warning");
+    if (!warningEl) return;
+
+    warningEl.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
+    warningEl.classList.remove("animate-shake");
+    // Force reflow to restart animation after repeated invalid submissions.
+    void warningEl.offsetWidth;
+    warningEl.classList.add("animate-shake");
+  }, [locationWarningPulse, showLocationWarning]);
 
   // Handle Escape key to close filter drawer (via shared hook for consistency)
   useKeyboardShortcuts([
@@ -873,8 +900,6 @@ export default function SearchForm({
   // Body scroll lock for filter drawer is handled by FilterModal's useBodyScrollLock(isOpen).
   // No duplicate lock needed here.
 
-  const isCompact = variant === "compact";
-  const isHome = variant === "home";
   // 'en-CA' locale returns YYYY-MM-DD format in local timezone, safe across DST transitions
   const minMoveInDate = new Date().toLocaleDateString("en-CA");
   const minEndDate = moveInDate || minMoveInDate;
@@ -1087,14 +1112,23 @@ export default function SearchForm({
                 isUserTypingLocationRef.current = true;
                 setLocation(value);
                 if (selectedCoords) setSelectedCoords(null);
+                if (value.trim().length <= 2) {
+                  setLocationValidationAttempted(false);
+                }
                 setShowRecentSearches(false);
               }}
               onLocationSelect={(data) => {
                 isUserTypingLocationRef.current = false;
+                setLocationValidationAttempted(false);
                 handleLocationSelect(data);
                 setShowRecentSearches(false);
               }}
+              inputRef={locationInputRef}
               fallbackItems={recentLocationFallbackItems}
+              ariaInvalid={showLocationWarning}
+              ariaErrorMessage={
+                showLocationWarning ? "location-warning" : undefined
+              }
               onFocus={() => {
                 setLocationInputFocused(true);
                 handleFieldFocus("where");
@@ -1420,9 +1454,11 @@ export default function SearchForm({
       {/* Location warning when user hasn't selected from dropdown.
                 Uses absolute positioning so it doesn't change the header height —
                 a height change triggers ResizeObserver → map moveEnd → search-as-move → URL update → clears input. */}
-      {showLocationWarning && !isCompact && !locationInputFocused && (
+      {showLocationWarning && (
         <div
           id="location-warning"
+          role="alert"
+          aria-live="polite"
           className={cn(
             "border border-outline-variant/20 bg-amber-50 text-sm text-amber-800 flex gap-2",
             isHome

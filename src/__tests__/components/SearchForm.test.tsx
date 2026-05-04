@@ -21,11 +21,19 @@ jest.mock("next/navigation", () => ({
 // Mock LocationSearchInput
 jest.mock("@/components/LocationSearchInput", () => {
   return function MockLocationSearchInput({
+    id,
     value,
     onChange,
     onLocationSelect,
+    onFocus,
+    onBlur,
     placeholder,
+    inputRef,
+    ariaInvalid,
+    ariaErrorMessage,
+    ariaDescribedBy,
   }: {
+    id?: string;
     value: string;
     onChange: (value: string) => void;
     onLocationSelect?: (location: {
@@ -34,15 +42,32 @@ jest.mock("@/components/LocationSearchInput", () => {
       lng: number;
       bbox?: [number, number, number, number];
     }) => void;
+    onFocus?: () => void;
+    onBlur?: () => void;
     placeholder?: string;
+    inputRef?: { current: HTMLInputElement | null };
+    ariaInvalid?: boolean;
+    ariaErrorMessage?: string;
+    ariaDescribedBy?: string;
   }) {
     return (
       <div>
         <input
+          id={id}
           data-testid="location-input"
+          ref={(node) => {
+            if (inputRef) {
+              inputRef.current = node;
+            }
+          }}
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onFocus={onFocus}
+          onBlur={onBlur}
           placeholder={placeholder}
+          aria-invalid={ariaInvalid || undefined}
+          aria-errormessage={ariaErrorMessage}
+          aria-describedby={ariaDescribedBy}
         />
         <button
           data-testid="select-location"
@@ -740,15 +765,66 @@ describe("SearchForm", () => {
       window.removeEventListener(MAP_FLY_TO_EVENT, eventListener);
     });
 
-    it("shows warning when location typed but not selected", async () => {
+    it("shows warning when location typed but not selected after blur", async () => {
+      render(<SearchForm />);
+
+      const locationInput = screen.getByTestId("location-input");
+      await user.type(locationInput, "San Francisco");
+      fireEvent.blur(locationInput);
+
+      expect(
+        screen.getByText(/select a location from the dropdown/i)
+      ).toBeInTheDocument();
+    });
+
+    it("shows warning after submit while typed location input remains focused", async () => {
       render(<SearchForm />);
 
       const locationInput = screen.getByTestId("location-input");
       await user.type(locationInput, "San Francisco");
 
+      expect(locationInput).toHaveFocus();
+      fireEvent.submit(screen.getByRole("search"));
+
       expect(
         screen.getByText(/select a location from the dropdown/i)
       ).toBeInTheDocument();
+      expect(mockPush).not.toHaveBeenCalled();
+      expect(locationInput).toHaveAttribute("aria-invalid", "true");
+      expect(locationInput).toHaveAttribute(
+        "aria-errormessage",
+        "location-warning"
+      );
+    });
+
+    it("clears location validation state when selected or shortened below threshold", async () => {
+      render(<SearchForm />);
+
+      const locationInput = screen.getByTestId("location-input");
+      await user.type(locationInput, "San Francisco");
+      fireEvent.submit(screen.getByRole("search"));
+
+      expect(
+        screen.getByText(/select a location from the dropdown/i)
+      ).toBeInTheDocument();
+
+      fireEvent.change(locationInput, { target: { value: "SF" } });
+      expect(
+        screen.queryByText(/select a location from the dropdown/i)
+      ).not.toBeInTheDocument();
+      expect(locationInput).not.toHaveAttribute("aria-invalid", "true");
+      expect(locationInput).not.toHaveAttribute("aria-errormessage");
+
+      await user.clear(locationInput);
+      await user.type(locationInput, "San Francisco");
+      fireEvent.submit(screen.getByRole("search"));
+      await user.click(screen.getByTestId("select-location"));
+
+      expect(
+        screen.queryByText(/select a location from the dropdown/i)
+      ).not.toBeInTheDocument();
+      expect(locationInput).not.toHaveAttribute("aria-invalid", "true");
+      expect(locationInput).not.toHaveAttribute("aria-errormessage");
     });
 
     it("hides warning in compact mode", async () => {
@@ -760,6 +836,22 @@ describe("SearchForm", () => {
       expect(
         screen.queryByText(/select a location from the dropdown/i)
       ).not.toBeInTheDocument();
+    });
+
+    it("uses toast fallback for invalid compact submit", async () => {
+      render(<SearchForm variant="compact" />);
+
+      const locationInput = screen.getByTestId("location-input");
+      await user.type(locationInput, "San Francisco");
+      fireEvent.submit(screen.getByRole("search"));
+
+      expect(
+        screen.queryByText(/select a location from the dropdown/i)
+      ).not.toBeInTheDocument();
+      expect(mockToastError).toHaveBeenCalledWith(
+        "Select a location from the dropdown suggestions."
+      );
+      expect(mockPush).not.toHaveBeenCalled();
     });
   });
 

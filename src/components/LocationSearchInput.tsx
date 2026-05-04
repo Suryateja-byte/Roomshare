@@ -67,6 +67,9 @@ interface LocationSearchInputProps {
   inputRef?: MutableRefObject<HTMLInputElement | null>;
   fallbackItems?: LocationSearchFallbackItem[];
   fallbackTitle?: string;
+  ariaInvalid?: boolean;
+  ariaErrorMessage?: string;
+  ariaDescribedBy?: string;
 }
 
 class AutocompleteUnavailableError extends Error {
@@ -227,6 +230,9 @@ export default function LocationSearchInput({
   inputRef: forwardedInputRef,
   fallbackItems = [],
   fallbackTitle = "Recent locations",
+  ariaInvalid,
+  ariaErrorMessage,
+  ariaDescribedBy,
 }: LocationSearchInputProps) {
   const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -690,6 +696,9 @@ export default function LocationSearchInput({
           aria-autocomplete="list"
           aria-haspopup="listbox"
           aria-busy={isLoading}
+          aria-invalid={ariaInvalid || undefined}
+          aria-errormessage={ariaErrorMessage}
+          aria-describedby={ariaDescribedBy}
         />
 
         <div className="absolute inset-y-0 right-0 flex items-center">
