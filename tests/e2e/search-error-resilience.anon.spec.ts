@@ -24,6 +24,10 @@ import {
   tags,
   searchResultsContainer,
 } from "./helpers/test-utils";
+import {
+  gotoSearchPage,
+  isSearchReleaseGateEnabled,
+} from "./helpers/search-release-gate-helpers";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 const SEARCH_URL = `/search?${boundsQS}`;
@@ -480,116 +484,45 @@ test.describe("Group 2: Client-Side Error Recovery", () => {
 // Group 3: Rate Limit UI
 // ---------------------------------------------------------------------------
 test.describe("Group 3: Rate Limit UI", () => {
+  test.beforeEach(() => {
+    test.skip(
+      !isSearchReleaseGateEnabled(),
+      "Enable deterministic search scenarios with ENABLE_SEARCH_TEST_SCENARIOS=true"
+    );
+  });
+
   test(`${tags.anon} 3.1 - Rate limit page renders correct heading`, async ({
     page,
   }) => {
-    // We cannot reliably trigger SSR rate limiting from E2E because it requires
-    // hitting the actual Upstash Redis rate limiter. Instead, we verify the
-    // rate limit UI structure by checking the API endpoint behavior.
-    const url = `/api/search/v2?${boundsQS}`;
-    const BURST_COUNT = 80;
+    await gotoSearchPage(page, "rate-limited");
 
-    // Fire burst requests to try to trigger rate limiting on the API
-    const responses = await Promise.all(
-      Array.from({ length: BURST_COUNT }, () => page.request.get(url))
-    );
-
-    const statuses = responses.map((r) => r.status());
-    const got429 = statuses.some((s) => s === 429);
-    const all404 = statuses.every((s) => s === 404);
-
-    if (all404) {
-      test.skip(true, "Search V2 not enabled");
-      return;
-    }
-
-    // No 500s should occur regardless of rate limiting
-    const got500 = statuses.some((s) => s === 500);
-    expect(got500).toBe(false);
-
-    if (got429) {
-      // If rate limiting triggered, the 429 response should have proper structure
-      const rateLimitedResponse = responses.find((r) => r.status() === 429);
-      expect(rateLimitedResponse).toBeDefined();
-    } else {
-      // Rate limiter may not be configured in dev -- soft pass
-      console.warn(
-        "Rate limiter did not trigger after burst requests. " +
-          "Verify UPSTASH_REDIS_REST_URL is set."
-      );
-    }
+    await expect(
+      page.getByRole("heading", { name: /too many requests/i, level: 1 })
+    ).toBeVisible({ timeout: 15_000 });
   });
 
   test(`${tags.anon} 3.2 - Rate limit page shows retry guidance`, async ({
     page,
   }) => {
-    // Test the SSR rate limit page structure by navigating after triggering limits.
-    // Fire many rapid page navigations to try to trigger SSR rate limiting.
-    const navigations: Promise<unknown>[] = [];
-    for (let i = 0; i < 50; i++) {
-      navigations.push(
-        page.request.get(`/search?${boundsQS}&_=${i}`).catch(() => null)
-      );
-    }
-    await Promise.all(navigations);
+    await gotoSearchPage(page, "rate-limited");
 
-    // Now navigate to the search page -- may or may not be rate limited
-    await page.goto(SEARCH_URL);
-    await page.waitForLoadState("domcontentloaded");
-
-    const rateLimitHeading = page.locator('h1:has-text("Too Many Requests")');
-    const isRateLimited = await rateLimitHeading
-      .isVisible({ timeout: 5_000 })
-      .catch(() => false);
-
-    if (isRateLimited) {
-      // Verify retry guidance is shown
-      const retryText = page.getByText(
-        /try again in|wait.*moment|please wait/i
-      );
-      await expect(retryText).toBeVisible();
-    } else {
-      // Rate limiter not configured (no Redis) -- skip this test
-      test.skip(
-        true,
-        "Rate limiter not configured (no Redis) — rate limit page did not appear"
-      );
-      return;
-    }
+    await expect(
+      page.getByText(/please wait a moment before searching again/i)
+    ).toBeVisible({ timeout: 15_000 });
   });
 
   test(`${tags.anon} ${tags.a11y} 3.3 - Rate limit page is accessible`, async ({
     page,
   }) => {
-    // Navigate to search -- check both normal and rate-limited states for a11y
-    await page.goto(SEARCH_URL);
-    await page.waitForLoadState("domcontentloaded");
+    await gotoSearchPage(page, "rate-limited");
 
-    const rateLimitHeading = page.locator('h1:has-text("Too Many Requests")');
-    const isRateLimited = await rateLimitHeading
-      .isVisible({ timeout: 5_000 })
-      .catch(() => false);
+    await expect(page.locator("h1")).toHaveText(/too many requests/i);
+    await expect(
+      page.getByText(/please wait a moment before searching again/i)
+    ).toBeVisible();
 
-    if (isRateLimited) {
-      // Rate limit page should have proper heading hierarchy
-      const h1 = page.locator("h1");
-      await expect(h1).toBeVisible();
-
-      // Should have descriptive text
-      const description = page.getByText(/searching too quickly|wait/i);
-      await expect(description).toBeVisible();
-
-      // The page should have a logical structure (not just empty)
-      const bodyText = await page.locator("body").textContent();
-      expect(bodyText!.length).toBeGreaterThan(20);
-    } else {
-      // Rate limiter not configured (no Redis) -- skip this test
-      test.skip(
-        true,
-        "Rate limiter not configured (no Redis) — rate limit page did not appear"
-      );
-      return;
-    }
+    const bodyText = await page.locator("body").textContent();
+    expect(bodyText!.length).toBeGreaterThan(20);
   });
 });
 

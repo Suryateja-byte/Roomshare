@@ -14,6 +14,11 @@ import {
   selectors,
   searchResultsContainer,
 } from "./helpers/test-utils";
+import {
+  SEARCH_SCENARIO_HEADER,
+  isSearchReleaseGateEnabled,
+  scenarioHeaders,
+} from "./helpers/search-release-gate-helpers";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 
@@ -252,45 +257,31 @@ test.describe("REG-005: Invalid cursor fallback", () => {
 });
 
 // ---------------------------------------------------------------------------
-// REG-006: Rate limiting — 50 requests in 10s
+// REG-006: Rate limiting — deterministic scenario
 // Implements TC-SEARCH risk #6
-// Expected: >=1 request returns HTTP 429
+// Expected: scenario seam returns a typed rate-limited state without live bursts
 // ---------------------------------------------------------------------------
 test.describe("REG-006: Rate limiting enforcement", () => {
-  test("returns 429 under burst traffic", async ({ request }) => {
-    const url = `/api/search/v2?${boundsQS}`;
-    // Use higher burst count to reliably trigger rate limiting
-    // (Upstash ratelimit windows may be generous in dev)
-    const BURST_COUNT = 100;
-
-    // Fire requests in rapid batches
-    const responses = await Promise.all(
-      Array.from({ length: BURST_COUNT }, () => request.get(url))
+  test("returns typed rate-limited state through scenario headers", async ({
+    request,
+  }) => {
+    test.skip(
+      !isSearchReleaseGateEnabled(),
+      "Enable deterministic search scenarios with ENABLE_SEARCH_TEST_SCENARIOS=true"
     );
 
-    const statuses = responses.map((r) => r.status());
-    const got429 = statuses.some((s) => s === 429);
-    const got500 = statuses.some((s) => s === 500);
+    const headers = scenarioHeaders("rate-limited");
+    expect(headers[SEARCH_SCENARIO_HEADER]).toBe("rate-limited");
 
-    // No 500s regardless
-    expect(got500).toBe(false);
+    const resp = await request.get(`/api/search/listings?${boundsQS}`, {
+      headers,
+    });
 
-    // If V2 is disabled (all 404), skip rate limit assertion
-    const all404 = statuses.every((s) => s === 404);
-    if (all404) {
-      test.skip(true, "Search V2 not enabled");
-      return;
-    }
-
-    // Rate limiter should trigger — if not, it may be disabled in dev.
-    // Log rather than hard-fail so the suite doesn't block on local dev config.
-    if (!got429) {
-      console.warn(
-        "WARN: Rate limiter did not trigger after 100 concurrent requests. " +
-          "Verify UPSTASH_REDIS_REST_URL is set and rate limiting is active."
-      );
-    }
-    // Soft assertion: at minimum, no 500s occurred
+    expect(resp.status()).toBe(200);
+    const body = await resp.json();
+    expect(body.kind).toBe("rate-limited");
+    expect(body.retryAfter).toBe(30);
+    expect(body.meta).toBeTruthy();
   });
 });
 
@@ -334,12 +325,8 @@ test.describe("REG-008: V2 API response contract", () => {
       return;
     }
 
-    // Rate limit window is 60s — if REG-006 burst test ran first, skip gracefully
     if (resp.status() === 429) {
-      test.skip(
-        true,
-        "Rate limited from REG-006 burst test — shape validated in isolation"
-      );
+      test.skip(true, "Search V2 API was rate-limited by the environment");
       return;
     }
 
