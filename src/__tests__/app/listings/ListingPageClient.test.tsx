@@ -1,4 +1,5 @@
 import React from "react";
+import { renderToString } from "react-dom/server";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import ListingPageClient from "@/app/listings/[id]/ListingPageClient";
 
@@ -244,6 +245,14 @@ describe("ListingPageClient", () => {
     jest.clearAllTimers();
     jest.useRealTimers();
     delete process.env.NEXT_PUBLIC_NEARBY_ENABLED;
+  });
+
+  it("renders public description and amenity labels in server markup", () => {
+    const html = renderToString(<ListingPageClient {...makeProps()} />);
+
+    expect(html).toContain("Shared room near Japan Center.");
+    expect(html).toContain("Wifi");
+    expect(html).toContain("Kitchen");
   });
 
   it("renders a mobile-safe header structure for long visitor titles", async () => {

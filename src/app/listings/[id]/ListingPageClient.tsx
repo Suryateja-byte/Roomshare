@@ -618,7 +618,6 @@ export default function ListingPageClient({
   const contactCheckoutParam = searchParams.get("contactCheckout");
   const phoneRevealCheckoutParam = searchParams.get("phoneRevealCheckout");
   const checkoutSessionIdParam = searchParams.get("session_id");
-  const [hasHydrated, setHasHydrated] = useState(false);
   const [privateFeedbackOpen, setPrivateFeedbackOpen] = useState(false);
   const [checkoutNotice, setCheckoutNotice] =
     useState<CheckoutReturnNotice | null>(null);
@@ -684,10 +683,6 @@ export default function ListingPageClient({
         return gender;
     }
   };
-
-  useEffect(() => {
-    setHasHydrated(true);
-  }, []);
 
   useEffect(() => {
     if (
@@ -1205,7 +1200,7 @@ export default function ListingPageClient({
                   About this place
                 </h2>
                 <p className="text-on-surface-variant leading-relaxed text-lg font-light whitespace-pre-line">
-                  {hasHydrated ? listing.description : null}
+                  {listing.description}
                 </p>
               </div>
 
@@ -1234,7 +1229,7 @@ export default function ListingPageClient({
                             )}
                           </div>
                           <span className="text-on-surface-variant font-medium">
-                            {hasHydrated ? amenity : null}
+                            {amenity}
                           </span>
                         </div>
                       );
