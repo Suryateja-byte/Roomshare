@@ -51,4 +51,70 @@ describe("searchV2MapToListings", () => {
     expect(listings[0].groupContext?.contextKey).toBe("pg1_public-key");
     expect(listings[0].location).toEqual({ lat: 30.27, lng: -97.74 });
   });
+
+  it("handles partial map features without exposing raw metadata", () => {
+    const listings = searchV2MapToListings({
+      geojson: {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            geometry: {
+              type: "Point",
+              coordinates: [-97.7431, 30.2672],
+            },
+            properties: {
+              id: "partial-listing",
+              title: "Partial listing",
+              price: null,
+              availableSlots: "bad-value",
+              image: "cover.jpg",
+              groupContext: {
+                siblingCount: 1,
+                dateCount: 1,
+                completeness: "complete",
+                contextKey: "raw-unit-key:1",
+              },
+            },
+          },
+          {
+            type: "Feature",
+            geometry: {
+              type: "Point",
+              coordinates: [0, 0],
+            },
+            properties: {
+              id: "invalid-listing",
+              title: "Invalid listing",
+              price: 1500,
+              availableSlots: 1,
+              image: "bad.jpg",
+            },
+          },
+        ],
+      },
+      pins: [{ id: "partial-listing", tier: "primary" }],
+    } as any);
+
+    expect(listings).toHaveLength(1);
+    expect(listings[0]).toMatchObject({
+      id: "partial-listing",
+      title: "Partial listing",
+      price: 0,
+      availableSlots: 0,
+      totalSlots: 0,
+      images: ["cover.jpg"],
+      location: { lat: 30.27, lng: -97.74 },
+      groupKey: null,
+      groupSummary: null,
+      groupContext: null,
+      tier: "primary",
+      publicAvailability: {
+        availabilitySource: "HOST_MANAGED",
+        openSlots: 0,
+        totalSlots: 0,
+      },
+    });
+    expect(JSON.stringify(listings[0])).not.toContain("raw-unit-key");
+  });
 });
