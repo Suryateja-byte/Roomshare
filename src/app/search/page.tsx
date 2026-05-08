@@ -53,6 +53,7 @@ import {
 } from "@/lib/search/search-telemetry";
 import { V2MapDataSetter } from "@/components/search/V2MapDataSetter";
 import type { SearchV2Response } from "@/lib/search/types";
+import { toPublicSearchListings } from "@/lib/search/public-listing-payload";
 
 type SearchPageSearchParams = {
   q?: string;
@@ -305,7 +306,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     });
 
     if (scenarioState.kind === "location-required") {
-      return renderLocationRequiredState(locationLabel || q || what || "your search");
+      return renderLocationRequiredState(
+        locationLabel || q || what || "your search"
+      );
     }
 
     if (scenarioState.kind === "rate-limited") {
@@ -518,6 +521,10 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   }
 
   const { items: listings, total: rawTotal } = paginatedResult;
+  const publicListings =
+    usedV2 && v2Response?.list.fullItems
+      ? v2Response.list.fullItems
+      : toPublicSearchListings(listings);
   // IMPORTANT: Keep null distinct from 0 - null means "unknown count (>100 results)"
   // whereas 0 means "confirmed zero results"
   const total = rawTotal;
@@ -530,7 +537,8 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
   // Only show zero-results UI when we have confirmed zero results (total === 0)
   // Not when total is null (unknown count, >100 results)
-  const hasConfirmedZeroResults = total !== null && total === 0;
+  const hasConfirmedZeroResults =
+    total !== null && total === 0 && listings.length === 0;
 
   // Build search params string for client-side "Load more" fetches
   // Include all filter/sort params but NOT cursor/page (those are managed client-side)
@@ -587,7 +595,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         <InlineFilterStrip
           desktopSummary={{
             total,
-            visibleCount: listings.length,
+            visibleCount: publicListings.length,
             locationLabel: displayLocation,
             browseMode,
           }}
@@ -619,7 +627,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             ) : null}
             <SearchResultsClient
               key={normalizedKeyString}
-              initialListings={listings}
+              initialListings={publicListings}
               initialNextCursor={initialNextCursor}
               initialTotal={total}
               savedListingIds={[]}

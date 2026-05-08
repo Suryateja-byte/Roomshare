@@ -158,11 +158,38 @@ import { parseSearchParams } from "@/lib/search-params";
 import { checkSuspension, checkEmailVerified } from "@/app/actions/suspension";
 import { upsertSearchDocSync } from "@/lib/search/search-doc-sync";
 import { triggerInstantAlerts } from "@/lib/search-alerts";
+import { buildPublicAvailability } from "@/lib/search/public-availability";
+import type { ListingData } from "@/lib/search-types";
 
 describe("Listings API", () => {
   const mockSession = {
     user: { id: "user-123", name: "Test User", email: "test@example.com" },
   };
+  const makeListing = (overrides: Partial<ListingData> = {}): ListingData => ({
+    id: "listing-1",
+    title: "Cozy Room",
+    description: "Private source description",
+    price: 1200,
+    images: ["listing.jpg"],
+    availableSlots: 1,
+    totalSlots: 2,
+    amenities: [],
+    houseRules: [],
+    householdLanguages: [],
+    location: {
+      address: "123 Private St",
+      city: "Portland",
+      state: "OR",
+      zip: "97201",
+      lat: 45.51234,
+      lng: -122.61234,
+    },
+    publicAvailability: buildPublicAvailability({
+      availableSlots: 1,
+      totalSlots: 2,
+    }),
+    ...overrides,
+  });
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -177,8 +204,8 @@ describe("Listings API", () => {
     it("returns paginated listings successfully", async () => {
       const mockResult = {
         items: [
-          { id: "listing-1", title: "Cozy Room" },
-          { id: "listing-2", title: "Sunny Apartment" },
+          makeListing(),
+          makeListing({ id: "listing-2", title: "Sunny Apartment" }),
         ],
         total: 2,
         page: 1,
@@ -192,7 +219,10 @@ describe("Listings API", () => {
 
       expect(response.status).toBe(200);
       const data = await response.json();
-      expect(data.items).toEqual(mockResult.items);
+      expect(data.items.map((item: { id: string }) => item.id)).toEqual([
+        "listing-1",
+        "listing-2",
+      ]);
       expect(data.total).toBe(2);
       expect(data.page).toBe(1);
       // Security: prevent CDN caching of user-generated listing data
@@ -202,11 +232,10 @@ describe("Listings API", () => {
     it("does not leak address or zip in listing location", async () => {
       const mockResult = {
         items: [
-          {
+          makeListing({
             id: "listing-1",
             title: "Cozy Room",
-            location: { city: "Portland", state: "OR", lat: 45.5, lng: -122.6 },
-          },
+          }),
         ],
         total: 1,
         page: 1,

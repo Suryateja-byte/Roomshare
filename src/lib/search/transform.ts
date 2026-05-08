@@ -28,6 +28,7 @@ import {
   type PublicAvailability,
 } from "./public-availability";
 import { toPublicCoordinates } from "./public-coordinates";
+import { toPublicGroupMetadata } from "./public-listing-payload";
 
 type AvailabilityLike = Pick<
   ListingData | MapListingData,
@@ -100,6 +101,7 @@ export function transformToListItem(listing: ListingData): SearchV2ListItem {
   const badges: string[] = [];
   const publicAvailability = getNormalizedPublicAvailability(listing);
   const publicCoordinates = toPublicCoordinates(listing.location);
+  const publicGroupMetadata = toPublicGroupMetadata(listing);
 
   // Add near-match badge if applicable
   if (listing.isNearMatch) {
@@ -122,8 +124,8 @@ export function transformToListItem(listing: ListingData): SearchV2ListItem {
     availableSlots: publicAvailability.openSlots,
     totalSlots: publicAvailability.totalSlots,
     publicAvailability,
-    groupSummary: listing.groupSummary ?? null,
-    groupContext: listing.groupContext ?? null,
+    groupSummary: publicGroupMetadata.groupSummary,
+    groupContext: publicGroupMetadata.groupContext,
     // scoreHint is reserved for future relevance scoring
   };
 }
@@ -157,6 +159,7 @@ export function transformToGeoJSON(
   const features = listings.map((listing) => {
     const publicAvailability = getNormalizedPublicAvailability(listing);
     const publicCoordinates = toPublicCoordinates(listing.location);
+    const publicGroupMetadata = toPublicGroupMetadata(listing);
 
     return {
       type: "Feature" as const,
@@ -174,7 +177,7 @@ export function transformToGeoJSON(
         image: listing.images[0] ?? null,
         availableSlots: publicAvailability.openSlots,
         publicAvailability,
-        groupContext: listing.groupContext ?? null,
+        groupContext: publicGroupMetadata.groupContext,
       } satisfies SearchV2FeatureProperties,
     };
   });
@@ -248,7 +251,9 @@ export function transformToPins(
   return tieredGroups.map((group) => {
     // Explicitly pick best listing by lowest rank (highest score), not just [0]
     const bestListing = getBestListingInGroup(group.listings, rankMap);
-    const sourceListing = listings.find((listing) => listing.id === bestListing.id);
+    const sourceListing = listings.find(
+      (listing) => listing.id === bestListing.id
+    );
     const publicAvailability = sourceListing
       ? getNormalizedPublicAvailability(sourceListing)
       : buildPublicAvailability({
