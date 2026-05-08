@@ -63,6 +63,10 @@ import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
 import { buildSearchUrl } from "@/lib/search-utils";
 
+const SAVED_SEARCH_TEST_NOW = new Date("2026-04-01T12:00:00.000Z");
+const SAVED_SEARCH_MOVE_IN_DATE = "2026-05-01";
+const SAVED_SEARCH_END_DATE = "2026-07-01";
+
 describe("Saved Search Actions", () => {
   const mockSession = {
     user: { id: "user-123", name: "Test User", email: "test@example.com" },
@@ -86,6 +90,10 @@ describe("Saved Search Actions", () => {
       offers: [],
     });
     mockCheckSuspension.mockResolvedValue({ suspended: false });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   describe("saveSearch", () => {
@@ -184,6 +192,8 @@ describe("Saved Search Actions", () => {
     });
 
     it("persists endDate in filters and canonical search spec", async () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(SAVED_SEARCH_TEST_NOW);
       (prisma.savedSearch.count as jest.Mock).mockResolvedValue(0);
       (prisma.savedSearch.create as jest.Mock).mockResolvedValue({
         id: "search-123",
@@ -194,8 +204,8 @@ describe("Saved Search Actions", () => {
         name: "Date Range",
         filters: {
           query: "apartment",
-          moveInDate: "2026-05-01",
-          endDate: "2026-07-01",
+          moveInDate: SAVED_SEARCH_MOVE_IN_DATE,
+          endDate: SAVED_SEARCH_END_DATE,
         },
       });
 
@@ -203,18 +213,18 @@ describe("Saved Search Actions", () => {
         .calls[0][0];
       expect(createArgs.data.filters).toEqual(
         expect.objectContaining({
-          moveInDate: "2026-05-01",
-          endDate: "2026-07-01",
+          moveInDate: SAVED_SEARCH_MOVE_IN_DATE,
+          endDate: SAVED_SEARCH_END_DATE,
         })
       );
       expect(createArgs.data.searchSpecJson.filters).toEqual(
         expect.objectContaining({
-          moveInDate: "2026-05-01",
-          endDate: "2026-07-01",
+          moveInDate: SAVED_SEARCH_MOVE_IN_DATE,
+          endDate: SAVED_SEARCH_END_DATE,
         })
       );
       expect(buildSearchUrl(createArgs.data.filters)).toContain(
-        "endDate=2026-07-01"
+        `endDate=${SAVED_SEARCH_END_DATE}`
       );
     });
 
