@@ -22,7 +22,7 @@ test.beforeEach(async () => {
 
 // ─── J31: Edit Listing and Verify ─────────────────────────────────────────────
 test.describe("J31: Edit Listing and Verify", () => {
-  test("navigate to own listing → edit → change title + price → save → verify", async ({
+  test("navigate to own listing → edit availability → save → verify", async ({
     page,
     nav,
   }) => {
@@ -66,90 +66,100 @@ test.describe("J31: Edit Listing and Verify", () => {
     await editBtn.first().click();
     await page.waitForLoadState("domcontentloaded");
 
-    // Step 4: Edit title
-    const titleField = page
-      .getByLabel(/title/i)
-      .or(page.locator('input[name="title"]'));
-    if (
-      await titleField
-        .first()
-        .isVisible()
-        .catch(() => false)
-    ) {
-      await titleField.first().clear();
-      await titleField.first().fill("Sunny Mission Room Updated");
-    }
+    // Step 4: Edit the current host-managed availability form
+    const openSlotsField = page
+      .getByLabel(/open slots/i)
+      .or(page.locator("#openSlots"));
+    const totalSlotsField = page
+      .getByLabel(/total slots/i)
+      .or(page.locator("#totalSlots"));
 
-    // Step 5: Save
+    await expect(openSlotsField.first()).toBeVisible({ timeout: 10000 });
+    await expect(totalSlotsField.first()).toBeVisible({ timeout: 10000 });
+
+    const parseSlotValue = async (
+      locator: typeof openSlotsField,
+      fallback: number
+    ) => {
+      const raw = await locator.first().inputValue();
+      const parsed = Number.parseInt(raw, 10);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    };
+
+    const originalOpenSlots = await parseSlotValue(openSlotsField, 1);
+    const originalTotalSlots = await parseSlotValue(totalSlotsField, 2);
+    const editableTotalSlots = Math.max(originalTotalSlots, 2);
+    const updatedOpenSlots =
+      originalOpenSlots >= editableTotalSlots
+        ? Math.max(1, editableTotalSlots - 1)
+        : Math.min(editableTotalSlots, originalOpenSlots + 1);
+    const listingPath = new URL(cardHref, page.url()).pathname;
+
+    if (editableTotalSlots !== originalTotalSlots) {
+      await totalSlotsField.first().clear();
+      await totalSlotsField.first().fill(String(editableTotalSlots));
+    }
+    await openSlotsField.first().clear();
+    await openSlotsField.first().fill(String(updatedOpenSlots));
+
+    // Step 5: Save and verify the versioned availability PATCH succeeds
     const saveBtn = page
       .getByRole("button", { name: /save|update|submit/i })
       .or(page.locator('button[type="submit"]'));
-    if (
-      await saveBtn
-        .first()
-        .isVisible()
-        .catch(() => false)
-    ) {
-      await saveBtn.first().click();
-      await page.waitForLoadState("domcontentloaded");
-    }
+    await expect(saveBtn.first()).toBeVisible({ timeout: 10000 });
 
-    // Step 6: Verify changes
-    const updatedTitle = page.getByText(/Sunny Mission Room Updated/i);
+    const updateResponse = page.waitForResponse(
+      (response) =>
+        response
+          .url()
+          .includes(`/api/listings/${listingPath.split("/").pop()}`) &&
+        response.request().method() === "PATCH"
+    );
+
+    await saveBtn.first().click();
+    const response = await updateResponse;
+    expect(response.ok()).toBeTruthy();
+    const updatedListing = await response.json();
+    expect(updatedListing.openSlots).toBe(updatedOpenSlots);
+
     await expect
       .poll(
-        async () => {
-          const hasToast = await page
-            .locator(selectors.toast)
-            .isVisible()
-            .catch(() => false);
-          const hasUpdated = await updatedTitle.isVisible().catch(() => false);
-          return hasToast || hasUpdated;
-        },
-        { timeout: 15000 }
+        () => page.url().includes(listingPath) && !page.url().includes("/edit"),
+        { timeout: 20000 }
       )
       .toBe(true);
 
-    // Restore original title for future test runs
-    const hasUpdated = await updatedTitle.isVisible().catch(() => false);
-    if (hasUpdated) {
-      const editAgain = page
-        .getByRole("link", { name: /edit|manage/i })
-        .or(page.locator('a[href*="/edit"]'));
-      if (
-        await editAgain
-          .first()
-          .isVisible()
-          .catch(() => false)
-      ) {
-        await editAgain.first().click();
-        await page.waitForLoadState("domcontentloaded");
-        const tf = page
-          .getByLabel(/title/i)
-          .or(page.locator('input[name="title"]'));
-        if (
-          await tf
-            .first()
-            .isVisible()
-            .catch(() => false)
-        ) {
-          await tf.first().clear();
-          await tf.first().fill("Sunny Mission Room");
-          const sb = page
-            .getByRole("button", { name: /save|update|submit/i })
-            .or(page.locator('button[type="submit"]'));
-          if (
-            await sb
-              .first()
-              .isVisible()
-              .catch(() => false)
-          ) {
-            await sb.first().click();
-            await page.waitForLoadState("domcontentloaded");
-          }
-        }
-      }
-    }
+    await expect(
+      page.locator('[data-testid="listing-detail-header"]')
+    ).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Restore original availability for future test runs.
+    await page.goto(`${listingPath}/edit`);
+    await page.waitForLoadState("domcontentloaded");
+    await expect(openSlotsField.first()).toBeVisible({ timeout: 10000 });
+    await expect(totalSlotsField.first()).toBeVisible({ timeout: 10000 });
+    await totalSlotsField.first().clear();
+    await totalSlotsField.first().fill(String(originalTotalSlots));
+    await openSlotsField.first().clear();
+    await openSlotsField.first().fill(String(originalOpenSlots));
+
+    const restoreResponse = page.waitForResponse(
+      (response) =>
+        response
+          .url()
+          .includes(`/api/listings/${listingPath.split("/").pop()}`) &&
+        response.request().method() === "PATCH"
+    );
+    await saveBtn.first().click();
+    expect((await restoreResponse).ok()).toBeTruthy();
+    await expect
+      .poll(
+        () => page.url().includes(listingPath) && !page.url().includes("/edit"),
+        { timeout: 20000 }
+      )
+      .toBe(true);
   });
 });
 

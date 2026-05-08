@@ -50,6 +50,17 @@ const createMockSearchParams = (
   return urlSearchParams;
 };
 
+function futureDateInput(daysFromNow: number): string {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() + daysFromNow);
+  return date.toISOString().slice(0, 10);
+}
+
+const VALID_MOVE_IN_DATE = futureDateInput(30);
+const VALID_END_DATE = futureDateInput(60);
+const LATER_MOVE_IN_DATE = futureDateInput(90);
+
 // --- Unit tests for readFiltersFromURL (pure function, no hooks needed) ---
 
 describe("readFiltersFromURL", () => {
@@ -692,29 +703,29 @@ describe("useBatchedFilters hook", () => {
       act(() => {
         result.current.commit({
           roomType: "Private Room",
-          moveInDate: "2026-05-01",
-          endDate: "2026-06-01",
+          moveInDate: VALID_MOVE_IN_DATE,
+          endDate: VALID_END_DATE,
         });
       });
 
       expect(result.current.pending.roomType).toBe("Private Room");
-      expect(result.current.pending.moveInDate).toBe("2026-05-01");
-      expect(result.current.pending.endDate).toBe("2026-06-01");
+      expect(result.current.pending.moveInDate).toBe(VALID_MOVE_IN_DATE);
+      expect(result.current.pending.endDate).toBe(VALID_END_DATE);
 
       const calledUrl = mockRouter.push.mock.calls[0][0] as string;
       const searchUrl = new URL(calledUrl, "http://localhost");
 
       expect(searchUrl.searchParams.get("sort")).toBeNull();
       expect(searchUrl.searchParams.get("roomType")).toBe("Private Room");
-      expect(searchUrl.searchParams.get("moveInDate")).toBe("2026-05-01");
-      expect(searchUrl.searchParams.get("endDate")).toBe("2026-06-01");
+      expect(searchUrl.searchParams.get("moveInDate")).toBe(VALID_MOVE_IN_DATE);
+      expect(searchUrl.searchParams.get("endDate")).toBe(VALID_END_DATE);
     });
 
     it("drops endDate when commit overrides produce an invalid range", () => {
       (useSearchParams as jest.Mock).mockReturnValue(
         createMockSearchParams({
-          moveInDate: "2026-05-01",
-          endDate: "2026-06-01",
+          moveInDate: VALID_MOVE_IN_DATE,
+          endDate: VALID_END_DATE,
         })
       );
 
@@ -722,17 +733,19 @@ describe("useBatchedFilters hook", () => {
 
       act(() => {
         result.current.commit({
-          moveInDate: "2026-07-01",
+          moveInDate: LATER_MOVE_IN_DATE,
         });
       });
 
-      expect(result.current.pending.moveInDate).toBe("2026-07-01");
+      expect(result.current.pending.moveInDate).toBe(LATER_MOVE_IN_DATE);
       expect(result.current.pending.endDate).toBe("");
 
       const calledUrl = mockRouter.push.mock.calls[0][0] as string;
       const searchUrl = new URL(calledUrl, "http://localhost");
 
-      expect(searchUrl.searchParams.get("moveInDate")).toBe("2026-07-01");
+      expect(searchUrl.searchParams.get("moveInDate")).toBe(
+        LATER_MOVE_IN_DATE
+      );
       expect(searchUrl.searchParams.get("endDate")).toBeNull();
     });
   });

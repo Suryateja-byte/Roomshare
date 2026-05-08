@@ -6,6 +6,7 @@ import type {
 import { buildPublicAvailability } from "@/lib/search/public-availability";
 import type { PublicAvailabilitySource } from "@/lib/search/public-availability";
 import { toPublicCoordinates } from "@/lib/search/public-coordinates";
+import { toPublicGroupMetadata } from "@/lib/search/public-listing-payload";
 
 type MapListingInput = {
   id: string;
@@ -114,6 +115,11 @@ export function sanitizeMapListing(
           : Math.max(1, toSafeSlotCount(listing.minStayMonths, 1)),
       lastConfirmedAt: toSafeDate(listing.lastConfirmedAt),
     });
+  const publicGroupMetadata = toPublicGroupMetadata({
+    groupKey: toOptionalTrimmedString(listing.groupKey) ?? null,
+    groupSummary: listing.groupSummary ?? null,
+    groupContext: listing.groupContext ?? null,
+  });
 
   return {
     id: listing.id,
@@ -131,13 +137,16 @@ export function sanitizeMapListing(
     availabilitySource: publicAvailability.availabilitySource,
     openSlots: toSafeSlotCount(publicAvailability.openSlots),
     availableUntil: toSafeDate(publicAvailability.availableUntil),
-    minStayMonths: Math.max(1, toSafeSlotCount(publicAvailability.minStayMonths, 1)),
+    minStayMonths: Math.max(
+      1,
+      toSafeSlotCount(publicAvailability.minStayMonths, 1)
+    ),
     lastConfirmedAt: toSafeDate(publicAvailability.lastConfirmedAt),
     status: toOptionalTrimmedString(listing.status),
-    statusReason: toOptionalTrimmedString(listing.statusReason) ?? null,
-    groupKey: toOptionalTrimmedString(listing.groupKey) ?? null,
-    groupSummary: listing.groupSummary ?? null,
-    groupContext: listing.groupContext ?? null,
+    statusReason: null,
+    groupKey: publicGroupMetadata.groupKey,
+    groupSummary: publicGroupMetadata.groupSummary,
+    groupContext: publicGroupMetadata.groupContext,
     location: {
       city: toOptionalTrimmedString(listing.location?.city),
       state: toOptionalTrimmedString(listing.location?.state),

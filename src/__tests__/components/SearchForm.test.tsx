@@ -139,6 +139,18 @@ jest.mock("sonner", () => ({
 import SearchForm from "@/components/SearchForm";
 import { MAP_FLY_TO_EVENT } from "@/components/SearchForm";
 
+function futureDateInput(daysFromNow: number): string {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() + daysFromNow);
+  return date.toISOString().slice(0, 10);
+}
+
+const VALID_MOVE_IN_DATE = futureDateInput(30);
+const VALID_END_DATE = futureDateInput(60);
+const LATER_MOVE_IN_DATE = futureDateInput(60);
+const EARLIER_END_DATE = futureDateInput(30);
+
 // Polyfill requestSubmit for JSDOM
 beforeAll(() => {
   if (!HTMLFormElement.prototype.requestSubmit) {
@@ -362,13 +374,13 @@ describe("SearchForm", () => {
 
       await user.click(screen.getByRole("button", { name: /filters/i }));
       fireEvent.change(screen.getByPlaceholderText("Select move-in date"), {
-        target: { value: "2026-06-01" },
+        target: { value: VALID_MOVE_IN_DATE },
       });
       await user.click(screen.getByRole("button", { name: "Wifi" }));
       fireEvent.click(screen.getByTestId("filter-modal-apply"));
 
       const pushCall = mockPush.mock.calls[0]?.[0] ?? "";
-      expect(pushCall).toContain("moveInDate=2026-06-01");
+      expect(pushCall).toContain(`moveInDate=${VALID_MOVE_IN_DATE}`);
       expect(pushCall).toContain("amenities=Wifi");
     });
 
@@ -820,8 +832,8 @@ describe("SearchForm", () => {
     });
 
     it("preserves a valid moveInDate/endDate range on search submit", async () => {
-      mockSearchParams.set("moveInDate", "2026-05-01");
-      mockSearchParams.set("endDate", "2026-06-01");
+      mockSearchParams.set("moveInDate", VALID_MOVE_IN_DATE);
+      mockSearchParams.set("endDate", VALID_END_DATE);
       mockSearchParams.set("lat", "37.7749");
       mockSearchParams.set("lng", "-122.4194");
 
@@ -831,8 +843,8 @@ describe("SearchForm", () => {
       jest.advanceTimersByTime(500);
 
       const pushCall = mockPush.mock.calls[0]?.[0] ?? "";
-      expect(pushCall).toContain("moveInDate=2026-05-01");
-      expect(pushCall).toContain("endDate=2026-06-01");
+      expect(pushCall).toContain(`moveInDate=${VALID_MOVE_IN_DATE}`);
+      expect(pushCall).toContain(`endDate=${VALID_END_DATE}`);
     });
 
     it("lets the filters drawer create a valid search range", async () => {
@@ -840,16 +852,16 @@ describe("SearchForm", () => {
 
       await user.click(screen.getByRole("button", { name: /filters/i }));
       fireEvent.change(screen.getByPlaceholderText("Select move-in date"), {
-        target: { value: "2026-05-01" },
+        target: { value: VALID_MOVE_IN_DATE },
       });
       fireEvent.change(screen.getByPlaceholderText("Select end date"), {
-        target: { value: "2026-06-01" },
+        target: { value: VALID_END_DATE },
       });
       fireEvent.click(screen.getByTestId("filter-modal-apply"));
 
       const pushCall = mockPush.mock.calls[0]?.[0] ?? "";
-      expect(pushCall).toContain("moveInDate=2026-05-01");
-      expect(pushCall).toContain("endDate=2026-06-01");
+      expect(pushCall).toContain(`moveInDate=${VALID_MOVE_IN_DATE}`);
+      expect(pushCall).toContain(`endDate=${VALID_END_DATE}`);
     });
 
     it("drops invalid endDate values from the applied search range", async () => {
@@ -857,15 +869,15 @@ describe("SearchForm", () => {
 
       await user.click(screen.getByRole("button", { name: /filters/i }));
       fireEvent.change(screen.getByPlaceholderText("Select move-in date"), {
-        target: { value: "2026-06-01" },
+        target: { value: LATER_MOVE_IN_DATE },
       });
       fireEvent.change(screen.getByPlaceholderText("Select end date"), {
-        target: { value: "2026-05-01" },
+        target: { value: EARLIER_END_DATE },
       });
       fireEvent.click(screen.getByTestId("filter-modal-apply"));
 
       const pushCall = mockPush.mock.calls[0]?.[0] ?? "";
-      expect(pushCall).toContain("moveInDate=2026-06-01");
+      expect(pushCall).toContain(`moveInDate=${LATER_MOVE_IN_DATE}`);
       expect(pushCall).not.toContain("endDate=");
     });
 

@@ -29,6 +29,7 @@ import {
 import { features } from "@/lib/env";
 import { syncListingEmbedding } from "@/lib/embeddings/sync";
 import { normalizeAddress } from "@/lib/search/normalize-address";
+import { toPublicSearchListings } from "@/lib/search/public-listing-payload";
 import {
   checkCollisionRateLimit,
   findCollisions,
@@ -104,13 +105,16 @@ export async function GET(request: Request) {
     });
 
     // Private, no-store: prevent caching of user-generated listing data
-    return NextResponse.json(result, {
-      headers: {
-        "Cache-Control": "private, no-store",
-        "x-request-id": requestId,
-        Vary: "Accept-Encoding",
-      },
-    });
+    return NextResponse.json(
+      { ...result, items: toPublicSearchListings(result.items) },
+      {
+        headers: {
+          "Cache-Control": "private, no-store",
+          "x-request-id": requestId,
+          Vary: "Accept-Encoding",
+        },
+      }
+    );
   } catch (error) {
     // Detect user-facing validation errors (return 400 instead of 500).
     // getListingsPaginated wraps errors via wrapDatabaseError; original message is in error.cause.message.

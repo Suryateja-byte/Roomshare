@@ -53,6 +53,7 @@ import {
   recordSearchZeroResults,
 } from "@/lib/search/search-telemetry";
 import { buildPublicCacheHeadersForListings } from "@/lib/public-cache/headers";
+import { toPublicSearchListings } from "@/lib/search/public-listing-payload";
 
 export const runtime = "nodejs";
 
@@ -76,7 +77,9 @@ export async function GET(request: NextRequest) {
       const searchParams = request.nextUrl.searchParams;
       const rawParams = buildRawParamsFromSearchParams(searchParams);
       const parsed = parseSearchParams(rawParams);
-      const normalizedQuery = normalizeSearchQuery(rawParams as RawSearchParams);
+      const normalizedQuery = normalizeSearchQuery(
+        rawParams as RawSearchParams
+      );
       const testScenario = resolveSearchScenario({
         headerValue: request.headers.get(SEARCH_SCENARIO_HEADER),
       });
@@ -148,9 +151,7 @@ export async function GET(request: NextRequest) {
             );
             if (result.unboundedSearch) return result;
             if (!result.response || result.error) {
-              throw new Error(
-                result.error || "V2 search returned no response"
-              );
+              throw new Error(result.error || "V2 search returned no response");
             }
             return result;
           });
@@ -228,10 +229,13 @@ export async function GET(request: NextRequest) {
 
       // V2 success path
       if (v2Result?.response && v2Result.paginatedResult) {
-        const { items: listings, total: rawTotal } = v2Result.paginatedResult;
+        const { items: rawListings, total: rawTotal } =
+          v2Result.paginatedResult;
+        const listings =
+          v2Result.response.list.fullItems ??
+          toPublicSearchListings(rawListings);
         const total = rawTotal;
-        const nextCursor =
-          v2Result.response.list.nextCursor ?? null;
+        const nextCursor = v2Result.response.list.nextCursor ?? null;
         const nearMatchExpansion =
           "nearMatchExpansion" in v2Result.paginatedResult
             ? v2Result.paginatedResult.nearMatchExpansion
@@ -292,22 +296,19 @@ export async function GET(request: NextRequest) {
           resultCount: total,
         });
 
-        return NextResponse.json(
-          state,
-          {
-            headers: {
-              "Cache-Control":
-                "public, s-maxage=60, max-age=30, stale-while-revalidate=120",
-              ...buildPublicCacheHeadersForListings({
-                listings,
-                projectionEpoch: v2Result.response.meta.projectionEpoch,
-                embeddingVersion: v2Result.response.meta.embeddingVersion,
-              }),
-              "x-request-id": requestId,
-              Vary: "Accept-Encoding",
-            },
-          }
-        );
+        return NextResponse.json(state, {
+          headers: {
+            "Cache-Control":
+              "public, s-maxage=60, max-age=30, stale-while-revalidate=120",
+            ...buildPublicCacheHeadersForListings({
+              listings: rawListings,
+              projectionEpoch: v2Result.response.meta.projectionEpoch,
+              embeddingVersion: v2Result.response.meta.embeddingVersion,
+            }),
+            "x-request-id": requestId,
+            Vary: "Accept-Encoding",
+          },
+        });
       }
 
       // V1 fallback path
@@ -336,7 +337,7 @@ export async function GET(request: NextRequest) {
                 kind: "degraded",
                 source: "v1-fallback",
                 data: {
-                  items: paginatedResult.items,
+                  items: toPublicSearchListings(paginatedResult.items),
                   nextCursor: null,
                   total: paginatedResult.total,
                 },
@@ -345,7 +346,7 @@ export async function GET(request: NextRequest) {
             : ({
                 kind: "ok",
                 data: {
-                  items: paginatedResult.items,
+                  items: toPublicSearchListings(paginatedResult.items),
                   nextCursor: null,
                   total: paginatedResult.total,
                 },
@@ -371,25 +372,19 @@ export async function GET(request: NextRequest) {
             : 0,
       });
 
-      return NextResponse.json(
-        state,
-        {
-          headers: {
-            "Cache-Control":
-              "public, s-maxage=60, max-age=30, stale-while-revalidate=120",
-            ...buildPublicCacheHeadersForListings({
-              listings:
-                state.kind === "ok" || state.kind === "degraded"
-                  ? state.data.items
-                  : [],
-              projectionEpoch: state.meta.projectionEpoch,
-              embeddingVersion: state.meta.embeddingVersion,
-            }),
-            "x-request-id": requestId,
-            Vary: "Accept-Encoding",
-          },
-        }
-      );
+      return NextResponse.json(state, {
+        headers: {
+          "Cache-Control":
+            "public, s-maxage=60, max-age=30, stale-while-revalidate=120",
+          ...buildPublicCacheHeadersForListings({
+            listings: paginatedResult.items,
+            projectionEpoch: state.meta.projectionEpoch,
+            embeddingVersion: state.meta.embeddingVersion,
+          }),
+          "x-request-id": requestId,
+          Vary: "Accept-Encoding",
+        },
+      });
     } catch (error) {
       logger.sync.error("Search listings API error", {
         error: sanitizeErrorMessage(error),

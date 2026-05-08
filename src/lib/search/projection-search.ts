@@ -41,6 +41,7 @@ import {
   transformToListItems,
   transformToMapResponse,
 } from "./transform";
+import { toPublicSearchListings } from "./public-listing-payload";
 import {
   buildPublicAvailability,
   type PublicAvailability,
@@ -723,7 +724,7 @@ function buildResult(input: {
     meta,
     list: {
       items: transformToListItems(items),
-      fullItems: items,
+      fullItems: toPublicSearchListings(items),
       nextCursor: input.nextCursor,
       total: input.total,
     },

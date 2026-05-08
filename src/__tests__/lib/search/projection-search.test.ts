@@ -196,7 +196,10 @@ describe("Phase 04 projection search", () => {
     });
 
     expect(result.response?.list.fullItems).toHaveLength(1);
-    expect(result.response?.list.fullItems?.[0]?.groupKey).toBe("unit-a:1");
+    expect(result.response?.list.fullItems?.[0]?.groupKey).toEqual(
+      expect.stringMatching(/^pg1_/)
+    );
+    expect(result.response?.list.fullItems?.[0]?.groupKey).not.toBe("unit-a:1");
     expect(
       result.response?.list.fullItems?.[0]?.groupSummary?.members
     ).toHaveLength(2);

@@ -28,8 +28,8 @@ import { getFilterSuggestions } from "@/app/actions/filter-suggestions";
 import { useMobileSearch } from "@/contexts/MobileSearchContext";
 import { useSearchMapUI } from "@/contexts/SearchMapUIContext";
 import { useSearchTestScenario } from "@/contexts/SearchTestScenarioContext";
-import type { ListingData, FilterSuggestion } from "@/lib/data";
-import type { FilterParams } from "@/lib/search-types";
+import type { FilterSuggestion } from "@/lib/data";
+import type { FilterParams, PublicSearchListing } from "@/lib/search-types";
 import {
   getSearchQueryHash,
   SEARCH_RESPONSE_VERSION,
@@ -59,7 +59,7 @@ import { cn } from "@/lib/utils";
  */
 const MAX_ACCUMULATED = 60;
 
-function getSeenGroupKeys(listings: ListingData[]): Set<string> {
+function getSeenGroupKeys(listings: PublicSearchListing[]): Set<string> {
   return new Set(
     listings
       .map((listing) => listing.groupKey)
@@ -67,7 +67,9 @@ function getSeenGroupKeys(listings: ListingData[]): Set<string> {
   );
 }
 
-function dedupeListingsForDisplay(listings: ListingData[]): ListingData[] {
+function dedupeListingsForDisplay(
+  listings: PublicSearchListing[]
+): PublicSearchListing[] {
   const seenIds = new Set<string>();
   const seenGroupKeys = new Set<string>();
 
@@ -98,7 +100,7 @@ function formatMobileResultsLabel(
 }
 
 interface SearchResultsClientProps {
-  initialListings: ListingData[];
+  initialListings: PublicSearchListing[];
   initialNextCursor: string | null;
   initialTotal: number | null;
   savedListingIds: string[];
@@ -161,7 +163,7 @@ export function SearchResultsClient({
   const { shouldShowMap } = useSearchMapUI();
   const testScenario = useSearchTestScenario();
   const [isHydrated, setIsHydrated] = useState(false);
-  const [extraListings, setExtraListings] = useState<ListingData[]>([]);
+  const [extraListings, setExtraListings] = useState<PublicSearchListing[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(
     initialNextCursor
   );
@@ -212,7 +214,7 @@ export function SearchResultsClient({
 
   // --- Client-side search fetch (when feature flag enabled) ---
   const [clientFetchedListings, setClientFetchedListings] = useState<
-    ListingData[] | null
+    PublicSearchListing[] | null
   >(null);
   const [clientFetchedTotal, setClientFetchedTotal] = useState<number | null>(
     null

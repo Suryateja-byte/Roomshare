@@ -2,6 +2,7 @@ import {
   sanitizeMapListing,
   sanitizeMapListings,
 } from "@/lib/maps/sanitize-map-listings";
+import { PUBLIC_GROUP_KEY_PREFIX } from "@/lib/search/public-listing-payload";
 
 describe("sanitize-map-listings", () => {
   it("filters out invalid coordinates including 0,0 and non-finite values", () => {
@@ -60,5 +61,38 @@ describe("sanitize-map-listings", () => {
         groupSummary: null,
       })
     );
+  });
+
+  it("replaces raw group identifiers and drops private status reasons", () => {
+    const listing = sanitizeMapListing({
+      id: "listing-private-map",
+      price: 1200,
+      availableSlots: 1,
+      location: { lat: 30.2672, lng: -97.7431 },
+      groupKey: "private-unit-key:12",
+      groupSummary: {
+        groupKey: "private-unit-key:12",
+        siblingIds: ["sibling-1"],
+        availableFromDates: ["2026-06-01"],
+        combinedOpenSlots: 1,
+        combinedTotalSlots: 2,
+        groupOverflow: false,
+      },
+      groupContext: {
+        siblingCount: 1,
+        dateCount: 1,
+        completeness: "complete",
+        contextKey: "private-unit-key:12",
+      },
+      statusReason: "PRIVATE_REASON",
+    });
+
+    expect(listing?.groupKey).toMatch(
+      new RegExp(`^${PUBLIC_GROUP_KEY_PREFIX}`)
+    );
+    expect(listing?.groupSummary?.groupKey).toBe(listing?.groupKey);
+    expect(listing?.groupContext?.contextKey).toBe(listing?.groupKey);
+    expect(JSON.stringify(listing)).not.toContain("private-unit-key");
+    expect(listing?.statusReason).toBeNull();
   });
 });
