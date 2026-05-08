@@ -175,10 +175,7 @@ jest.mock("@/lib/timeout-wrapper", () => ({
 // ============================================================================
 
 import { executeSearchV2 } from "@/lib/search/search-v2-service";
-import {
-  getListingsPaginated,
-  getMapListingsResult,
-} from "@/lib/data";
+import { getListingsPaginated, getMapListingsResult } from "@/lib/data";
 import {
   isSearchDocEnabled,
   getSearchDocListingsByIds,
@@ -316,9 +313,8 @@ const mockClampBoundsToMaxSpan = clampBoundsToMaxSpan as jest.MockedFunction<
   typeof clampBoundsToMaxSpan
 >;
 const mockWithTimeout = withTimeout as jest.MockedFunction<typeof withTimeout>;
-const mockPrismaListingFindMany = prisma.listing.findMany as jest.MockedFunction<
-  typeof prisma.listing.findMany
->;
+const mockPrismaListingFindMany = prisma.listing
+  .findMany as jest.MockedFunction<typeof prisma.listing.findMany>;
 const mockGetAvailabilityForListings =
   getAvailabilityForListings as jest.MockedFunction<
     typeof getAvailabilityForListings
@@ -344,7 +340,9 @@ const mockIsPhase04ForceClustersOnlyActive =
     typeof isPhase04ForceClustersOnlyActive
   >;
 const mockExecuteProjectionSearchV2 =
-  executeProjectionSearchV2 as jest.MockedFunction<typeof executeProjectionSearchV2>;
+  executeProjectionSearchV2 as jest.MockedFunction<
+    typeof executeProjectionSearchV2
+  >;
 
 // ============================================================================
 // Shared test fixtures
@@ -588,7 +586,9 @@ describe("search-v2-service", () => {
             nextCursor: null,
             total: 0,
           },
-          map: { geojson: { type: "FeatureCollection" as const, features: [] } },
+          map: {
+            geojson: { type: "FeatureCollection" as const, features: [] },
+          },
         },
         paginatedResult: {
           items: [],
@@ -699,9 +699,7 @@ describe("search-v2-service", () => {
     });
 
     it("strips fallback pins while preserving map metadata when cluster-only kill switch is active", async () => {
-      const mapListings = [
-        makeMapListingData({ id: "map-cluster-only" }),
-      ];
+      const mapListings = [makeMapListingData({ id: "map-cluster-only" })];
       setupDefaultMocks({
         listItems: [makeListingData({ id: "listing-cluster-only" })],
         mapListings,
@@ -954,6 +952,66 @@ describe("search-v2-service", () => {
       );
     });
 
+    it("returns public card payloads in fullItems without exact location or private fields", async () => {
+      const rawListing = makeListingData({
+        id: "private-listing-1",
+        ownerId: "owner-secret-1",
+        description: "Call 555-123-4567 for the apartment number.",
+        location: {
+          address: "123 Private St Apt 4",
+          city: "Austin",
+          state: "TX",
+          zip: "78701",
+          lat: 30.26721,
+          lng: -97.74312,
+        },
+        groupKey: "private-unit-key:12",
+        groupSummary: {
+          groupKey: "private-unit-key:12",
+          siblingIds: ["sibling-1"],
+          availableFromDates: ["2026-06-01"],
+          combinedOpenSlots: 1,
+          combinedTotalSlots: 2,
+          groupOverflow: false,
+        },
+        groupContext: {
+          siblingCount: 1,
+          dateCount: 1,
+          completeness: "complete",
+          contextKey: "private-unit-key:12",
+        },
+        statusReason: "PRIVATE_REASON",
+      });
+      setupDefaultMocks({ listItems: [rawListing] });
+
+      const result = await executeSearchV2({
+        rawParams: {
+          minLat: "37.7",
+          maxLat: "37.85",
+          minLng: "-122.52",
+          maxLng: "-122.35",
+        },
+      });
+
+      const fullItem = result.response!.list.fullItems?.[0];
+      const serialized = JSON.stringify(fullItem);
+
+      expect(fullItem).toBeDefined();
+      expect(fullItem?.description).toBe("");
+      expect(fullItem?.location).toEqual({
+        city: "Austin",
+        state: "TX",
+        lat: 30.27,
+        lng: -97.74,
+      });
+      expect(serialized).not.toContain("owner-secret-1");
+      expect(serialized).not.toContain("123 Private St");
+      expect(serialized).not.toContain("78701");
+      expect(serialized).not.toContain("private-unit-key");
+      expect(serialized).not.toContain("PRIVATE_REASON");
+      expect(result.paginatedResult!.items[0].ownerId).toBe("owner-secret-1");
+    });
+
     it("preserves host-managed publicAvailability across list and map response surfaces", async () => {
       const hostManagedAvailability = buildPublicAvailability({
         availabilitySource: "HOST_MANAGED",
@@ -1184,13 +1242,16 @@ describe("search-v2-service", () => {
         })
       );
       const semanticListing = makeListingData({ id: "semantic-1" });
-      mockSemanticSearchQuery.mockResolvedValue([{ id: "semantic-row-1" }] as never);
+      mockSemanticSearchQuery.mockResolvedValue([
+        { id: "semantic-row-1" },
+      ] as never);
       mockMapSemanticRowsToListingData.mockReturnValue([semanticListing]);
 
       const result = await executeSearchV2({
         rawParams: {
           q: "Irving",
           what: "quiet roommates",
+          vibeQuery: "quiet roommates",
           minLat: "32.8",
           maxLat: "32.9",
           minLng: "-96.99",
@@ -1231,20 +1292,37 @@ describe("search-v2-service", () => {
 
       const now = new Date();
       const moveInDate = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
-      const availableUntil = new Date(now.getTime() + 120 * 24 * 60 * 60 * 1000);
+      const availableUntil = new Date(
+        now.getTime() + 120 * 24 * 60 * 60 * 1000
+      );
       const staleConfirmedAt = new Date(
         now.getTime() - 22 * 24 * 60 * 60 * 1000
       );
       const semanticItems = [
-        makeListingData({ id: "eligible-host", availableSlots: 4, totalSlots: 4 }),
-        makeListingData({ id: "invalid-host", availableSlots: 4, totalSlots: 4 }),
+        makeListingData({
+          id: "eligible-host",
+          availableSlots: 4,
+          totalSlots: 4,
+        }),
+        makeListingData({
+          id: "invalid-host",
+          availableSlots: 4,
+          totalSlots: 4,
+        }),
         makeListingData({ id: "stale-host", availableSlots: 4, totalSlots: 4 }),
-        makeListingData({ id: "legacy-review", availableSlots: 2, totalSlots: 2 }),
+        makeListingData({
+          id: "legacy-review",
+          availableSlots: 2,
+          totalSlots: 2,
+        }),
       ];
 
-      mockSemanticSearchQuery.mockResolvedValue(
-        [{ id: "row-1" }, { id: "row-2" }, { id: "row-3" }, { id: "row-4" }] as never
-      );
+      mockSemanticSearchQuery.mockResolvedValue([
+        { id: "row-1" },
+        { id: "row-2" },
+        { id: "row-3" },
+        { id: "row-4" },
+      ] as never);
       mockMapSemanticRowsToListingData.mockReturnValue(semanticItems);
       mockPrismaListingFindMany.mockResolvedValue([
         {
@@ -1325,6 +1403,7 @@ describe("search-v2-service", () => {
         rawParams: {
           q: "Irving",
           what: "quiet roommates",
+          vibeQuery: "quiet roommates",
           minLat: "32.8",
           maxLat: "32.9",
           minLng: "-96.99",
@@ -1350,8 +1429,8 @@ describe("search-v2-service", () => {
     });
 
     it("fills semantic page 1 from later eligible matches and computes next page from eligible rows", async () => {
-      setupDefaultMocks();
       (features as Record<string, unknown>).semanticSearch = true;
+      setupDefaultMocks();
       mockParseSearchParams.mockReturnValue(
         defaultParsedSearchParams({
           filterParams: {
@@ -1362,10 +1441,11 @@ describe("search-v2-service", () => {
         })
       );
 
-      const now = new Date("2026-04-15T12:30:00.000Z");
-      const staleConfirmedAt = new Date("2026-03-20T12:30:00.000Z");
-      const moveInDate = new Date("2026-06-01T00:00:00.000Z");
-      const availableUntil = new Date("2026-12-01T00:00:00.000Z");
+      const dayMs = 24 * 60 * 60 * 1000;
+      const now = new Date();
+      const staleConfirmedAt = new Date(now.getTime() - 45 * dayMs);
+      const moveInDate = new Date(now.getTime() + 30 * dayMs);
+      const availableUntil = new Date(now.getTime() + 210 * dayMs);
       const semanticRows = [
         { id: "filtered-invalid" },
         { id: "filtered-stale" },
@@ -1499,15 +1579,14 @@ describe("search-v2-service", () => {
         "eligible-2",
       ]);
       expect(result.response?.list.nextCursor).toBe("cursor-page-2");
-      expect(mockSemanticSearchQuery.mock.calls.map((call) => call[2])).toEqual([
-        0,
-        3,
-      ]);
+      expect(mockSemanticSearchQuery.mock.calls.map((call) => call[2])).toEqual(
+        [0, 3]
+      );
     });
 
     it("keeps later semantic pages stable after filtering ineligible ranked matches", async () => {
-      setupDefaultMocks();
       (features as Record<string, unknown>).semanticSearch = true;
+      setupDefaultMocks();
       mockParseSearchParams.mockReturnValue(
         defaultParsedSearchParams({
           requestedPage: 2,
@@ -1519,10 +1598,11 @@ describe("search-v2-service", () => {
         })
       );
 
-      const now = new Date("2026-04-15T12:30:00.000Z");
-      const staleConfirmedAt = new Date("2026-03-20T12:30:00.000Z");
-      const moveInDate = new Date("2026-06-01T00:00:00.000Z");
-      const availableUntil = new Date("2026-12-01T00:00:00.000Z");
+      const dayMs = 24 * 60 * 60 * 1000;
+      const now = new Date();
+      const staleConfirmedAt = new Date(now.getTime() - 45 * dayMs);
+      const moveInDate = new Date(now.getTime() + 30 * dayMs);
+      const availableUntil = new Date(now.getTime() + 210 * dayMs);
       const semanticRows = [
         { id: "filtered-invalid" },
         { id: "filtered-stale" },
@@ -1654,11 +1734,9 @@ describe("search-v2-service", () => {
       expect(result.paginatedResult?.total).toBe(4);
       expect(result.paginatedResult?.totalPages).toBe(2);
       expect(mockEncodeCursor).not.toHaveBeenCalled();
-      expect(mockSemanticSearchQuery.mock.calls.map((call) => call[2])).toEqual([
-        0,
-        3,
-        6,
-      ]);
+      expect(mockSemanticSearchQuery.mock.calls.map((call) => call[2])).toEqual(
+        [0, 3, 6]
+      );
     });
 
     it("falls back to broadened area results when semantic ranking returns no rows", async () => {

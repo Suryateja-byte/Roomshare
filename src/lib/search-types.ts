@@ -94,6 +94,21 @@ export interface ListingData {
   isNearMatch?: boolean;
 }
 
+/**
+ * Browser-visible listing card payload for search/list discovery surfaces.
+ *
+ * This intentionally excludes owner ids and exact address fields. Coordinates
+ * are present only after public coarsening at the serialization boundary.
+ */
+export type PublicSearchListing = Omit<ListingData, "ownerId" | "location"> & {
+  location: {
+    city: string;
+    state: string;
+    lat: number;
+    lng: number;
+  };
+};
+
 export type SortOption =
   | "recommended"
   | "price_asc"

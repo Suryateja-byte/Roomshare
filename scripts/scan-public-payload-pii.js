@@ -33,6 +33,46 @@ function pathJoin(parent, key) {
   return parent ? `${parent}.${key}` : String(key);
 }
 
+function hasAtMostDecimalPlaces(value, maxDecimals) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return false;
+  }
+
+  const factor = 10 ** maxDecimals;
+  return Math.abs(value * factor - Math.round(value * factor)) < 1e-9;
+}
+
+function isCoordinateKey(key) {
+  return /^(lat|latitude|lng|longitude)$/i.test(key);
+}
+
+function isSafePublicCoordinateValue(value) {
+  return hasAtMostDecimalPlaces(value, 2);
+}
+
+function isImageValuePath(currentPath) {
+  return /(^|\.)(image|images\.\d+)$/i.test(currentPath);
+}
+
+function isSnapshotVersionPath(currentPath) {
+  return /(^|\.)snapshotVersion$/i.test(currentPath);
+}
+
+function isGroupIdentityPath(currentPath) {
+  return /(^|\.)(groupKey|contextKey)$/i.test(currentPath);
+}
+
+function isPublicGroupIdentity(value) {
+  return typeof value === "string" && value.startsWith("pg1_");
+}
+
+function isLikelyImageUrl(value) {
+  return (
+    typeof value === "string" &&
+    (/^https?:\/\//i.test(value) || value.startsWith("/images/"))
+  );
+}
+
 function scanPublicPayloadForPii(payload, options = {}) {
   const violations = [];
   const allowedKeys = new Set(options.allowedKeys || []);
@@ -46,14 +86,23 @@ function scanPublicPayloadForPii(payload, options = {}) {
     if (isPlainObject(value)) {
       for (const [key, nested] of Object.entries(value)) {
         const nextPath = pathJoin(currentPath, key);
-        if (
+        const hasForbiddenKey =
           !allowedKeys.has(nextPath) &&
-          FORBIDDEN_KEY_PATTERNS.some((pattern) => pattern.test(key))
-        ) {
-          violations.push({
-            path: nextPath,
-            reason: "forbidden_public_key",
-          });
+          FORBIDDEN_KEY_PATTERNS.some((pattern) => pattern.test(key));
+        if (hasForbiddenKey) {
+          if (isCoordinateKey(key)) {
+            if (!isSafePublicCoordinateValue(nested)) {
+              violations.push({
+                path: nextPath,
+                reason: "exact_coordinate_value",
+              });
+            }
+          } else {
+            violations.push({
+              path: nextPath,
+              reason: "forbidden_public_key",
+            });
+          }
         }
         scan(nested, nextPath);
       }
@@ -61,6 +110,20 @@ function scanPublicPayloadForPii(payload, options = {}) {
     }
 
     if (typeof value !== "string") {
+      return;
+    }
+
+    if (isGroupIdentityPath(currentPath)) {
+      if (!isPublicGroupIdentity(value)) {
+        violations.push({ path: currentPath, reason: "raw_group_identity" });
+      }
+      return;
+    }
+
+    if (
+      isSnapshotVersionPath(currentPath) ||
+      (isImageValuePath(currentPath) && isLikelyImageUrl(value))
+    ) {
       return;
     }
 
@@ -102,7 +165,9 @@ function main(argv) {
   }
 
   if (allViolations.length > 0) {
-    console.error(JSON.stringify({ ok: false, violations: allViolations }, null, 2));
+    console.error(
+      JSON.stringify({ ok: false, violations: allViolations }, null, 2)
+    );
     return 1;
   }
 

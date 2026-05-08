@@ -10,7 +10,7 @@ import type { PublicAvailability } from "./public-availability";
 import type {
   GroupContextPresentation,
   GroupSummary,
-  ListingData,
+  PublicSearchListing,
 } from "@/lib/search-types";
 
 // ============================================================================
@@ -134,8 +134,8 @@ export interface SearchV2Meta {
 /** List section of the response */
 export interface SearchV2List {
   items: SearchV2ListItem[];
-  /** Full-fidelity card payload for first-party web clients */
-  fullItems?: ListingData[];
+  /** Public card payload for first-party web clients */
+  fullItems?: PublicSearchListing[];
   /** Base64url encoded cursor for next page, null if no more pages */
   nextCursor: string | null;
   /** Exact total if ≤100, null if >100 (hybrid count optimization) */

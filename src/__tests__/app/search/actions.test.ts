@@ -102,6 +102,7 @@ jest.mock("@/lib/timeout-wrapper", () => {
 
 import { fetchMoreListings } from "@/app/search/actions";
 import { TimeoutError, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
+import { buildPublicAvailability } from "@/lib/search/public-availability";
 
 describe("fetchMoreListings", () => {
   beforeEach(() => {
@@ -112,7 +113,7 @@ describe("fetchMoreListings", () => {
 
   it("wraps executeSearchV2 with withTimeout using DATABASE timeout", async () => {
     const v2Data = {
-      response: { list: { nextCursor: "cursor-2" } },
+      response: { list: { fullItems: [{ id: "1" }], nextCursor: "cursor-2" } },
       paginatedResult: {
         items: [{ id: "1" }],
         nextCursor: "cursor-2",
@@ -178,7 +179,9 @@ describe("fetchMoreListings", () => {
 
   it("returns V2 result when it succeeds within timeout", async () => {
     const v2Data = {
-      response: { list: { nextCursor: "next" } },
+      response: {
+        list: { fullItems: [{ id: "a" }, { id: "b" }], nextCursor: "next" },
+      },
       paginatedResult: {
         items: [{ id: "a" }, { id: "b" }],
         nextCursor: "next",
@@ -197,6 +200,68 @@ describe("fetchMoreListings", () => {
       })
     );
     expect(result.meta).toBeTruthy();
+  });
+
+  it("sanitizes raw paginated V2 items when fullItems is unavailable", async () => {
+    const publicAvailability = buildPublicAvailability({
+      availableSlots: 1,
+      totalSlots: 2,
+    });
+    const v2Data = {
+      response: {
+        list: { nextCursor: "next" },
+      },
+      paginatedResult: {
+        items: [
+          {
+            id: "private-1",
+            title: "Private listing",
+            description: "Call 555-123-4567",
+            price: 1200,
+            images: ["img.jpg"],
+            availableSlots: 1,
+            totalSlots: 2,
+            amenities: [],
+            houseRules: [],
+            householdLanguages: [],
+            ownerId: "owner-secret",
+            location: {
+              address: "123 Private St",
+              city: "Austin",
+              state: "TX",
+              zip: "78701",
+              lat: 30.26721,
+              lng: -97.74312,
+            },
+            publicAvailability,
+            groupKey: "private-unit:1",
+          },
+        ],
+        nextCursor: "next",
+        hasNextPage: true,
+      },
+    };
+    mockExecuteSearchV2.mockResolvedValue(v2Data);
+
+    const result = await fetchMoreListings("c1", { q: "sf" });
+    const serialized = JSON.stringify(result.items[0]);
+
+    expect(result.items[0]).toEqual(
+      expect.objectContaining({
+        id: "private-1",
+        description: "",
+        location: {
+          city: "Austin",
+          state: "TX",
+          lat: 30.27,
+          lng: -97.74,
+        },
+      })
+    );
+    expect(serialized).not.toContain("owner-secret");
+    expect(serialized).not.toContain("123 Private St");
+    expect(serialized).not.toContain("78701");
+    expect(serialized).not.toContain("private-unit");
   });
 
   it("returns a structured snapshotExpired result when the pinned search cursor is stale", async () => {

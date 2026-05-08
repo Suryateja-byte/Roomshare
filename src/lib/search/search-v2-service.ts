@@ -41,6 +41,7 @@ import {
   determineMode,
   shouldIncludePins,
 } from "@/lib/search/transform";
+import { toPublicSearchListings } from "@/lib/search/public-listing-payload";
 import {
   isRankingEnabled,
   buildScoreMap,
@@ -104,7 +105,9 @@ function getEmptyMapResponse(): SearchV2Response["map"] {
   };
 }
 
-function getSnapshotMapMode(mapPayload: SearchV2Response["map"]): "geojson" | "pins" {
+function getSnapshotMapMode(
+  mapPayload: SearchV2Response["map"]
+): "geojson" | "pins" {
   return mapPayload.pins ? "pins" : "geojson";
 }
 
@@ -254,7 +257,10 @@ interface SemanticListingAvailabilityRow {
 
 async function resolveEligibleSemanticItems(
   items: ListingData[],
-  filterParams: Pick<FilterParams, "moveInDate" | "endDate" | "minAvailableSlots">
+  filterParams: Pick<
+    FilterParams,
+    "moveInDate" | "endDate" | "minAvailableSlots"
+  >
 ): Promise<ListingData[]> {
   if (items.length === 0) {
     return [];
@@ -316,12 +322,12 @@ async function resolveEligibleSemanticItems(
 
       return Boolean(
         listingRow &&
-          resolvedAvailability &&
-          isListingEligibleForPublicSearch({
-            statusReason: listingRow?.statusReason,
-            resolvedAvailability,
-          }) &&
-          item.availableSlots >= requiredSlots
+        resolvedAvailability &&
+        isListingEligibleForPublicSearch({
+          statusReason: listingRow?.statusReason,
+          resolvedAvailability,
+        }) &&
+        item.availableSlots >= requiredSlots
       );
     });
 }
@@ -359,14 +365,16 @@ async function getSemanticEligibleListPage(
       break;
     }
 
-    const batchItems = mapSemanticRowsToListingData(semanticRows).filter((item) => {
-      if (seenListingIds.has(item.id)) {
-        return false;
-      }
+    const batchItems = mapSemanticRowsToListingData(semanticRows).filter(
+      (item) => {
+        if (seenListingIds.has(item.id)) {
+          return false;
+        }
 
-      seenListingIds.add(item.id);
-      return true;
-    });
+        seenListingIds.add(item.id);
+        return true;
+      }
+    );
 
     if (batchItems.length === 0) {
       break;
@@ -392,7 +400,8 @@ async function getSemanticEligibleListPage(
     total,
     page,
     limit: pageSize,
-    totalPages: hasNextPage || total === null ? null : Math.ceil(total / pageSize),
+    totalPages:
+      hasNextPage || total === null ? null : Math.ceil(total / pageSize),
     hasNextPage,
     nextCursor: hasNextPage ? encodeCursor(page + 1) : null,
   };
@@ -480,12 +489,17 @@ async function hydrateSnapshotPage(options: {
     };
   }
 
-  const snapshotResult = await loadValidQuerySnapshot(options.cursor.snapshotId);
+  const snapshotResult = await loadValidQuerySnapshot(
+    options.cursor.snapshotId
+  );
   if (!snapshotResult.ok) {
     return {
       response: null,
       paginatedResult: null,
-      snapshotExpired: buildSnapshotExpired(options.queryHash, snapshotResult.reason),
+      snapshotExpired: buildSnapshotExpired(
+        options.queryHash,
+        snapshotResult.reason
+      ),
     };
   }
 
@@ -520,7 +534,7 @@ async function hydrateSnapshotPage(options: {
       },
       list: {
         items: transformToListItems(items),
-        fullItems: items,
+        fullItems: toPublicSearchListings(items),
         nextCursor,
         total,
       },
@@ -822,11 +836,10 @@ export async function executeSearchV2(
           );
         } else {
           // First page - get first page with keyset cursor
-          const firstPageResult =
-            await getSearchDocListingsFirstPage(
-              filterParams,
-              keysetSnapshot
-            );
+          const firstPageResult = await getSearchDocListingsFirstPage(
+            filterParams,
+            keysetSnapshot
+          );
           return finalizeListResult(
             firstPageResult,
             firstPageResult.nextCursor
@@ -914,12 +927,8 @@ export async function executeSearchV2(
     const warnings: string[] = [];
 
     if (listSettled.status === "fulfilled") {
-      ({
-        listResult,
-        nextCursor,
-        usedSoftVibeFallback,
-        usedSemanticSearch,
-      } = listSettled.value);
+      ({ listResult, nextCursor, usedSoftVibeFallback, usedSemanticSearch } =
+        listSettled.value);
     } else {
       logger.sync.error("[SearchV2] List query failed", {
         error:
@@ -964,7 +973,9 @@ export async function executeSearchV2(
     }
 
     // Determine mode based on mapListings count (not list total)
-    const mode = forceClustersOnly ? "geojson" : determineMode(mapListings.length);
+    const mode = forceClustersOnly
+      ? "geojson"
+      : determineMode(mapListings.length);
     const versionMeta = getSearchV2VersionMeta({
       useSearchDoc,
       usedSemanticSearch,
@@ -1053,12 +1064,13 @@ export async function executeSearchV2(
     });
     const mapResponse = applyPhase04MapKillSwitches(transformedMapResponse);
 
-    let responseMetaBase: import("@/lib/search/search-response").SearchResponseMeta = {
-      queryHash,
-      backendSource: "v2",
-      responseVersion: SEARCH_RESPONSE_VERSION,
-      ...versionMeta,
-    };
+    let responseMetaBase: import("@/lib/search/search-response").SearchResponseMeta =
+      {
+        queryHash,
+        backendSource: "v2",
+        responseVersion: SEARCH_RESPONSE_VERSION,
+        ...versionMeta,
+      };
     let listNextCursor = nextCursor;
 
     if (snapshotContractEnabled && !snapshotCursor && !keysetCursor) {
@@ -1126,7 +1138,7 @@ export async function executeSearchV2(
       },
       list: {
         items: listItems,
-        fullItems: listResult.items,
+        fullItems: toPublicSearchListings(listResult.items),
         nextCursor: listNextCursor,
         total: listResult.total,
       },

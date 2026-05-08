@@ -1,4 +1,4 @@
-import type { ListingData, MapListingData } from "@/lib/search-types";
+import type { MapListingData, PublicSearchListing } from "@/lib/search-types";
 import { generateSearchQueryHash } from "./query-hash";
 import type { NormalizedSearchQuery } from "./search-query";
 
@@ -21,7 +21,7 @@ export interface SearchResponseMeta {
 }
 
 export interface SearchListPayload {
-  items: ListingData[];
+  items: PublicSearchListing[];
   nextCursor: string | null;
   total: number | null;
   nearMatchExpansion?: string;
@@ -54,7 +54,10 @@ export type SearchMapState = SearchState<SearchMapPayload>;
 export function createSearchResponseMeta(
   query: NormalizedSearchQuery,
   backendSource: SearchBackendSource,
-  extras?: Omit<SearchResponseMeta, "queryHash" | "backendSource" | "responseVersion">
+  extras?: Omit<
+    SearchResponseMeta,
+    "queryHash" | "backendSource" | "responseVersion"
+  >
 ): SearchResponseMeta {
   return {
     queryHash: getSearchQueryHash(query),

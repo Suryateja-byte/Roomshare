@@ -2,7 +2,8 @@
 
 import { headers } from "next/headers";
 import { executeSearchV2 } from "@/lib/search/search-v2-service";
-import { type ListingData } from "@/lib/data";
+import type { PublicSearchListing } from "@/lib/search-types";
+import { toPublicSearchListings } from "@/lib/search/public-listing-payload";
 import {
   buildRawParamsFromSearchParams,
   type RawSearchParams,
@@ -31,7 +32,7 @@ import {
 } from "@/lib/search/search-telemetry";
 
 export interface FetchMoreResult {
-  items: ListingData[];
+  items: PublicSearchListing[];
   nextCursor: string | null;
   hasNextPage: boolean;
   meta?: SearchResponseMeta;
@@ -54,7 +55,10 @@ export async function fetchMoreListings(
   const requestStartTime = performance.now();
   try {
     const normalizedQuery = normalizeSearchQuery(rawParams as RawSearchParams);
-    const fallbackMeta = createSearchResponseMeta(normalizedQuery, "v1-fallback");
+    const fallbackMeta = createSearchResponseMeta(
+      normalizedQuery,
+      "v1-fallback"
+    );
     const testScenario = resolveSearchScenario({
       override: scenarioOverride ?? null,
     });
@@ -232,7 +236,9 @@ export async function fetchMoreListings(
             resultCount: v2Result.paginatedResult.items.length,
           });
           return {
-            items: v2Result.paginatedResult.items,
+            items:
+              v2Result.response?.list.fullItems ??
+              toPublicSearchListings(v2Result.paginatedResult.items),
             nextCursor: v2Result.paginatedResult.nextCursor ?? null,
             hasNextPage: v2Result.paginatedResult.hasNextPage ?? false,
             meta: finalMeta,

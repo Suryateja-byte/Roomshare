@@ -25,7 +25,7 @@ function base64UrlDecode(value: string): string {
   return Buffer.from(value, "base64url").toString("utf8");
 }
 
-function getPublicCacheSigningSecret(): string {
+export function getPublicCacheSigningSecret(): string {
   const secret =
     process.env.PUBLIC_CACHE_CURSOR_SECRET ||
     process.env.PUBLIC_CACHE_KEY_SECRET ||
@@ -79,7 +79,9 @@ export function signPublicCacheCursor(
     cursor.enqueuedAt instanceof Date
       ? cursor.enqueuedAt.toISOString()
       : new Date(cursor.enqueuedAt).toISOString();
-  const payload = base64UrlEncode(JSON.stringify({ id: cursor.id, enqueuedAt }));
+  const payload = base64UrlEncode(
+    JSON.stringify({ id: cursor.id, enqueuedAt })
+  );
   return `v1.${payload}.${signPayload(payload)}`;
 }
 
@@ -148,7 +150,10 @@ export function normalizeCacheInvalidationReason(reason: string): string {
   if (normalized.includes("IDENTITY")) {
     return "IDENTITY_MUTATION";
   }
-  if (normalized.includes("REPUBLICATION") || normalized.includes("REPUBLISH")) {
+  if (
+    normalized.includes("REPUBLICATION") ||
+    normalized.includes("REPUBLISH")
+  ) {
     return "REPUBLISH";
   }
   return "PUBLIC_CACHE_INVALIDATE";

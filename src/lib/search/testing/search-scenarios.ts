@@ -1,9 +1,9 @@
-import type { ListingData, MapListingData } from "@/lib/search-types";
+import type { MapListingData, PublicSearchListing } from "@/lib/search-types";
 import type { NormalizedSearchQuery } from "@/lib/search/search-query";
 import { buildPublicAvailability } from "@/lib/search/public-availability";
+import { toPublicCoordinates } from "@/lib/search/public-coordinates";
 import {
   createSearchResponseMeta,
-  type SearchListPayload,
   type SearchListState,
   type SearchMapState,
   type SearchResponseMeta,
@@ -34,7 +34,7 @@ const RESPONSE_DELAY_MS = {
 export type SearchScenario = (typeof SEARCH_SCENARIOS)[number];
 
 export interface SearchScenarioLoadMoreResult {
-  items: ListingData[];
+  items: PublicSearchListing[];
   nextCursor: string | null;
   hasNextPage: boolean;
   meta: SearchResponseMeta;
@@ -54,7 +54,7 @@ interface ScenarioContext {
 }
 
 interface ScenarioListData {
-  items: ListingData[];
+  items: PublicSearchListing[];
   nextCursor: string | null;
   total: number;
   nearMatchExpansion?: string;
@@ -112,15 +112,19 @@ function createListing(
   price: number,
   latOffset: number,
   lngOffset: number,
-  overrides: Partial<ListingData> = {}
-): ListingData {
+  overrides: Partial<PublicSearchListing> = {}
+): PublicSearchListing {
   const anchor = getAnchor(query);
   const locationLabel = getLocationLabel(query);
+  const publicCoordinates = toPublicCoordinates({
+    lat: anchor.lat + latOffset,
+    lng: anchor.lng + lngOffset,
+  });
 
   return {
     id: `scenario-${suffix}`,
     title: `${locationLabel} Room ${suffix.toUpperCase()}`,
-    description: `Deterministic scenario listing ${suffix} for ${locationLabel}.`,
+    description: "",
     price,
     images: ["/images/team/surya.webp"],
     availableSlots: overrides.availableSlots ?? 1,
@@ -136,14 +140,11 @@ function createListing(
     roomType: overrides.roomType ?? "Private Room",
     moveInDate:
       overrides.moveInDate ?? new Date("2026-06-01T00:00:00.000Z"),
-    ownerId: overrides.ownerId ?? "scenario-owner",
     location: {
-      address: `${suffix.toUpperCase()} Example St`,
       city: locationLabel.split(",")[0] || "Austin",
       state: locationLabel.split(",")[1]?.trim() || "TX",
-      zip: "78701",
-      lat: Number((anchor.lat + latOffset).toFixed(5)),
-      lng: Number((anchor.lng + lngOffset).toFixed(5)),
+      lat: publicCoordinates.lat,
+      lng: publicCoordinates.lng,
     },
     publicAvailability:
       overrides.publicAvailability ??
@@ -157,7 +158,7 @@ function createListing(
   };
 }
 
-function buildBaseListings(query: NormalizedSearchQuery): ListingData[] {
+function buildBaseListings(query: NormalizedSearchQuery): PublicSearchListing[] {
   return [
     createListing(query, "a", 900, 0.012, -0.015, {
       amenities: ["Wifi", "Parking"],
@@ -189,9 +190,9 @@ function buildBaseListings(query: NormalizedSearchQuery): ListingData[] {
 }
 
 function applyScenarioFilters(
-  listings: ListingData[],
+  listings: PublicSearchListing[],
   query: NormalizedSearchQuery
-): ListingData[] {
+): PublicSearchListing[] {
   return listings.filter((listing) => {
     if (query.minPrice !== undefined && listing.price < query.minPrice) {
       return false;
@@ -222,9 +223,9 @@ function applyScenarioFilters(
 }
 
 function sortScenarioListings(
-  listings: ListingData[],
+  listings: PublicSearchListing[],
   query: NormalizedSearchQuery
-): ListingData[] {
+): PublicSearchListing[] {
   const next = [...listings];
 
   switch (query.sort) {
@@ -239,7 +240,7 @@ function sortScenarioListings(
     default:
       return [next[2], next[0], next[4], next[1], next[5], next[3]].filter(
         Boolean
-      ) as ListingData[];
+      ) as PublicSearchListing[];
   }
 }
 
@@ -255,7 +256,7 @@ function parseScenarioCursor(cursor?: string | null): number {
 }
 
 function paginateScenarioListings(
-  listings: ListingData[],
+  listings: PublicSearchListing[],
   cursor?: string | null
 ): ScenarioListData {
   const currentPage = parseScenarioCursor(cursor);
@@ -304,7 +305,7 @@ function buildSlowScenarioData(
   };
 }
 
-function toMapListings(listings: ListingData[]): MapListingData[] {
+function toMapListings(listings: PublicSearchListing[]): MapListingData[] {
   return listings.map((listing) => ({
     id: listing.id,
     title: listing.title,

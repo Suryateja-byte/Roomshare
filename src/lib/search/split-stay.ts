@@ -1,8 +1,8 @@
-import type { ListingData } from "@/lib/data";
+import type { PublicSearchListing } from "@/lib/search-types";
 
 export interface SplitStayPair {
-  first: ListingData;
-  second: ListingData;
+  first: PublicSearchListing;
+  second: PublicSearchListing;
   /** Total combined price for the full stay */
   combinedPrice: number;
   /** Label like "2 weeks + 2 weeks" */
@@ -19,7 +19,7 @@ export interface SplitStayPair {
  * data not yet in the schema.
  */
 export function findSplitStays(
-  listings: ListingData[],
+  listings: PublicSearchListing[],
   stayMonths?: number
 ): SplitStayPair[] {
   // Only suggest split stays for 6+ month durations with enough listings
