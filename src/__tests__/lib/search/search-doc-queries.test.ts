@@ -16,6 +16,25 @@ import {
 import { buildPublicAvailability } from "@/lib/search/public-availability";
 import { joinWhereClauseWithSecurityInvariant } from "@/lib/sql-safety";
 
+function dateInputFromNow(daysFromNow: number): string {
+  const date = new Date();
+  date.setUTCHours(0, 0, 0, 0);
+  date.setUTCDate(date.getUTCDate() + daysFromNow);
+  return date.toISOString().slice(0, 10);
+}
+
+function timestampFromNow(daysFromNow: number): string {
+  const date = new Date();
+  date.setUTCHours(12, 30, 0, 0);
+  date.setUTCDate(date.getUTCDate() + daysFromNow);
+  return date.toISOString();
+}
+
+const HOST_MOVE_IN_DATE = dateInputFromNow(30);
+const HOST_AVAILABLE_UNTIL = dateInputFromNow(210);
+const RECENT_LAST_CONFIRMED_AT = timestampFromNow(-7);
+const STALE_LAST_CONFIRMED_AT = timestampFromNow(-30);
+
 describe("buildSearchDocWhereConditions", () => {
   it("excludes listings with null coordinates from map results (F1.1)", () => {
     const { conditions } = buildSearchDocWhereConditions({});
@@ -379,9 +398,9 @@ describe("SearchDoc projection mapping", () => {
       totalSlots: 4,
       availabilitySource: "HOST_MANAGED" as const,
       openSlots: 2,
-      availableUntil: "2026-12-01",
+      availableUntil: HOST_AVAILABLE_UNTIL,
       minStayMonths: 3,
-      lastConfirmedAt: "2026-04-15T12:30:00.000Z",
+      lastConfirmedAt: RECENT_LAST_CONFIRMED_AT,
       status: "ACTIVE",
       statusReason: null,
       needsMigrationReview: false,
@@ -391,7 +410,7 @@ describe("SearchDoc projection mapping", () => {
       primaryHomeLanguage: "English",
       leaseDuration: "6_months",
       roomType: "private",
-      moveInDate: "2026-06-01",
+      moveInDate: HOST_MOVE_IN_DATE,
       viewCount: 10,
       city: "San Francisco",
       state: "CA",
@@ -419,7 +438,7 @@ describe("SearchDoc projection mapping", () => {
   it("suppresses stale HOST_MANAGED rows from list projection", () => {
     const results = mapRawListingsToPublic([
       createHostManagedRaw({
-        lastConfirmedAt: "2026-03-20T12:30:00.000Z",
+        lastConfirmedAt: STALE_LAST_CONFIRMED_AT,
       }),
     ]);
 
@@ -475,7 +494,7 @@ describe("SearchDoc projection mapping", () => {
   it("suppresses stale HOST_MANAGED rows from map projection", () => {
     const results = mapRawMapListingsToPublic([
       createHostManagedRaw({
-        lastConfirmedAt: "2026-03-20T12:30:00.000Z",
+        lastConfirmedAt: STALE_LAST_CONFIRMED_AT,
       }),
     ]);
 
@@ -513,10 +532,10 @@ describe("SearchDoc projection mapping", () => {
         availabilitySource: "HOST_MANAGED",
         openSlots: 2,
         totalSlots: 4,
-        availableFrom: "2026-06-01",
-        availableUntil: "2026-12-01",
+        availableFrom: HOST_MOVE_IN_DATE,
+        availableUntil: HOST_AVAILABLE_UNTIL,
         minStayMonths: 3,
-        lastConfirmedAt: "2026-04-15T12:30:00.000Z",
+        lastConfirmedAt: RECENT_LAST_CONFIRMED_AT,
       })
     );
     expect(mapResult.publicAvailability).toMatchObject(
@@ -538,7 +557,7 @@ describe("SearchDoc projection mapping", () => {
       }),
       createHostManagedRaw({
         id: "stale-host-managed",
-        lastConfirmedAt: "2026-03-20T12:30:00.000Z",
+        lastConfirmedAt: STALE_LAST_CONFIRMED_AT,
       }),
       createHostManagedRaw({
         id: "needs-migration-review",

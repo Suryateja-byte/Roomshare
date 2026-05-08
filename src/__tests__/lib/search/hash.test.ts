@@ -22,6 +22,7 @@ describe("search/hash", () => {
 
   afterEach(() => {
     process.env = originalEnv;
+    jest.useRealTimers();
   });
 
   describe("generateQueryHash", () => {
@@ -206,6 +207,9 @@ describe("search/hash", () => {
     });
 
     it("matches the versioned golden hash for a representative normalized query", () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date("2026-04-01T12:00:00.000Z"));
+
       const params: HashableFilterParams = {
         query: "Austin",
         vibeQuery: "quiet roommates",

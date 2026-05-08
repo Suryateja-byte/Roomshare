@@ -180,6 +180,18 @@ beforeAll(() => {
   })) as jest.Mock;
 });
 
+function futureMonthDate(monthsFromNow: number): string {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(1);
+  date.setMonth(date.getMonth() + monthsFromNow);
+  return date.toISOString().slice(0, 10);
+}
+
+const SEARCH_MOVE_IN_DATE = futureMonthDate(2);
+const SEARCH_END_DATE = futureMonthDate(3);
+const SEARCH_LONG_END_DATE = futureMonthDate(5);
+
 const createMockListing = (
   id: string,
   title?: string,
@@ -263,17 +275,17 @@ describe("SearchResultsClient", () => {
       render(
         <SearchResultsClient
           {...defaultProps}
-          searchParamsString="q=test&moveInDate=2026-05-01&endDate=2026-06-01"
+          searchParamsString={`q=test&moveInDate=${SEARCH_MOVE_IN_DATE}&endDate=${SEARCH_END_DATE}`}
         />
       );
 
       expect(screen.getByTestId("listing-1")).toHaveAttribute(
         "data-href",
-        "/listings/1?startDate=2026-05-01&endDate=2026-06-01"
+        `/listings/1?startDate=${SEARCH_MOVE_IN_DATE}&endDate=${SEARCH_END_DATE}`
       );
       expect(screen.getByTestId("listing-2")).toHaveAttribute(
         "data-href",
-        "/listings/2?startDate=2026-05-01&endDate=2026-06-01"
+        `/listings/2?startDate=${SEARCH_MOVE_IN_DATE}&endDate=${SEARCH_END_DATE}`
       );
     });
 
@@ -281,7 +293,7 @@ describe("SearchResultsClient", () => {
       render(
         <SearchResultsClient
           {...defaultProps}
-          searchParamsString="q=test&moveInDate=2026-05-01"
+          searchParamsString={`q=test&moveInDate=${SEARCH_MOVE_IN_DATE}`}
         />
       );
 
@@ -308,7 +320,7 @@ describe("SearchResultsClient", () => {
       render(
         <SearchResultsClient
           {...defaultProps}
-          searchParamsString="q=test&moveInDate=2026-05-01&endDate=2026-06-01"
+          searchParamsString={`q=test&moveInDate=${SEARCH_MOVE_IN_DATE}&endDate=${SEARCH_END_DATE}`}
         />
       );
 
@@ -316,8 +328,8 @@ describe("SearchResultsClient", () => {
       expect(mockSplitStayCard).toHaveBeenCalledWith(
         expect.objectContaining({
           listingDetailDateParams: {
-            moveInDate: "2026-05-01",
-            endDate: "2026-06-01",
+            moveInDate: SEARCH_MOVE_IN_DATE,
+            endDate: SEARCH_END_DATE,
             startDate: null,
           },
         })
@@ -375,7 +387,7 @@ describe("SearchResultsClient", () => {
           initialNextCursor={null}
           initialTotal={0}
           hasConfirmedZeroResults={true}
-          searchParamsString="q=test&bookingMode=WHOLE_UNIT&moveInDate=2026-05-01&endDate=2026-08-01"
+          searchParamsString={`q=test&bookingMode=WHOLE_UNIT&moveInDate=${SEARCH_MOVE_IN_DATE}&endDate=${SEARCH_LONG_END_DATE}`}
           filterParams={{}}
         />
       );
@@ -385,8 +397,8 @@ describe("SearchResultsClient", () => {
           expect.objectContaining({
             query: "test",
             bookingMode: "WHOLE_UNIT",
-            moveInDate: "2026-05-01",
-            endDate: "2026-08-01",
+            moveInDate: SEARCH_MOVE_IN_DATE,
+            endDate: SEARCH_LONG_END_DATE,
           })
         );
       });
@@ -396,7 +408,7 @@ describe("SearchResultsClient", () => {
       render(
         <SearchResultsClient
           {...defaultProps}
-          searchParamsString="q=test&moveInDate=2026-05-01&endDate=2026-08-01"
+          searchParamsString={`q=test&moveInDate=${SEARCH_MOVE_IN_DATE}&endDate=${SEARCH_LONG_END_DATE}`}
         />
       );
 

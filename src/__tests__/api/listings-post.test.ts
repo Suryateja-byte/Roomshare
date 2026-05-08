@@ -165,6 +165,15 @@ const mockSession = {
   user: { id: "user-123", name: "Test User", email: "test@example.com" },
 };
 
+function futureDateInput(daysFromNow: number): string {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() + daysFromNow);
+  return date.toISOString().slice(0, 10);
+}
+
+const VALID_MOVE_IN_DATE = futureDateInput(30);
+
 const validBody = {
   title: "Cozy Room in Downtown",
   description: "A nice place to stay with great amenities and city views",
@@ -177,7 +186,7 @@ const validBody = {
   zip: "94102",
   roomType: "Private Room",
   totalSlots: "1",
-  moveInDate: "2026-05-01",
+  moveInDate: VALID_MOVE_IN_DATE,
   images: [
     "https://test-project.supabase.co/storage/v1/object/public/images/listings/user-123/test.jpg",
   ],

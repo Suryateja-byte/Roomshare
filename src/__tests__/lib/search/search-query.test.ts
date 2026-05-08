@@ -6,7 +6,20 @@ import {
   serializeSearchQuery,
 } from "@/lib/search/search-query";
 
+const SEARCH_QUERY_TEST_NOW = new Date("2026-04-01T12:00:00.000Z");
+const FUTURE_MOVE_IN_DATE = "2026-05-01";
+const FUTURE_END_DATE = "2026-06-01";
+
+function freezeSearchQueryClock(): void {
+  jest.useFakeTimers();
+  jest.setSystemTime(SEARCH_QUERY_TEST_NOW);
+}
+
 describe("search-query", () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it("normalizes array params, drops invalid price ranges, and canonicalizes pagination", () => {
     const query = normalizeSearchQuery(
       new URLSearchParams(
@@ -146,32 +159,40 @@ describe("search-query", () => {
   });
 
   it("preserves explicit endDate values through normalization and serialization", () => {
+    freezeSearchQueryClock();
+
     const query = normalizeSearchQuery(
-      new URLSearchParams("moveInDate=2026-05-01&endDate=2026-06-01")
+      new URLSearchParams(
+        `moveInDate=${FUTURE_MOVE_IN_DATE}&endDate=${FUTURE_END_DATE}`
+      )
     );
 
-    expect(query.moveInDate).toBe("2026-05-01");
-    expect(query.endDate).toBe("2026-06-01");
+    expect(query.moveInDate).toBe(FUTURE_MOVE_IN_DATE);
+    expect(query.endDate).toBe(FUTURE_END_DATE);
 
     const params = serializeSearchQuery(query);
-    expect(params.get("moveInDate")).toBe("2026-05-01");
-    expect(params.get("endDate")).toBe("2026-06-01");
+    expect(params.get("moveInDate")).toBe(FUTURE_MOVE_IN_DATE);
+    expect(params.get("endDate")).toBe(FUTURE_END_DATE);
 
     expect(buildCanonicalSearchUrl(query, { includePagination: false })).toBe(
-      "/search?endDate=2026-06-01&moveInDate=2026-05-01"
+      `/search?endDate=${FUTURE_END_DATE}&moveInDate=${FUTURE_MOVE_IN_DATE}`
     );
   });
 
   it("normalizes inbound startDate aliases back to canonical search params", () => {
+    freezeSearchQueryClock();
+
     const query = normalizeSearchQuery(
-      new URLSearchParams("startDate=2026-05-01&endDate=2026-06-01")
+      new URLSearchParams(
+        `startDate=${FUTURE_MOVE_IN_DATE}&endDate=${FUTURE_END_DATE}`
+      )
     );
 
-    expect(query.moveInDate).toBe("2026-05-01");
-    expect(query.endDate).toBe("2026-06-01");
+    expect(query.moveInDate).toBe(FUTURE_MOVE_IN_DATE);
+    expect(query.endDate).toBe(FUTURE_END_DATE);
 
     expect(buildCanonicalSearchUrl(query, { includePagination: false })).toBe(
-      "/search?endDate=2026-06-01&moveInDate=2026-05-01"
+      `/search?endDate=${FUTURE_END_DATE}&moveInDate=${FUTURE_MOVE_IN_DATE}`
     );
   });
 

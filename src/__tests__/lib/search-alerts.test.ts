@@ -94,6 +94,21 @@ describe("search-alerts", () => {
     user: mockUser,
   };
 
+  function futureDateInput(daysFromNow: number): string {
+    const date = new Date();
+    date.setUTCHours(0, 0, 0, 0);
+    date.setUTCDate(date.getUTCDate() + daysFromNow);
+    return date.toISOString().slice(0, 10);
+  }
+
+  function futureDate(daysFromNow: number): Date {
+    return new Date(`${futureDateInput(daysFromNow)}T00:00:00.000Z`);
+  }
+
+  const SAVED_MOVE_IN_DATE = futureDateInput(30);
+  const SAVED_END_DATE = futureDateInput(60);
+  const LISTING_ENDS_BEFORE_SAVED_END_DATE = futureDateInput(45);
+
   function buildPublicListing(id = "listing-123") {
     return {
       id,
@@ -106,10 +121,10 @@ describe("search-alerts", () => {
       availableSlots: 1,
       totalSlots: 1,
       openSlots: 1,
-      moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+      moveInDate: futureDate(30),
       availableUntil: null,
       minStayMonths: 1,
-      lastConfirmedAt: new Date("2026-04-20T00:00:00.000Z"),
+      lastConfirmedAt: futureDate(-10),
     };
   }
 
@@ -314,8 +329,8 @@ describe("search-alerts", () => {
         const dateRangeSearch = {
           ...mockSavedSearch,
           filters: {
-            moveInDate: "2026-05-01",
-            endDate: "2026-06-01",
+            moveInDate: SAVED_MOVE_IN_DATE,
+            endDate: SAVED_END_DATE,
           },
         };
         (prisma.savedSearch.findMany as jest.Mock).mockResolvedValue([
@@ -594,8 +609,8 @@ describe("search-alerts", () => {
             name: "NYC Rooms",
             filters: {
               query: "New York",
-              moveInDate: "2026-05-01",
-              endDate: "2026-06-01",
+              moveInDate: SAVED_MOVE_IN_DATE,
+              endDate: SAVED_END_DATE,
             },
             active: true,
             alertEnabled: true,
@@ -631,7 +646,7 @@ describe("search-alerts", () => {
         "searchAlert",
         mockUser.email,
         expect.objectContaining({
-          ctaHref: expect.stringContaining("endDate=2026-06-01"),
+          ctaHref: expect.stringContaining(`endDate=${SAVED_END_DATE}`),
         })
       );
       expect(prisma.notification.create).toHaveBeenCalledWith({
@@ -854,8 +869,8 @@ describe("search-alerts", () => {
         const dateRangeSearch = {
           ...instantSearch,
           filters: {
-            moveInDate: "2026-05-01",
-            endDate: "2026-06-01",
+            moveInDate: SAVED_MOVE_IN_DATE,
+            endDate: SAVED_END_DATE,
           },
         };
         (prisma.savedSearch.findMany as jest.Mock).mockResolvedValue([
@@ -864,7 +879,7 @@ describe("search-alerts", () => {
 
         const result = await triggerInstantAlerts({
           ...newListing,
-          availableUntil: "2026-05-15",
+          availableUntil: LISTING_ENDS_BEFORE_SAVED_END_DATE,
         });
 
         expect(result.sent).toBe(0);
@@ -875,8 +890,8 @@ describe("search-alerts", () => {
         const dateRangeSearch = {
           ...instantSearch,
           filters: {
-            moveInDate: "2026-05-01",
-            endDate: "2026-06-01",
+            moveInDate: SAVED_MOVE_IN_DATE,
+            endDate: SAVED_END_DATE,
           },
         };
         (prisma.savedSearch.findMany as jest.Mock).mockResolvedValue([
@@ -887,8 +902,8 @@ describe("search-alerts", () => {
 
         const result = await triggerInstantAlerts({
           ...newListing,
-          moveInDate: new Date("2026-05-01T00:00:00.000Z"),
-          availableUntil: new Date("2026-06-01T00:00:00.000Z"),
+          moveInDate: futureDate(30),
+          availableUntil: futureDate(60),
         });
 
         expect(result.sent).toBe(1);

@@ -15,6 +15,23 @@ const mockUseMediaQuery = jest.fn();
 const mockPending = { ...emptyFilterValues };
 const mockCommitted = { ...emptyFilterValues };
 
+function futureDateInput(daysFromNow: number): string {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() + daysFromNow);
+  return date.toISOString().slice(0, 10);
+}
+
+function formatDateLabel(dateInput: string, includeYear = false): string {
+  return new Date(`${dateInput}T00:00:00`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    ...(includeYear ? { year: "numeric" as const } : {}),
+  });
+}
+
+const FILTER_MOVE_IN_DATE = futureDateInput(30);
+
 jest.mock("next/navigation", () => ({
   useRouter: () => ({
     push: mockRouterPush,
@@ -261,11 +278,11 @@ describe("InlineFilterStrip", () => {
     Object.assign(mockCommitted, {
       minPrice: "1200",
       maxPrice: "1800",
-      moveInDate: "2026-05-01",
+      moveInDate: FILTER_MOVE_IN_DATE,
       roomType: "Private Room",
     });
     mockSearchParams = new URLSearchParams(
-      "minPrice=1200&maxPrice=1800&moveInDate=2026-05-01&roomType=Private+Room"
+      `minPrice=1200&maxPrice=1800&moveInDate=${FILTER_MOVE_IN_DATE}&roomType=Private+Room`
     );
 
     render(<InlineFilterStrip />);
@@ -274,7 +291,7 @@ describe("InlineFilterStrip", () => {
       "$1,200-$1,800"
     );
     expect(screen.getByTestId("mobile-filter-move-in")).toHaveTextContent(
-      "May 1"
+      formatDateLabel(FILTER_MOVE_IN_DATE)
     );
     expect(screen.getByTestId("mobile-filter-room-type")).toHaveTextContent(
       "Private Room"
@@ -285,7 +302,7 @@ describe("InlineFilterStrip", () => {
     mockUseMediaQuery.mockReturnValue(false);
     mockMobileResultsView = "list";
     mockSearchParams = new URLSearchParams(
-      "minPrice=1200&maxPrice=1800&moveInDate=2026-05-01&roomType=Private+Room"
+      `minPrice=1200&maxPrice=1800&moveInDate=${FILTER_MOVE_IN_DATE}&roomType=Private+Room`
     );
 
     render(<InlineFilterStrip />);
@@ -294,7 +311,9 @@ describe("InlineFilterStrip", () => {
       name: "Applied filters",
     });
     expect(appliedRegion).toHaveTextContent("$1,200 - $1,800");
-    expect(appliedRegion).toHaveTextContent("Move-in: May 1, 2026");
+    expect(appliedRegion).toHaveTextContent(
+      `Move-in: ${formatDateLabel(FILTER_MOVE_IN_DATE, true)}`
+    );
     expect(appliedRegion).toHaveTextContent("+1 more");
   });
 });
