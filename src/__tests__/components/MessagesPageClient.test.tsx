@@ -32,10 +32,12 @@ jest.mock("next/link", () => ({
   default: ({
     children,
     href,
+    prefetch: _prefetch,
     ...props
   }: AnchorHTMLAttributes<HTMLAnchorElement> & {
     children: ReactNode;
     href: string;
+    prefetch?: boolean;
   }) => (
     <a href={href} {...props}>
       {children}
@@ -174,6 +176,7 @@ jest.mock("@/components/ui/alert-dialog", () => ({
 }));
 
 import MessagesPageClient from "@/components/MessagesPageClient";
+import { toast } from "sonner";
 
 type MockMessage = {
   id: string;
@@ -256,6 +259,7 @@ describe("MessagesPageClient", () => {
     fetchMock.mockReset();
     global.fetch = fetchMock as unknown as typeof fetch;
     mockUseMediaQuery.mockReturnValue(false);
+    sessionStorage.clear();
     mockMarkAllMessagesAsRead.mockResolvedValue({ success: true, count: 0 });
     mockDeleteConversation.mockResolvedValue({ success: true });
   });
@@ -487,8 +491,82 @@ describe("MessagesPageClient", () => {
     }
   });
 
+  it("restores a saved draft for the active desktop conversation", async () => {
+    sessionStorage.setItem("chat_draft_conv-1", "Restored draft text");
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes("/api/messages?")) {
+        return createJsonResponse({
+          messages: [],
+          typingUsers: [],
+          hasNewMessages: false,
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    render(
+      <MessagesPageClient
+        currentUserId="user-123"
+        initialConversations={initialConversations}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("message-input")).toHaveValue(
+        "Restored draft text"
+      );
+    });
+    expect(sessionStorage.getItem("chat_draft_conv-1")).toBeNull();
+    expect(toast.info).toHaveBeenCalledWith("Your message draft was restored");
+  });
+
+  it("saves the draft and redirects to the active thread when the send session expires", async () => {
+    mockSendMessage.mockResolvedValue({
+      error: "Unauthorized",
+      code: "SESSION_EXPIRED",
+    });
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes("/api/messages?")) {
+        return createJsonResponse({
+          messages: [],
+          typingUsers: [],
+          hasNewMessages: false,
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    render(
+      <MessagesPageClient
+        currentUserId="user-123"
+        initialConversations={initialConversations}
+      />
+    );
+
+    const input = await screen.findByTestId("message-input");
+    fireEvent.change(input, { target: { value: "Draft before expiry" } });
+    fireEvent.click(screen.getByTestId("send-button"));
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith(
+        "/login?callbackUrl=/messages/conv-1"
+      );
+    });
+    expect(sessionStorage.getItem("chat_draft_conv-1")).toBe(
+      "Draft before expiry"
+    );
+    expect(toast.error).toHaveBeenCalledWith(
+      "Your session has expired. Redirecting to login..."
+    );
+    expect(screen.queryByText("Draft before expiry")).not.toBeInTheDocument();
+  });
   it("keeps desktop conversation selection in-page instead of following the thread link", async () => {
     mockUseMediaQuery.mockReturnValue(false);
+    sessionStorage.clear();
     const matchMediaSpy = mockDesktopMatchMedia(true);
     fetchMock.mockImplementation((input) => {
       const url = String(input);

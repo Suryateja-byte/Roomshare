@@ -874,6 +874,9 @@ async function main() {
     lat: 37.7920, lng: -122.4130,
     address: '1000 California St', city: 'San Francisco', state: 'CA', zip: '94108',
   };
+  const reviewerMoveInDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const reviewerAvailableUntil = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000);
+  const reviewerImages = ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=600'];
 
   const existingReviewerListing = await prisma.listing.findFirst({
     where: { title: REVIEWER_LISTING.title, ownerId: reviewer.id },
@@ -896,10 +899,12 @@ async function main() {
         householdLanguages: ['en'],
         totalSlots: 1,
         availableSlots: 1,
-        moveInDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        images: [
-          'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=600',
-        ],
+        openSlots: 1,
+        moveInDate: reviewerMoveInDate,
+        availableUntil: reviewerAvailableUntil,
+        minStayMonths: 1,
+        lastConfirmedAt: new Date(),
+        images: reviewerImages,
         location: {
           create: {
             address: REVIEWER_LISTING.address,
@@ -918,6 +923,52 @@ async function main() {
     `;
     console.log(`  ✓ Reviewer listing: ${REVIEWER_LISTING.title} (${reviewerListing.id})`);
   }
+  reviewerListing = await prisma.listing.update({
+    where: { id: reviewerListing.id },
+    data: {
+      ownerId: reviewer.id,
+      title: REVIEWER_LISTING.title,
+      description: REVIEWER_LISTING.description,
+      price: REVIEWER_LISTING.price,
+      roomType: REVIEWER_LISTING.roomType,
+      amenities: ['WiFi', 'Furnished', 'Laundry'],
+      houseRules: ['No Pets'],
+      householdLanguages: ['en'],
+      totalSlots: 1,
+      availableSlots: 1,
+      openSlots: 1,
+      moveInDate: reviewerMoveInDate,
+      availableUntil: reviewerAvailableUntil,
+      minStayMonths: 1,
+      lastConfirmedAt: new Date(),
+      status: 'ACTIVE',
+      statusReason: null,
+      images: reviewerImages,
+      location: {
+        upsert: {
+          update: {
+            address: REVIEWER_LISTING.address,
+            city: REVIEWER_LISTING.city,
+            state: REVIEWER_LISTING.state,
+            zip: REVIEWER_LISTING.zip,
+          },
+          create: {
+            address: REVIEWER_LISTING.address,
+            city: REVIEWER_LISTING.city,
+            state: REVIEWER_LISTING.state,
+            zip: REVIEWER_LISTING.zip,
+          },
+        },
+      },
+    },
+  });
+  const reviewerPoint = `POINT(${REVIEWER_LISTING.lng} ${REVIEWER_LISTING.lat})`;
+  await prisma.$executeRaw`
+    UPDATE "Location"
+    SET coords = ST_SetSRID(ST_GeomFromText(${reviewerPoint}), 4326)
+    WHERE "listingId" = ${reviewerListing.id}
+  `;
+  console.log(`  ✓ Reviewer listing refreshed for public contact flow: ${REVIEWER_LISTING.title}`);
 
   console.log('  ✓ Review fixture uses contact-first private feedback; bookings retired');
 

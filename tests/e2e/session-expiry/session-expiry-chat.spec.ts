@@ -21,6 +21,23 @@ import {
   expectLoginRedirect,
 } from "../helpers";
 
+async function openFirstConversationThread(
+  page: import("@playwright/test").Page
+): Promise<string> {
+  const firstConvo = page.locator('a[href^="/messages/"]').first();
+  if (!(await firstConvo.isVisible({ timeout: 10000 }).catch(() => false))) {
+    test.skip(true, "No conversations available for test");
+  }
+
+  const href = await firstConvo.getAttribute("href");
+  if (!href) {
+    test.skip(true, "Conversation link missing href");
+  }
+
+  await page.goto(href!, { waitUntil: "domcontentloaded" });
+  await page.waitForURL(/\/messages\/.+/);
+  return page.url().split("/messages/")[1]?.split("?")[0] ?? "";
+}
 test.describe("Session Expiry: Messaging", () => {
   test.use({ storageState: "playwright/.auth/user.json" });
 
@@ -35,16 +52,7 @@ test.describe("Session Expiry: Messaging", () => {
     await page.goto("/messages");
     await page.waitForLoadState("domcontentloaded");
 
-    // Click first conversation if available
-    const firstConvo = page.locator('a[href^="/messages/"]').first();
-    if (!(await firstConvo.isVisible({ timeout: 10000 }).catch(() => false))) {
-      test.skip(true, "No conversations available for test");
-      return;
-    }
-    await firstConvo.click();
-    await page.waitForURL(/\/messages\/.+/);
-
-    const conversationId = page.url().split("/messages/")[1]?.split("?")[0];
+    const conversationId = await openFirstConversationThread(page);
 
     // 2. Type a message
     const input = page.getByRole("textbox");
@@ -78,15 +86,7 @@ test.describe("Session Expiry: Messaging", () => {
     await page.goto("/messages");
     await page.waitForLoadState("domcontentloaded");
 
-    const firstConvo = page.locator('a[href^="/messages/"]').first();
-    if (!(await firstConvo.isVisible({ timeout: 10000 }).catch(() => false))) {
-      test.skip(true, "No conversations available");
-      return;
-    }
-    await firstConvo.click();
-    await page.waitForURL(/\/messages\/.+/);
-
-    const conversationId = page.url().split("/messages/")[1]?.split("?")[0];
+    const conversationId = await openFirstConversationThread(page);
 
     // Pre-set draft in sessionStorage (simulating a prior session expiry save)
     await page.evaluate(

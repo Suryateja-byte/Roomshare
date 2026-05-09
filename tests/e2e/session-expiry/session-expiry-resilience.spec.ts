@@ -16,6 +16,22 @@ import {
   expectLoginRedirect,
 } from "../helpers";
 
+async function openFirstConversationThread(
+  page: import("@playwright/test").Page
+): Promise<void> {
+  const firstConvo = page.locator('a[href^="/messages/"]').first();
+  if (!(await firstConvo.isVisible({ timeout: 10000 }).catch(() => false))) {
+    test.skip(true, "No conversations available");
+  }
+
+  const href = await firstConvo.getAttribute("href");
+  if (!href) {
+    test.skip(true, "Conversation link missing href");
+  }
+
+  await page.goto(href!, { waitUntil: "domcontentloaded" });
+  await page.waitForURL(/\/messages\/.+/);
+}
 test.describe("Session Expiry: Resilience", () => {
   test.use({ storageState: "playwright/.auth/user.json" });
 
@@ -30,13 +46,7 @@ test.describe("Session Expiry: Resilience", () => {
     await page.goto("/messages");
     await page.waitForLoadState("domcontentloaded");
 
-    const firstConvo = page.locator('a[href^="/messages/"]').first();
-    if (!(await firstConvo.isVisible({ timeout: 10000 }).catch(() => false))) {
-      test.skip(true, "No conversations available");
-      return;
-    }
-    await firstConvo.click();
-    await page.waitForURL(/\/messages\/.+/);
+    await openFirstConversationThread(page);
 
     // Expire session
     await expireSession(page);
@@ -70,7 +80,10 @@ test.describe("Session Expiry: Resilience", () => {
     await page.waitForLoadState("domcontentloaded");
     // On mobile Chrome, auth may redirect to login before settings loads
     const onLoginPage = page.url().includes("/login");
-    test.skip(onLoginPage, "Auth session not established — redirected to login before test");
+    test.skip(
+      onLoginPage,
+      "Auth session not established — redirected to login before test"
+    );
     if (onLoginPage) return;
     await expect(page).toHaveURL(/\/settings/, { timeout: 10000 });
 
