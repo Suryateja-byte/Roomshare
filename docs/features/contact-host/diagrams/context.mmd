@@ -1,0 +1,8 @@
+flowchart LR
+  Viewer["Viewer"] --> Listing["Listing detail"]
+  Listing --> Contact["Contact Host"]
+  Contact --> Messages["Messages"]
+  Contact --> Paywall["Contact paywall"]
+  Messages --> Host["Listing host"]
+  Messages --> Email["Notification email"]
+  Paywall --> Stripe["Stripe checkout"]

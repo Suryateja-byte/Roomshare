@@ -1,0 +1,29 @@
+# Errors, Empty, Loading, And Edge Cases
+
+Status: source-backed edge-case inventory with focused test evidence cited where available.
+
+| Scenario | Expected/current source behavior | Current evidence | Test coverage | Risk | Gap |
+|---|---|---|---|---|---|
+| Anonymous viewer tries to contact | Login CTA or unauthorized start redirects to login. Current source routes listing-contact login to `/login` without a documented callback, so automatic contact resumption after login is not proven. | CH-E002, CH-E003, CH-E006; `src/app/listings/[id]/ListingPageClient.tsx:571`; `src/components/ContactHostButton.tsx:131`; `src/app/login/LoginClient.tsx:114` | Component source test exists; not run | Broken conversion path | Browser return-to-flow not verified |
+| Email-unverified viewer | Verify-email CTA or server rejection. | CH-E002, CH-E006 | API/source tests partial | User may see wrong call to action | Runtime not verified |
+| Suspended user | Start/send/checkout blocked. | CH-E006, CH-E012; `phase-4/04-auth-security-permissions.md` | Source tests partial | Abuse bypass | Runtime not verified |
+| Owner contacts own listing | Contact start and checkout own-listing purchase blocked. | CH-E007; `phase-4/04-auth-security-permissions.md` | Not run | Self-thread or payment misuse | Runtime not verified |
+| Listing unavailable/inactive/moderation/migration | Contact start/send/checkout blocked. | CH-E007, CH-E013, CH-E021 | Unit/API source tests exist | Contact against unavailable listings | Runtime not verified |
+| Blocked relationship | Start/send blocked; composer can be replaced by blocked banner. | CH-E007, CH-E013, CH-E022 | API source tests exist; UI gap | Safety issue | Block UI not verified |
+| Paywall required | Button opens paywall dialog; start returns paywall error when needed. | CH-E004, CH-E010 | Component source tests exist | Payment-gated contact broken | Checkout runtime not verified |
+| Paywall unavailable | Button shows retry-later copy. | CH-E003, CH-E004 | Component source tests exist | Confusing failure | Runtime not verified |
+| Checkout canceled/missing/failed/expired/timeout | Listing detail source sets notices and cleans URL params where applicable. | CH-E044; `phase-4/01-ui-interaction-census.md` | Focused checkout-session Jest passed; browser checkout return not run | Failed paid flow recovery | Runtime not verified |
+| Duplicate rapid contact starts | Client guard plus server transaction/advisory lock/idempotency reduce duplicates. | CH-E008-CH-E011 | Component/E2E source tests exist; not run | Duplicate conversations/consumption | Runtime not verified |
+| Hidden/deleted conversation receives new message | Message send deletes conversation-deletion records to resurrect hidden conversation. | `phase-4/03-state-model.md` | Not run | Missing new message | Runtime not verified |
+| Inaccessible `/messages/[id]` | Server page returns access denied/not found UI. | CH-E018 | Not run | Data exposure or confusing thread | Runtime not verified |
+| Empty inbox | Inbox source shows empty state with `/search` link. | `phase-4/01-ui-interaction-census.md` | E2E source exists | Dead-end messaging page | Browser not verified |
+| Search-empty inbox | Conversation search has no matches. | `src/components/MessagesPageClient.tsx:906-911` | Not run | User may think inbox is broken | Copy: "No conversations match your search" |
+| No conversations inbox | Conversation list is empty and no search query is active. | `src/components/MessagesPageClient.tsx:912-929` | E2E source exists; Mobile Chrome no-deps covers empty state | Dead-end messaging page | Copy: "No conversations yet", "Start chatting by contacting a listing host", "Browse Listings" |
+| Messages route loading | `/messages` route is loading. | `src/app/messages/loading.tsx:1-4` | Not run | Layout shift or confusing wait | UI renders `MessageListSkeleton`; exact skeleton text is not specified here |
+| Messages route error | `/messages` route error boundary catches an error. | `src/app/messages/error.tsx:18-39` | Not run | User cannot recover | Copy: "Unable to load your messages", "We're having trouble loading your messages right now. This is usually temporary.", "Your messages are safe — try refreshing the page in a moment.", actions "Try again" and "Go home" |
+| Thread route loading | `/messages/{id}` route is loading. | `src/app/messages/[id]/loading.tsx:1-4` | Not run | Layout shift or confusing wait | UI renders `ChatSkeleton`; exact skeleton text is not specified here |
+| Thread route error | `/messages/{id}` route error boundary catches an error. | `src/app/messages/[id]/error.tsx:20-40` | Not run | User cannot recover | Copy: "Unable to load conversation", "We encountered an error while loading this conversation. Please try again.", actions "Try again" and "Back to messages" |
+| API rate limit | Configured limits and route checks exist. | CH-E026 | Source tests partial | Abuse or noisy failures | Runtime limiter not verified |
+| Email delivery failure | Source calls preference-aware email; actual delivery not verified. | CH-E014 | API source test mocks calls | Missed notifications | Email runtime not verified |
+| Realtime unavailable | ChatWindow falls back to polling on close/error/timeout source paths. | `phase-4/01-ui-interaction-census.md` | No direct manifest test | Delayed/missing messages | Supabase runtime not verified |
+| Message length boundary | Inbox uses 1000, thread uses 500, server/API allow 2000. | CH-E030 | No resolved test | Client/server mismatch | Needs product decision |

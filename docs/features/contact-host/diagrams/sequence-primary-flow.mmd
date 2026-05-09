@@ -1,0 +1,21 @@
+sequenceDiagram
+  participant User
+  participant Listing as Listing detail
+  participant ViewerState as GET /api/listings/{id}/viewer-state
+  participant Button as ContactHostButton
+  participant Action as startConversation
+  participant DB as Database
+  participant Thread as Message thread
+
+  User->>Listing: Open listing
+  Listing-->>User: Fallback contact/login/verify/edit CTA
+  Listing->>ViewerState: Fetch viewer contact contract
+  ViewerState-->>Listing: Contact CTA state / paywall summary / fallback on error
+  Listing-->>User: Merged contact CTA state
+  User->>Button: Click Contact Host
+  Button->>Action: listing id and idempotency key
+  Action->>Action: Validate auth, account, listing, block, paywall
+  Action->>DB: Reuse/resurrect/create conversation
+  DB-->>Action: conversation id
+  Action-->>Button: success
+  Button-->>Thread: Navigate to /messages/{id}

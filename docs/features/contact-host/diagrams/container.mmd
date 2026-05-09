@@ -1,0 +1,14 @@
+flowchart TB
+  Browser["Browser UI"] --> ListingPage["/listings/{id}"]
+  Browser --> MessagesPages["/messages and /messages/{id}"]
+  ListingPage --> ViewerState["GET /api/listings/{id}/viewer-state"]
+  ListingPage --> ContactAction["startConversation server action"]
+  ListingPage --> Checkout["POST /api/payments/checkout"]
+  ListingPage --> CheckoutStatus["GET /api/payments/checkout-session"]
+  MessagesPages --> MessagesApi["GET/POST /api/messages"]
+  MessagesPages --> ChatActions["chat server actions"]
+  ContactAction --> DB["Postgres via Prisma"]
+  MessagesApi --> DB
+  ChatActions --> DB
+  Checkout --> Stripe["Stripe"]
+  ChatActions --> Email["Email/notifications"]

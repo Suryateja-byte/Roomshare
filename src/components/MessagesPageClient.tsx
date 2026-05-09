@@ -713,6 +713,39 @@ export default function MessagesPageClient({
     );
   };
 
+  const shouldUseDesktopInPageSelection = () => {
+    if (
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function"
+    ) {
+      return window.matchMedia("(min-width: 768px)").matches;
+    }
+
+    return isMobileViewport === false;
+  };
+
+  const openMobileThread = (conversationId: string) => {
+    setActiveId(conversationId);
+
+    if (typeof window === "undefined") return;
+
+    const threadPath = `/messages/${conversationId}`;
+    if (window.location.pathname !== threadPath) {
+      window.history.pushState(null, "", threadPath);
+    }
+  };
+
+  const showConversationList = () => {
+    setActiveId(null);
+
+    if (
+      typeof window !== "undefined" &&
+      window.location.pathname.startsWith("/messages/")
+    ) {
+      window.history.pushState(null, "", "/messages");
+    }
+  };
+
   // Filter conversations based on search query
   const filteredConversations = conversations.filter((c) => {
     if (!searchQuery.trim()) return true;
@@ -793,21 +826,36 @@ export default function MessagesPageClient({
             const lastMsg = c.messages[0];
             const hasUnread = (c.unreadCount || 0) > 0;
             return (
-              <div
+              <Link
                 key={c.id}
                 data-testid="conversation-item"
-                onClick={() => {
-                  const shouldOpenThreadRoute =
-                    typeof window !== "undefined" &&
-                    window.matchMedia("(max-width: 767px)").matches;
-
-                  if (shouldOpenThreadRoute || isMobileViewport) {
-                    router.push(`/messages/${c.id}`);
+                href={`/messages/${c.id}`}
+                onClick={(event) => {
+                  if (
+                    event.metaKey ||
+                    event.ctrlKey ||
+                    event.shiftKey ||
+                    event.altKey ||
+                    event.button !== 0 ||
+                    !shouldUseDesktopInPageSelection()
+                  ) {
+                    if (
+                      !event.metaKey &&
+                      !event.ctrlKey &&
+                      !event.shiftKey &&
+                      !event.altKey &&
+                      event.button === 0
+                    ) {
+                      event.preventDefault();
+                      openMobileThread(c.id);
+                    }
                     return;
                   }
+
+                  event.preventDefault();
                   setActiveId(c.id);
                 }}
-                className={`px-6 py-4 flex gap-4 cursor-pointer transition-colors border-l-4 ${activeId === c.id ? "bg-surface-canvas border-outline-variant/20" : "bg-surface-container-lowest border-transparent hover:bg-surface-canvas"}`}
+                className={`w-full px-6 py-4 flex gap-4 cursor-pointer transition-colors border-l-4 ${activeId === c.id ? "bg-surface-canvas border-outline-variant/20" : "bg-surface-container-lowest border-transparent hover:bg-surface-canvas"}`}
               >
                 <div className="relative">
                   <UserAvatar
@@ -852,7 +900,7 @@ export default function MessagesPageClient({
                     {c.listing.title}
                   </p>
                 </div>
-              </div>
+              </Link>
             );
           })}
           {filteredConversations.length === 0 && (
@@ -899,7 +947,7 @@ export default function MessagesPageClient({
                 <button
                   data-testid="back-button"
                   aria-label="Back to conversations"
-                  onClick={() => setActiveId(null)}
+                  onClick={showConversationList}
                   className="md:hidden p-2 -ml-2 text-on-surface-variant"
                 >
                   <ArrowLeft className="w-5 h-5" />
