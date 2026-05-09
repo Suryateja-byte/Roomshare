@@ -1,0 +1,11 @@
+flowchart TB
+  CTA["MessagingCta"] --> Button["ContactHostButton"]
+  Button --> Start["startConversation"]
+  Button --> Dialog["Paywall dialog"]
+  Dialog --> Checkout["/api/payments/checkout"]
+  Start --> Auth["Auth/rate/account gates"]
+  Start --> ListingGate["Listing/contactability gates"]
+  Start --> BlockGate["Block gate"]
+  Start --> Paywall["Paywall consumption"]
+  Start --> Conversation["Conversation create/reuse"]
+  Conversation --> Messages["/messages/{conversationId}"]

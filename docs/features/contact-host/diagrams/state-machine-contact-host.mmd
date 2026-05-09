@@ -1,0 +1,25 @@
+stateDiagram-v2
+  [*] --> ListingDetail
+  ListingDetail --> LoginRequired: anonymous
+  ListingDetail --> VerifyEmail: unverified email
+  ListingDetail --> OwnerEdit: owner
+  ListingDetail --> ContactDisabled: unavailable / moderation / migration
+  ListingDetail --> ContactReady: can contact
+  ListingDetail --> PaywallRequired: unlock required
+  ContactReady --> StartingConversation: click contact
+  StartingConversation --> MessageThread: success
+  StartingConversation --> StartError: auth / rate / block / listing / paywall error
+  StartError --> ContactReady: toast shown / loading reset / retry
+  StartError --> LoginRequired: unauthorized / session expired
+  StartError --> PaywallRequired: paywall required
+  PaywallRequired --> CheckoutOpening: select offer
+  CheckoutOpening --> CheckoutReturn: Stripe return
+  CheckoutReturn --> ContactReady: fulfilled
+  CheckoutReturn --> PaywallRequired: canceled / failed / timeout
+  MessageThread --> Sending: submit message
+  Sending --> MessageThread: persisted
+  Sending --> SendError: rate / auth / block / listing / network
+  MessageThread --> Blocked: block relation
+  Blocked --> MessageThread: unblock
+  MessageThread --> Polling: realtime unavailable
+  Polling --> MessageThread: new messages

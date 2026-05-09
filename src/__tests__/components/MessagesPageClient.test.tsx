@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { AnchorHTMLAttributes, ReactNode } from "react";
 import "@testing-library/jest-dom";
 import {
   render,
@@ -29,8 +29,17 @@ jest.mock("@/hooks/useMediaQuery", () => ({
 
 jest.mock("next/link", () => ({
   __esModule: true,
-  default: ({ children, href }: { children: ReactNode; href: string }) => (
-    <a href={href}>{children}</a>
+  default: ({
+    children,
+    href,
+    ...props
+  }: AnchorHTMLAttributes<HTMLAnchorElement> & {
+    children: ReactNode;
+    href: string;
+  }) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
   ),
 }));
 
@@ -182,6 +191,23 @@ function createJsonResponse(body: unknown, status = 200) {
   });
 }
 
+function mockDesktopMatchMedia(matchesDesktop: boolean) {
+  return jest.spyOn(window, "matchMedia").mockImplementation(
+    (query: string) =>
+      ({
+        matches:
+          query === "(min-width: 768px)" ? matchesDesktop : !matchesDesktop,
+        media: query,
+        onchange: null,
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+        addListener: jest.fn(),
+        removeListener: jest.fn(),
+        dispatchEvent: jest.fn(),
+      }) as MediaQueryList
+  );
+}
+
 function buildMessage(
   id: string,
   senderId: string,
@@ -226,6 +252,7 @@ describe("MessagesPageClient", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    window.history.replaceState(null, "", "/messages");
     fetchMock.mockReset();
     global.fetch = fetchMock as unknown as typeof fetch;
     mockUseMediaQuery.mockReturnValue(false);
@@ -380,8 +407,20 @@ describe("MessagesPageClient", () => {
     errorSpy.mockRestore();
   });
 
-  it("keeps the inbox list visible first on mobile and routes taps to the thread page", async () => {
+  it("keeps the inbox list visible first on mobile and exposes a native thread link", async () => {
     mockUseMediaQuery.mockReturnValue(true);
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes("/api/messages?")) {
+        return createJsonResponse({
+          messages: [],
+          typingUsers: [],
+          hasNewMessages: false,
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
 
     render(
       <MessagesPageClient
@@ -396,8 +435,98 @@ describe("MessagesPageClient", () => {
       expect.anything()
     );
 
-    fireEvent.click(screen.getByTestId("conversation-item"));
+    const conversationLink = screen.getByTestId("conversation-item");
 
-    expect(mockPush).toHaveBeenCalledWith("/messages/conv-1");
+    expect(conversationLink).toBe(
+      screen.getByRole("link", { name: /Other User/i })
+    );
+    expect(conversationLink).toHaveAttribute("href", "/messages/conv-1");
+    expect(fireEvent.click(conversationLink)).toBe(false);
+    expect(window.location.pathname).toBe("/messages/conv-1");
+    await waitFor(() => {
+      expect(screen.getByTestId("message-input")).toBeInTheDocument();
+    });
+    expect(mockPush).not.toHaveBeenCalledWith("/messages/conv-1");
+  });
+
+  it("opens the mobile thread while the mobile media hook is unresolved", async () => {
+    mockUseMediaQuery.mockReturnValue(undefined);
+    const matchMediaSpy = mockDesktopMatchMedia(false);
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes("/api/messages?")) {
+        return createJsonResponse({
+          messages: [],
+          typingUsers: [],
+          hasNewMessages: false,
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    try {
+      render(
+        <MessagesPageClient
+          currentUserId="user-123"
+          initialConversations={initialConversations}
+        />
+      );
+
+      const conversationLink = screen.getByTestId("conversation-item");
+
+      expect(conversationLink).toHaveAttribute("href", "/messages/conv-1");
+      expect(fireEvent.click(conversationLink)).toBe(false);
+      expect(window.location.pathname).toBe("/messages/conv-1");
+      await waitFor(() => {
+        expect(screen.getByTestId("message-input")).toBeInTheDocument();
+      });
+      expect(mockPush).not.toHaveBeenCalledWith("/messages/conv-1");
+    } finally {
+      matchMediaSpy.mockRestore();
+    }
+  });
+
+  it("keeps desktop conversation selection in-page instead of following the thread link", async () => {
+    mockUseMediaQuery.mockReturnValue(false);
+    const matchMediaSpy = mockDesktopMatchMedia(true);
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url === "/api/messages") {
+        return createJsonResponse({ success: true, count: 0 });
+      }
+      if (url.includes("/api/messages?")) {
+        return createJsonResponse({
+          messages: [],
+          typingUsers: [],
+          hasNewMessages: false,
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    try {
+      render(
+        <MessagesPageClient
+          currentUserId="user-123"
+          initialConversations={initialConversations}
+        />
+      );
+
+      const conversationLink = screen.getByTestId("conversation-item");
+
+      expect(conversationLink).toBe(
+        screen.getByRole("link", { name: /Other User/i })
+      );
+      expect(conversationLink).toHaveAttribute("href", "/messages/conv-1");
+      expect(fireEvent.click(conversationLink)).toBe(false);
+      await waitFor(() => {
+        expect(screen.getByTestId("message-input")).toBeInTheDocument();
+      });
+      expect(mockPush).not.toHaveBeenCalledWith("/messages/conv-1");
+    } finally {
+      matchMediaSpy.mockRestore();
+    }
   });
 });

@@ -106,7 +106,17 @@ const mockedFeatures = features as {
 };
 
 describe("POST /api/payments/checkout", () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+
+  const setNodeEnv = (value: string) => {
+    Object.defineProperty(process.env, "NODE_ENV", {
+      value,
+      configurable: true,
+    });
+  };
+
   beforeEach(() => {
+    setNodeEnv(originalNodeEnv || "test");
     jest.clearAllMocks();
     mockedFeatures.contactPaywall = true;
     mockedFeatures.searchAlertPaywall = false;
@@ -181,6 +191,35 @@ describe("POST /api/payments/checkout", () => {
     (prisma.paymentAbuseSignal.create as jest.Mock).mockResolvedValue({
       id: "signal-123",
     });
+  });
+
+  afterAll(() => {
+    setNodeEnv(originalNodeEnv || "test");
+  });
+
+  it("rejects checkout mutation requests without an Origin header when CSRF is active", async () => {
+    setNodeEnv("production");
+
+    const response = await POST(
+      new Request("http://localhost/api/payments/checkout", {
+        method: "POST",
+        headers: {
+          host: "localhost",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          listingId: "listing-123",
+          productCode: "CONTACT_PACK_3",
+        }),
+      })
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "Forbidden: missing Origin header",
+    });
+    expect(auth).not.toHaveBeenCalled();
+    expect(prisma.listing.findUnique).not.toHaveBeenCalled();
   });
 
   it("returns 404 when the paywall feature is off", async () => {

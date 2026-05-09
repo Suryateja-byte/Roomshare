@@ -52,10 +52,21 @@ test.describe("J25: Send Message in Conversation", () => {
     const hasConversations = (await conversationItem.count()) > 0;
     test.skip(!hasConversations, "No conversations found — skipping");
 
-    // Step 3: Click first conversation
-    await conversationItem.first().click({ timeout: 30000 });
-    // Wait for message input to appear (conversation loaded)
-    await page.getByPlaceholder(/message|type|write/i).or(page.locator('[data-testid="message-input"]')).first().waitFor({ state: "visible", timeout: 10_000 }).catch(() => {});
+    // Step 3: Open the first conversation route deterministically.
+    // Desktop rows may select in-page while links can still navigate; going to the
+    // href avoids filling the composer during a late route transition.
+    const conversationLink = page.locator('a[href^="/messages/"]').first();
+    await conversationLink.waitFor({ state: "visible", timeout: 30_000 });
+    const conversationHref = await conversationLink.getAttribute("href");
+    test.skip(!conversationHref, "No conversation href found — skipping");
+    if (!conversationHref) return;
+
+    await page.goto(conversationHref, { waitUntil: "commit" });
+    await page.waitForURL(/\/messages\/[^/]+/, {
+      timeout: timeouts.navigation,
+      waitUntil: "commit",
+    });
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Step 4: Type and send a message
     const msgInput = page
@@ -70,13 +81,19 @@ test.describe("J25: Send Message in Conversation", () => {
       .catch(() => false);
     test.skip(!canType, "No message input found — skipping");
 
+    const input = msgInput.first();
+    await input.waitFor({ state: "visible", timeout: 10_000 });
+
     const testMsg = `E2E test message ${Date.now()}`;
-    await msgInput.first().fill(testMsg);
+    await input.click();
+    await input.pressSequentially(testMsg, { delay: 5 });
+    await expect(input).toHaveValue(testMsg);
 
     const sendBtn = page
       .getByRole("button", { name: /send/i })
       .or(page.locator('[data-testid="send-button"]'))
       .or(page.locator('button[type="submit"]'));
+    await expect(sendBtn.first()).toBeEnabled({ timeout: 10_000 });
     await sendBtn.first().click({ timeout: 30000 });
     // Wait for sent message to appear
     await page.getByText(testMsg).last().waitFor({ state: "visible", timeout: 10_000 }).catch(() => {});
@@ -97,7 +114,17 @@ test.describe("J26: Start Conversation from Listing", () => {
     nav,
   }) => {
     // Step 1: Find a listing NOT owned by test user
-    await nav.goToSearch({ q: "Reviewer Nob Hill", bounds: SF_BOUNDS });
+    const searchParams = new URLSearchParams({
+      q: "Reviewer Nob Hill",
+      minLat: SF_BOUNDS.minLat.toString(),
+      maxLat: SF_BOUNDS.maxLat.toString(),
+      minLng: SF_BOUNDS.minLng.toString(),
+      maxLng: SF_BOUNDS.maxLng.toString(),
+    });
+    await page.goto(`/search?${searchParams.toString()}`, {
+      waitUntil: "domcontentloaded",
+      timeout: timeouts.navigation,
+    });
     await page.waitForLoadState("networkidle").catch(() => {});
 
     const cards = searchResultsContainer(page).locator(selectors.listingCard);
@@ -165,7 +192,10 @@ test.describe("J26: Start Conversation from Listing", () => {
       .catch(() => false);
     if (canType) {
       const testMsg = `Interested in this listing! ${Date.now()}`;
-      await msgInput.first().fill(testMsg);
+      const input = msgInput.first();
+      await input.click();
+      await input.pressSequentially(testMsg, { delay: 5 });
+      await expect(input).toHaveValue(testMsg);
 
       const sendBtn = page
         .getByRole("button", { name: /send|submit/i })

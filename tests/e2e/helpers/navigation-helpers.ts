@@ -80,6 +80,44 @@ async function waitForSearchTransition(
     .catch(() => false);
 }
 
+async function waitForSearchResultsSettled(page: Page) {
+  await page
+    .getByRole("status", { name: /loading search results/i })
+    .waitFor({ state: "hidden", timeout: 15_000 })
+    .catch(() => {});
+}
+
+async function navigateToListingHref(page: Page, href: string) {
+  const targetUrl = new URL(href, page.url()).toString();
+  const maxAttempts = 2;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await page.goto(targetUrl, {
+        waitUntil: "commit",
+        timeout: timeouts.navigation,
+      });
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const alreadyOnListing = /\/listings\//.test(page.url());
+      const retryableAbort = message.includes("net::ERR_ABORTED");
+
+      if (alreadyOnListing) {
+        return;
+      }
+
+      if (!retryableAbort || attempt === maxAttempts) {
+        throw error;
+      }
+
+      await page
+        .waitForLoadState("domcontentloaded", { timeout: 5000 })
+        .catch(() => {});
+    }
+  }
+}
+
 const knownSearchLocations: Record<
   string,
   {
@@ -309,6 +347,7 @@ export function navigationHelpers(page: Page) {
     async clickListingCard(index = 0) {
       // Wait for listing cards to appear
       const cards = page.locator('[data-testid="listing-card"]');
+      await waitForSearchResultsSettled(page);
       await cards.first().waitFor({ state: "attached", timeout: 30000 });
 
       const count = await cards.count();
@@ -319,12 +358,20 @@ export function navigationHelpers(page: Page) {
       // Navigate directly to the listing URL from the card's link href
       const card = cards.nth(index);
       const link = card.locator('a[href^="/listings/"]').first();
+      await link.waitFor({ state: "attached", timeout: timeouts.navigation });
       const href = await link.getAttribute("href");
       if (!href) {
         throw new Error(`No listing link found in card at index ${index}`);
       }
-      await page.goto(href);
-      await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation });
+      await navigateToListingHref(page, href);
+      await page.waitForURL(/\/listings\//, {
+        timeout: timeouts.navigation,
+        waitUntil: "commit",
+      });
+      await waitForPageReady(page, {
+        selector: 'main, h1, [data-testid="listing-detail"]',
+        timeout: timeouts.navigation,
+      });
     },
 
     /**

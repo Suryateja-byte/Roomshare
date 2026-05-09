@@ -1,0 +1,166 @@
+{
+  "claims": [
+    {
+      "claimId": "V-CH-001",
+      "claim": "Listing detail is the primary contact-host entry point and includes explicit no-booking/no-hold copy.",
+      "citation": "README.md; 02-user-flows.md; evidence-register.md CH-E001",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V-CH-002",
+      "claim": "ContactHostButton starts or resumes a conversation and navigates to /messages/{conversationId} on success.",
+      "citation": "02-user-flows.md; 03-interaction-census.md; evidence-register.md CH-E003",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V-CH-003",
+      "claim": "ContactHostButton can open a paywall dialog and post checkout offers to /api/payments/checkout.",
+      "citation": "02-user-flows.md; 05-api-contracts.md; evidence-register.md CH-E004",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V-CH-004",
+      "claim": "startConversation enforces auth, rate limit, suspension, email verification, listing contactability, self-contact, host suspension, unit epoch, block, duplicate conversation, paywall, and contact-attempt behavior.",
+      "citation": "05-api-contracts.md; 08-auth-security-permissions.md; evidence-register.md CH-E005-CH-E011",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V-CH-005",
+      "claim": "Message sending goes through sendMessage and sendConversationMessage with auth, rate, account, participant, listing, block, content flag, persistence, notification, and email paths.",
+      "citation": "02-user-flows.md; 04-runtime-sequences.md; evidence-register.md CH-E012-CH-E014",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V-CH-006",
+      "claim": "GET and POST /api/messages are documented with auth, rate, access, polling, unread, mark-read, direct send, cache, and failure behavior.",
+      "citation": "05-api-contracts.md; evidence-register.md CH-E015-CH-E016, CH-E032, CH-E044",
+      "verdict": "partial",
+      "discrepancy": "Source and focused Jest/API/security evidence support the documented behavior, including route-level missing-Origin CSRF rejection, but direct HTTP cache/header capture remains a P1 gap.",
+      "recommendedFix": "Run direct HTTP/API checks for status codes and cache headers before marking this fully pass."
+    },
+    {
+      "claimId": "V-CH-007",
+      "claim": "The viewer-state API and public contact contract document contact CTA state, paywall summary, availability gates, private no-store behavior, and canBook/canHold false.",
+      "citation": "05-api-contracts.md; 07-state-management.md; evidence-register.md CH-E019-CH-E020",
+      "verdict": "partial",
+      "discrepancy": "Source contract fields are documented, but the full viewer-state route contract lacks focused runtime/status/cache tests.",
+      "recommendedFix": "Run or add focused viewer-state route tests for fields, statuses, cache headers, auth variants, and paywall conversion."
+    },
+    {
+      "claimId": "V-CH-008",
+      "claim": "The data model and invariants cover conversation, message, notification, block, contact attempt, entitlement, consumption, listing, user, and physical unit state.",
+      "citation": "06-data-model-and-invariants.md; evidence-register.md CH-E023-CH-E024",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V-CH-009",
+      "claim": "Auth/security docs distinguish protected and public/optional-auth surfaces and record source-observed permission gates.",
+      "citation": "08-auth-security-permissions.md; phase-4/04-auth-security-permissions.md",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V-CH-010",
+      "claim": "Interaction census rows include trigger, code path, state/API effect, UI result, failure behavior, evidence, and current evidence-backed test status.",
+      "citation": "03-interaction-census.md; evidence-register.md CH-E032-CH-E045",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V-CH-011",
+      "claim": "State model and diagrams cover viewer state, contact button, paywall, conversation, messages, read state, typing, block, deletion, checkout return, and realtime/polling state.",
+      "citation": "07-state-management.md; diagrams/state-machine-contact-host.mmd",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V-CH-012",
+      "claim": "The test matrix separates release-blocking checks from confidence-building checks, records focused Jest/API/security/component, Chromium messaging, focused listing-detail Contact Host, Mobile Chrome no-deps, and setup-backed Mobile Chrome commands as passed, records the failed pre-fix and first-fix Mobile Chrome attempts as historical, and keeps broader E2E/runtime gaps explicit.",
+      "citation": "11-test-traceability-matrix.md; phase-4/05-test-traceability.md; evidence-register.md CH-E032-CH-E045",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V-CH-013",
+      "claim": "Runtime verification is explicitly marked PARTIALLY VERIFIED, with remaining unverified browser/runtime behavior not described as current verified behavior.",
+      "citation": "README.md; runtime-verification.md; 12-gaps-unknowns-and-questions.md; evidence-register.md CH-E038-CH-E045; 12-gaps-unknowns-and-questions.md CH-G001-CH-G002",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V-CH-014",
+      "claim": "Message length mismatch is documented as a gap rather than resolved behavior.",
+      "citation": "06-data-model-and-invariants.md; 09-errors-empty-loading-edge-cases.md; 12-gaps-unknowns-and-questions.md; evidence-register.md CH-E030",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V-CH-015",
+      "claim": "The Phase 11 round-trip status reconciles historical Phase 1/2 and Phase 4 snapshots with current focused runtime/test evidence and preserves viewer-state full contract, checkout browser return, realtime/RLS, message-length, email, and full-matrix items as explicit P1/P2 gaps while adding schema/test-name detail for reconstruction.",
+      "citation": "round-trip-review.md; 00-feature-boundary.md; phase-4/05-test-traceability.md; 05-api-contracts.md; 11-test-traceability-matrix.md; evidence-register.md CH-E032-CH-E045",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    }
+  ],
+  "coverageGaps": [
+    {
+      "manifestItem": "Runtime/browser contact-host flows",
+      "gap": "Chromium dedupe passed earlier. Current verification passed Chromium messaging, focused listing-detail Contact Host runtime, Mobile Chrome no-deps, and setup-backed Mobile Chrome after stabilizing historical failures. Suspended/paywall/unavailable listing-detail states, checkout browser return, blocked UI browser flow, realtime/presence, email, and full browser matrix are not runtime verified.",
+      "severity": "P1"
+    },
+    {
+      "manifestItem": "Release-blocking tests",
+      "gap": "Focused component/API/security/unit tests, focused MessagesPageClient tests, Chromium messaging E2E, focused listing-detail Contact Host E2E, Mobile Chrome messages no-deps, and setup-backed Mobile Chrome passed after the follow-up stabilization. The full browser matrix plus targeted checkout browser return/realtime tests have not been completed in this documentation pass.",
+      "severity": "P1"
+    },
+    {
+      "manifestItem": "Viewer-state API",
+      "gap": "A viewer-state private-feedback no-bleed test was discovered and added to the manifest, but no full focused route contract/status/cache test has been run for GET /api/listings/[id]/viewer-state.",
+      "severity": "P1"
+    },
+    {
+      "manifestItem": "Checkout APIs",
+      "gap": "Focused checkout and checkout-session API tests passed in CH-E044, but checkout browser return and runtime paid-unlock acceptance remain incomplete.",
+      "severity": "P1"
+    },
+    {
+      "manifestItem": "Supabase realtime",
+      "gap": "Realtime authorization/RLS and fallback behavior remain source-observed but not runtime verified.",
+      "severity": "P1"
+    },
+    {
+      "manifestItem": "Message length contract",
+      "gap": "Inbox, thread, and server/API limits differ and require product/test resolution.",
+      "severity": "P1"
+    },
+    {
+      "manifestItem": "CSRF implementation",
+      "gap": "CSRF helper behavior is documented from source, helper-level CSRF tests pass, and direct missing-Origin rejection tests pass for contact-host API paths; per-route malformed/mismatched Origin variants remain optional confidence coverage.",
+      "severity": "P1"
+    },
+    {
+      "manifestItem": "Email delivery",
+      "gap": "Email send calls are source-observed, but delivery behavior is not runtime verified.",
+      "severity": "P2"
+    }
+  ]
+}

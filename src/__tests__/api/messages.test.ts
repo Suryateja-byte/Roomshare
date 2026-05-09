@@ -94,8 +94,17 @@ describe("Messages API", () => {
   const mockSession = {
     user: { id: "user-123", name: "Test User", email: "test@example.com" },
   };
+  const originalNodeEnv = process.env.NODE_ENV;
+
+  const setNodeEnv = (value: string) => {
+    Object.defineProperty(process.env, "NODE_ENV", {
+      value,
+      configurable: true,
+    });
+  };
 
   beforeEach(() => {
+    setNodeEnv(originalNodeEnv || "test");
     jest.clearAllMocks();
     (auth as jest.Mock).mockResolvedValue(mockSession);
     // Mock user.findUnique for suspension check
@@ -112,6 +121,10 @@ describe("Messages API", () => {
       success: true,
     });
     mockScanOutboundMessageContent.mockReturnValue([]);
+  });
+
+  afterAll(() => {
+    setNodeEnv(originalNodeEnv || "test");
   });
 
   describe("GET", () => {
@@ -281,6 +294,26 @@ describe("Messages API", () => {
   });
 
   describe("POST", () => {
+    it("rejects mutation requests without an Origin header when CSRF is active", async () => {
+      setNodeEnv("production");
+
+      const request = new Request("http://localhost/api/messages", {
+        method: "POST",
+        headers: {
+          host: "localhost",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ conversationId: "conv-123", content: "Hello" }),
+      });
+      const response = await POST(request);
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toEqual({
+        error: "Forbidden: missing Origin header",
+      });
+      expect(auth).not.toHaveBeenCalled();
+    });
+
     it("returns 401 when not authenticated", async () => {
       (auth as jest.Mock).mockResolvedValue(null);
 
