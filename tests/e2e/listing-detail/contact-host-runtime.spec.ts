@@ -55,9 +55,9 @@ async function openReviewerListing(page: import("@playwright/test").Page) {
 test.describe("Contact Host listing detail runtime", () => {
   test.slow();
 
-  test("authenticated non-owner sees contact-first sidebar CTA", async ({
+  test("authenticated non-owner sees contact-first CTA", async ({
     page,
-  }) => {
+  }, testInfo) => {
     await openReviewerListing(page);
 
     await expect(page.getByText(/hosted by e2e reviewer/i).first()).toBeVisible({
@@ -71,12 +71,15 @@ test.describe("Contact Host listing detail runtime", () => {
       page.getByText(/no booking request or hold is created from this page/i)
     ).toBeVisible();
 
-    const sidebar = page.getByTestId("contact-host-sidebar");
-    await expect(sidebar).toBeVisible();
+    const contactRegion = testInfo.project.name.includes("Mobile")
+      ? page.getByTestId("contact-host-host-section")
+      : page.getByTestId("contact-host-sidebar");
+
+    await expect(contactRegion).toBeVisible();
     await expect(
-      sidebar
+      contactRegion
         .getByRole("button", { name: /contact host|unlock to contact/i })
-        .or(sidebar.getByRole("link", { name: /verify email|sign in/i }))
+        .or(contactRegion.getByRole("link", { name: /verify email|sign in/i }))
         .first()
     ).toBeVisible();
   });

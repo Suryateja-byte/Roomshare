@@ -626,29 +626,35 @@ export async function PATCH(
       try {
         const availabilityPatchResult = await prisma.$transaction(
           async (tx) => {
-            const [lockedListing] = await tx.$queryRaw<LockedListingRow[]>`
-            SELECT
-              id,
-              "ownerId",
-              version,
-              status,
-              "statusReason",
-              "normalizedAddress",
-              "physical_unit_id" AS "physicalUnitId",
-              "openSlots",
-              "availableSlots",
-              "totalSlots",
-              "moveInDate",
-              "availableUntil",
-              "minStayMonths",
-              "lastConfirmedAt",
-              "freshnessReminderSentAt",
-              "freshnessWarningSentAt",
-              "autoPausedAt"
+            await tx.$queryRaw<{ id: string }[]>`
+            SELECT id
             FROM "Listing"
             WHERE "id" = ${id}
             FOR UPDATE
           `;
+
+            const lockedListing = await tx.listing.findUnique({
+              where: { id },
+              select: {
+                id: true,
+                ownerId: true,
+                version: true,
+                status: true,
+                statusReason: true,
+                normalizedAddress: true,
+                physicalUnitId: true,
+                openSlots: true,
+                availableSlots: true,
+                totalSlots: true,
+                moveInDate: true,
+                availableUntil: true,
+                minStayMonths: true,
+                lastConfirmedAt: true,
+                freshnessReminderSentAt: true,
+                freshnessWarningSentAt: true,
+                autoPausedAt: true,
+              },
+            });
 
             if (!lockedListing || lockedListing.ownerId !== userId) {
               throw new Error("NOT_FOUND");
@@ -1001,29 +1007,35 @@ export async function PATCH(
 
       try {
         const profilePatchResult = await prisma.$transaction(async (tx) => {
-          const [lockedListing] = await tx.$queryRaw<LockedListingRow[]>`
-            SELECT
-              id,
-              "ownerId",
-              version,
-              status,
-              "statusReason",
-              "normalizedAddress",
-              "physical_unit_id" AS "physicalUnitId",
-              "openSlots",
-              "availableSlots",
-              "totalSlots",
-              "moveInDate",
-              "availableUntil",
-              "minStayMonths",
-              "lastConfirmedAt",
-              "freshnessReminderSentAt",
-              "freshnessWarningSentAt",
-              "autoPausedAt"
+          await tx.$queryRaw<{ id: string }[]>`
+            SELECT id
             FROM "Listing"
             WHERE "id" = ${id}
             FOR UPDATE
           `;
+
+          const lockedListing = await tx.listing.findUnique({
+            where: { id },
+            select: {
+              id: true,
+              ownerId: true,
+              version: true,
+              status: true,
+              statusReason: true,
+              normalizedAddress: true,
+              physicalUnitId: true,
+              openSlots: true,
+              availableSlots: true,
+              totalSlots: true,
+              moveInDate: true,
+              availableUntil: true,
+              minStayMonths: true,
+              lastConfirmedAt: true,
+              freshnessReminderSentAt: true,
+              freshnessWarningSentAt: true,
+              autoPausedAt: true,
+            },
+          });
 
           if (!lockedListing || lockedListing.ownerId !== userId) {
             throw new Error("NOT_FOUND");
