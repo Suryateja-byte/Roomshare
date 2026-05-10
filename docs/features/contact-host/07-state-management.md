@@ -52,6 +52,6 @@ Drift risk scale:
 
 ## State Gaps
 
-- Supabase realtime authorization and database policy behavior remain unknown. Evidence: `phase-4/04-auth-security-permissions.md`.
+- Supabase realtime authorization and database policy behavior remain unknown. PR #123 CI covers runnable messaging functional-core behavior, not RLS. Evidence: `phase-4/04-auth-security-permissions.md`; CH-E049.
 - Message length state is inconsistent between inbox, thread, server action, and API. Evidence: CH-E030.
-- Runtime visual state transitions are not verified. Evidence: CH-E029.
+- Runtime visual state transitions are partially verified by focused browser checks and PR #123 CI; checkout, blocked/delete/search/mark-all-read, suspended/paywall/unavailable, and skipped/fixme realtime states remain gaps. Evidence: CH-E029, CH-E049.

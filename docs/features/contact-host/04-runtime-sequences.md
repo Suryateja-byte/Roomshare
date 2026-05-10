@@ -3,10 +3,11 @@
 These diagrams represent source-observed flow and cite later focused runtime
 evidence where available. Contact button, `/api/messages`, listing
 contactability, focused Chromium listing-detail, Chromium messaging, Mobile
-Chrome no-deps messaging, setup-backed Mobile Chrome messaging, and P1 unit/API
-follow-up checks pass. Checkout browser return, realtime/RLS, actual email delivery,
-suspended/paywall/unavailable listing states, and the full browser matrix remain
-gaps.
+Chrome no-deps messaging, setup-backed Mobile Chrome messaging, P1 unit/API
+follow-up checks, and PR #123 runnable messaging functional-core CI coverage
+pass. Checkout browser return, Supabase RLS, skipped/fixme messaging realtime
+cases, actual email delivery, suspended/paywall/unavailable listing states, and
+browser coverage outside configured CI projects remain gaps.
 
 ## Primary Contact Flow
 

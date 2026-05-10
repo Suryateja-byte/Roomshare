@@ -4,9 +4,11 @@ These flows describe current source behavior plus later focused verification.
 Runtime coverage is partial, not absent: focused Contact Host Jest/API/security,
 `MessagesPageClient` Jest, Chromium messaging/listing-detail, Mobile Chrome
 no-deps messaging, setup-backed Mobile Chrome messaging, and P1 unit/API
-follow-up checks pass. Checkout browser return, realtime/RLS, actual email
-delivery, suspended/paywall-required/unavailable listing states, and the full
-Firefox/WebKit matrix remain gaps. Evidence: CH-E032-CH-E048.
+follow-up checks pass. PR #123 full sharded Playwright CI also passed with
+runnable messaging functional-core coverage. Checkout browser return, Supabase
+RLS, skipped/fixme messaging realtime cases, actual email delivery,
+suspended/paywall-required/unavailable listing states, and browser coverage
+outside configured CI projects remain gaps. Evidence: CH-E032-CH-E049.
 
 ## Listing Detail Contact Entry
 
