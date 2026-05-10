@@ -75,7 +75,7 @@
     {
       "claimId": "V-CH-010",
       "claim": "Interaction census rows include trigger, code path, state/API effect, UI result, failure behavior, evidence, and current evidence-backed test status.",
-      "citation": "03-interaction-census.md; evidence-register.md CH-E032-CH-E046",
+      "citation": "03-interaction-census.md; evidence-register.md CH-E032-CH-E048",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -90,8 +90,8 @@
     },
     {
       "claimId": "V-CH-012",
-      "claim": "The test matrix separates release-blocking checks from confidence-building checks, records focused Jest/API/security/component, Chromium messaging, focused listing-detail Contact Host, Mobile Chrome no-deps, and setup-backed Mobile Chrome commands as passed, records the failed pre-fix and first-fix Mobile Chrome attempts as historical, and keeps broader E2E/runtime gaps explicit.",
-      "citation": "11-test-traceability-matrix.md; phase-4/05-test-traceability.md; evidence-register.md CH-E032-CH-E046",
+      "claim": "The test matrix separates release-blocking checks from confidence-building checks, records focused Jest/API/security/component, Chromium messaging, focused listing-detail Contact Host, Mobile Chrome no-deps, setup-backed Mobile Chrome, and P1 unit/API follow-up commands as passed, records the failed pre-fix and first-fix Mobile Chrome attempts as historical, records the blocked messaging functional E2E attempt, and keeps broader E2E/runtime gaps explicit.",
+      "citation": "11-test-traceability-matrix.md; phase-4/05-test-traceability.md; evidence-register.md CH-E032-CH-E048",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -99,7 +99,7 @@
     {
       "claimId": "V-CH-013",
       "claim": "Runtime verification is explicitly marked PARTIALLY VERIFIED, with remaining unverified browser/runtime behavior not described as current verified behavior.",
-      "citation": "README.md; runtime-verification.md; 12-gaps-unknowns-and-questions.md; evidence-register.md CH-E038-CH-E046; 12-gaps-unknowns-and-questions.md CH-G001-CH-G002",
+      "citation": "README.md; runtime-verification.md; 12-gaps-unknowns-and-questions.md; evidence-register.md CH-E038-CH-E048; 12-gaps-unknowns-and-questions.md CH-G001-CH-G002",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -115,7 +115,7 @@
     {
       "claimId": "V-CH-015",
       "claim": "The Phase 11 round-trip status reconciles historical Phase 1/2 and Phase 4 snapshots with current focused runtime/test evidence and preserves viewer-state full contract, checkout browser return, realtime/RLS, message-length, email, and full-matrix items as explicit P1/P2 gaps while adding schema/test-name detail for reconstruction.",
-      "citation": "round-trip-review.md; 00-feature-boundary.md; phase-4/05-test-traceability.md; 05-api-contracts.md; 11-test-traceability-matrix.md; evidence-register.md CH-E032-CH-E046",
+      "citation": "round-trip-review.md; 00-feature-boundary.md; phase-4/05-test-traceability.md; 05-api-contracts.md; 11-test-traceability-matrix.md; evidence-register.md CH-E032-CH-E048",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -124,12 +124,12 @@
   "coverageGaps": [
     {
       "manifestItem": "Runtime/browser contact-host flows",
-      "gap": "Chromium dedupe passed earlier. Current verification passed Chromium messaging, focused listing-detail Contact Host runtime, Mobile Chrome no-deps, and setup-backed Mobile Chrome after stabilizing historical failures. Suspended/paywall/unavailable listing-detail states, checkout browser return, blocked UI browser flow, realtime/presence, email, and full browser matrix are not runtime verified.",
+      "gap": "Chromium dedupe passed earlier. Current verification passed Chromium messaging, focused listing-detail Contact Host runtime, Mobile Chrome no-deps, setup-backed Mobile Chrome, and P1 unit/API follow-up checks after stabilizing historical failures. Suspended/paywall/unavailable listing-detail states, checkout browser return, blocked UI browser flow, realtime/RLS, actual email delivery, and full browser matrix are not runtime verified. A focused messaging functional E2E attempt was blocked before spec execution by missing local DATABASE_URL.",
       "severity": "P1"
     },
     {
       "manifestItem": "Release-blocking tests",
-      "gap": "Focused component/API/security/unit tests, focused MessagesPageClient tests, Chromium messaging E2E, focused listing-detail Contact Host E2E, Mobile Chrome messages no-deps, and setup-backed Mobile Chrome passed after the follow-up stabilization. The full browser matrix plus targeted checkout browser return/realtime tests have not been completed in this documentation pass.",
+      "gap": "Focused component/API/security/unit tests, focused MessagesPageClient tests, Chromium messaging E2E, focused listing-detail Contact Host E2E, Mobile Chrome messages no-deps, setup-backed Mobile Chrome, and P1 checkout/session/paywall/restoration/email-helper/suspension/contact-attempt tests passed after the follow-up stabilization. The full browser matrix plus targeted checkout browser return/realtime tests have not been completed in this documentation pass.",
       "severity": "P1"
     },
     {
@@ -139,12 +139,12 @@
     },
     {
       "manifestItem": "Checkout APIs",
-      "gap": "Focused checkout and checkout-session API tests passed in CH-E044, but checkout browser return and runtime paid-unlock acceptance remain incomplete.",
+      "gap": "Focused checkout, checkout-session, contact paywall, and contact restoration tests passed in CH-E044/CH-E047, but checkout browser return and runtime paid-unlock acceptance remain incomplete.",
       "severity": "P1"
     },
     {
       "manifestItem": "Supabase realtime",
-      "gap": "Realtime authorization/RLS and fallback behavior remain source-observed but not runtime verified.",
+      "gap": "Realtime authorization/RLS and fallback behavior remain source-observed but not runtime verified. The focused messaging functional E2E attempt in CH-E048 was blocked before spec execution by missing local DATABASE_URL.",
       "severity": "P1"
     },
     {
@@ -159,7 +159,7 @@
     },
     {
       "manifestItem": "Email delivery",
-      "gap": "Email send calls are source-observed, but delivery behavior is not runtime verified.",
+      "gap": "Email send calls and helper behavior are source/unit-observed, but actual delivery behavior is not runtime verified.",
       "severity": "P2"
     }
   ]

@@ -3,13 +3,15 @@
 Status: historical Phase 4 source-only evidence pass. No tests were run during
 this pass. Later focused command results supersede the `NOT RUN` cells below and
 are recorded in `../11-test-traceability-matrix.md` and
-`../evidence-register.md` CH-E032-CH-E046. Current passing evidence includes
+`../evidence-register.md` CH-E032-CH-E048. Current passing evidence includes
 focused component/API/security tests, checkout/checkout-session route tests,
-private-feedback no-bleed, CSRF helper and route missing-Origin tests, Chromium
-messaging, Mobile Chrome no-deps/setup-backed, and focused listing-detail
-Contact Host runtime. Remaining gaps are full viewer-state contract/status/cache
-proof, checkout browser return, realtime/presence, email, state-matrix browser
-coverage, message length resolution, and the full browser matrix.
+private-feedback no-bleed, CSRF helper and route missing-Origin tests, P1
+checkout/session/paywall/restoration/email-helper/suspension/contact-attempt
+unit/API tests, Chromium messaging, Mobile Chrome no-deps/setup-backed, and
+focused listing-detail Contact Host runtime. Remaining gaps are full
+viewer-state contract/status/cache proof, checkout browser return, realtime/RLS,
+actual email delivery, state-matrix browser coverage, message length resolution,
+and the full browser matrix.
 
 ## Manifest-Listed Test Inventory
 
