@@ -114,6 +114,53 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ id: user.id });
       }
 
+      case "setUserPasswordChangedAt": {
+        const email = toStringParam(params.email, "").toLowerCase();
+        if (!email) {
+          return NextResponse.json(
+            { error: "email is required" },
+            { status: 400 }
+          );
+        }
+
+        const rawPasswordChangedAt = params.passwordChangedAt;
+        const passwordChangedAt =
+          rawPasswordChangedAt === null || rawPasswordChangedAt === undefined
+            ? null
+            : new Date(String(rawPasswordChangedAt));
+
+        if (passwordChangedAt && Number.isNaN(passwordChangedAt.getTime())) {
+          return NextResponse.json(
+            { error: "passwordChangedAt must be an ISO date or null" },
+            { status: 400 }
+          );
+        }
+
+        const user = await prisma.user.findUnique({
+          where: { email },
+          select: { passwordChangedAt: true },
+        });
+
+        if (!user) {
+          return NextResponse.json(
+            { error: "User not found" },
+            { status: 404 }
+          );
+        }
+
+        await prisma.user.update({
+          where: { email },
+          data: { passwordChangedAt },
+        });
+
+        return NextResponse.json({
+          success: true,
+          previousPasswordChangedAt:
+            user.passwordChangedAt?.toISOString() ?? null,
+          passwordChangedAt: passwordChangedAt?.toISOString() ?? null,
+        });
+      }
+
       case "getListingSlots": {
         const listing = await prisma.listing.findUnique({
           where: { id: toStringParam(params.listingId) },

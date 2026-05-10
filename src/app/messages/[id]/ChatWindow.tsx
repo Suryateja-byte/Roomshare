@@ -124,6 +124,7 @@ export default function ChatWindow({
   const channelRef = useRef<RealtimeChannel | null>(null);
   const pollAbortRef = useRef<AbortController | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const sessionExpiryRedirectRef = useRef(false);
   const router = useRouter();
   const lastMessageIdRef = useRef<string | null>(
     initialMessages.length > 0
@@ -149,6 +150,27 @@ export default function ChatWindow({
 
   // Network status tracking
   const { isOffline } = useNetworkStatus();
+
+  const handleSessionExpired = useCallback(
+    (draft: string, messageIdToRemove?: string) => {
+      if (messageIdToRemove) {
+        setMessages((prev) =>
+          prev.filter((message) => message.id !== messageIdToRemove)
+        );
+      }
+
+      const trimmedDraft = draft.trim();
+      if (trimmedDraft) {
+        sessionStorage.setItem(`chat_draft_${conversationId}`, trimmedDraft);
+      }
+
+      if (sessionExpiryRedirectRef.current) return;
+      sessionExpiryRedirectRef.current = true;
+      toast.error("Your session has expired. Redirecting to login...");
+      router.push(`/login?callbackUrl=/messages/${conversationId}`);
+    },
+    [conversationId, router]
+  );
 
   // Handle blocking a user
   const handleBlock = async () => {
@@ -338,6 +360,11 @@ export default function ChatWindow({
         signal: abortController.signal,
       });
 
+      if (response.status === 401) {
+        handleSessionExpired(inputRef.current?.value ?? "");
+        return;
+      }
+
       if (!response.ok) {
         throw new Error(`Polling failed with status ${response.status}`);
       }
@@ -383,7 +410,12 @@ export default function ChatWindow({
       }
       isPollingRef.current = false;
     }
-  }, [conversationId, currentUserId, markConversationRead]);
+  }, [
+    conversationId,
+    currentUserId,
+    handleSessionExpired,
+    markConversationRead,
+  ]);
 
   // Set up real-time subscription with presence and typing
   useEffect(() => {
@@ -588,11 +620,7 @@ export default function ChatWindow({
       // Check for session expiry or other errors
       if (result && "error" in result) {
         if (result.code === "SESSION_EXPIRED") {
-          // Remove optimistic message and save draft before redirect
-          setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
-          sessionStorage.setItem(`chat_draft_${conversationId}`, content);
-          toast.error("Your session has expired. Redirecting to login...");
-          router.push(`/login?callbackUrl=/messages/${conversationId}`);
+          handleSessionExpired(content, optimisticId);
           return;
         }
 
@@ -650,10 +678,7 @@ export default function ChatWindow({
 
       if (result && "error" in result) {
         if (result.code === "SESSION_EXPIRED") {
-          setMessages((prev) => prev.filter((m) => m.id !== failedId));
-          sessionStorage.setItem(`chat_draft_${conversationId}`, content);
-          toast.error("Your session has expired. Redirecting to login...");
-          router.push(`/login?callbackUrl=/messages/${conversationId}`);
+          handleSessionExpired(content, failedId);
           return;
         }
 

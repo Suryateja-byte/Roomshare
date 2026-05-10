@@ -127,6 +127,7 @@ export {
   clearAuthCookies,
   expireSession,
   mockApi401,
+  revokeCurrentUserSession,
   triggerSessionPoll,
   expectLoginRedirect,
   expectDraftSaved,

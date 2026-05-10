@@ -11,35 +11,65 @@
 import { Page, Route } from "@playwright/test";
 import { expect } from "@playwright/test";
 
-const AUTH_COOKIES = [
-  "authjs.session-token",
-  "__Secure-authjs.session-token",
-  "authjs.csrf-token",
-  "__Host-authjs.csrf-token",
-  "authjs.callback-url",
-  "__Secure-authjs.callback-url",
-];
-
 export async function clearAuthCookies(page: Page): Promise<void> {
-  const currentCookies = await page.context().cookies();
-  const matchingCookies = currentCookies.filter((cookie) =>
-    AUTH_COOKIES.includes(cookie.name)
-  );
+  // Session-expiry tests need server actions and route handlers to see a fully
+  // expired browser context. Clearing every cookie is more robust than chasing
+  // Auth.js exact/chunked cookie names and is scoped to these expiry helpers.
+  await page.context().clearCookies();
+}
 
-  if (matchingCookies.length === 0) {
-    for (const cookie of AUTH_COOKIES) {
-      await page.context().clearCookies({ name: cookie });
-    }
-    return;
+type PasswordChangedAtResponse = {
+  previousPasswordChangedAt?: string | null;
+  passwordChangedAt?: string | null;
+};
+
+async function setUserPasswordChangedAt(
+  page: Page,
+  email: string,
+  passwordChangedAt: string | null
+): Promise<PasswordChangedAtResponse> {
+  const secret = process.env.E2E_TEST_SECRET;
+  if (!secret) {
+    throw new Error("E2E_TEST_SECRET is required to revoke test sessions");
   }
 
-  for (const cookie of matchingCookies) {
-    await page.context().clearCookies({
-      name: cookie.name,
-      domain: cookie.domain,
-      path: cookie.path,
-    });
+  const response = await page.request.post("/api/test-helpers", {
+    data: {
+      action: "setUserPasswordChangedAt",
+      params: { email, passwordChangedAt },
+    },
+    headers: {
+      Authorization: `Bearer ${secret}`,
+    },
+    timeout: 10_000,
+  });
+
+  const body = (await response.json().catch(() => ({}))) as
+    | PasswordChangedAtResponse
+    | { error?: string };
+
+  if (!response.ok()) {
+    const message = "error" in body && body.error ? body.error : response.statusText();
+    throw new Error(`Failed to update passwordChangedAt: ${message}`);
   }
+
+  return body as PasswordChangedAtResponse;
+}
+
+export async function revokeCurrentUserSession(
+  page: Page,
+  email = process.env.E2E_TEST_EMAIL || "test@example.com"
+): Promise<() => Promise<void>> {
+  const revokedAt = new Date(Date.now() + 60_000).toISOString();
+  const result = await setUserPasswordChangedAt(page, email, revokedAt);
+
+  return async () => {
+    await setUserPasswordChangedAt(
+      page,
+      email,
+      result.previousPasswordChangedAt ?? null
+    );
+  };
 }
 
 /**
@@ -56,6 +86,19 @@ export async function expireSession(
   const { mockEndpoint = true, triggerRefetch = false } = options;
 
   await clearAuthCookies(page);
+
+  const currentUrl = new URL(page.url());
+  await page.context().addCookies([
+    {
+      name: "authjs.session-token",
+      value: "expired-session-token",
+      domain: currentUrl.hostname,
+      path: "/",
+      httpOnly: true,
+      secure: currentUrl.protocol === "https:",
+      sameSite: "Lax",
+    },
+  ]);
 
   if (mockEndpoint) {
     await page.route("**/api/auth/session", async (route: Route) => {

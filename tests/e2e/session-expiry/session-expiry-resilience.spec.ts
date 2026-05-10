@@ -14,6 +14,7 @@ import {
   clearAuthCookies,
   expireSession,
   expectLoginRedirect,
+  revokeCurrentUserSession,
 } from "../helpers";
 
 async function openFirstConversationThread(
@@ -48,28 +49,37 @@ test.describe("Session Expiry: Resilience", () => {
 
     await openFirstConversationThread(page);
 
-    // Expire session
-    await expireSession(page);
+    // Revoke the server-side JWT without mocking the session endpoint; this
+    // keeps the thread mounted long enough to exercise the send action's
+    // one-redirect SESSION_EXPIRED handling.
+    const restoreSession = await revokeCurrentUserSession(page);
 
-    const input = page.getByRole("textbox");
-    await expect(input).toBeVisible({ timeout: 10000 });
+    try {
+      const input = page.locator('[data-testid="message-input"]');
+      await expect(input).toBeVisible({ timeout: 10000 });
 
-    // Type and send rapidly 3 times
-    const sendBtn = page.getByRole("button", { name: /send/i });
-    for (let i = 0; i < 3; i++) {
-      await input.fill(`Rapid message ${i + 1}`);
-      await sendBtn.click().catch(() => {
-        // Button may become disabled or page may navigate
-      });
+      // Type and send rapidly 3 times
+      const sendBtn = page.locator('[data-testid="send-button"]');
+      for (let i = 0; i < 3; i++) {
+        const canType = await input.isEnabled().catch(() => false);
+        if (!canType || /\/(login|signin|auth)/.test(page.url())) break;
+
+        await input.fill(`Rapid message ${i + 1}`);
+        await sendBtn.click().catch(() => {
+          // Button may become disabled or page may navigate
+        });
+      }
+
+      // Should redirect to login exactly once (not infinite loop)
+      await expectLoginRedirect(page);
+
+      // Verify page is stable (no redirect loop)
+      await expect(page).toHaveURL(/\/login/, { timeout: 5000 });
+      // Confirm URL stays on login (no redirect loop)
+      await expect(page).toHaveURL(/\/login/);
+    } finally {
+      await restoreSession();
     }
-
-    // Should redirect to login exactly once (not infinite loop)
-    await expectLoginRedirect(page);
-
-    // Verify page is stable (no redirect loop)
-    await expect(page).toHaveURL(/\/login/, { timeout: 5000 });
-    // Confirm URL stays on login (no redirect loop)
-    await expect(page).toHaveURL(/\/login/);
   });
 
   test(`${tags.auth} ${tags.sessionExpiry} - SE-R02: Browser back after session expiry redirect does not crash`, async ({

@@ -247,7 +247,9 @@ test.describe("Listing Edit — Auth & Access Guards", () => {
       const titleValue = await titleInput.inputValue();
       expect(titleValue.length).toBeGreaterThan(0);
     } else {
-      await expect(page.locator("#openSlots")).toBeVisible({ timeout: 10000 });
+      await expect(page.getByLabel(/open slots/i).first()).toBeVisible({
+        timeout: 10000,
+      });
     }
   });
 });
