@@ -22,10 +22,10 @@ as historical snapshots unless a later current-status document supersedes them.
 
 - `00-feature-boundary.md` records the Phase 1/2 source-discovery boundary.
   Later runtime/test status lives in `runtime-verification.md`,
-  `11-test-traceability-matrix.md`, and `evidence-register.md` CH-E032-CH-E046.
+  `11-test-traceability-matrix.md`, and `evidence-register.md` CH-E032-CH-E048.
 - `phase-4/*` files are historical source-only evidence passes. Their `NOT RUN`
   cells describe Phase 4 only and are superseded by later command evidence where
-  the final docs cite CH-E032-CH-E046.
+  the final docs cite CH-E032-CH-E048.
 - `source-map.md` and `01-source-map.md` use source-verification labels for
   inspected files; runtime proof is only claimed where command evidence is
   cited.
@@ -35,13 +35,13 @@ as historical snapshots unless a later current-status document supersedes them.
 | Gap | Classification | Why not P0 in current docs |
 |---|---|---|
 | Viewer-state direct HTTP/status/cache proof | P1 | Source contract is documented and not claimed as direct HTTP verified. |
-| Checkout browser return/runtime | P1 | Focused checkout and checkout-session route tests passed in CH-E044; paid unlock browser return remains a gap. Promote to P0 if paid unlock runtime is release-blocking. |
+| Checkout browser return/runtime | P1 | Focused checkout, checkout-session, paywall, and contact-restoration tests passed in CH-E044/CH-E047; paid unlock browser return remains a gap. Promote to P0 if paid unlock runtime is release-blocking. |
 | Expanded CSRF route variants | P1 | CSRF helper tests and route-level missing-Origin rejection passed in CH-E044; per-route malformed/mismatched Origin variants remain optional confidence coverage. |
-| Supabase realtime/RLS | P1 | Messaging has polling/API evidence; realtime delivery/security remains explicitly unverified. |
+| Supabase realtime/RLS | P1 | Messaging has polling/API evidence; the focused functional E2E attempt in CH-E048 was blocked before spec execution by missing local `DATABASE_URL`, so realtime delivery/security remains explicitly unverified. |
 | Message length mismatch | P1 | The contradiction is documented as unresolved and needs product decision plus tests. |
 | Broader profile-completion gates | P1 | Docs only claim email verification and suspension gates, not broader profile requirements. |
 | Full Firefox-WebKit/browser matrix | P1 | Focused current gates, including setup-backed Mobile Chrome, pass; full matrix is marked incomplete. |
-| Email delivery | P2 | Source send calls are documented, but delivery is environment dependent and unverified. |
+| Email delivery | P2 | Source send calls and helper tests are documented, but actual delivery is environment dependent and unverified. |
 
 Ready for Phase 12 human validation: yes, as a documentation package with no P0
 documentation blockers and explicit P1/P2 open gaps.

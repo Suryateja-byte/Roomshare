@@ -1,12 +1,12 @@
 # User Flows
 
 These flows describe current source behavior plus later focused verification.
-Runtime coverage is partial, not absent: focused Contact Host Jest,
-`MessagesPageClient` Jest, Chromium messaging/listing-detail, and Mobile Chrome
-no-deps messaging checks pass. Setup-backed Mobile Chrome auth, checkout,
-realtime/presence, email delivery, suspended/paywall-required/unavailable
-listing states, and the full Firefox/WebKit matrix remain gaps. Evidence:
-CH-E032-CH-E040.
+Runtime coverage is partial, not absent: focused Contact Host Jest/API/security,
+`MessagesPageClient` Jest, Chromium messaging/listing-detail, Mobile Chrome
+no-deps messaging, setup-backed Mobile Chrome messaging, and P1 unit/API
+follow-up checks pass. Checkout browser return, realtime/RLS, actual email
+delivery, suspended/paywall-required/unavailable listing states, and the full
+Firefox/WebKit matrix remain gaps. Evidence: CH-E032-CH-E048.
 
 ## Listing Detail Contact Entry
 
