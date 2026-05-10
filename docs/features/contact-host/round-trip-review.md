@@ -22,10 +22,10 @@ as historical snapshots unless a later current-status document supersedes them.
 
 - `00-feature-boundary.md` records the Phase 1/2 source-discovery boundary.
   Later runtime/test status lives in `runtime-verification.md`,
-  `11-test-traceability-matrix.md`, and `evidence-register.md` CH-E032-CH-E045.
+  `11-test-traceability-matrix.md`, and `evidence-register.md` CH-E032-CH-E046.
 - `phase-4/*` files are historical source-only evidence passes. Their `NOT RUN`
   cells describe Phase 4 only and are superseded by later command evidence where
-  the final docs cite CH-E032-CH-E045.
+  the final docs cite CH-E032-CH-E046.
 - `source-map.md` and `01-source-map.md` use source-verification labels for
   inspected files; runtime proof is only claimed where command evidence is
   cited.

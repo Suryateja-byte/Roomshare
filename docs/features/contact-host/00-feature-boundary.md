@@ -7,10 +7,11 @@ Slug: `contact-host`
 Evidence status: historical Phase 1/2 boundary snapshot. Runtime/browser
 behavior and test execution were `NOT VERIFIED` in this phase. Current focused
 runtime/test status is recorded in `runtime-verification.md`,
-`11-test-traceability-matrix.md`, and `evidence-register.md` CH-E032-CH-E045.
+`11-test-traceability-matrix.md`, and `evidence-register.md` CH-E032-CH-E046.
 
-Source of truth: current dirty worktree on 2026-05-08. Production code was not
-modified.
+Source of truth: merged `main` commit `e4db1036` after PR #121 was
+squash-merged, with follow-up documentation evidence recorded in CH-E046.
+Production code was not modified.
 
 ## Included
 
@@ -87,7 +88,7 @@ modified.
   helpers, contactability, paywall/contact attempts, conversation deduplication,
   messaging journeys, mobile messaging, and notifications. Test execution was
   `NOT VERIFIED` in Phase 1/2; later focused command results are tracked in
-  `evidence-register.md` CH-E032-CH-E045 and
+  `evidence-register.md` CH-E032-CH-E046 and
   `11-test-traceability-matrix.md`. Phase 1/2 evidence:
   `src/__tests__/components/ContactHostButton.test.tsx:33-289`,
   `src/__tests__/api/messages.test.ts:93-621`,
