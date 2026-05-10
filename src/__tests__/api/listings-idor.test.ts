@@ -321,7 +321,10 @@ describe("Listings API IDOR Protection", () => {
         async (callback) => {
           const tx = {
             $queryRaw: queryRawMock,
-            listing: { update: updateMock },
+            listing: {
+              findUnique: jest.fn().mockResolvedValue(makeLockedListing()),
+              update: updateMock,
+            },
             location: { update: jest.fn() },
             $executeRaw: jest.fn(),
           };
@@ -764,7 +767,13 @@ describe("Listings API IDOR Protection", () => {
         async (callback) => {
           const tx = {
             $queryRaw: queryRawMock,
-            listing: { update: updateMock },
+            listing: {
+              findUnique: jest.fn().mockResolvedValue({
+                ...makeLockedListing(),
+                ownerId: "attacker-456",
+              }),
+              update: updateMock,
+            },
             location: { update: jest.fn() },
             $executeRaw: jest.fn(),
           };
@@ -799,7 +808,10 @@ describe("Listings API IDOR Protection", () => {
         async (callback) => {
           const tx = {
             $queryRaw: queryRawMock,
-            listing: { update: updateMock },
+            listing: {
+              findUnique: jest.fn().mockResolvedValue(null),
+              update: updateMock,
+            },
             location: { update: jest.fn() },
             $executeRaw: jest.fn(),
           };
