@@ -75,7 +75,7 @@
     {
       "claimId": "V-CH-010",
       "claim": "Interaction census rows include trigger, code path, state/API effect, UI result, failure behavior, evidence, and current evidence-backed test status.",
-      "citation": "03-interaction-census.md; evidence-register.md CH-E032-CH-E045",
+      "citation": "03-interaction-census.md; evidence-register.md CH-E032-CH-E046",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -91,7 +91,7 @@
     {
       "claimId": "V-CH-012",
       "claim": "The test matrix separates release-blocking checks from confidence-building checks, records focused Jest/API/security/component, Chromium messaging, focused listing-detail Contact Host, Mobile Chrome no-deps, and setup-backed Mobile Chrome commands as passed, records the failed pre-fix and first-fix Mobile Chrome attempts as historical, and keeps broader E2E/runtime gaps explicit.",
-      "citation": "11-test-traceability-matrix.md; phase-4/05-test-traceability.md; evidence-register.md CH-E032-CH-E045",
+      "citation": "11-test-traceability-matrix.md; phase-4/05-test-traceability.md; evidence-register.md CH-E032-CH-E046",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -99,7 +99,7 @@
     {
       "claimId": "V-CH-013",
       "claim": "Runtime verification is explicitly marked PARTIALLY VERIFIED, with remaining unverified browser/runtime behavior not described as current verified behavior.",
-      "citation": "README.md; runtime-verification.md; 12-gaps-unknowns-and-questions.md; evidence-register.md CH-E038-CH-E045; 12-gaps-unknowns-and-questions.md CH-G001-CH-G002",
+      "citation": "README.md; runtime-verification.md; 12-gaps-unknowns-and-questions.md; evidence-register.md CH-E038-CH-E046; 12-gaps-unknowns-and-questions.md CH-G001-CH-G002",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -115,7 +115,7 @@
     {
       "claimId": "V-CH-015",
       "claim": "The Phase 11 round-trip status reconciles historical Phase 1/2 and Phase 4 snapshots with current focused runtime/test evidence and preserves viewer-state full contract, checkout browser return, realtime/RLS, message-length, email, and full-matrix items as explicit P1/P2 gaps while adding schema/test-name detail for reconstruction.",
-      "citation": "round-trip-review.md; 00-feature-boundary.md; phase-4/05-test-traceability.md; 05-api-contracts.md; 11-test-traceability-matrix.md; evidence-register.md CH-E032-CH-E045",
+      "citation": "round-trip-review.md; 00-feature-boundary.md; phase-4/05-test-traceability.md; 05-api-contracts.md; 11-test-traceability-matrix.md; evidence-register.md CH-E032-CH-E046",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
