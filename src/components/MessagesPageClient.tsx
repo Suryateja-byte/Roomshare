@@ -126,6 +126,7 @@ export default function MessagesPageClient({
   const lastReadMessageIdRef = useRef<string | null>(null);
   const pollAbortRef = useRef<AbortController | null>(null);
   const isPollingRef = useRef(false);
+  const sessionExpiryRedirectRef = useRef(false);
   const router = useRouter();
   const { isOffline } = useNetworkStatus();
   const [showDeleteConversationDialog, setShowDeleteConversationDialog] =
@@ -195,6 +196,37 @@ export default function MessagesPageClient({
     },
     []
   );
+  const redirectToLoginForConversation = useCallback(
+    (conversationId: string | null | undefined) => {
+      if (sessionExpiryRedirectRef.current) return;
+      sessionExpiryRedirectRef.current = true;
+      const callbackUrl = conversationId
+        ? `/messages/${conversationId}`
+        : "/messages";
+      router.push(`/login?callbackUrl=${callbackUrl}`);
+    },
+    [router]
+  );
+
+  const handleSessionExpired = useCallback(
+    (conversationId: string, draft: string, optimisticMessageId?: string) => {
+      if (optimisticMessageId) {
+        setMsgs((prev) =>
+          prev.filter((message) => message.id !== optimisticMessageId)
+        );
+      }
+
+      if (draft.trim()) {
+        sessionStorage.setItem(`chat_draft_${conversationId}`, draft);
+      }
+
+      if (!sessionExpiryRedirectRef.current) {
+        toast.error("Your session has expired. Redirecting to login...");
+      }
+      redirectToLoginForConversation(conversationId);
+    },
+    [redirectToLoginForConversation]
+  );
 
   const markConversationRead = useCallback(
     async (conversationId: string, latestIncomingMessageId?: string | null) => {
@@ -220,7 +252,7 @@ export default function MessagesPageClient({
         });
 
         if (response.status === 401) {
-          router.push("/login?callbackUrl=/messages");
+          handleSessionExpired(conversationId, "");
           return;
         }
 
@@ -246,7 +278,7 @@ export default function MessagesPageClient({
         console.error("Failed to mark messages as read:", _error);
       }
     },
-    [currentUserId, router]
+    [currentUserId, handleSessionExpired]
   );
 
   // Handle blocking a user
@@ -373,7 +405,7 @@ export default function MessagesPageClient({
         });
 
         if (response.status === 401) {
-          router.push("/login?callbackUrl=/messages");
+          handleSessionExpired(activeId, "");
           return;
         }
 
@@ -488,8 +520,8 @@ export default function MessagesPageClient({
   }, [
     activeId,
     currentUserId,
+    handleSessionExpired,
     markConversationRead,
-    router,
     updateConversationPreview,
   ]);
 
@@ -510,6 +542,17 @@ export default function MessagesPageClient({
       document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [activeId, currentUserId, markConversationRead]);
 
+  useEffect(() => {
+    if (!activeId) return;
+
+    const draftKey = `chat_draft_${activeId}`;
+    const savedDraft = sessionStorage.getItem(draftKey);
+    if (!savedDraft) return;
+
+    setInput(savedDraft);
+    sessionStorage.removeItem(draftKey);
+    toast.info("Your message draft was restored");
+  }, [activeId]);
   // Handle typing status
   const handleInputChange = useCallback(
     (value: string) => {
@@ -598,8 +641,7 @@ export default function MessagesPageClient({
     if ("error" in result) {
       // Handle session expiry
       if (result.code === "SESSION_EXPIRED") {
-        sessionStorage.setItem(`chat_draft_${activeId}`, content);
-        router.push(`/login?callbackUrl=/messages`);
+        handleSessionExpired(activeId, content, optimisticId);
         return;
       }
 
@@ -667,8 +709,7 @@ export default function MessagesPageClient({
     if ("error" in result) {
       // Handle session expiry
       if (result.code === "SESSION_EXPIRED") {
-        sessionStorage.setItem(`chat_draft_${activeId}`, content);
-        router.push(`/login?callbackUrl=/messages`);
+        handleSessionExpired(activeId, content, newOptimisticId);
         return;
       }
 
@@ -711,6 +752,39 @@ export default function MessagesPageClient({
             new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
         )
     );
+  };
+
+  const shouldUseDesktopInPageSelection = () => {
+    if (
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function"
+    ) {
+      return window.matchMedia("(min-width: 768px)").matches;
+    }
+
+    return isMobileViewport === false;
+  };
+
+  const openMobileThread = (conversationId: string) => {
+    setActiveId(conversationId);
+
+    if (typeof window === "undefined") return;
+
+    const threadPath = `/messages/${conversationId}`;
+    if (window.location.pathname !== threadPath) {
+      window.history.pushState(null, "", threadPath);
+    }
+  };
+
+  const showConversationList = () => {
+    setActiveId(null);
+
+    if (
+      typeof window !== "undefined" &&
+      window.location.pathname.startsWith("/messages/")
+    ) {
+      window.history.pushState(null, "", "/messages");
+    }
   };
 
   // Filter conversations based on search query
@@ -793,21 +867,37 @@ export default function MessagesPageClient({
             const lastMsg = c.messages[0];
             const hasUnread = (c.unreadCount || 0) > 0;
             return (
-              <div
+              <Link
                 key={c.id}
                 data-testid="conversation-item"
-                onClick={() => {
-                  const shouldOpenThreadRoute =
-                    typeof window !== "undefined" &&
-                    window.matchMedia("(max-width: 767px)").matches;
-
-                  if (shouldOpenThreadRoute || isMobileViewport) {
-                    router.push(`/messages/${c.id}`);
+                href={`/messages/${c.id}`}
+                prefetch={false}
+                onClick={(event) => {
+                  if (
+                    event.metaKey ||
+                    event.ctrlKey ||
+                    event.shiftKey ||
+                    event.altKey ||
+                    event.button !== 0 ||
+                    !shouldUseDesktopInPageSelection()
+                  ) {
+                    if (
+                      !event.metaKey &&
+                      !event.ctrlKey &&
+                      !event.shiftKey &&
+                      !event.altKey &&
+                      event.button === 0
+                    ) {
+                      event.preventDefault();
+                      openMobileThread(c.id);
+                    }
                     return;
                   }
+
+                  event.preventDefault();
                   setActiveId(c.id);
                 }}
-                className={`px-6 py-4 flex gap-4 cursor-pointer transition-colors border-l-4 ${activeId === c.id ? "bg-surface-canvas border-outline-variant/20" : "bg-surface-container-lowest border-transparent hover:bg-surface-canvas"}`}
+                className={`w-full px-6 py-4 flex gap-4 cursor-pointer transition-colors border-l-4 ${activeId === c.id ? "bg-surface-canvas border-outline-variant/20" : "bg-surface-container-lowest border-transparent hover:bg-surface-canvas"}`}
               >
                 <div className="relative">
                   <UserAvatar
@@ -852,7 +942,7 @@ export default function MessagesPageClient({
                     {c.listing.title}
                   </p>
                 </div>
-              </div>
+              </Link>
             );
           })}
           {filteredConversations.length === 0 && (
@@ -899,7 +989,7 @@ export default function MessagesPageClient({
                 <button
                   data-testid="back-button"
                   aria-label="Back to conversations"
-                  onClick={() => setActiveId(null)}
+                  onClick={showConversationList}
                   className="md:hidden p-2 -ml-2 text-on-surface-variant"
                 >
                   <ArrowLeft className="w-5 h-5" />
@@ -1179,7 +1269,9 @@ export default function MessagesPageClient({
                 {isOffline && (
                   <div className="px-4 py-2 bg-surface-container-high rounded-xl flex items-center gap-2 text-sm text-on-surface-variant">
                     <WifiOff className="w-4 h-4" />
-                    <span>You&apos;re offline. Reconnect to send messages.</span>
+                    <span>
+                      You&apos;re offline. Reconnect to send messages.
+                    </span>
                   </div>
                 )}
                 <form

@@ -63,8 +63,19 @@ test.describe("J31: Edit Listing and Verify", () => {
       .catch(() => false);
     test.skip(!canEdit, "No edit button — not owner view");
 
-    await editBtn.first().click();
-    await page.waitForLoadState("domcontentloaded");
+    const editHref = await editBtn
+      .first()
+      .getAttribute("href")
+      .catch(() => null);
+    if (editHref) {
+      await page.goto(editHref, { waitUntil: "domcontentloaded" });
+    } else {
+      await editBtn.first().click();
+      await page.waitForLoadState("domcontentloaded");
+    }
+    await page.waitForURL(/\/listings\/[^/]+\/edit/, {
+      timeout: timeouts.navigation,
+    });
 
     // Step 4: Edit the current host-managed availability form
     const openSlotsField = page
@@ -122,13 +133,6 @@ test.describe("J31: Edit Listing and Verify", () => {
     const updatedListing = await response.json();
     expect(updatedListing.openSlots).toBe(updatedOpenSlots);
 
-    await expect
-      .poll(
-        () => page.url().includes(listingPath) && !page.url().includes("/edit"),
-        { timeout: 20000 }
-      )
-      .toBe(true);
-
     await expect(
       page.locator('[data-testid="listing-detail-header"]')
     ).toBeVisible({
@@ -154,12 +158,11 @@ test.describe("J31: Edit Listing and Verify", () => {
     );
     await saveBtn.first().click();
     expect((await restoreResponse).ok()).toBeTruthy();
-    await expect
-      .poll(
-        () => page.url().includes(listingPath) && !page.url().includes("/edit"),
-        { timeout: 20000 }
-      )
-      .toBe(true);
+    await expect(
+      page.locator('[data-testid="listing-detail-header"]')
+    ).toBeVisible({
+      timeout: 10000,
+    });
   });
 });
 

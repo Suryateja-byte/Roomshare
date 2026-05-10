@@ -504,7 +504,7 @@ function ContactFirstSidebarCard({
 
         <div
           data-testid="contact-host-sidebar"
-          className="[&>button]:bg-transparent [&>button]:border [&>button]:border-outline-variant/30 [&>button]:text-on-surface [&>button]:hover:bg-surface-container-high [&>button]:shadow-none"
+          className="hidden lg:block [&>button]:bg-transparent [&>button]:border [&>button]:border-outline-variant/30 [&>button]:text-on-surface [&>button]:hover:bg-surface-container-high [&>button]:shadow-none"
         >
           <MessagingCta
             listingId={listingId}

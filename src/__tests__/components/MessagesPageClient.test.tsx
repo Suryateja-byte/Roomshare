@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { AnchorHTMLAttributes, ReactNode } from "react";
 import "@testing-library/jest-dom";
 import {
   render,
@@ -29,8 +29,19 @@ jest.mock("@/hooks/useMediaQuery", () => ({
 
 jest.mock("next/link", () => ({
   __esModule: true,
-  default: ({ children, href }: { children: ReactNode; href: string }) => (
-    <a href={href}>{children}</a>
+  default: ({
+    children,
+    href,
+    prefetch: _prefetch,
+    ...props
+  }: AnchorHTMLAttributes<HTMLAnchorElement> & {
+    children: ReactNode;
+    href: string;
+    prefetch?: boolean;
+  }) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
   ),
 }));
 
@@ -165,6 +176,7 @@ jest.mock("@/components/ui/alert-dialog", () => ({
 }));
 
 import MessagesPageClient from "@/components/MessagesPageClient";
+import { toast } from "sonner";
 
 type MockMessage = {
   id: string;
@@ -180,6 +192,23 @@ function createJsonResponse(body: unknown, status = 200) {
     status,
     json: async () => body,
   });
+}
+
+function mockDesktopMatchMedia(matchesDesktop: boolean) {
+  return jest.spyOn(window, "matchMedia").mockImplementation(
+    (query: string) =>
+      ({
+        matches:
+          query === "(min-width: 768px)" ? matchesDesktop : !matchesDesktop,
+        media: query,
+        onchange: null,
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+        addListener: jest.fn(),
+        removeListener: jest.fn(),
+        dispatchEvent: jest.fn(),
+      }) as MediaQueryList
+  );
 }
 
 function buildMessage(
@@ -226,9 +255,11 @@ describe("MessagesPageClient", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    window.history.replaceState(null, "", "/messages");
     fetchMock.mockReset();
     global.fetch = fetchMock as unknown as typeof fetch;
     mockUseMediaQuery.mockReturnValue(false);
+    sessionStorage.clear();
     mockMarkAllMessagesAsRead.mockResolvedValue({ success: true, count: 0 });
     mockDeleteConversation.mockResolvedValue({ success: true });
   });
@@ -380,8 +411,20 @@ describe("MessagesPageClient", () => {
     errorSpy.mockRestore();
   });
 
-  it("keeps the inbox list visible first on mobile and routes taps to the thread page", async () => {
+  it("keeps the inbox list visible first on mobile and exposes a native thread link", async () => {
     mockUseMediaQuery.mockReturnValue(true);
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes("/api/messages?")) {
+        return createJsonResponse({
+          messages: [],
+          typingUsers: [],
+          hasNewMessages: false,
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
 
     render(
       <MessagesPageClient
@@ -396,8 +439,172 @@ describe("MessagesPageClient", () => {
       expect.anything()
     );
 
-    fireEvent.click(screen.getByTestId("conversation-item"));
+    const conversationLink = screen.getByTestId("conversation-item");
 
-    expect(mockPush).toHaveBeenCalledWith("/messages/conv-1");
+    expect(conversationLink).toBe(
+      screen.getByRole("link", { name: /Other User/i })
+    );
+    expect(conversationLink).toHaveAttribute("href", "/messages/conv-1");
+    expect(fireEvent.click(conversationLink)).toBe(false);
+    expect(window.location.pathname).toBe("/messages/conv-1");
+    await waitFor(() => {
+      expect(screen.getByTestId("message-input")).toBeInTheDocument();
+    });
+    expect(mockPush).not.toHaveBeenCalledWith("/messages/conv-1");
+  });
+
+  it("opens the mobile thread while the mobile media hook is unresolved", async () => {
+    mockUseMediaQuery.mockReturnValue(undefined);
+    const matchMediaSpy = mockDesktopMatchMedia(false);
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes("/api/messages?")) {
+        return createJsonResponse({
+          messages: [],
+          typingUsers: [],
+          hasNewMessages: false,
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    try {
+      render(
+        <MessagesPageClient
+          currentUserId="user-123"
+          initialConversations={initialConversations}
+        />
+      );
+
+      const conversationLink = screen.getByTestId("conversation-item");
+
+      expect(conversationLink).toHaveAttribute("href", "/messages/conv-1");
+      expect(fireEvent.click(conversationLink)).toBe(false);
+      expect(window.location.pathname).toBe("/messages/conv-1");
+      await waitFor(() => {
+        expect(screen.getByTestId("message-input")).toBeInTheDocument();
+      });
+      expect(mockPush).not.toHaveBeenCalledWith("/messages/conv-1");
+    } finally {
+      matchMediaSpy.mockRestore();
+    }
+  });
+
+  it("restores a saved draft for the active desktop conversation", async () => {
+    sessionStorage.setItem("chat_draft_conv-1", "Restored draft text");
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes("/api/messages?")) {
+        return createJsonResponse({
+          messages: [],
+          typingUsers: [],
+          hasNewMessages: false,
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    render(
+      <MessagesPageClient
+        currentUserId="user-123"
+        initialConversations={initialConversations}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("message-input")).toHaveValue(
+        "Restored draft text"
+      );
+    });
+    expect(sessionStorage.getItem("chat_draft_conv-1")).toBeNull();
+    expect(toast.info).toHaveBeenCalledWith("Your message draft was restored");
+  });
+
+  it("saves the draft and redirects to the active thread when the send session expires", async () => {
+    mockSendMessage.mockResolvedValue({
+      error: "Unauthorized",
+      code: "SESSION_EXPIRED",
+    });
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes("/api/messages?")) {
+        return createJsonResponse({
+          messages: [],
+          typingUsers: [],
+          hasNewMessages: false,
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    render(
+      <MessagesPageClient
+        currentUserId="user-123"
+        initialConversations={initialConversations}
+      />
+    );
+
+    const input = await screen.findByTestId("message-input");
+    fireEvent.change(input, { target: { value: "Draft before expiry" } });
+    fireEvent.click(screen.getByTestId("send-button"));
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith(
+        "/login?callbackUrl=/messages/conv-1"
+      );
+    });
+    expect(sessionStorage.getItem("chat_draft_conv-1")).toBe(
+      "Draft before expiry"
+    );
+    expect(toast.error).toHaveBeenCalledWith(
+      "Your session has expired. Redirecting to login..."
+    );
+    expect(screen.queryByText("Draft before expiry")).not.toBeInTheDocument();
+  });
+  it("keeps desktop conversation selection in-page instead of following the thread link", async () => {
+    mockUseMediaQuery.mockReturnValue(false);
+    sessionStorage.clear();
+    const matchMediaSpy = mockDesktopMatchMedia(true);
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url === "/api/messages") {
+        return createJsonResponse({ success: true, count: 0 });
+      }
+      if (url.includes("/api/messages?")) {
+        return createJsonResponse({
+          messages: [],
+          typingUsers: [],
+          hasNewMessages: false,
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    try {
+      render(
+        <MessagesPageClient
+          currentUserId="user-123"
+          initialConversations={initialConversations}
+        />
+      );
+
+      const conversationLink = screen.getByTestId("conversation-item");
+
+      expect(conversationLink).toBe(
+        screen.getByRole("link", { name: /Other User/i })
+      );
+      expect(conversationLink).toHaveAttribute("href", "/messages/conv-1");
+      expect(fireEvent.click(conversationLink)).toBe(false);
+      await waitFor(() => {
+        expect(screen.getByTestId("message-input")).toBeInTheDocument();
+      });
+      expect(mockPush).not.toHaveBeenCalledWith("/messages/conv-1");
+    } finally {
+      matchMediaSpy.mockRestore();
+    }
   });
 });

@@ -209,19 +209,20 @@ function mockTransaction({
 } = {}) {
   const queryRaw = jest.fn().mockResolvedValue(lockedRows);
   const update = jest.fn().mockResolvedValue(updateResult);
+  const findUnique = jest.fn().mockResolvedValue(lockedRows[0] ?? null);
   const locationUpdate = jest.fn();
   const executeRaw = jest.fn();
 
   (prisma.$transaction as jest.Mock).mockImplementation(async (callback) =>
     callback({
       $queryRaw: queryRaw,
-      listing: { update },
+      listing: { update, findUnique },
       location: { update: locationUpdate },
       $executeRaw: executeRaw,
     })
   );
 
-  return { queryRaw, update, locationUpdate, executeRaw };
+  return { queryRaw, update, findUnique, locationUpdate, executeRaw };
 }
 
 describe("PATCH /api/listings/[id] contact-first availability contract", () => {

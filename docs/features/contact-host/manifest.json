@@ -1,0 +1,524 @@
+{
+  "feature": "contact-host",
+  "phase": "Phase 1/2",
+  "sourceOfTruth": "Current dirty worktree on 2026-05-08",
+  "status": "source-scan-complete-runtime-partially-verified",
+  "entryPoints": [
+    {
+      "id": "listing-detail-contact-cta",
+      "surface": "/listings/[id]",
+      "files": [
+        "src/app/listings/[id]/ListingPageClient.tsx",
+        "src/components/ContactHostButton.tsx"
+      ],
+      "evidence": [
+        "src/app/listings/[id]/ListingPageClient.tsx:497-523",
+        "src/app/listings/[id]/ListingPageClient.tsx:529-597",
+        "src/components/ContactHostButton.tsx:32-214"
+      ],
+      "status": "documented-source"
+    },
+    {
+      "id": "messages-inbox",
+      "surface": "/messages",
+      "files": [
+        "src/app/messages/page.tsx",
+        "src/components/MessagesPageClient.tsx"
+      ],
+      "evidence": [
+        "src/app/messages/page.tsx:8-35",
+        "src/components/MessagesPageClient.tsx:53-430"
+      ],
+      "status": "documented-source"
+    },
+    {
+      "id": "message-thread",
+      "surface": "/messages/[id]",
+      "files": [
+        "src/app/messages/[id]/page.tsx",
+        "src/app/messages/[id]/ChatWindow.tsx"
+      ],
+      "evidence": [
+        "src/app/messages/[id]/page.tsx:24-125",
+        "src/app/messages/[id]/ChatWindow.tsx:69-430"
+      ],
+      "status": "documented-source"
+    }
+  ],
+  "routes": [
+    {
+      "path": "/listings/[id]",
+      "role": "Listing detail entry point for contact host CTA.",
+      "evidence": "src/app/listings/[id]/ListingPageClient.tsx:497-523"
+    },
+    {
+      "path": "/messages",
+      "role": "Authenticated conversation inbox.",
+      "evidence": "src/app/messages/page.tsx:14-35"
+    },
+    {
+      "path": "/messages/[id]",
+      "role": "Authenticated conversation thread.",
+      "evidence": "src/app/messages/[id]/page.tsx:24-125"
+    }
+  ],
+  "serverComponents": [
+    {
+      "file": "src/app/messages/page.tsx",
+      "symbols": ["MessagesPage"],
+      "evidence": "src/app/messages/page.tsx:14-35"
+    },
+    {
+      "file": "src/app/messages/[id]/page.tsx",
+      "symbols": ["ConversationPage"],
+      "evidence": "src/app/messages/[id]/page.tsx:24-125"
+    }
+  ],
+  "clientComponents": [
+    {
+      "file": "src/components/ContactHostButton.tsx",
+      "symbols": ["ContactHostButton"],
+      "evidence": "src/components/ContactHostButton.tsx:32-214"
+    },
+    {
+      "file": "src/app/listings/[id]/ListingPageClient.tsx",
+      "symbols": ["ListingPageClient", "MessagingCta"],
+      "evidence": "src/app/listings/[id]/ListingPageClient.tsx:497-597"
+    },
+    {
+      "file": "src/components/MessagesPageClient.tsx",
+      "symbols": ["MessagesPageClient"],
+      "evidence": "src/components/MessagesPageClient.tsx:53-430"
+    },
+    {
+      "file": "src/app/messages/[id]/ChatWindow.tsx",
+      "symbols": ["ChatWindow"],
+      "evidence": "src/app/messages/[id]/ChatWindow.tsx:69-430"
+    },
+    {
+      "file": "src/components/chat/BlockedConversationBanner.tsx",
+      "symbols": ["BlockedConversationBanner"],
+      "evidence": "src/components/chat/BlockedConversationBanner.tsx"
+    }
+  ],
+  "serverActions": [
+    {
+      "file": "src/app/actions/chat.ts",
+      "symbols": [
+        "startConversation",
+        "sendMessage",
+        "getConversations",
+        "getMessages",
+        "getUnreadMessageCount",
+        "markAllMessagesAsRead"
+      ],
+      "evidence": [
+        "src/app/actions/chat.ts:43-362",
+        "src/app/actions/chat.ts:368-608"
+      ]
+    },
+    {
+      "file": "src/app/actions/block.ts",
+      "symbols": [
+        "blockUser",
+        "unblockUser",
+        "getBlockStatus",
+        "checkBlockBeforeAction"
+      ],
+      "evidence": "src/app/actions/block.ts:10-217"
+    },
+    {
+      "file": "src/app/actions/suspension.ts",
+      "symbols": ["checkSuspension", "checkEmailVerified"],
+      "evidence": "src/app/actions/suspension.ts:6-53"
+    }
+  ],
+  "apiRoutes": [
+    {
+      "path": "GET /api/messages",
+      "file": "src/app/api/messages/route.ts",
+      "responsibilities": [
+        "pre-auth rate limit",
+        "authenticated conversation list",
+        "thread messages",
+        "polling messages",
+        "unread count"
+      ],
+      "evidence": "src/app/api/messages/route.ts:76-268"
+    },
+    {
+      "path": "POST /api/messages",
+      "file": "src/app/api/messages/route.ts",
+      "responsibilities": [
+        "CSRF",
+        "auth",
+        "mark read",
+        "send message",
+        "validation",
+        "rate limits",
+        "cache headers"
+      ],
+      "evidence": "src/app/api/messages/route.ts:270-386"
+    },
+    {
+      "path": "GET /api/listings/[id]/viewer-state",
+      "file": "src/app/api/listings/[id]/viewer-state/route.ts",
+      "responsibilities": [
+        "viewer contact contract",
+        "paywall summary",
+        "privacy-first listing availability",
+        "private no-store cache header"
+      ],
+      "evidence": "src/app/api/listings/[id]/viewer-state/route.ts:69-307"
+    },
+    {
+      "path": "POST /api/payments/checkout",
+      "file": "src/app/api/payments/checkout/route.ts",
+      "responsibilities": [
+        "contact unlock checkout",
+        "product validation",
+        "auth/suspension/rate limit",
+        "Stripe checkout URL response"
+      ],
+      "evidence": "src/app/api/payments/checkout/route.ts:110-459"
+    },
+    {
+      "path": "GET /api/payments/checkout-session",
+      "file": "src/app/api/payments/checkout-session/route.ts",
+      "responsibilities": [
+        "contact checkout return polling",
+        "checkout session ownership validation",
+        "fulfillment status response",
+        "private no-store cache header"
+      ],
+      "evidence": "src/app/api/payments/checkout-session/route.ts:48-179"
+    }
+  ],
+  "dataAccessFunctions": [
+    {
+      "file": "src/lib/messages.ts",
+      "symbols": [
+        "getAccessibleConversation",
+        "userCanAccessConversation",
+        "listConversationMessages",
+        "markConversationMessagesAsReadForUser"
+      ],
+      "evidence": "src/lib/messages.ts:27-104"
+    },
+    {
+      "file": "src/lib/messaging/send-conversation-message.ts",
+      "symbols": ["sendConversationMessage"],
+      "evidence": "src/lib/messaging/send-conversation-message.ts:49-228"
+    },
+    {
+      "file": "src/lib/messaging/listing-contactable.ts",
+      "symbols": ["evaluateListingContactable"],
+      "evidence": "src/lib/messaging/listing-contactable.ts:1-60"
+    },
+    {
+      "file": "src/lib/listings/public-contact-contract.ts",
+      "symbols": [
+        "buildPrivacyFirstViewerContract",
+        "resolvePublicListingVisibilityState",
+        "coerceViewerContactFields"
+      ],
+      "evidence": "src/lib/listings/public-contact-contract.ts:1-234"
+    },
+    {
+      "file": "src/lib/contact/contact-attempts.ts",
+      "symbols": ["recordContactAttempt"],
+      "evidence": "src/lib/contact/contact-attempts.ts:1-70"
+    },
+    {
+      "file": "src/lib/payments/contact-paywall.ts",
+      "symbols": [
+        "evaluateMessageStartPaywall",
+        "consumeMessageStartEntitlement",
+        "attachConsumptionToConversation"
+      ],
+      "evidence": "src/lib/payments/contact-paywall.ts:1-730"
+    }
+  ],
+  "searchParamParsers": [
+    {
+      "surface": "listing detail checkout return params",
+      "params": ["contactCheckout", "phoneRevealCheckout"],
+      "evidence": "src/app/listings/[id]/ListingPageClient.tsx:618-620"
+    },
+    {
+      "surface": "messages API pagination and polling params",
+      "params": ["conversationId", "view", "poll", "lastMessageId", "page", "limit"],
+      "evidence": "src/app/api/messages/route.ts:98-264"
+    }
+  ],
+  "databaseModels": [
+    {
+      "name": "User",
+      "evidence": "prisma/schema.prisma:42-60",
+      "contactHostRelevance": "auth identity, email verification, suspension, notification preferences, participant relations"
+    },
+    {
+      "name": "Listing",
+      "evidence": "prisma/schema.prisma:107-125",
+      "contactHostRelevance": "owner, status, availability, physical unit"
+    },
+    {
+      "name": "Conversation",
+      "evidence": "prisma/schema.prisma:250-263",
+      "contactHostRelevance": "listing-linked message thread with participants"
+    },
+    {
+      "name": "ConversationDeletion",
+      "evidence": "prisma/schema.prisma:265-276",
+      "contactHostRelevance": "per-user conversation hide state"
+    },
+    {
+      "name": "Message",
+      "evidence": "prisma/schema.prisma:278-293",
+      "contactHostRelevance": "thread content, read state, soft delete"
+    },
+    {
+      "name": "Notification",
+      "evidence": "prisma/schema.prisma:307-338",
+      "contactHostRelevance": "NEW_MESSAGE internal notifications"
+    },
+    {
+      "name": "BlockedUser",
+      "evidence": "prisma/schema.prisma:516-527",
+      "contactHostRelevance": "blocks contact and message sending"
+    },
+    {
+      "name": "ContactConsumption",
+      "evidence": "prisma/schema.prisma:768-793",
+      "contactHostRelevance": "paywall contact-credit consumption"
+    },
+    {
+      "name": "EntitlementState",
+      "evidence": "prisma/schema.prisma:847-858",
+      "contactHostRelevance": "current paywall credits/pass/freeze state"
+    },
+    {
+      "name": "ContactRestoration",
+      "evidence": "prisma/schema.prisma:863-874",
+      "contactHostRelevance": "restores contact credits after qualifying events"
+    },
+    {
+      "name": "ContactAttempt",
+      "evidence": "prisma/schema.prisma:877-895",
+      "contactHostRelevance": "audit log for start-contact outcomes"
+    },
+    {
+      "name": "HostContactChannel",
+      "evidence": "prisma/schema.prisma:898-909",
+      "contactHostRelevance": "adjacent phone reveal channel; not primary message-start flow"
+    },
+    {
+      "name": "PhysicalUnit",
+      "evidence": "prisma/schema.prisma:931-995",
+      "contactHostRelevance": "unit identity epoch used by stale-contact and paywall checks"
+    }
+  ],
+  "migrations": [
+    {
+      "path": "prisma/migrations/20251122195016_add_conversation_model/migration.sql",
+      "coverage": [
+        "Conversation",
+        "Message",
+        "ConversationParticipants",
+        "Notification",
+        "TypingStatus",
+        "User notification/suspension fields"
+      ],
+      "evidence": [
+        "prisma/migrations/20251122195016_add_conversation_model/migration.sql:86-225",
+        "prisma/migrations/20251122195016_add_conversation_model/migration.sql:328-342",
+        "prisma/migrations/20251122195016_add_conversation_model/migration.sql:469-480"
+      ]
+    },
+    {
+      "path": "prisma/migrations/20260205000000_per_user_conversation_deletion/migration.sql",
+      "coverage": ["ConversationDeletion"],
+      "evidence": "prisma/migrations/20260205000000_per_user_conversation_deletion/migration.sql:1-3"
+    },
+    {
+      "path": "prisma/migrations/20260505000000_phase05_privacy_contact_host_ghost/migration.sql",
+      "coverage": ["ContactAttempt", "HostContactChannel", "PhoneRevealAudit"],
+      "evidence": "prisma/migrations/20260505000000_phase05_privacy_contact_host_ghost/migration.sql:10-54"
+    },
+    {
+      "path": "prisma/migrations/20260512000000_payments_entitlement_refund_queue_fix/migration.sql",
+      "coverage": ["EntitlementState contact_kind default MESSAGE_START"],
+      "evidence": "prisma/migrations/20260512000000_payments_entitlement_refund_queue_fix/migration.sql:20-22"
+    }
+  ],
+  "externalServices": [
+    {
+      "name": "Stripe checkout",
+      "currentEvidence": "checkout API creates Stripe checkout sessions and returns checkoutUrl",
+      "evidence": "src/app/api/payments/checkout/route.ts:403-459",
+      "runtimeStatus": "NOT VERIFIED"
+    },
+    {
+      "name": "Resend/email",
+      "currentEvidence": "sendNotificationEmailWithPreference maps newMessage to emailMessages and calls sendEmail",
+      "evidence": "src/lib/email.ts:64-72, 209-271",
+      "runtimeStatus": "NOT VERIFIED"
+    },
+    {
+      "name": "Supabase realtime",
+      "currentEvidence": "ChatWindow imports realtime/polling behavior",
+      "evidence": "src/app/messages/[id]/ChatWindow.tsx:1-151",
+      "runtimeStatus": "NOT VERIFIED"
+    }
+  ],
+  "environmentVariables": [
+    {
+      "name": "ENABLE_CONTACT_PAYWALL",
+      "evidence": "src/lib/env.ts:694-696"
+    },
+    {
+      "name": "ENABLE_CONTACT_PAYWALL_ENFORCEMENT",
+      "evidence": "src/lib/env.ts:697-699"
+    },
+    {
+      "name": "ENABLE_ENTITLEMENT_STATE",
+      "evidence": "src/lib/env.ts:703-705"
+    },
+    {
+      "name": "KILL_SWITCH_EMERGENCY_OPEN_PAYWALL",
+      "evidence": "src/lib/env.ts:720-722"
+    },
+    {
+      "name": "ENABLE_PRIVATE_FEEDBACK",
+      "evidence": "src/lib/env.ts:732-734"
+    },
+    {
+      "name": "RESEND_API_KEY",
+      "evidence": "src/lib/email.ts:70-72"
+    }
+  ],
+  "rateLimits": [
+    {
+      "name": "chatStartConversation",
+      "limit": "20/hour",
+      "evidence": "src/lib/rate-limit.ts:279-280"
+    },
+    {
+      "name": "chatSendMessage",
+      "limit": "100/hour",
+      "evidence": "src/lib/rate-limit.ts:279"
+    },
+    {
+      "name": "messages",
+      "limit": "60/hour",
+      "evidence": "src/lib/rate-limit.ts:237"
+    },
+    {
+      "name": "messagesPoll",
+      "limit": "180/minute",
+      "evidence": "src/lib/rate-limit.ts:254"
+    },
+    {
+      "name": "messageRead",
+      "limit": "120/minute",
+      "evidence": "src/lib/rate-limit.ts:255"
+    },
+    {
+      "name": "messagesPreAuth",
+      "limit": "300/hour per IP",
+      "evidence": "src/lib/rate-limit.ts:307"
+    },
+    {
+      "name": "viewerState",
+      "limit": "60/minute",
+      "evidence": "src/lib/rate-limit.ts:294"
+    },
+    {
+      "name": "paymentsCheckout",
+      "limit": "10/hour",
+      "evidence": "src/lib/rate-limit.ts:282"
+    },
+    {
+      "name": "paymentsCheckoutStatus",
+      "limit": "60/minute",
+      "evidence": "src/lib/rate-limit.ts:283"
+    }
+  ],
+  "tests": [
+    {
+      "path": "src/__tests__/components/ContactHostButton.test.tsx",
+      "coverage": "contact button states, redirects, double-click guard, paywall dialog, checkout handoff",
+      "evidence": "src/__tests__/components/ContactHostButton.test.tsx:33-289",
+      "phase1_2Status": "NOT RUN in Phase 1/2"
+    },
+    {
+      "path": "src/__tests__/api/messages.test.ts",
+      "coverage": "messages API auth, rate limits, access, polling, send, notification/email calls, contactability failures",
+      "evidence": "src/__tests__/api/messages.test.ts:93-621",
+      "phase1_2Status": "NOT RUN in Phase 1/2"
+    },
+    {
+      "path": "src/__tests__/api/private-feedback-no-public-bleed.test.ts",
+      "coverage": "viewer-state privacy no-bleed behavior for private feedback report rows",
+      "evidence": "src/__tests__/api/private-feedback-no-public-bleed.test.ts:538",
+            "phase1_2Status": "DISCOVERED LATER; focused command passed in CH-E044"
+    },
+    {
+      "path": "src/__tests__/api/payments-checkout-route.test.ts",
+      "coverage": "checkout creation route for contact paywall sessions, metadata, and Stripe idempotency",
+      "evidence": "src/__tests__/api/payments-checkout-route.test.ts:234-330",
+            "phase1_2Status": "DISCOVERED LATER; focused command passed in CH-E044"
+    },
+    {
+      "path": "src/__tests__/api/payments-checkout-session-route.test.ts",
+      "coverage": "checkout-session polling route for pending, fulfilled, and context-specific status responses",
+      "evidence": "src/__tests__/api/payments-checkout-session-route.test.ts:172-240",
+            "phase1_2Status": "DISCOVERED LATER; focused command passed in CH-E044"
+    },
+    {
+      "path": "src/__tests__/lib/messaging/listing-contactable.test.ts",
+      "coverage": "listing contactability gates",
+      "evidence": "src/__tests__/lib/messaging/listing-contactable.test.ts:23-133",
+      "phase1_2Status": "NOT RUN in Phase 1/2"
+    },
+    {
+      "path": "tests/e2e/concurrent/conversation-dedup.spec.ts",
+      "coverage": "parallel contact-host starts and duplicate conversation prevention",
+      "evidence": "tests/e2e/concurrent/conversation-dedup.spec.ts:1-176",
+      "phase1_2Status": "NOT RUN in Phase 1/2"
+    },
+    {
+      "path": "tests/e2e/journeys/22-messaging-conversations.spec.ts",
+      "coverage": "listing to contact host to messaging journey and inbox states",
+      "evidence": "tests/e2e/journeys/22-messaging-conversations.spec.ts:93-234",
+      "phase1_2Status": "NOT RUN in Phase 1/2; Chromium-only command passed later"
+    },
+    {
+      "path": "tests/e2e/listing-detail/listing-detail.spec.ts",
+      "coverage": "listing detail contact-first sidebar, removed booking controls, owner view, unauthenticated sign-in CTA, and listing detail visitor states",
+      "evidence": "tests/e2e/listing-detail/listing-detail.spec.ts:59-583",
+      "phase1_2Status": "NOT RUN in Phase 1/2; historical Chromium-only command passed later; latest broad rerun exposed setup/external-image timing noise, so focused Contact Host runtime proof moved to contact-host-runtime.spec.ts"
+    },
+    {
+      "path": "tests/e2e/listing-detail/contact-host-runtime.spec.ts",
+      "coverage": "focused listing-detail Contact Host runtime proof for authenticated non-owner contact-first sidebar and anonymous sign-in CTA, with external listing images mocked",
+      "evidence": "tests/e2e/listing-detail/contact-host-runtime.spec.ts:1-90",
+      "phase1_2Status": "DISCOVERED/ADDED LATER; Chromium command passed in CH-E045"
+    },
+    {
+      "path": "tests/e2e/mobile/mobile-messages.spec.ts",
+      "coverage": "mobile conversation list, thread open, message input, back navigation, empty state, wrapping, scrolling, and unread indicator",
+      "evidence": "tests/e2e/mobile/mobile-messages.spec.ts:12-266",
+      "phase1_2Status": "NOT RUN in Phase 1/2; Mobile Chrome no-deps and setup-backed commands passed later in CH-E045"
+    }
+  ],
+  "unknowns": [
+    "Runtime/browser behavior for listing detail contact CTA is partially verified by focused Chromium listing-detail Contact Host E2E; Mobile Chrome no-deps and setup-backed Mobile Chrome messages passed after the second-pass fix; paywall dialog, checkout browser return, realtime, email, suspended/paywall-required/unavailable listing states, and full browser matrix remain NOT VERIFIED.",
+    "Search/map listing-card direct contact entry point is UNKNOWN.",
+    "Supabase realtime delivery and polling fallback are UNKNOWN at runtime.",
+    "Actual email delivery and notification preference behavior are NOT VERIFIED at runtime.",
+    "Release-blocking versus confidence-building test classification exists in 11-test-traceability-matrix.md; checkout browser return, realtime, email, suspended/paywall-required/unavailable listing states, and full matrix execution remain incomplete.",
+    "Client/server message length mismatch needs later evidence: ChatWindow uses 500, MessagesPageClient uses 1000, server action schema allows 2000.",
+    "Broader profile-completion or user-verification gates beyond email verification and suspension are UNKNOWN until Phase 4 auth/profile tracing."
+  ]
+}

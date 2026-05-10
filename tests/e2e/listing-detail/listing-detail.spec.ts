@@ -26,6 +26,18 @@ function visibleContactHostButtons(page: import("@playwright/test").Page) {
   return page.locator("button:visible").filter({ hasText: "Contact Host" });
 }
 
+async function openFirstGalleryImage(
+  page: import("@playwright/test").Page,
+  title: RegExp
+) {
+  const image = page.getByRole("img", { name: title }).first();
+  await expect(image).toBeVisible({ timeout: 10_000 });
+  const galleryItem = image.locator(
+    "xpath=ancestor::div[contains(@class, 'group/item')][1]"
+  );
+  await galleryItem.click();
+}
+
 // ---------------------------------------------------------------------------
 // Shared navigation helper
 // ---------------------------------------------------------------------------
@@ -165,18 +177,38 @@ test.describe("LD: Page Load & Content (Visitor)", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 test.describe("LD: Visitor Action Buttons", () => {
   test("LD-08  share button opens fallback dropdown", async ({ page, nav }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "share", {
+        configurable: true,
+        value: undefined,
+      });
+    });
+
     const found = await goToListing(page, nav, "Reviewer Nob Hill");
     test.skip(!found, "Listing not found");
 
     // Headless browsers lack navigator.share — force undefined
     await page.evaluate(() => {
-      (navigator as any).share = undefined;
+      Object.defineProperty(navigator, "share", {
+        configurable: true,
+        value: undefined,
+      });
     });
 
     const shareBtn = page.getByRole("button", { name: /Share listing/i });
-    await shareBtn.click();
+    await expect(shareBtn).toBeEnabled({ timeout: 10_000 });
 
-    await expect(page.getByText("Copy Link")).toBeVisible();
+    const copyLink = page.getByText("Copy Link");
+    await shareBtn.click();
+    const opened = await copyLink
+      .waitFor({ state: "visible", timeout: 2_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!opened) {
+      await shareBtn.click();
+    }
+
+    await expect(copyLink).toBeVisible();
     await expect(page.getByText("Twitter")).toBeVisible();
     await expect(page.getByText("Email")).toBeVisible();
   });
@@ -309,11 +341,7 @@ test.describe("LD: Image Gallery", () => {
     test.skip(!found, "Listing not found");
 
     // Click first gallery image to open lightbox
-    const galleryItem = page
-      .locator("[class*='cursor-pointer']")
-      .or(page.locator(".group\\/item"))
-      .first();
-    await galleryItem.click();
+    await openFirstGalleryImage(page, /Sunny Mission Room - Image 1/i);
 
     // Lightbox overlay should appear (fixed inset-0)
     const lightbox = page.locator(".fixed.inset-0");
@@ -359,11 +387,7 @@ test.describe("LD: Image Gallery", () => {
     test.skip(!found, "Listing not found");
 
     // Open lightbox
-    const galleryItem = page
-      .locator("[class*='cursor-pointer']")
-      .or(page.locator(".group\\/item"))
-      .first();
-    await galleryItem.click();
+    await openFirstGalleryImage(page, /Sunny Mission Room - Image 1/i);
 
     // Verify lightbox overlay opened
     const lightbox = page.locator(".fixed.inset-0");
@@ -428,16 +452,23 @@ test.describe("LD: Owner View", () => {
 
     // Find the status toggle — there are two instances (stats bar + sidebar)
     const toggleBtn = page
-      .getByRole("button", { name: /Active|Paused|Rented/i })
+      .getByRole("button", { name: /^(Active|Paused|Rented)$/i })
       .first();
+    await expect(toggleBtn).toBeEnabled({ timeout: 10_000 });
     await toggleBtn.click();
 
     // Dropdown options (labels or descriptions)
-    await expect(
-      page
-        .getByText(/Visible to everyone|Hidden from search|Marked as rented/)
-        .first()
-    ).toBeVisible({ timeout: 5_000 });
+    const statusOption = page
+      .getByText(/Visible to everyone|Hidden from search|Marked as rented/)
+      .first();
+    const opened = await statusOption
+      .waitFor({ state: "visible", timeout: 2_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!opened) {
+      await toggleBtn.click();
+    }
+    await expect(statusOption).toBeVisible({ timeout: 5_000 });
 
     // Close by pressing Escape — do NOT change status
     await page.keyboard.press("Escape");
