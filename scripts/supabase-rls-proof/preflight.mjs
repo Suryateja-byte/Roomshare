@@ -120,6 +120,25 @@ function redactSecrets(output) {
   return output
     .split(/\r?\n/)
     .map((line) => {
+      if (line.includes("│")) {
+        const cells = line.split("│");
+        const hasSecretCell = cells.some((cell) =>
+          SECRET_LINE_PATTERN.test(cell)
+        );
+
+        if (hasSecretCell) {
+          return cells
+            .map((cell, index) => {
+              if (index === 0 || index === cells.length - 1) {
+                return cell;
+              }
+
+              return index === 1 ? cell : " [REDACTED] ";
+            })
+            .join("│");
+        }
+      }
+
       if (SECRET_LINE_PATTERN.test(line)) {
         const [label] = line.split(":", 1);
         return label ? `${label}: [REDACTED]` : "[REDACTED]";
@@ -215,20 +234,72 @@ function checkSupabaseCli() {
 
 function parseStatus(output) {
   const parsed = {};
+  let section = null;
 
   for (const line of output.split(/\r?\n/)) {
-    const match = line.match(/^\s*([^:]+):\s*(.+?)\s*$/);
-    if (!match) {
+    if (line.includes("Development Tools")) {
+      section = "developmentTools";
       continue;
     }
 
-    const label = match[1].trim();
-    const key = REQUIRED_STATUS_LABELS.get(label);
+    if (line.includes("APIs")) {
+      section = "apis";
+      continue;
+    }
+
+    if (line.includes("Database")) {
+      section = "database";
+      continue;
+    }
+
+    if (line.includes("Authentication Keys")) {
+      section = "authenticationKeys";
+      continue;
+    }
+
+    if (line.includes("Storage")) {
+      section = "storage";
+      continue;
+    }
+
+    const tableCells = line.includes("│")
+      ? line
+          .split("│")
+          .slice(1, -1)
+          .map((cell) => cell.trim())
+      : [];
+    const match =
+      tableCells.length >= 2 ? null : line.match(/^\s*([^:]+):\s*(.+?)\s*$/);
+
+    if (!match && tableCells.length < 2) {
+      continue;
+    }
+
+    const label = match ? match[1].trim() : tableCells[0];
+    const value = match ? match[2].trim() : tableCells[1];
+    let key = REQUIRED_STATUS_LABELS.get(label);
+
+    if (!key && section === "developmentTools" && label === "Studio") {
+      key = "studioUrl";
+    }
+
+    if (!key && section === "apis" && label === "Project URL") {
+      key = "apiUrl";
+    }
+
+    if (!key && section === "database" && label === "URL") {
+      key = "dbUrl";
+    }
+
     if (!key) {
       continue;
     }
 
-    parsed[key] = match[2].trim();
+    if (parsed[key]) {
+      continue;
+    }
+
+    parsed[key] = value;
   }
 
   return parsed;
