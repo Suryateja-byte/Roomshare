@@ -91,7 +91,7 @@
     {
       "claimId": "V-CH-012",
       "claim": "The test matrix separates release-blocking checks from confidence-building checks, records current deterministic passes, the current checkout-route fixture-repair pass, current viewer-state route contract proof, deterministic per-route CSRF variant proof, historical and updated message-length boundary evidence, the current focused listing-detail Contact Host browser pass, the clean full Chromium messaging rerun, the mocked checkout-return browser pass, the scoped listing-detail state-matrix browser pass, the suspended/blocked source/test/fixture implementation and Chromium browser proof, focused WebKit/Mobile Chrome/Mobile Safari browser-matrix passes, the Firefox install plus post-install failure reclassification, historical Mobile Chrome evidence, and broader E2E/runtime gaps.",
-      "citation": "11-test-traceability-matrix.md; phase-4/05-test-traceability.md; evidence-register.md CH-E032-CH-E073",
+      "citation": "11-test-traceability-matrix.md; phase-4/05-test-traceability.md; evidence-register.md CH-E032-CH-E074",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -115,7 +115,7 @@
     {
       "claimId": "V-CH-015",
             "claim": "The Phase 11 round-trip status reconciles historical Phase 1/2 and Phase 4 snapshots with current focused runtime/test evidence and keeps provider-level Supabase realtime/RLS as the remaining P1 while email, optional live-server parity, and real payment-provider fulfillment remain P2 items; it also records fallback/API/mocked-realtime reduction evidence, closes message-limit focused execution, adds the suspended/blocked contract/test-source reduction, closes suspended/blocked listing-detail Chromium execution in CH-E073, and adds schema/test-name detail for reconstruction.",
-      "citation": "round-trip-review.md; 00-feature-boundary.md; phase-4/05-test-traceability.md; 05-api-contracts.md; 11-test-traceability-matrix.md; evidence-register.md CH-E032-CH-E073",
+      "citation": "round-trip-review.md; 00-feature-boundary.md; phase-4/05-test-traceability.md; 05-api-contracts.md; 11-test-traceability-matrix.md; evidence-register.md CH-E032-CH-E074",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -146,8 +146,16 @@
     },
     {
       "claimId": "V-CH-019",
-      "claim": "The Contact Host email delivery P2 is reduced but blocked: mocked email invocation, recipient scoping, provider-client retry/circuit/no-key behavior, and no-real-provider local evidence are recorded, while the real new-message template cannot render the current Contact Host send-path payload because listingTitle and messagePreview are omitted.",
-      "citation": "goal-progress-email-delivery.md; 10-performance-observability.md; 11-test-traceability-matrix.md; 12-gaps-unknowns-and-questions.md CH-G010; evidence-register.md CH-E072",
+      "claim": "The Contact Host email delivery P2 is reduced but real provider delivery remains unverified: mocked email invocation, recipient scoping, provider-client retry/circuit/no-key behavior, complete newMessage payload, preview normalization/truncation, fallback listing title, and template escaping are locally verified without provider calls.",
+      "citation": "goal-progress-email-delivery.md; 10-performance-observability.md; 11-test-traceability-matrix.md; 12-gaps-unknowns-and-questions.md CH-G010; evidence-register.md CH-E072, CH-E074",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V-CH-020",
+      "claim": "The provider-level Supabase realtime/RLS proof path is planned but not executed: Option A local provider harness is preferred, Option B isolated staging/provider verification is the fallback, and the current P1 remains blocked until approved user-scoped JWT, direct RLS, realtime authorization, cleanup, and evidence requirements are satisfied.",
+      "citation": "supabase-rls-proof-plan.md; goal-progress-provider-rls.md; goal-progress-realtime-rls.md; remaining-p1-decision-package.md; 11-test-traceability-matrix.md; 12-gaps-unknowns-and-questions.md CH-G005; evidence-register.md CH-E075",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -181,12 +189,12 @@
     },
     {
       "manifestItem": "Supabase realtime",
-      "gap": "Fallback polling, API read/unread isolation, and mocked client-side realtime insert handling are locally verified in CH-E062. Provider-level Supabase realtime delivery/JWT authorization/database RLS remains blocked in CH-E070 because source/config search found no local `Message`/conversation RLS policies, no `supabase/config.toml`, no local Supabase directory, no Supabase provider test script, and no Supabase Realtime/Auth docker service.",
+      "gap": "Fallback polling, API read/unread isolation, and mocked client-side realtime insert handling are locally verified in CH-E062. Provider-level Supabase realtime delivery/JWT authorization/database RLS remains blocked in CH-E070 because source/config search found no local `Message`/conversation RLS policies, no `supabase/config.toml`, no local Supabase directory, no Supabase provider test script, and no Supabase Realtime/Auth docker service. `supabase-rls-proof-plan.md` defines the docs-only approval path for Option A local provider proof or Option B staging fallback; it is not provider proof and does not close the P1.",
       "severity": "P1"
     },
     {
       "manifestItem": "Email delivery",
-      "gap": "CH-E072 verifies safe local mocked behavior for Contact Host email invocation: internal notification plus mocked preference-aware email call are asserted for /api/messages, provider-client retry/circuit/no-key behavior is tested with mocked fetch, and no real email provider call was made. The gap is now precisely blocked because the real new-message template requires listingTitle and messagePreview, while the Contact Host send path passes only recipientName, senderName, and conversationId; the local no-provider render check fails before provider I/O. Real provider acceptance, inbox delivery, bounce/webhook handling, and provider observability remain unverified.",
+      "gap": "CH-E072 verifies safe local mocked behavior for Contact Host email invocation: internal notification plus mocked preference-aware email call are asserted for /api/messages, provider-client retry/circuit/no-key behavior is tested with mocked fetch, and no real email provider call was made. CH-E074 fixes and verifies the local newMessage payload/template contract with listingTitle, messagePreview, recipientName, senderName, conversationId, fallback title, normalized/truncated preview, and template escaping. Real provider acceptance, inbox delivery, bounce/webhook handling, and provider observability remain unverified.",
       "severity": "P2"
     }
   ]

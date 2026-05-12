@@ -46,6 +46,27 @@ type SendConversationMessageResult =
       code?: string;
     };
 
+const MESSAGE_PREVIEW_LIMIT = 160;
+const MESSAGE_PREVIEW_ELLIPSIS = "...";
+const FALLBACK_LISTING_TITLE = "this listing";
+
+function buildEmailMessagePreview(content: string): string {
+  const normalized = content.trim().replace(/\s+/g, " ");
+  const characters = Array.from(normalized);
+
+  if (characters.length <= MESSAGE_PREVIEW_LIMIT) {
+    return normalized;
+  }
+
+  return `${characters
+    .slice(0, MESSAGE_PREVIEW_LIMIT - MESSAGE_PREVIEW_ELLIPSIS.length)
+    .join("")}${MESSAGE_PREVIEW_ELLIPSIS}`;
+}
+
+function buildEmailListingTitle(title: string | null | undefined): string {
+  return title?.trim() || FALLBACK_LISTING_TITLE;
+}
+
 async function getBlockFailure(senderId: string, recipientId: string) {
   try {
     const block = await prisma.blockedUser.findFirst({
@@ -81,6 +102,7 @@ export async function sendConversationMessage(
       },
       listing: {
         select: {
+          title: true,
           ownerId: true,
           status: true,
           statusReason: true,
@@ -192,6 +214,8 @@ export async function sendConversationMessage(
   });
 
   const senderName = input.senderName?.trim() || "Someone";
+  const listingTitle = buildEmailListingTitle(conversation.listing.title);
+  const messagePreview = buildEmailMessagePreview(input.content);
   const participantEmails = await prisma.user.findMany({
     where: { id: { in: otherParticipants.map((participant) => participant.id) } },
     select: { id: true, email: true },
@@ -217,6 +241,8 @@ export async function sendConversationMessage(
           {
             recipientName: participant.name || "User",
             senderName,
+            listingTitle,
+            messagePreview,
             conversationId: input.conversationId,
           }
         );

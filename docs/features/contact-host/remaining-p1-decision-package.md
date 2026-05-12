@@ -153,6 +153,12 @@ Decision needed: should the team invest in a repeatable local provider harness
 or approve an isolated staging/provider runbook? Recommended answer: approve
 Option A first, with Option B as fallback.
 
+Approval-ready plan artifact:
+`docs/features/contact-host/supabase-rls-proof-plan.md` defines the docs-only
+proof path, prerequisites, evidence, PII constraints, validation commands,
+cleanup, rollback, and closure decision points. It does not mark provider proof
+complete and does not close this P1.
+
 ## P1-3: Message-Length Authoritative Limit
 
 ### Current Evidence

@@ -4,6 +4,10 @@ Status date: 2026-05-11.
 
 Outcome: `P1 REDUCED / PROVIDER BLOCKED`. Fallback polling, API access isolation, read/unread isolation, and mocked client-side realtime subscription handling are locally verified. CH-E070 confirms provider-level Supabase realtime authorization/RLS remains blocked because this repo does not contain local `Message`/conversation RLS policies, local Supabase config, a Supabase provider test script, or a Supabase Realtime/Auth docker service.
 
+Next proof-path plan: `supabase-rls-proof-plan.md` documents the approval-ready
+Option A local provider harness and Option B staging fallback. It is docs-only
+and does not close the provider-level P1.
+
 ## Checklist
 
 - [x] Create or update `docs/features/contact-host/goal-progress-realtime-rls.md` with this checklist and progress notes.

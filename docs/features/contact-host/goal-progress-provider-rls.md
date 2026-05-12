@@ -62,6 +62,9 @@ verification plan that can seed two users and one nonparticipant, subscribe with
 user-scoped JWTs, and prove authorized participants receive only their own
 conversation events while nonparticipants receive none. Do not mark this P1
 closed until provider-level delivery/JWT/RLS behavior is proven by that harness.
+The docs-only approval plan is now captured in
+`docs/features/contact-host/supabase-rls-proof-plan.md`; it is a plan artifact,
+not provider proof.
 
 ## Validation
 

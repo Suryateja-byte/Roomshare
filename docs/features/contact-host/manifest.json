@@ -361,15 +361,15 @@
     },
     {
       "name": "Resend/email",
-      "currentEvidence": "sendNotificationEmailWithPreference maps newMessage to emailMessages and calls sendEmail; CH-E072 verifies mocked invocation/provider-client behavior and blocks Contact Host runtime delivery on a local newMessage payload/template mismatch",
-      "evidence": "src/lib/email.ts:64-112, 188-271; src/lib/messaging/send-conversation-message.ts:194-223; src/lib/email-templates.ts:88-103; docs/features/contact-host/evidence-register.md CH-E072",
-      "runtimeStatus": "PARTIALLY VERIFIED; TEMPLATE_PAYLOAD_BLOCKED; PROVIDER_DELIVERY_NOT_VERIFIED"
+      "currentEvidence": "sendNotificationEmailWithPreference maps newMessage to emailMessages and calls sendEmail; CH-E072 verifies mocked invocation/provider-client behavior, and CH-E074 fixes the local Contact Host newMessage payload/template mismatch with focused payload and template coverage",
+      "evidence": "src/lib/email.ts:64-112, 188-271; src/lib/messaging/send-conversation-message.ts:49-68, 103-108, 216-246; src/lib/email-templates.ts:88-103; src/__tests__/api/messages.test.ts:640-784; src/__tests__/lib/email-templates.test.ts:1-30; docs/features/contact-host/evidence-register.md CH-E072, CH-E074",
+      "runtimeStatus": "PARTIALLY VERIFIED; LOCAL_TEMPLATE_PAYLOAD_VERIFIED; PROVIDER_DELIVERY_NOT_VERIFIED"
     },
     {
       "name": "Supabase realtime",
-      "currentEvidence": "ChatWindow imports realtime/polling behavior; fallback polling and mocked realtime insert handling are locally tested, while provider-level delivery/RLS is blocked by missing local policy/provider harness evidence",
-      "evidence": "src/app/messages/[id]/ChatWindow.tsx:319-512; src/__tests__/components/ChatWindow.test.tsx:245-478; docs/features/contact-host/evidence-register.md CH-E062, CH-E070",
-      "runtimeStatus": "PARTIALLY VERIFIED; PROVIDER_RLS_BLOCKED"
+      "currentEvidence": "ChatWindow imports realtime/polling behavior; fallback polling and mocked realtime insert handling are locally tested, while provider-level delivery/RLS is blocked by missing local policy/provider harness evidence. The docs-only proof path is captured in supabase-rls-proof-plan.md.",
+      "evidence": "src/app/messages/[id]/ChatWindow.tsx:319-512; src/__tests__/components/ChatWindow.test.tsx:245-478; docs/features/contact-host/evidence-register.md CH-E062, CH-E070, CH-E075; docs/features/contact-host/supabase-rls-proof-plan.md",
+      "runtimeStatus": "PARTIALLY VERIFIED; PROVIDER_RLS_BLOCKED; PLAN_ONLY"
     }
   ],
   "environmentVariables": [
@@ -550,11 +550,11 @@
     }
   ],
   "unknowns": [
-    "Runtime/browser behavior for listing detail contact CTA is partially verified by focused Chromium/WebKit/Firefox/Mobile Chrome/Mobile Safari listing-detail Contact Host E2E; mocked Chromium checkout return / paid-unlock runtime passed in CH-E058; paywall-required/unavailable/migration-review/moderation-locked listing-detail states passed in CH-E059; CH-E068 implements suspended/blocked disabled pre-click contract, fixture, route proof, and test source; CH-E073 passes focused suspended/blocked Chromium proof and the full listing-detail Contact Host Chromium spec; focused WebKit/Firefox/Mobile Chrome/Mobile Safari messaging specs passed after CH-E065; CH-E064 installed Firefox and reproduced Firefox-specific test/setup failures, and CH-E065 closed those focused-spec blockers with narrow test/helper changes plus a passing practical combined Firefox two-spec run; Mobile Chrome no-deps and setup-backed Mobile Chrome messages passed after the second-pass fix; fallback polling and mocked realtime insert handling passed in CH-E062; provider-level Supabase realtime/RLS, email provider delivery, and real payment-provider fulfillment remain NOT VERIFIED. CH-E072 reduces email to mocked invocation/provider-client proof but blocks Contact Host runtime email on a newMessage payload/template mismatch.",
+    "Runtime/browser behavior for listing detail contact CTA is partially verified by focused Chromium/WebKit/Firefox/Mobile Chrome/Mobile Safari listing-detail Contact Host E2E; mocked Chromium checkout return / paid-unlock runtime passed in CH-E058; paywall-required/unavailable/migration-review/moderation-locked listing-detail states passed in CH-E059; CH-E068 implements suspended/blocked disabled pre-click contract, fixture, route proof, and test source; CH-E073 passes focused suspended/blocked Chromium proof and the full listing-detail Contact Host Chromium spec; focused WebKit/Firefox/Mobile Chrome/Mobile Safari messaging specs passed after CH-E065; CH-E064 installed Firefox and reproduced Firefox-specific test/setup failures, and CH-E065 closed those focused-spec blockers with narrow test/helper changes plus a passing practical combined Firefox two-spec run; Mobile Chrome no-deps and setup-backed Mobile Chrome messages passed after the second-pass fix; fallback polling and mocked realtime insert handling passed in CH-E062; provider-level Supabase realtime/RLS, email provider delivery, and real payment-provider fulfillment remain NOT VERIFIED. CH-E072 reduces email to mocked invocation/provider-client proof, and CH-E074 fixes the local Contact Host newMessage payload/template mismatch with focused payload/template coverage.",
     "Search/map listing-card direct contact entry point is UNKNOWN.",
-    "Supabase fallback polling and mocked client-side realtime insert handling are locally verified in CH-E062; provider-level delivery/JWT/RLS remains blocked by missing local policy/provider evidence.",
-    "Actual email provider delivery is NOT VERIFIED. Notification preference behavior is source-observed and provider-client behavior is locally mocked, but CH-E072 proves Contact Host new-message runtime email is blocked by a payload/template mismatch before any provider call.",
-    "Release-blocking versus confidence-building test classification exists in 11-test-traceability-matrix.md; provider-level Supabase realtime/RLS, email provider delivery plus the Contact Host newMessage payload/template blocker, and real payment-provider fulfillment remain incomplete.",
+    "Supabase fallback polling and mocked client-side realtime insert handling are locally verified in CH-E062; provider-level delivery/JWT/RLS remains blocked by missing local policy/provider evidence. The docs-only approval path is captured in supabase-rls-proof-plan.md and does not close the P1.",
+    "Actual email provider delivery is NOT VERIFIED. Notification preference behavior is source-observed, provider-client behavior is locally mocked, and CH-E074 verifies the local Contact Host newMessage payload/template contract without any provider call.",
+    "Release-blocking versus confidence-building test classification exists in 11-test-traceability-matrix.md; provider-level Supabase realtime/RLS, email provider delivery, and real payment-provider fulfillment remain incomplete.",
     "Message length product decision is resolved to a uniform 1000-character outbound limit in CH-E066; source and focused test files are aligned, and focused Linux-side WSL Jest execution passed in CH-E067.",
     "Broader profile-completion or user-verification gates beyond email verification and suspension are UNKNOWN until Phase 4 auth/profile tracing."
   ]

@@ -491,6 +491,7 @@ describe("Messages API", () => {
         id: "conv-123",
         participants: [{ id: "user-123" }, { id: "user-456" }],
         listing: {
+          title: "Sunny Loft",
           status: "ACTIVE",
           statusReason: null,
           availableSlots: 1,
@@ -522,6 +523,7 @@ describe("Messages API", () => {
         id: "conv-123",
         participants: [{ id: "user-123" }, { id: "user-456" }],
         listing: {
+          title: "Sunny Loft",
           status: "ACTIVE",
           statusReason: null,
           availableSlots: 1,
@@ -593,6 +595,7 @@ describe("Messages API", () => {
         id: "conv-123",
         participants: [{ id: "user-123" }, { id: "user-456" }],
         listing: {
+          title: "Sunny Loft",
           status: "ACTIVE",
           statusReason: null,
           availableSlots: 1,
@@ -645,8 +648,141 @@ describe("Messages API", () => {
         {
           recipientName: "User",
           senderName: "Test User",
+          listingTitle: "Sunny Loft",
+          messagePreview: "Hello",
           conversationId: "conv-123",
         }
+      );
+    });
+
+    it("normalizes whitespace for new-message email previews", async () => {
+      (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
+        id: "conv-123",
+        participants: [{ id: "user-123" }, { id: "user-456" }],
+        listing: {
+          title: "Sunny Loft",
+          status: "ACTIVE",
+          statusReason: null,
+          availableSlots: 1,
+          totalSlots: 1,
+          openSlots: 1,
+          moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+          availableUntil: null,
+          minStayMonths: 1,
+          lastConfirmedAt: freshLastConfirmedAt(),
+        },
+      });
+      (prisma.message.create as jest.Mock).mockResolvedValue({
+        id: "msg-new",
+        content: "  Hello\n\tthere   from   guest  ",
+        senderId: "user-123",
+      });
+      (prisma.conversation.update as jest.Mock).mockResolvedValue({});
+
+      const request = new Request("http://localhost/api/messages", {
+        method: "POST",
+        body: JSON.stringify({
+          conversationId: "conv-123",
+          content: "  Hello\n\tthere   from   guest  ",
+        }),
+      });
+      const response = await POST(request);
+
+      expect(response.status).toBe(201);
+      expect(mockSendNotificationEmailWithPreference).toHaveBeenCalledWith(
+        "newMessage",
+        "user-456",
+        "recipient@example.com",
+        expect.objectContaining({
+          messagePreview: "Hello there from guest",
+        })
+      );
+    });
+
+    it("truncates new-message email previews to 160 visible characters", async () => {
+      const content = `${"a".repeat(156)}\u{1F3E0}bbbb`;
+      const expectedPreview = `${"a".repeat(156)}\u{1F3E0}...`;
+
+      (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
+        id: "conv-123",
+        participants: [{ id: "user-123" }, { id: "user-456" }],
+        listing: {
+          title: "Sunny Loft",
+          status: "ACTIVE",
+          statusReason: null,
+          availableSlots: 1,
+          totalSlots: 1,
+          openSlots: 1,
+          moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+          availableUntil: null,
+          minStayMonths: 1,
+          lastConfirmedAt: freshLastConfirmedAt(),
+        },
+      });
+      (prisma.message.create as jest.Mock).mockResolvedValue({
+        id: "msg-new",
+        content,
+        senderId: "user-123",
+      });
+      (prisma.conversation.update as jest.Mock).mockResolvedValue({});
+
+      const request = new Request("http://localhost/api/messages", {
+        method: "POST",
+        body: JSON.stringify({ conversationId: "conv-123", content }),
+      });
+      const response = await POST(request);
+
+      expect(response.status).toBe(201);
+      expect(mockSendNotificationEmailWithPreference).toHaveBeenCalledWith(
+        "newMessage",
+        "user-456",
+        "recipient@example.com",
+        expect.objectContaining({
+          messagePreview: expectedPreview,
+        })
+      );
+      expect(Array.from(expectedPreview)).toHaveLength(160);
+    });
+
+    it("uses a fallback listing title for new-message emails when title is blank", async () => {
+      (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
+        id: "conv-123",
+        participants: [{ id: "user-123" }, { id: "user-456" }],
+        listing: {
+          title: "   ",
+          status: "ACTIVE",
+          statusReason: null,
+          availableSlots: 1,
+          totalSlots: 1,
+          openSlots: 1,
+          moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+          availableUntil: null,
+          minStayMonths: 1,
+          lastConfirmedAt: freshLastConfirmedAt(),
+        },
+      });
+      (prisma.message.create as jest.Mock).mockResolvedValue({
+        id: "msg-new",
+        content: "Hello",
+        senderId: "user-123",
+      });
+      (prisma.conversation.update as jest.Mock).mockResolvedValue({});
+
+      const request = new Request("http://localhost/api/messages", {
+        method: "POST",
+        body: JSON.stringify({ conversationId: "conv-123", content: "Hello" }),
+      });
+      const response = await POST(request);
+
+      expect(response.status).toBe(201);
+      expect(mockSendNotificationEmailWithPreference).toHaveBeenCalledWith(
+        "newMessage",
+        "user-456",
+        "recipient@example.com",
+        expect.objectContaining({
+          listingTitle: "this listing",
+          messagePreview: expect.any(String),
+        })
       );
     });
 
