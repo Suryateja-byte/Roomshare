@@ -1,7 +1,12 @@
 import { test as setup, expect, Page } from "@playwright/test";
+import { PrismaClient } from "@prisma/client";
 import path from "path";
 
 const authFile = path.join(__dirname, "../../playwright/.auth/user.json");
+const suspendedViewerAuthFile = path.join(
+  __dirname,
+  "../../playwright/.auth/suspended-viewer.json"
+);
 
 /**
  * Shared login helper — authenticates via the Auth.js credentials callback,
@@ -168,4 +173,26 @@ setup("authenticate as reviewer", async ({ page }) => {
       .or(page.locator('[data-testid="user-menu"]'))
       .or(page.locator('[aria-label*="user"]'))
   ).toBeVisible({ timeout: 10000 });
+});
+
+setup("authenticate as suspended viewer", async ({ page }) => {
+  const prisma = new PrismaClient();
+  const email = "e2e-suspended-viewer@roomshare.dev";
+  const password = "TestPassword123!";
+
+  try {
+    await prisma.user.update({
+      where: { email },
+      data: { isSuspended: false },
+    });
+
+    await loginAndSaveState(page, email, password, suspendedViewerAuthFile);
+
+    await prisma.user.update({
+      where: { email },
+      data: { isSuspended: true },
+    });
+  } finally {
+    await prisma.$disconnect();
+  }
 });

@@ -1,0 +1,19 @@
+flowchart TB
+  Browser["Browser Client"]
+  SearchPage["/search Server Page"]
+  SearchClient["SearchResultsClient"]
+  MapWrapper["PersistentMapWrapper"]
+  Map["Map"]
+  APIs["Search / Map / Facets / Favorites APIs"]
+  Data["Search V2, Search-doc, Legacy Data Helpers"]
+  DB["Postgres"]
+
+  Browser --> SearchPage
+  SearchPage --> Data
+  SearchPage --> SearchClient
+  SearchPage --> MapWrapper
+  SearchClient --> APIs
+  MapWrapper --> APIs
+  MapWrapper --> Map
+  APIs --> Data
+  Data --> DB

@@ -6,7 +6,7 @@
  * 2. Custom limit (max 100) respected
  * 3. Conversation list paginated
  * 4. Invalid cursor returns 400
- * 5. Max message length (2000 chars) enforced
+ * 5. Max message length (1000 chars) enforced
  */
 
 // Mock Prisma before imports
@@ -99,6 +99,10 @@ function createMockRequest(
   init?: { method?: string; headers?: Record<string, string>; body?: string }
 ): Request {
   return new Request(url, init);
+}
+
+function freshLastConfirmedAt(): Date {
+  return new Date(Date.now() - 24 * 60 * 60 * 1000);
 }
 
 // Generate mock messages for pagination testing
@@ -508,13 +512,13 @@ describe("Messages Pagination (P1-03)", () => {
           moveInDate: new Date("2026-05-01T00:00:00.000Z"),
           availableUntil: null,
           minStayMonths: 1,
-          lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
+          lastConfirmedAt: freshLastConfirmedAt(),
         },
       });
     });
 
-    it("accepts message within 2000 character limit", async () => {
-      const validContent = "A".repeat(2000);
+    it("accepts message at the 1000 character limit", async () => {
+      const validContent = "A".repeat(1000);
       (prisma.message.create as jest.Mock).mockResolvedValue({
         id: "message-new",
         senderId: "user-123",
@@ -537,8 +541,8 @@ describe("Messages Pagination (P1-03)", () => {
       expect(response.status).toBe(201);
     });
 
-    it("rejects message exceeding 2000 character limit", async () => {
-      const tooLongContent = "A".repeat(2001);
+    it("rejects message exceeding the 1000 character limit", async () => {
+      const tooLongContent = "A".repeat(1001);
 
       const request = createMockRequest("http://localhost:3000/api/messages", {
         method: "POST",
@@ -553,7 +557,7 @@ describe("Messages Pagination (P1-03)", () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe("Invalid message payload");
+      expect(data.error).toBe("Message must be 1000 characters or less.");
     });
 
     it("rejects empty message", async () => {

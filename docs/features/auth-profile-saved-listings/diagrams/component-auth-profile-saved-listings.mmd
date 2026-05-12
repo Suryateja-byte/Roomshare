@@ -1,0 +1,17 @@
+%% Evidence: APS-E001, APS-E003, APS-E011, APS-E012, APS-E014, APS-E015
+flowchart LR
+  Session[JWT session and authTime]
+  Suspension[Live suspension check]
+  Password[Password revocation]
+  ProfileDraft[Profile draft]
+  SavedState[Saved listing state]
+  SearchAlerts[Saved search alert state]
+  SettingsState[Settings and delete state]
+  DB[(Prisma user and saved models)]
+
+  Session --> Suspension
+  Session --> Password
+  ProfileDraft --> DB
+  SavedState --> DB
+  SearchAlerts --> DB
+  SettingsState --> DB

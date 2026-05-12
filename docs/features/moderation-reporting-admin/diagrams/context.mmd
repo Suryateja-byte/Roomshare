@@ -1,0 +1,21 @@
+%% Evidence: MRA-E001 through MRA-E018
+flowchart LR
+  User[Authenticated user]
+  Admin[Admin user]
+  Reports[/api/reports/]
+  AdminUI[Admin pages]
+  AdminActions[Admin actions]
+  Verification[Verification actions and document route]
+  Audit[(AuditLog)]
+  DB[(Reports, listings, users, verification)]
+
+  User --> Reports
+  User --> Verification
+  Admin --> AdminUI
+  AdminUI --> AdminActions
+  AdminUI --> Verification
+  Reports --> DB
+  AdminActions --> DB
+  Verification --> DB
+  AdminActions --> Audit
+  Verification --> Audit

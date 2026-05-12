@@ -1,0 +1,43 @@
+%% Evidence: MRA-E001 through MRA-E018
+flowchart TB
+  subgraph PublicAccount
+    ReportAPI[POST /api/reports]
+    VerificationSubmit[submitVerificationRequest]
+  end
+
+  subgraph Admin
+    Dashboard[/admin pages]
+    UserActions[User admin actions]
+    ListingActions[Listing moderation actions]
+    ReportActions[Report actions]
+    VerificationActions[Verification approve/reject]
+    DocumentRoute[Verification document route]
+  end
+
+  subgraph Data
+    Report[(Report)]
+    Listing[(Listing)]
+    User[(User)]
+    VerificationRequest[(VerificationRequest)]
+    VerificationUpload[(VerificationUpload)]
+    AuditLog[(AuditLog)]
+  end
+
+  ReportAPI --> Report
+  VerificationSubmit --> VerificationRequest
+  VerificationSubmit --> VerificationUpload
+  Dashboard --> UserActions
+  Dashboard --> ListingActions
+  Dashboard --> ReportActions
+  Dashboard --> VerificationActions
+  ListingActions --> Listing
+  ReportActions --> Report
+  ReportActions --> Listing
+  VerificationActions --> VerificationRequest
+  VerificationActions --> User
+  DocumentRoute --> VerificationRequest
+  UserActions --> AuditLog
+  ListingActions --> AuditLog
+  ReportActions --> AuditLog
+  VerificationActions --> AuditLog
+  DocumentRoute --> AuditLog

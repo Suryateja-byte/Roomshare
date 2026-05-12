@@ -43,18 +43,18 @@
     {
       "claimId": "V-CH-006",
       "claim": "GET and POST /api/messages are documented with auth, rate, access, polling, unread, mark-read, direct send, cache, and failure behavior.",
-      "citation": "05-api-contracts.md; evidence-register.md CH-E015-CH-E016, CH-E032, CH-E044",
-      "verdict": "partial",
-      "discrepancy": "Source and focused Jest/API/security evidence support the documented behavior, including route-level missing-Origin CSRF rejection, but direct HTTP cache/header capture remains a P1 gap.",
-      "recommendedFix": "Run direct HTTP/API checks for status codes and cache headers before marking this fully pass."
+      "citation": "05-api-contracts.md; evidence-register.md CH-E015-CH-E016, CH-E032, CH-E049, CH-E055",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
     },
     {
       "claimId": "V-CH-007",
-      "claim": "The viewer-state API and public contact contract document contact CTA state, paywall summary, availability gates, private no-store behavior, and canBook/canHold false.",
-      "citation": "05-api-contracts.md; 07-state-management.md; evidence-register.md CH-E019-CH-E020",
-      "verdict": "partial",
-      "discrepancy": "Source contract fields are documented, but the full viewer-state route contract lacks focused runtime/status/cache tests.",
-      "recommendedFix": "Run or add focused viewer-state route tests for fields, statuses, cache headers, auth variants, and paywall conversion."
+      "claim": "The viewer-state API and public contact contract document contact CTA state, paywall summary, availability gates, suspended/blocked disabled reasons, private no-store behavior, and canBook/canHold false.",
+      "citation": "05-api-contracts.md; 07-state-management.md; evidence-register.md CH-E019-CH-E020, CH-E046, CH-E056, CH-E068",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
     },
     {
       "claimId": "V-CH-008",
@@ -66,8 +66,8 @@
     },
     {
       "claimId": "V-CH-009",
-      "claim": "Auth/security docs distinguish protected and public/optional-auth surfaces and record source-observed permission gates.",
-      "citation": "08-auth-security-permissions.md; phase-4/04-auth-security-permissions.md",
+      "claim": "Auth/security docs distinguish protected and public/optional-auth surfaces, record source-observed permission gates, and include deterministic route-handler CSRF variant proof for the documented Contact Host mutation routes.",
+      "citation": "08-auth-security-permissions.md; phase-4/04-auth-security-permissions.md; evidence-register.md CH-E071",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -75,7 +75,7 @@
     {
       "claimId": "V-CH-010",
       "claim": "Interaction census rows include trigger, code path, state/API effect, UI result, failure behavior, evidence, and current evidence-backed test status.",
-      "citation": "03-interaction-census.md; evidence-register.md CH-E032-CH-E045",
+      "citation": "03-interaction-census.md; evidence-register.md CH-E032-CH-E062",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -90,8 +90,8 @@
     },
     {
       "claimId": "V-CH-012",
-      "claim": "The test matrix separates release-blocking checks from confidence-building checks, records focused Jest/API/security/component, Chromium messaging, focused listing-detail Contact Host, Mobile Chrome no-deps, and setup-backed Mobile Chrome commands as passed, records the failed pre-fix and first-fix Mobile Chrome attempts as historical, and keeps broader E2E/runtime gaps explicit.",
-      "citation": "11-test-traceability-matrix.md; phase-4/05-test-traceability.md; evidence-register.md CH-E032-CH-E045",
+      "claim": "The test matrix separates release-blocking checks from confidence-building checks, records current deterministic passes, the current checkout-route fixture-repair pass, current viewer-state route contract proof, deterministic per-route CSRF variant proof, historical and updated message-length boundary evidence, the current focused listing-detail Contact Host browser pass, the clean full Chromium messaging rerun, the mocked checkout-return browser pass, the scoped listing-detail state-matrix browser pass, the suspended/blocked source/test/fixture implementation and Chromium browser proof, focused WebKit/Mobile Chrome/Mobile Safari browser-matrix passes, the Firefox install plus post-install failure reclassification, historical Mobile Chrome evidence, and broader E2E/runtime gaps.",
+      "citation": "11-test-traceability-matrix.md; phase-4/05-test-traceability.md; evidence-register.md CH-E032-CH-E073",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -99,23 +99,55 @@
     {
       "claimId": "V-CH-013",
       "claim": "Runtime verification is explicitly marked PARTIALLY VERIFIED, with remaining unverified browser/runtime behavior not described as current verified behavior.",
-      "citation": "README.md; runtime-verification.md; 12-gaps-unknowns-and-questions.md; evidence-register.md CH-E038-CH-E045; 12-gaps-unknowns-and-questions.md CH-G001-CH-G002",
+      "citation": "README.md; runtime-verification.md; 12-gaps-unknowns-and-questions.md; evidence-register.md CH-E038-CH-E064; 12-gaps-unknowns-and-questions.md CH-G001-CH-G002",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
     },
     {
       "claimId": "V-CH-014",
-      "claim": "Message length mismatch is documented as a gap rather than resolved behavior.",
-      "citation": "06-data-model-and-invariants.md; 09-errors-empty-loading-edge-cases.md; 12-gaps-unknowns-and-questions.md; evidence-register.md CH-E030",
+      "claim": "Message length is documented as an approved uniform 1000-character outbound contract across source and focused test sources, with focused Linux-side WSL Jest execution passing for the updated boundary tests.",
+      "citation": "05-api-contracts.md; 06-data-model-and-invariants.md; 09-errors-empty-loading-edge-cases.md; 11-test-traceability-matrix.md; 12-gaps-unknowns-and-questions.md; goal-progress-message-limit-1000.md; evidence-register.md CH-E030, CH-E060, CH-E066, CH-E067",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
     },
     {
       "claimId": "V-CH-015",
-      "claim": "The Phase 11 round-trip status reconciles historical Phase 1/2 and Phase 4 snapshots with current focused runtime/test evidence and preserves viewer-state full contract, checkout browser return, realtime/RLS, message-length, email, and full-matrix items as explicit P1/P2 gaps while adding schema/test-name detail for reconstruction.",
-      "citation": "round-trip-review.md; 00-feature-boundary.md; phase-4/05-test-traceability.md; 05-api-contracts.md; 11-test-traceability-matrix.md; evidence-register.md CH-E032-CH-E045",
+            "claim": "The Phase 11 round-trip status reconciles historical Phase 1/2 and Phase 4 snapshots with current focused runtime/test evidence and keeps provider-level Supabase realtime/RLS as the remaining P1 while email, optional live-server parity, and real payment-provider fulfillment remain P2 items; it also records fallback/API/mocked-realtime reduction evidence, closes message-limit focused execution, adds the suspended/blocked contract/test-source reduction, closes suspended/blocked listing-detail Chromium execution in CH-E073, and adds schema/test-name detail for reconstruction.",
+      "citation": "round-trip-review.md; 00-feature-boundary.md; phase-4/05-test-traceability.md; 05-api-contracts.md; 11-test-traceability-matrix.md; evidence-register.md CH-E032-CH-E073",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V-CH-016",
+            "claim": "The provider-level Supabase realtime/RLS P1 is reduced but not closed: fallback polling, API read/unread isolation, and mocked client-side realtime insert handling are locally verified as non-provider coverage, while provider-level Supabase realtime authorization/RLS remains blocked because this repo state has no committed Message/conversation RLS policies, no local Supabase config, no Supabase provider test script, and only a plain Postgres docker service.",
+      "citation": "goal-progress-realtime-rls.md; goal-progress-provider-rls.md; evidence-register.md CH-E062, CH-E070; runtime-verification.md; 07-state-management.md; 08-auth-security-permissions.md; 11-test-traceability-matrix.md; 12-gaps-unknowns-and-questions.md CH-G005",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V-CH-017",
+            "claim": "The focused Contact Host browser-matrix blocker is closed for the named Firefox focused-spec blockers: listing-detail runtime and messaging conversation specs pass on WebKit, Firefox, Mobile Chrome, and Mobile Safari after narrow test/setup fixes, and the practical combined two-spec Firefox run passes.",
+      "citation": "goal-progress-browser-matrix.md; goal-progress-firefox-matrix.md; goal-progress-firefox-stabilization.md; evidence-register.md CH-E063-CH-E065; runtime-verification.md; 11-test-traceability-matrix.md; 12-gaps-unknowns-and-questions.md CH-G001-CH-G002",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V-CH-018",
+      "claim": "The approved suspended/blocked listing-detail proof path has explicit viewer-state disabled reasons, safe disabled CTA copy, dedicated seed/auth fixtures, passing focused route proof, focused Chromium E2E test source, and passing focused plus full listing-detail Contact Host Chromium browser proof.",
+      "citation": "goal-progress-suspended-blocked-contract.md; 05-api-contracts.md; 11-test-traceability-matrix.md; evidence-register.md CH-E068-CH-E073",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V-CH-019",
+      "claim": "The Contact Host email delivery P2 is reduced but blocked: mocked email invocation, recipient scoping, provider-client retry/circuit/no-key behavior, and no-real-provider local evidence are recorded, while the real new-message template cannot render the current Contact Host send-path payload because listingTitle and messagePreview are omitted.",
+      "citation": "goal-progress-email-delivery.md; 10-performance-observability.md; 11-test-traceability-matrix.md; 12-gaps-unknowns-and-questions.md CH-G010; evidence-register.md CH-E072",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -123,43 +155,38 @@
   ],
   "coverageGaps": [
     {
-      "manifestItem": "Runtime/browser contact-host flows",
-      "gap": "Chromium dedupe passed earlier. Current verification passed Chromium messaging, focused listing-detail Contact Host runtime, Mobile Chrome no-deps, and setup-backed Mobile Chrome after stabilizing historical failures. Suspended/paywall/unavailable listing-detail states, checkout browser return, blocked UI browser flow, realtime/presence, email, and full browser matrix are not runtime verified.",
-      "severity": "P1"
+            "manifestItem": "Runtime/browser contact-host confidence gaps",
+            "gap": "Chromium dedupe passed earlier. Current verification passed focused listing-detail Contact Host runtime, deterministic API/action/component coverage, fallback polling, API read/unread isolation, mocked client-side realtime insert handling, the full Chromium messaging journey after a narrow J25 test/setup synchronization fix, mocked Chromium checkout return / paid-unlock runtime, scoped listing-detail paywall-required/unavailable/migration-review/moderation-locked browser states, suspended/blocked listing-detail Chromium states, and focused WebKit/Firefox/Mobile Chrome/Mobile Safari listing-detail plus messaging specs. CH-E064 installed Firefox and reproduced focused Firefox image decode and NS_BINDING_ABORTED failures as test/setup evidence; CH-E065 closed those focused-spec blockers with narrow test/helper changes and a passing practical combined Firefox two-spec run. CH-E068 implements suspended/blocked listing-detail pre-click contract, fixture, route proof, and focused E2E test source; CH-E073 closes focused and full Chromium execution for those states. Remaining non-provider runtime/browser parity work is future confidence coverage. Provider-level Supabase realtime/RLS is tracked separately as the only current Contact Host P1; email remains tracked only in the separate P2 email delivery gap.",
+            "severity": "P2"
     },
     {
-      "manifestItem": "Release-blocking tests",
-      "gap": "Focused component/API/security/unit tests, focused MessagesPageClient tests, Chromium messaging E2E, focused listing-detail Contact Host E2E, Mobile Chrome messages no-deps, and setup-backed Mobile Chrome passed after the follow-up stabilization. The full browser matrix plus targeted checkout browser return/realtime tests have not been completed in this documentation pass.",
-      "severity": "P1"
+            "manifestItem": "Release confidence tests",
+            "gap": "Current focused deterministic tests passed for viewer-state route contract/listing-page, checkout creation route, checkout-session, CSRF/messages API, per-route CSRF variants, messaging/contact-host action/component coverage, affected contact/payment coverage, historical and updated message-length cap assertions, fallback polling, API read/unread isolation, and mocked client-side realtime insert handling. Focused listing-detail Contact Host E2E passed sequentially, the full Chromium messaging journey passed in CH-E057 after a test/setup synchronization fix, mocked checkout browser return passed in CH-E058, scoped listing-detail paywall/unavailable/migration/moderation browser states passed in CH-E059, and CH-E061 reran the focused state matrix plus full focused spec in WSL with `.last-run.json` passing. CH-E063 passed focused listing-detail and messaging specs on WebKit, Mobile Chrome, and Mobile Safari after narrow test/setup fixes. CH-E064 installed Firefox and reproduced the focused Firefox image decode and direct-navigation NS_BINDING_ABORTED failures; CH-E065 closed those blockers after narrow test/helper changes, with individual focused Firefox listing-detail and messaging specs plus the practical combined Firefox two-spec run passing. CH-E067 closed the message-length execution gate with a focused Linux-side WSL Jest pass. CH-E068 adds and passes suspended/blocked route coverage and adds browser test source; CH-E073 closes the focused suspended/blocked Chromium proof and full listing-detail Contact Host Chromium spec. CH-E071 closed deterministic per-route CSRF variant coverage for `/api/messages` and `/api/payments/checkout`. Remaining broad browser/runtime parity items are P2 confidence gaps; CH-E070 provider-level Supabase realtime/RLS remains the separate current P1.",
+            "severity": "P2"
+    },
+    {
+      "manifestItem": "Messages API",
+      "gap": "Direct /api/messages route-handler status/cache-header evidence passed in CH-E055 for unread-count, thread, polling, conversation-list, send, and mark-read success paths after a test-only stale-fixture repair. Optional direct HTTP live-server status/cache/header capture remains confidence coverage if release acceptance requires transport-level proof outside route-handler Jest.",
+      "severity": "P2"
     },
     {
       "manifestItem": "Viewer-state API",
-      "gap": "A viewer-state private-feedback no-bleed test was discovered and added to the manifest, but no full focused route contract/status/cache test has been run for GET /api/listings/[id]/viewer-state.",
-      "severity": "P1"
+      "gap": "Focused route-handler tests passed for GET /api/listings/[id]/viewer-state status/cache headers, auth variants, privacy-safe fields, unavailable/moderation-locked states, paywall-required state, rate-limit passthrough, and fallback behavior. Optional direct HTTP live-server status/cache/header capture remains confidence coverage if release acceptance requires transport-level proof outside route-handler Jest.",
+      "severity": "P2"
     },
     {
       "manifestItem": "Checkout APIs",
-      "gap": "Focused checkout and checkout-session API tests passed in CH-E044, but checkout browser return and runtime paid-unlock acceptance remain incomplete.",
-      "severity": "P1"
+      "gap": "Checkout creation route and checkout-session/status tests passed in CH-E053 after the checkout fixture freshness repair. Affected contact/payment coverage passed in CH-E054 after an adjacent phone-reveal fixture repair. Mocked Chromium checkout browser return and paid-unlock runtime passed in CH-E058. Real Stripe redirect and webhook/provider fulfillment remain unverified confidence coverage.",
+      "severity": "P2"
     },
     {
       "manifestItem": "Supabase realtime",
-      "gap": "Realtime authorization/RLS and fallback behavior remain source-observed but not runtime verified.",
-      "severity": "P1"
-    },
-    {
-      "manifestItem": "Message length contract",
-      "gap": "Inbox, thread, and server/API limits differ and require product/test resolution.",
-      "severity": "P1"
-    },
-    {
-      "manifestItem": "CSRF implementation",
-      "gap": "CSRF helper behavior is documented from source, helper-level CSRF tests pass, and direct missing-Origin rejection tests pass for contact-host API paths; per-route malformed/mismatched Origin variants remain optional confidence coverage.",
+      "gap": "Fallback polling, API read/unread isolation, and mocked client-side realtime insert handling are locally verified in CH-E062. Provider-level Supabase realtime delivery/JWT authorization/database RLS remains blocked in CH-E070 because source/config search found no local `Message`/conversation RLS policies, no `supabase/config.toml`, no local Supabase directory, no Supabase provider test script, and no Supabase Realtime/Auth docker service.",
       "severity": "P1"
     },
     {
       "manifestItem": "Email delivery",
-      "gap": "Email send calls are source-observed, but delivery behavior is not runtime verified.",
+      "gap": "CH-E072 verifies safe local mocked behavior for Contact Host email invocation: internal notification plus mocked preference-aware email call are asserted for /api/messages, provider-client retry/circuit/no-key behavior is tested with mocked fetch, and no real email provider call was made. The gap is now precisely blocked because the real new-message template requires listingTitle and messagePreview, while the Contact Host send path passes only recipientName, senderName, and conversationId; the local no-provider render check fails before provider I/O. Real provider acceptance, inbox delivery, bounce/webhook handling, and provider observability remain unverified.",
       "severity": "P2"
     }
   ]

@@ -1,0 +1,41 @@
+%% Evidence: APS-E001 through APS-E016
+flowchart TB
+  subgraph Client
+    Login[LoginClient]
+    Signup[SignUpClient]
+    Profile[ProfileClient and EditProfileClient]
+    SavedListings[SavedListingsClient]
+    SavedSearches[SavedSearchList]
+    Settings[SettingsClient]
+  end
+
+  subgraph Server
+    AuthJS[Auth.js callbacks]
+    Register[POST /api/register]
+    Recovery[Auth recovery APIs]
+    Favorites[/api/favorites]
+    Actions[Profile, settings, saved actions]
+  end
+
+  subgraph Data
+    User[(User)]
+    Tokens[(Verification and reset tokens)]
+    SavedListing[(SavedListing)]
+    SavedSearch[(SavedSearch and AlertSubscription)]
+    Blocked[(BlockedUser)]
+  end
+
+  Login --> AuthJS
+  Signup --> Register
+  Register --> User
+  Register --> Tokens
+  Recovery --> Tokens
+  Profile --> Actions
+  Settings --> Actions
+  SavedListings --> Actions
+  SavedListings --> Favorites
+  SavedSearches --> Actions
+  Actions --> User
+  Actions --> SavedListing
+  Actions --> SavedSearch
+  Actions --> Blocked

@@ -1,0 +1,150 @@
+{
+  "featureSlug": "listing-management",
+  "status": "partial",
+  "verifiedAt": "2026-05-11",
+  "method": "source audit plus test discovery; focused Jest/API/action and broader direct API/security commands executed; local E2E database readiness repaired; listing-edit/status/delete Chromium coverage executed and passes; latest full create/listing-edit/dedupe Chromium gate executed and passes after LM-G006 focused diagnosis",
+  "claims": [
+    {
+      "claimId": "V-LM-001",
+      "claim": "Create listing page/form/API behavior is documented from source evidence.",
+      "citation": "LM-E001, LM-E002, LM-E003, LM-E004, LM-E005, LM-E006, LM-E007, LM-E016",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V-LM-002",
+      "claim": "Edit listing page/form/PATCH behavior is documented from source evidence.",
+      "citation": "LM-E008, LM-E009, LM-E010, LM-E011, LM-E012, LM-E018",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V-LM-003",
+      "claim": "Delete, can-delete, and status action behavior is documented from source evidence.",
+      "citation": "LM-E013, LM-E014, LM-E015",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V-LM-004",
+      "claim": "Data model and schema claims are documented from Prisma and Zod source evidence.",
+      "citation": "LM-E016, LM-E017",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V-LM-005",
+      "claim": "Listing-management browser/runtime behavior has been verified.",
+      "citation": "runtime-verification.md; LM-E021, LM-E022, LM-E024, LM-E025, LM-E026, LM-E027, LM-E028, LM-E029, LM-E030, LM-E031, LM-E032, LM-E033, LM-E034, LM-E035, LM-E036, LM-E037, LM-E038, LM-E039, LM-E040, LM-E041, LM-E042, LM-E043, LM-E044, LM-E045, LM-E046, LM-E047, LM-E048, LM-E049, LM-G001, LM-G002, LM-G003",
+      "verdict": "partial",
+      "discrepancy": "Source evidence, test inventory, focused Jest/API/action coverage, broader direct API/security coverage, local DB readiness repair, Chromium browser execution evidence, and focused failure diagnosis exist. Listing-edit/status/delete browser coverage passes for the current host-managed UI: listing-edit passed 10 with 1 retained dev-server redirect skip, status/delete passed 2/2, and the listing-edit folder passed 12 with 1 skipped. The latest full create/listing-edit/dedupe Chromium gate passed with 117 passed and 2 skipped after closing LM-G006. Verification remains partial because live HTTP/curl checks, broader component/schema inventory, migration SQL line audit, storage-provider cleanup checks, and LE-01 redirect determinism remain outside this pass.",
+      "recommendedFix": "Run live HTTP/curl mutation checks, broader component/schema tests, migration SQL audit, and storage-provider cleanup verification; revisit LE-01 if unauthenticated edit redirects become deterministic in E2E."
+    },
+    {
+      "claimId": "V-LM-008",
+      "claim": "The listing-management browser-flow verification attempts, environment repair, visual fixes, listing-edit/status/delete coverage, latest broad gate result, and remaining gaps are documented with exact command evidence.",
+      "citation": "LM-E023; LM-E025; LM-E026; LM-E027; LM-E028; LM-E029; LM-E030; LM-E031; LM-E032; LM-E033; LM-E034; LM-E035; LM-E036; LM-E037; LM-E038; LM-E039; LM-E040; LM-E041; LM-E042; LM-E043; LM-E044; LM-E045; LM-E046; LM-E047; LM-E048; LM-E049; runtime-verification.md; 11-test-traceability-matrix.md",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V-LM-007",
+      "claim": "Listing-management direct API route-handler and CSRF helper behavior has docs-safe verification evidence for create, edit, delete, status, status/cache headers, auth/ownership, idempotency, and duplicate-submit/collision behavior.",
+      "citation": "LM-E022; runtime-verification.md; 11-test-traceability-matrix.md",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V-LM-006",
+      "claim": "Migration-backed listing/canonical-inventory invariants are fully line-audited.",
+      "citation": "LM-E020; LM-G004",
+      "verdict": "partial",
+      "discrepancy": "Relevant migration paths were discovered, but migration SQL was not line-audited in this pass.",
+      "recommendedFix": "Line-audit relevant migration SQL and update 06-data-model-and-invariants.md."
+    }
+  ],
+  "failureTaxonomy": [
+    {
+      "cluster": "create-listing-date-minDate",
+      "count": "0 current; 41 prior",
+      "classification": "fixed product bug with test-helper exposure",
+      "evidence": "LM-E027, LM-E028, LM-E034, LM-E040, LM-E044",
+      "recommendedFix": "None for the fixed cluster; keep broad-gate date behavior in release verification."
+    },
+    {
+      "cluster": "dedupe-test-helper-404",
+      "count": "0 current; 6 prior",
+      "classification": "fixed seed/setup issue",
+      "evidence": "LM-E027, LM-E029, LM-E036, LM-E040, LM-E044",
+      "recommendedFix": "None for the fixed cluster; keep Playwright worker and managed server helper secrets aligned."
+    },
+    {
+      "cluster": "dedupe-canonical-card-routing",
+      "count": "0 current; 1 prior focused failure",
+      "classification": "unknown/prior, not reproduced in later dedupe and broad runs",
+      "evidence": "LM-E027, LM-E030, LM-E036, LM-E040, LM-E044",
+      "recommendedFix": "Reopen only if it reproduces; compare direct link click versus nested-heading click."
+    },
+    {
+      "cluster": "create-listing-visual-snapshots",
+      "count": "0 current; 4 prior",
+      "classification": "fixed test artifact/stale baseline plus one scroll-state issue",
+      "evidence": "LM-E027, LM-E032, LM-E037, LM-E038, LM-E039, LM-E040, LM-E044",
+      "recommendedFix": "None for the fixed cluster; V-003 now normalizes scroll position before screenshot."
+    },
+    {
+      "cluster": "listing-edit-skipped-coverage",
+      "count": "10 passed and 1 skipped in listing-edit.spec.ts; 12 passed and 1 skipped in listing-edit folder",
+      "classification": "closed coverage gap for current host-managed edit behavior",
+      "evidence": "LM-E027, LM-E031, LM-E041, LM-E043",
+      "recommendedFix": "No LM-G001 fix remains; revisit only if LE-01 unauthenticated redirect can be made deterministic."
+    },
+    {
+      "cluster": "create-listing-expired-draft-clearing",
+      "count": "0 current; 1 prior",
+      "classification": "not reproduced in focused rerun or final broad gate",
+      "evidence": "LM-E044, LM-E048, LM-E049",
+      "recommendedFix": "Reopen only if the draft-guard assertion reproduces."
+    },
+    {
+      "cluster": "dedupe-collision-rate-limit",
+      "count": "0 current; 5 prior",
+      "classification": "fixed broad-suite generic rate-limit isolation issue",
+      "evidence": "LM-E044, LM-E045, LM-E046, LM-E047, LM-E049",
+      "recommendedFix": "Keep dedupe collision runs on the existing non-production generic limiter bypass so collision-specific responses remain observable."
+    }
+  ],
+  "coverageGaps": [
+    {
+      "manifestItem": "Runtime browser behavior",
+      "gap": "Listing-edit/status/delete browser coverage exists and passes, closing LM-G001. The latest full create/listing-edit/dedupe Chromium gate is green, closing LM-G006. One retained listing-edit redirect skip remains documented as LE-01.",
+      "severity": "P2"
+    },
+    {
+      "manifestItem": "Live HTTP verification",
+      "gap": "Direct API route-handler/security tests passed, but live Next server/curl checks for listing mutation cache/header behavior and route-level CSRF rejection were not run.",
+      "severity": "P2"
+    },
+    {
+      "manifestItem": "Broader test inventory",
+      "gap": "Focused and broader direct API/security commands passed and selected browser specs executed, but component/schema tests outside those commands were not executed in this pass.",
+      "severity": "P2"
+    },
+    {
+      "manifestItem": "Migration SQL audit",
+      "gap": "Migration paths were discovered, but SQL line ranges were not audited for every invariant.",
+      "severity": "P2"
+    },
+    {
+      "manifestItem": "Storage cleanup",
+      "gap": "Best-effort storage cleanup is source-observed but not provider-runtime verified.",
+      "severity": "P2"
+    }
+  ]
+}

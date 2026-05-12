@@ -3,10 +3,15 @@
 These flows describe current source behavior plus later focused verification.
 Runtime coverage is partial, not absent: focused Contact Host Jest,
 `MessagesPageClient` Jest, Chromium messaging/listing-detail, and Mobile Chrome
-no-deps messaging checks pass. Setup-backed Mobile Chrome auth, checkout,
-realtime/presence, email delivery, suspended/paywall-required/unavailable
-listing states, and the full Firefox/WebKit matrix remain gaps. Evidence:
-CH-E032-CH-E040.
+no-deps messaging checks pass. Later evidence also covers setup-backed Mobile
+Chrome messaging, mocked checkout return, paywall/unavailable/migration/
+moderation listing-detail states, and CH-E068 source/test/fixture coverage for
+suspended/blocked listing-detail pre-click states. CH-E073 closes that
+historical CH-E068 execution gap with focused four-state Chromium proof and a
+full listing-detail Contact Host Chromium spec rerun. Provider-level Supabase
+realtime/RLS remains the only current Contact Host P1; email delivery and real
+payment-provider fulfillment remain P2 confidence gaps. Evidence:
+CH-E032-CH-E073.
 
 ## Listing Detail Contact Entry
 

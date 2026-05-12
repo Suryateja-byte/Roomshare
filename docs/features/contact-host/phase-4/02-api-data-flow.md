@@ -44,7 +44,7 @@ Status: Phase 4 source-only evidence pass. No API calls, browser flows, payment 
 ## Flow 5: Sending Messages And Notifications
 
 1. `MessagesPageClient` and `ChatWindow` both call the `sendMessage` server action from composer flows. Evidence: `src/components/MessagesPageClient.tsx:554-645`; `src/app/messages/[id]/ChatWindow.tsx:549-633`.
-2. The server action requires auth, rate limits, checks suspension, validates `conversationId` and message content up to 2000 characters, checks email verification, and delegates to `sendConversationMessage`. Evidence: `src/app/actions/chat.ts:368-421`.
+2. The server action requires auth, rate limits, checks suspension, validates `conversationId` and message content up to the approved 1000-character limit, checks email verification, and delegates to `sendConversationMessage`. Evidence: `src/app/actions/chat.ts:392-454`; CH-E066.
 3. Direct POST `/api/messages` validates CSRF, requires auth, rate limits send, checks suspension/email verification, validates payload, delegates to `sendConversationMessage`, and returns the created message with `Cache-Control: no-store`. Evidence: `src/app/api/messages/route.ts:270-382`.
 4. `sendConversationMessage` loads the conversation with participants/listing, rejects missing/deleted conversations and non-participants, re-runs listing contactability, blocks suspended recipients/owners, and checks block relationships. Evidence: `src/lib/messaging/send-conversation-message.ts:73-152`.
 5. Before persistence, outbound content is scanned and soft-flag telemetry is recorded. Evidence: `src/lib/messaging/send-conversation-message.ts:154-159`.
@@ -68,8 +68,8 @@ Status: Phase 4 source-only evidence pass. No API calls, browser flows, payment 
 
 ## Unknowns And Gaps
 
-- Runtime API behavior was NOT VERIFIED during Phase 4; no HTTP requests or server actions were executed in that pass. Later focused route tests for `/api/messages`, checkout, checkout-session, private-feedback no-bleed, and missing-Origin CSRF rejection passed in CH-E044.
+- Runtime API behavior was NOT VERIFIED during Phase 4; no HTTP requests or server actions were executed in that pass. Later focused tests for `/api/messages`, viewer-state route contract/status/cache, checkout creation route, checkout-session, private-feedback no-bleed, listing-page viewer-state consumers, and CSRF helper/messages-route coverage passed in CH-E046, CH-E047, CH-E049, CH-E053, and CH-E056.
 - Stripe checkout creation and checkout-session classification are source-observed, but webhook/payment fulfillment timing is NOT VERIFIED because the fulfillment webhook path is outside the current manifest.
 - Email notification delivery is NOT VERIFIED; the source only shows preference-aware send calls.
-- CSRF implementation details were NOT VERIFIED during Phase 4; manifest-listed routes call `validateCsrf`, but `src/lib/csrf.ts` was not inspected in that pass. Later CH-E041/CH-E044 verified helper behavior and route-level missing-Origin rejection.
+- CSRF implementation details were NOT VERIFIED during Phase 4; manifest-listed routes call `validateCsrf`, but `src/lib/csrf.ts` was not inspected in that pass. Later CH-E041/CH-E049 verified helper/messages-route behavior, and CH-E053 verified checkout missing-Origin rejection inside the current passing checkout-route suite.
 - Supabase realtime message delivery is source-observed in `ChatWindow`, but the Supabase helper/channel implementation is outside the current manifest and was NOT VERIFIED.

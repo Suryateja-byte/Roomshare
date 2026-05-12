@@ -1,0 +1,52 @@
+# Search / Map Source Map
+
+Source of truth: current dirty worktree. This is a Phase 1/2 source map, not final feature documentation.
+
+| Area | File | Symbols / components | Responsibility | Evidence | Confidence |
+|---|---|---|---|---|---|
+| Route | `src/app/search/page.tsx` | `SearchPage`, `generateMetadata` | Primary `/search` SSR entry point; parses URL params, rate-limits, runs V2 search, falls back to legacy listings, and renders result shell. | L158-L162, L242-L271, L390-L452, L507-L623 | Verified |
+| Route layout | `src/app/search/layout.tsx` | `SearchLayout` | Persistent `/search` layout and provider wiring for header, map/list split, map bounds, listing focus, V2 map data, and mobile search state. | L2-L13, L24-L41, L46-L93 | Verified |
+| Loading UI | `src/app/search/loading.tsx` | default loading component | Route loading skeleton. | L1-L3 | Verified |
+| Error UI | `src/app/search/error.tsx` | default error component | Route error boundary UI with retry action. | L9-L58 | Verified |
+| Pagination action | `src/app/search/actions.ts` | `fetchMoreListings` | Server action for load-more pagination; validates cursors, rate-limits, executes V2 search, and disables cursor support on V1 fallback. | L48-L110, L115-L172, L236-L237, L263-L285 | Verified |
+| URL parser | `src/lib/search-params.ts` | `parseSearchParams`, `normalizeSearchFilters`, `buildRawParamsFromSearchParams`, `buildCanonicalFilterParamsFromSearchParams`, `isBoundsRequired`, `normalizeSortOption` | Canonical URL/search-param normalization layer. | L4-L47, L54-L80, L110-L168, L207-L283, L534-L538, L582, L790-L906, L1021-L1024 | Verified |
+| Query mutation | `src/lib/search/search-query.ts` | `applySearchQueryChange` | Query-change helper used by sort/filter controls. | `src/components/SortSelect.tsx`:L61-L76 | Partially verified |
+| Search V2 service | `src/lib/search/search-v2-service.ts` | `executeSearchV2` | Primary V2 search service. | L587 | Verified |
+| Legacy data helpers | `src/lib/data.ts` | `getListingsPaginated`, `getMapListings`, `getMapListingsResult` | Legacy list/map data helpers and bounds-span guard. | L457-L464, L808-L845 | Verified |
+| Search-doc queries | `src/lib/search/search-doc-queries.ts` | `getSearchDocListingsFirstPage`, `getSearchDocMapListings`, `getSearchDocLimitedCount`, `semanticSearchQuery` | Search-document query path for list results, map markers, counts, cursors, and semantic search. | L1099, L1438, L1955, L2097-L2115, L2155, L2250, L2349-L2384 | Verified |
+| Cursor helpers | `src/lib/search/cursor.ts` | `encodeKeysetCursor`, `decodeKeysetCursor`, `buildCursorFromRow` | Keyset pagination cursor helpers. | L214, L256, L419 | Verified |
+| Response metadata | `src/lib/search/search-response.ts` | `createSearchResponseMeta`, `getSearchQueryHash` | Search response metadata and query hash support. | L54-L67 | Verified |
+| V2 API | `src/app/api/search/v2/route.ts` | `GET` | V2 search API with Redis rate limiting and `executeSearchV2`. | L23-L29, L56-L95, L102-L171, L194 | Verified |
+| Search listings API | `src/app/api/search/listings/route.ts` | `GET` | Client listing refresh/search API with V2 circuit breaker and V1 fallback. | L9-L32, L57-L78, L112-L141, L295-L315, L374-L378 | Verified |
+| Facets API | `src/app/api/search/facets/route.ts` | `GET` | Facet/filter count API with parser, rate limiting, bounds-required handling, and no-store responses. | L22-L24, L594-L621, L646-L680, L711-L768 | Verified |
+| Map listings API | `src/app/api/map-listings/route.ts` | `GET` | Map marker/listing API; validates or derives bounds and blocks unbounded map scans. | L9-L25, L57-L61, L111-L117, L230-L277, L317-L364, L390-L411 | Verified |
+| Geocoding API | `src/app/api/geocoding/autocomplete/route.ts` | `GET` | Public autocomplete endpoint with rate limiting and Photon/public autocomplete path. | L14-L18, L26-L36, L118-L165 | Verified |
+| Favorites API | `src/app/api/favorites/route.ts` | `GET`, `POST` | Saved-listing lookup and toggle API used by result cards. | L18-L70, L73-L171 | Verified |
+| Search form | `src/components/SearchForm.tsx` | `SearchForm`, `MAP_FLY_TO_EVENT` | Header search form, URL-backed location state, location selection, warnings, and filter modal integration. | L161-L182, L238-L256, L386-L430, L1469-L1498, L1582 | Verified |
+| Location input | `src/components/LocationSearchInput.tsx` | `LocationSearchInput` | Autocomplete UI that calls `/api/geocoding/autocomplete` and returns selected location data. | L173-L236, L342-L405, L480-L501, L623, L752-L943 | Verified |
+| Sort UI | `src/components/SortSelect.tsx` | `SortSelect` | Sort selector that mutates URL query state. | L24-L36, L41-L76, L97-L125 | Verified |
+| Client results | `src/components/search/SearchResultsClient.tsx` | `SearchResultsClient` | Client result list controller, empty states, map data handoff, load-more/refresh state, and listing-card rendering. | L122-L180, L300-L575, L1000-L1295 | Verified |
+| Inline filters | `src/components/search/InlineFilterStrip.tsx` | `InlineFilterStrip` | Inline filter controls rendered in `/search`. | `src/app/search/page.tsx`:L332-L355, L590-L623 | Partially verified |
+| Toolbar | `src/components/search/SearchResultsToolbar.tsx` | `SearchResultsToolbar` | Result toolbar rendered in `/search`. | `src/app/search/page.tsx`:L332-L355, L590-L623 | Partially verified |
+| Mobile heading | `src/components/search/SearchResultsMobileHeading.tsx` | `SearchResultsMobileHeading` | Mobile result heading/count state. | `src/app/search/page.tsx`:L332-L355, L590-L623 | Partially verified |
+| V2 map hydration | `src/components/search/V2MapDataSetter.tsx` | `V2MapDataSetter` | Hydrates server-provided V2 map data into client context. | `src/app/search/page.tsx`:L48-L54, L590-L623 | Partially verified |
+| Persistent map | `src/components/PersistentMapWrapper.tsx` | `PersistentMapWrapper`, `getMapRelevantParams`, `v2MapDataToListings` | Persistent map wrapper, lazy map bundle, independent `/api/map-listings` fetch path, bounds cache/padding. | L4-L17, L66-L75, L95-L155, L200-L205, L365-L430 | Verified |
+| Map component | `src/components/Map.tsx` | `Map`, `MapMarkerItem`, `MarkerPinContent` | Interactive map, cluster layers, markers, selected listing preview, bounds fitting, controls, error/empty overlays. | L4-L9, L248-L266, L331-L368, L667-L786, L804-L917, L1210-L1257, L3876-L4573 | Verified |
+| Map preference | `src/hooks/useMapPreference.ts` | `useMapPreference` | Desktop split/list-only and mobile list/map preference model. | L27-L29, L74-L117, L125-L149 | Verified |
+| Map/list toggle | `src/components/SearchViewToggle.tsx` | `SearchViewToggle` | Visible map/list toggle affordances. | L120-L136, L207-L219, L243-L317 | Verified |
+| Map bounds state | `src/contexts/MapBoundsContext.tsx` | `MapBoundsProvider`, `useMapBounds`, `useProgrammaticMove` | Map moved/programmatic move state; resets manual-move state on URL param changes; comment says deferred Search-this-area was removed. | L3-L13, L76-L94, L104-L141, L179-L205 | Verified |
+| Active pan bounds | `src/contexts/ActivePanBoundsContext.tsx` | `ActivePanBoundsProvider`, pan-bounds hooks | Dedicated state for active map drag bounds. | L4-L12, L40-L61, L86-L104 | Verified |
+| Listing focus | `src/contexts/ListingFocusContext.tsx` | `ListingFocusProvider`, focus hooks | List/map hover, active listing, and scroll request state. | L11-L16, L34-L48, L142-L211, L271-L315 | Verified |
+| Search map UI | `src/contexts/SearchMapUIContext.tsx` | `SearchMapUIProvider`, `useSearchMapUI` | Map visibility and focus-on-map action shared by result cards and map/list layout. | L33-L36, L62-L98, L123-L156, L165 | Verified |
+| V2 map data state | `src/contexts/SearchV2DataContext.tsx` | `SearchV2DataProvider`, `useV2MapData`, `useV2MapDataSetter` | Client-side V2 listing/map/GeoJSON data state. | L57-L83, L132-L175, L219-L296 | Verified |
+| List result IDs | `src/contexts/SearchListResultsContext.tsx` | `SearchListResultsProvider`, list-result hooks | Dirty-worktree context for list result IDs. | `src/components/search/SearchResultsClient.tsx`:L984; file discovery | Partially verified |
+| Listing card | `src/components/listings/ListingCard.tsx` | `ListingCard` | Listing card link, favorite button, hover/focus state, and show-on-map button. | L280-L352, L431-L499 | Verified |
+| Split-stay card | `src/components/search/SplitStayCard.tsx` | `SplitStayCard` | Split-stay result card variant with detail links and show-on-map interaction. | L64-L71, L133-L176 | Verified |
+| Favorite button | `src/components/FavoriteButton.tsx` | `FavoriteButton` | Optimistic favorite toggle and unauthorized login redirect. | L16-L24, L43-L87, L97-L100 | Verified |
+| Save search | `src/components/SaveSearchButton.tsx` | `SaveSearchButton` | Saves current search params through saved-search action/checkout flow. | L22-L34, L59-L63, L103-L120, L137-L178 | Verified |
+| Map sanitization | `src/lib/maps/sanitize-map-listings.ts` | `sanitizeMapListing`, `sanitizeMapListings` | Sanitizes public map listing payloads. | L87, L164 | Verified |
+| Public coordinates | `src/lib/search/public-coordinates.ts` | `toPublicCoordinates` | Public coordinate transformation/privacy helper. | L11 | Verified |
+| Location bounds | `src/lib/search/location-bounds.ts` | `deriveSearchBoundsFromPoint`, `boundsTupleToObject` | Derives and normalizes search bounds. | L17-L32 | Verified |
+| Env/config | `src/lib/env.ts`, `.env.example` | search/map/geocoding flags | Search-doc, semantic search, client search, Stadia, geocoding, and public autocomplete config. | `src/lib/env.ts`:L105-L110, L136, L157, L164-L174, L187, L357-L370, L449-L456, L571-L572, L596-L638, L803-L809, L866-L878; `.env.example`:L110-L111, L176-L200, L213-L241, L256-L259 | Verified |
+| Prisma schema | `prisma/schema.prisma` | `User`, `Listing`, `SavedListing`, `Location`, `SavedSearch`, `InventorySearchProjection`, `SemanticInventoryProjection`, `QuerySnapshot`, `HostContactChannels` | Data model support for search, saved listings/searches, geospatial lookup, projections, and adjacent contact-host channels. | L42-L74, L107-L168, L237-L247, L397-L420, L908-L909, L1106-L1136, L1183-L1186, L1207-L1211 | Verified |
+| Tests | `src/__tests__/**`, `tests/e2e/search/**`, `tests/e2e/dedupe/search-list-*.spec.ts` | Unit/integration/E2E search tests | Existing test files discovered; not executed in Phase 1/2. | file discovery | Not verified |

@@ -1,0 +1,18 @@
+%% Evidence: MRA-E002, MRA-E003, MRA-E004, MRA-E006, MRA-E008, MRA-E012, MRA-E013, MRA-E014
+flowchart LR
+  Auth[Admin auth]
+  Rate[Rate limits]
+  Locks[Row locks]
+  Version[Expected version or state]
+  ModerationLock[Moderation lock reasons]
+  Projection[Dirty marker and lifecycle sync]
+  Audit[Audit log]
+  Revalidate[Path revalidation]
+
+  Auth --> Rate
+  Rate --> Locks
+  Locks --> Version
+  Version --> ModerationLock
+  ModerationLock --> Projection
+  Projection --> Audit
+  Audit --> Revalidate

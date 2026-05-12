@@ -1,0 +1,77 @@
+%% Harness filename alias for state-machine-search-url-map.mmd.
+%% Evidence: docs/features/search-map/diagrams/state-machine-search-url-map.mmd.
+stateDiagram-v2
+  state "Raw URL params" as RawURL
+  state "Parsed params" as ParsedParams
+  state "Route loading" as RouteLoading
+  state "Route error" as RouteError
+  state "Server search" as ServerSearch
+  state "Client results" as ClientResults
+  state "Zero results" as ZeroResults
+  state "Location required" as LocationRequired
+  state "Rate limited" as RateLimited
+  state "Degraded fallback" as Degraded
+  state "Client fetch loading" as ClientFetchLoading
+  state "Client fetch error" as ClientFetchError
+  state "Load more pending" as LoadMore
+  state "V2 map data" as V2MapData
+  state "Map fetch loading" as MapFetch
+  state "Map rendered" as MapRendered
+  state "Map empty" as MapEmpty
+  state "Map error" as MapError
+  state "Active pan bounds" as ActivePanBounds
+  state "Listing card ready" as CardReady
+  state "Image failed" as ImageFailed
+  state "Placeholder image" as PlaceholderImage
+  state "Detail navigation" as DetailNavigation
+  state "Favorite idle" as FavoriteIdle
+  state "Favorite pending" as FavoritePending
+  state "Favorite saved" as FavoriteSaved
+  state "Favorite auth redirect" as FavoriteAuthRedirect
+  state "Favorite error" as FavoriteError
+  state "Save-search modal" as SaveSearchModal
+  state "Save pending" as SavePending
+  state "Save success" as SaveSuccess
+  state "Save error/auth/paywall" as SaveError
+  state "Mobile list" as MobileList
+  state "Mobile map" as MobileMap
+  state "Mobile sheet expanded" as MobileSheetExpanded
+  state "Mobile sheet collapsed" as MobileSheetCollapsed
+
+  [*] --> RawURL
+  RawURL --> ParsedParams: parseSearchParams
+  ParsedParams --> RouteLoading: navigation
+  RouteLoading --> ServerSearch: SSR/data ready
+  RouteLoading --> RouteError: route exception
+  RouteError --> RawURL: retry/navigation
+  ServerSearch --> ClientResults: ok
+  ServerSearch --> ZeroResults: zero-results
+  ServerSearch --> LocationRequired: bounds/location required
+  ServerSearch --> RateLimited: rate limit
+  ServerSearch --> Degraded: V1 fallback
+  Degraded --> ClientResults: render degraded list
+  ClientResults --> ClientFetchLoading: filter/sort/client refresh
+  ClientFetchLoading --> ClientResults: ok/degraded result
+  ClientFetchLoading --> ClientFetchError: API/network error
+  ClientFetchError --> ClientFetchLoading: retry
+  ClientResults --> LoadMore: nextCursor exists
+  LoadMore --> ClientResults: appended results
+  ServerSearch --> V2MapData: V2MapDataSetter
+  V2MapData --> MapRendered: hydrate context
+  MapRendered --> ActivePanBounds: user pans/zooms
+  ActivePanBounds --> MapFetch: /api/map-listings
+  MapFetch --> MapRendered: ok
+  MapFetch --> MapEmpty: zero listings
+  MapFetch --> MapError: API/style/tile failure
+  CardReady --> FavoritePending: save click
+  FavoritePending --> FavoriteSaved: 200 saved true
+  FavoritePending --> FavoriteIdle: 200 saved false
+  FavoritePending --> FavoriteAuthRedirect: 401
+  FavoritePending --> FavoriteError: non-OK/network
+  ClientResults --> SaveSearchModal: open save search
+  SaveSearchModal --> SavePending: submit
+  SavePending --> SaveSuccess: saved
+  SavePending --> SaveError: error/auth/paywall
+  ClientResults --> MobileList: mobile list view
+  MobileList --> MobileMap: toggle map
+  MobileMap --> MobileList: toggle list

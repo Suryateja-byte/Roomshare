@@ -1,0 +1,75 @@
+{
+  "featureSlug": "auth-profile-saved-listings",
+  "status": "partial",
+  "verifiedAt": "2026-05-10",
+  "method": "source audit plus test discovery; no runtime/browser/test commands executed",
+  "claims": [
+    {
+      "claimId": "V-APS-001",
+      "claim": "Authentication/session/login/signup behavior is documented from source evidence.",
+      "citation": "APS-E001, APS-E002, APS-E003, APS-E004, APS-E005, APS-E006",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V-APS-002",
+      "claim": "Verification and password recovery behavior is documented from source evidence.",
+      "citation": "APS-E007, APS-E008, APS-E009",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V-APS-003",
+      "claim": "Profile, settings, saved listings, favorites, saved searches, and data-model claims are documented from source evidence.",
+      "citation": "APS-E010, APS-E011, APS-E012, APS-E013, APS-E014, APS-E015, APS-E016",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V-APS-004",
+      "claim": "Browser/runtime behavior and focused tests have been verified.",
+      "citation": "runtime-verification.md; APS-G001, APS-G002, APS-G003",
+      "verdict": "partial",
+      "discrepancy": "Source evidence and test inventory exist, but browser, direct HTTP, provider-runtime, and focused test commands were not run in this documentation pass.",
+      "recommendedFix": "Run the focused commands in 11-test-traceability-matrix.md and update runtime-verification.md."
+    },
+    {
+      "claimId": "V-APS-005",
+      "claim": "Account deletion retention expectations are verified against product/legal requirements.",
+      "citation": "APS-G004",
+      "verdict": "partial",
+      "discrepancy": "Source tombstone behavior is documented, but product/legal retention requirements were not verified.",
+      "recommendedFix": "Review account deletion behavior with product/legal policy owners and update 12-gaps-unknowns-and-questions.md."
+    }
+  ],
+  "coverageGaps": [
+    {
+      "manifestItem": "Runtime browser behavior",
+      "gap": "Full browser auth/profile/settings/saved-listings/saved-searches suite was not run.",
+      "severity": "P1"
+    },
+    {
+      "manifestItem": "Direct API verification",
+      "gap": "Direct HTTP checks for statuses, cache headers, CSRF variants, favorites, saved-search actions, and auth recovery routes were not run.",
+      "severity": "P1"
+    },
+    {
+      "manifestItem": "External providers",
+      "gap": "Google OAuth, Turnstile, email delivery, and checkout return behavior were not runtime verified.",
+      "severity": "P1"
+    },
+    {
+      "manifestItem": "Account deletion retention",
+      "gap": "Policy/legal expectations for retained records were not verified beyond source behavior.",
+      "severity": "P2"
+    },
+    {
+      "manifestItem": "Saved-search checkout",
+      "gap": "Saved-search alert paywall and checkout fulfillment are source-observed but not payment-runtime verified.",
+      "severity": "P2"
+    }
+  ]
+}

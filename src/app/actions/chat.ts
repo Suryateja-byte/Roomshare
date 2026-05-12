@@ -39,11 +39,35 @@ import {
   sendConversationMessage,
   type SentConversationMessage,
 } from "@/lib/messaging/send-conversation-message";
+import {
+  OUTBOUND_MESSAGE_MAX_LENGTH,
+  OUTBOUND_MESSAGE_REQUIRED_ERROR,
+  OUTBOUND_MESSAGE_TOO_LONG_ERROR,
+} from "@/lib/messaging/message-limits";
 
 const sendMessageSchema = z.object({
   conversationId: z.string().trim().min(1).max(100),
-  content: z.string().trim().min(1).max(2000),
+  content: z
+    .string()
+    .trim()
+    .min(1, OUTBOUND_MESSAGE_REQUIRED_ERROR)
+    .max(OUTBOUND_MESSAGE_MAX_LENGTH, OUTBOUND_MESSAGE_TOO_LONG_ERROR),
 });
+
+function getSendMessageValidationError(error: z.ZodError): string {
+  const contentIssue = error.issues.find(
+    (issue) => issue.path[0] === "content"
+  );
+
+  if (
+    contentIssue?.message === OUTBOUND_MESSAGE_REQUIRED_ERROR ||
+    contentIssue?.message === OUTBOUND_MESSAGE_TOO_LONG_ERROR
+  ) {
+    return contentIssue.message;
+  }
+
+  return "Invalid message payload";
+}
 
 const startConversationObjectSchema = z.object({
   listingId: z.string().trim().min(1).max(100),
@@ -392,7 +416,7 @@ export async function sendMessage(
 
     const parsed = sendMessageSchema.safeParse({ conversationId, content });
     if (!parsed.success) {
-      return { error: "Invalid message payload" };
+      return { error: getSendMessageValidationError(parsed.error) };
     }
     const { conversationId: safeConversationId, content: safeContent } =
       parsed.data;

@@ -1,0 +1,37 @@
+%% Evidence: LM-E001 through LM-E018
+flowchart TB
+  subgraph Client
+    CreateForm[CreateListingForm]
+    EditForm[EditListingForm]
+    ImageUploader[ImageUploader]
+  end
+
+  subgraph Server
+    CreateRoute[POST /api/listings]
+    ListingRoute[PATCH and DELETE /api/listings/:id]
+    CanDelete[GET /api/listings/:id/can-delete]
+    StatusAction[updateListingStatus]
+  end
+
+  subgraph Data
+    Listing[(Listing)]
+    Location[(Location)]
+    Idempotency[(IdempotencyKey)]
+    Inventory[(ListingInventory)]
+  end
+
+  CreateForm --> ImageUploader
+  ImageUploader --> CreateRoute
+  CreateForm --> CreateRoute
+  EditForm --> ListingRoute
+  EditForm --> StatusAction
+  EditForm --> CanDelete
+  CreateRoute --> Listing
+  CreateRoute --> Location
+  CreateRoute --> Idempotency
+  CreateRoute --> Inventory
+  ListingRoute --> Listing
+  ListingRoute --> Location
+  ListingRoute --> Inventory
+  StatusAction --> Listing
+  StatusAction --> Inventory

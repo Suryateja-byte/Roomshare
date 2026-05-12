@@ -1,0 +1,22 @@
+%% Evidence: LM-E001, LM-E002, LM-E003, LM-E004, LM-E005, LM-E006, LM-E007
+sequenceDiagram
+  participant Host
+  participant Page as /listings/create
+  participant Form as CreateListingForm
+  participant Upload as /api/upload
+  participant API as POST /api/listings
+  participant DB as Postgres
+  participant Search as Search projections
+
+  Host->>Page: Open create page
+  Page->>Form: Render authenticated form
+  Host->>Form: Enter details and add images
+  Form->>Upload: Upload listing images
+  Upload-->>Form: Return uploaded URLs or errors
+  Host->>Form: Publish
+  Form->>API: POST JSON with X-Idempotency-Key
+  API->>API: Validate CSRF, auth, profile, schema, language, geocode, images
+  API->>DB: Transaction with advisory lock, collision checks, listing/location write
+  API->>Search: Mark dirty and run post-create side effects
+  API-->>Form: 201 { id } or validation/collision error
+  Form-->>Host: Clear draft and redirect on success

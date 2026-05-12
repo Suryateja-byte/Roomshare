@@ -31,6 +31,9 @@ import {
   revealHostPhoneForListing,
 } from "@/lib/contact/phone-reveal";
 
+const dayInMs = 24 * 60 * 60 * 1000;
+const freshLastConfirmedAt = () => new Date(Date.now() - dayInMs);
+
 function buildClient() {
   const client = {
     listing: {
@@ -77,7 +80,7 @@ const activeListing = {
   moveInDate: new Date("2026-05-01T00:00:00.000Z"),
   availableUntil: null,
   minStayMonths: 1,
-  lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
+  lastConfirmedAt: freshLastConfirmedAt(),
   owner: {
     isSuspended: false,
   },

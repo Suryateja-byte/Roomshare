@@ -1,0 +1,13 @@
+%% Evidence: APS-E001, APS-E002, APS-E003, APS-E006, APS-E008, APS-E009, APS-E015
+stateDiagram-v2
+  [*] --> Anonymous
+  Anonymous --> RegisteredUnverified: POST /api/register
+  RegisteredUnverified --> VerifiedUser: verify email token
+  Anonymous --> Authenticated: credentials or verified OAuth login
+  VerifiedUser --> Authenticated: login
+  Authenticated --> PasswordInvalidated: password reset or change
+  PasswordInvalidated --> Anonymous: protected route redirect to login
+  Authenticated --> Suspended: admin or account delete tombstone
+  Suspended --> LimitedAccess: protected write/page blocked
+  Authenticated --> DeletedTombstone: delete account
+  DeletedTombstone --> Anonymous: sign out

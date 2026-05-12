@@ -1,0 +1,19 @@
+%% Evidence: APS-E004, APS-E002, APS-E001, APS-E003
+sequenceDiagram
+  participant User
+  participant Login as LoginClient
+  participant Auth as Auth.js credentials
+  participant DB as Prisma User
+  participant Session as JWT session
+
+  User->>Login: Submit email/password
+  Login->>Login: Clear stale session if present
+  Login->>Auth: signIn credentials with optional Turnstile token
+  Auth->>Auth: Validate schema and rate limits
+  Auth->>Auth: Verify Turnstile
+  Auth->>DB: Fetch minimal user fields
+  DB-->>Auth: User with password hash and flags
+  Auth->>Auth: bcrypt compare
+  Auth->>Session: Seed token fields and authTime
+  Session-->>Login: Sign-in result
+  Login-->>User: Redirect to safe callback or home

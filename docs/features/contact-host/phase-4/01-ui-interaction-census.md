@@ -63,8 +63,8 @@ Status: Phase 4 source-only evidence pass. Browser/runtime behavior was not veri
 
 ## Unknowns And Gaps
 
-- Runtime visual behavior for listing contact CTAs, paywall dialog, checkout return notices, inbox split view, mobile thread route, and chat composer is NOT VERIFIED.
+- Runtime visual behavior remains partial: focused listing contact CTAs, mobile inbox/thread, full Chromium messaging, mocked checkout return, and scoped paywall/unavailable/migration/moderation listing-detail states are verified later in CH-E038/CH-E045/CH-E051/CH-E057/CH-E058/CH-E059; historical message-length cap assertions are verified later in CH-E060, the approved 1000-character source/test update is recorded later in CH-E066, and focused Linux-side WSL Jest execution passes later in CH-E067; CH-E061 is historical and superseded by CH-E073, which closes focused and full listing-detail Chromium proof for suspended/blocked listing-detail pre-click states; fallback/API/mocked realtime handling is reduced later in CH-E062; provider-level Supabase realtime/RLS remains NOT VERIFIED, while broader browser matrix behavior is reduced to P2 confidence coverage.
 - Browser accessibility behavior, focus management, and keyboard interaction are NOT VERIFIED.
 - Search/map listing-card direct contact entry point remains UNKNOWN; no manifest-listed file shows a search card contact CTA.
-- Supabase realtime delivery, presence accuracy, typing broadcast behavior, and polling fallback behavior are source-observed but NOT VERIFIED at runtime.
-- Message length limits differ by surface: inbox composer uses 1000 characters, thread composer uses 500, while server/API schemas allow 2000. Evidence: `src/components/MessagesPageClient.tsx:53`, `src/app/messages/[id]/ChatWindow.tsx:69`, `src/app/actions/chat.ts:43-46`, `src/app/api/messages/route.ts:23-27`.
+- Supabase fallback polling and mocked client-side realtime insert handling are locally verified later in CH-E062; provider-level delivery, presence accuracy, typing broadcast behavior, and RLS remain NOT VERIFIED.
+- Message length limits are now approved as a uniform 1000-character outbound contract after CH-E066; this Phase 4 snapshot retains historical context only.

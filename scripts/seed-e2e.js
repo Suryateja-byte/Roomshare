@@ -45,6 +45,10 @@ function buildSfListingSeed(data, index) {
   };
 }
 
+function freshLastConfirmedAt() {
+  return new Date();
+}
+
 // SF locations within the bounds used by E2E tests
 const SF_LISTINGS = [
   {
@@ -54,6 +58,7 @@ const SF_LISTINGS = [
     roomType: 'Private Room',
     lat: 37.7599, lng: -122.4148,
     address: '2400 Mission St', city: 'San Francisco', state: 'CA', zip: '94110',
+    publicAreaName: 'Mission District',
     amenities: ['Wifi', 'Furnished', 'Kitchen', 'Parking'],
     houseRules: ['No Smoking', 'Quiet Hours 10pm-8am'],
     leaseDuration: '6 months',
@@ -65,6 +70,7 @@ const SF_LISTINGS = [
     roomType: 'Shared Room',
     lat: 37.7785, lng: -122.3950,
     address: '500 Howard St', city: 'San Francisco', state: 'CA', zip: '94105',
+    publicAreaName: 'SoMa',
     amenities: ['Wifi', 'AC', 'Gym', 'Kitchen'],
     houseRules: ['No Smoking', 'Guests allowed'],
     leaseDuration: 'Month-to-month',
@@ -76,6 +82,7 @@ const SF_LISTINGS = [
     roomType: 'Entire Place',
     lat: 37.7535, lng: -122.4950,
     address: '1800 Irving St', city: 'San Francisco', state: 'CA', zip: '94122',
+    publicAreaName: 'Outer Sunset',
     amenities: ['Wifi', 'Furnished', 'Pool', 'Kitchen', 'Parking'],
     houseRules: ['No Smoking', 'Pets allowed'],
     leaseDuration: '12 months',
@@ -87,6 +94,7 @@ const SF_LISTINGS = [
     roomType: 'Private Room',
     lat: 37.7760, lng: -122.4240,
     address: '400 Hayes St', city: 'San Francisco', state: 'CA', zip: '94102',
+    publicAreaName: 'Hayes Valley',
     amenities: ['Wifi', 'Furnished', 'AC', 'Washer', 'Dryer'],
     houseRules: ['No Smoking', 'Quiet Hours 10pm-8am'],
     leaseDuration: '6 months',
@@ -98,6 +106,7 @@ const SF_LISTINGS = [
     roomType: 'Private Room',
     lat: 37.7800, lng: -122.4700,
     address: '600 Clement St', city: 'San Francisco', state: 'CA', zip: '94118',
+    publicAreaName: 'Inner Richmond',
     amenities: ['Wifi', 'Kitchen', 'Furnished'],
     houseRules: ['Quiet Hours 10pm-8am', 'Guests allowed'],
     leaseDuration: 'Month-to-month',
@@ -110,6 +119,7 @@ const SF_LISTINGS = [
     roomType: 'Private Room',
     lat: 37.8010, lng: -122.4370,
     address: '2100 Chestnut St', city: 'San Francisco', state: 'CA', zip: '94123',
+    publicAreaName: 'Marina District',
     amenities: ['Wifi', 'Parking', 'AC', 'Furnished'],
     houseRules: ['No Smoking', 'Pets allowed'],
     leaseDuration: '3 months',
@@ -121,6 +131,7 @@ const SF_LISTINGS = [
     roomType: 'Private Room',
     lat: 37.7502, lng: -122.4337,
     address: '1200 Church St', city: 'San Francisco', state: 'CA', zip: '94114',
+    publicAreaName: 'Noe Valley',
     amenities: ['Wifi', 'Furnished', 'Kitchen', 'Pool'],
     houseRules: ['Pets allowed', 'Guests allowed'],
     leaseDuration: '12 months',
@@ -132,6 +143,7 @@ const SF_LISTINGS = [
     roomType: 'Entire Place',
     lat: 37.7615, lng: -122.4010,
     address: '800 18th St', city: 'San Francisco', state: 'CA', zip: '94107',
+    publicAreaName: 'Potrero Hill',
     amenities: ['Wifi', 'Gym', 'AC', 'Parking', 'Kitchen'],
     houseRules: ['No Smoking', 'Couples allowed'],
     leaseDuration: '6 months',
@@ -143,6 +155,7 @@ const SF_LISTINGS = [
     roomType: 'Shared Room',
     lat: 37.7620, lng: -122.4600,
     address: '900 Irving St', city: 'San Francisco', state: 'CA', zip: '94122',
+    publicAreaName: 'Inner Sunset',
     amenities: ['Wifi', 'Kitchen'],
     houseRules: ['Quiet Hours 10pm-8am'],
     leaseDuration: 'Flexible',
@@ -154,6 +167,7 @@ const SF_LISTINGS = [
     roomType: 'Entire Place',
     lat: 37.7590, lng: -122.3880,
     address: '700 3rd St', city: 'San Francisco', state: 'CA', zip: '94107',
+    publicAreaName: 'Dogpatch',
     amenities: ['Wifi', 'Furnished', 'Pool', 'Gym', 'Parking', 'Kitchen'],
     houseRules: ['Pets allowed', 'Couples allowed'],
     leaseDuration: '12 months',
@@ -165,6 +179,7 @@ const SF_LISTINGS = [
     roomType: 'Private Room',
     lat: 37.7930, lng: -122.4340,
     address: '2500 Fillmore St', city: 'San Francisco', state: 'CA', zip: '94115',
+    publicAreaName: 'Pacific Heights',
     amenities: ['Wifi', 'Furnished', 'AC', 'Washer', 'Dryer', 'Parking'],
     houseRules: ['No Smoking', 'Quiet Hours 10pm-8am'],
     leaseDuration: '6 months',
@@ -176,6 +191,7 @@ const SF_LISTINGS = [
     roomType: 'Entire Place',
     lat: 37.7450, lng: -122.4150,
     address: '300 Cortland Ave', city: 'San Francisco', state: 'CA', zip: '94110',
+    publicAreaName: 'Bernal Heights',
     amenities: ['Wifi', 'Furnished', 'Kitchen', 'Pool'],
     houseRules: ['Pets allowed', 'Guests allowed'],
     leaseDuration: 'Flexible',
@@ -187,6 +203,7 @@ const SF_LISTINGS = [
     roomType: 'Private Room',
     lat: 37.7610, lng: -122.4350,
     address: '500 Castro St', city: 'San Francisco', state: 'CA', zip: '94114',
+    publicAreaName: 'Castro District',
     amenities: ['Wifi', 'AC', 'Kitchen', 'Gym'],
     houseRules: ['Guests allowed', 'Couples allowed'],
     leaseDuration: '3 months',
@@ -198,6 +215,7 @@ const SF_LISTINGS = [
     roomType: 'Shared Room',
     lat: 37.8010, lng: -122.4100,
     address: '400 Columbus Ave', city: 'San Francisco', state: 'CA', zip: '94133',
+    publicAreaName: 'North Beach',
     amenities: ['Wifi', 'Kitchen'],
     houseRules: ['Smoking allowed', 'Guests allowed'],
     leaseDuration: 'Month-to-month',
@@ -209,6 +227,7 @@ const SF_LISTINGS = [
     roomType: 'Private Room',
     lat: 37.7700, lng: -122.4480,
     address: '1600 Haight St', city: 'San Francisco', state: 'CA', zip: '94117',
+    publicAreaName: 'Haight-Ashbury',
     amenities: ['Wifi', 'Furnished', 'Parking', 'Gym'],
     houseRules: ['Pets allowed', 'Smoking allowed'],
     leaseDuration: '6 months',
@@ -220,6 +239,7 @@ const SF_LISTINGS = [
     roomType: 'Entire Place',
     lat: 37.7940, lng: -122.4010,
     address: '100 Montgomery St', city: 'San Francisco', state: 'CA', zip: '94104',
+    publicAreaName: 'Financial District',
     amenities: ['Wifi', 'AC', 'Furnished', 'Kitchen', 'Parking'],
     houseRules: ['No Smoking', 'Couples allowed'],
     leaseDuration: '12 months',
@@ -231,6 +251,7 @@ const SF_LISTINGS = [
     roomType: 'Shared Room',
     lat: 37.7855, lng: -122.4300,
     address: '1700 Post St', city: 'San Francisco', state: 'CA', zip: '94115',
+    publicAreaName: 'Japantown',
     amenities: ['Wifi', 'Kitchen'],
     houseRules: ['Quiet Hours 10pm-8am'],
     leaseDuration: 'Flexible',
@@ -242,6 +263,7 @@ const SF_LISTINGS = [
     roomType: 'Private Room',
     lat: 37.8020, lng: -122.4190,
     address: '1000 Lombard St', city: 'San Francisco', state: 'CA', zip: '94109',
+    publicAreaName: 'Russian Hill',
     amenities: ['Wifi', 'Furnished', 'AC', 'Kitchen'],
     houseRules: ['No Smoking', 'Quiet Hours 10pm-8am'],
     leaseDuration: '6 months',
@@ -253,6 +275,7 @@ const SF_LISTINGS = [
     roomType: 'Private Room',
     lat: 37.7730, lng: -122.4050,
     address: '200 Brannan St', city: 'San Francisco', state: 'CA', zip: '94107',
+    publicAreaName: 'SoMa',
     amenities: ['Wifi', 'Gym', 'Parking', 'Kitchen', 'AC'],
     houseRules: ['No Smoking', 'Guests allowed'],
     leaseDuration: '3 months',
@@ -371,7 +394,56 @@ const CROSS_OWNER_SEEDS = [
   },
 ];
 
+const CONTACT_RESTRICTION_SEEDS = {
+  suspendedHost: {
+    id: 'e2e-contact-suspended-host',
+    title: 'E2E Suspended Host Contact Room',
+    description: 'Dedicated listing-detail fixture for suspended host contact state.',
+    price: 1325,
+    roomType: 'Private Room',
+    lat: 37.7891,
+    lng: -122.4218,
+    address: '1440 Sacramento St',
+    city: 'San Francisco',
+    state: 'CA',
+    zip: '94109',
+    moveInDate: '2026-05-14T00:00:00.000Z',
+    createdAt: '2026-01-09T12:00:00.000Z',
+  },
+  viewerBlocksHost: {
+    id: 'e2e-contact-viewer-blocks-host',
+    title: 'E2E Viewer Blocks Host Contact Room',
+    description: 'Dedicated listing-detail fixture for viewer-blocks-host contact state.',
+    price: 1285,
+    roomType: 'Private Room',
+    lat: 37.7868,
+    lng: -122.4231,
+    address: '1300 Polk St',
+    city: 'San Francisco',
+    state: 'CA',
+    zip: '94109',
+    moveInDate: '2026-05-16T00:00:00.000Z',
+    createdAt: '2026-01-09T12:05:00.000Z',
+  },
+  hostBlocksViewer: {
+    id: 'e2e-contact-host-blocks-viewer',
+    title: 'E2E Host Blocks Viewer Contact Room',
+    description: 'Dedicated listing-detail fixture for host-blocks-viewer contact state.',
+    price: 1295,
+    roomType: 'Private Room',
+    lat: 37.7884,
+    lng: -122.4189,
+    address: '1200 Pine St',
+    city: 'San Francisco',
+    state: 'CA',
+    zip: '94109',
+    moveInDate: '2026-05-18T00:00:00.000Z',
+    createdAt: '2026-01-09T12:10:00.000Z',
+  },
+};
+
 async function upsertListingWithLocation(ownerId, seed) {
+  const lastConfirmedAt = freshLastConfirmedAt();
   const listing = await prisma.listing.upsert({
     where: { id: seed.id },
     update: {
@@ -387,6 +459,7 @@ async function upsertListingWithLocation(ownerId, seed) {
       totalSlots: seed.totalSlots || 2,
       availableSlots: seed.availableSlots || 1,
       openSlots: seed.openSlots ?? seed.availableSlots ?? 1,
+      lastConfirmedAt: lastConfirmedAt,
       moveInDate: new Date(seed.moveInDate),
       images: seed.images || DEFAULT_IMAGES,
       createdAt: new Date(seed.createdAt),
@@ -421,6 +494,7 @@ async function upsertListingWithLocation(ownerId, seed) {
       totalSlots: seed.totalSlots || 2,
       availableSlots: seed.availableSlots || 1,
       openSlots: seed.openSlots ?? seed.availableSlots ?? 1,
+      lastConfirmedAt: lastConfirmedAt,
       moveInDate: new Date(seed.moveInDate),
       images: seed.images || DEFAULT_IMAGES,
       createdAt: new Date(seed.createdAt),
@@ -537,7 +611,7 @@ async function upsertProjectionFixtureRows(inputs) {
     const { listing, seed, unit, roomCategory } = input;
     const point = `POINT(${seed.lng} ${seed.lat})`;
     const cell = `${Number(seed.lat).toFixed(4)},${Number(seed.lng).toFixed(4)}`;
-    const areaName = seed.city || 'San Francisco';
+    const areaName = seed.publicAreaName || seed.city || 'San Francisco';
     const capacityGuests = roomCategory === 'SHARED_ROOM' ? null : input.totalSlots;
     const totalBeds = roomCategory === 'SHARED_ROOM' ? input.totalSlots : null;
     const openBeds = roomCategory === 'SHARED_ROOM' ? input.openSlots : null;
@@ -871,6 +945,9 @@ async function main() {
     description: 'Cozy apartment on Nob Hill. Great for visiting SF.',
     price: 1500,
     roomType: 'Entire Place',
+    totalSlots: 1,
+    availableSlots: 1,
+    openSlots: 1,
     lat: 37.7920, lng: -122.4130,
     address: '1000 California St', city: 'San Francisco', state: 'CA', zip: '94108',
   };
@@ -881,7 +958,16 @@ async function main() {
 
   let reviewerListing;
   if (existingReviewerListing) {
-    reviewerListing = existingReviewerListing;
+    reviewerListing = await prisma.listing.update({
+      where: { id: existingReviewerListing.id },
+      data: {
+        openSlots:
+          existingReviewerListing.openSlots ??
+          existingReviewerListing.availableSlots ??
+          REVIEWER_LISTING.openSlots,
+        lastConfirmedAt: freshLastConfirmedAt(),
+      },
+    });
     console.log(`  ⏭ Reviewer listing exists: ${REVIEWER_LISTING.title}`);
   } else {
     reviewerListing = await prisma.listing.create({
@@ -894,8 +980,10 @@ async function main() {
         amenities: ['WiFi', 'Furnished', 'Laundry'],
         houseRules: ['No Pets'],
         householdLanguages: ['en'],
-        totalSlots: 1,
-        availableSlots: 1,
+        totalSlots: REVIEWER_LISTING.totalSlots,
+        availableSlots: REVIEWER_LISTING.availableSlots,
+        openSlots: REVIEWER_LISTING.openSlots,
+        lastConfirmedAt: freshLastConfirmedAt(),
         moveInDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         images: [
           'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=600',
@@ -970,6 +1058,97 @@ async function main() {
     },
   });
   console.log(`  ✓ Third user: ${thirdUser.email} (${thirdUser.id})`);
+
+  const upsertContactFixtureUser = (email, name, isSuspended = false) =>
+    prisma.user.upsert({
+      where: { email },
+      update: {
+        name,
+        password: hashedPassword,
+        emailVerified: new Date(),
+        isVerified: true,
+        isSuspended,
+        bio: DEFAULT_PROFILE_BIO,
+        image: DEFAULT_PROFILE_IMAGE,
+        countryOfOrigin: 'United States',
+        languages: ['en'],
+      },
+      create: {
+        email,
+        name,
+        password: hashedPassword,
+        emailVerified: new Date(),
+        isVerified: true,
+        isSuspended,
+        bio: DEFAULT_PROFILE_BIO,
+        image: DEFAULT_PROFILE_IMAGE,
+        countryOfOrigin: 'United States',
+        languages: ['en'],
+      },
+    });
+
+  const suspendedViewer = await upsertContactFixtureUser(
+    'e2e-suspended-viewer@roomshare.dev',
+    'E2E Suspended Viewer',
+    false
+  );
+  const suspendedHost = await upsertContactFixtureUser(
+    'e2e-suspended-host@roomshare.dev',
+    'E2E Suspended Host',
+    true
+  );
+  const viewerBlockedHost = await upsertContactFixtureUser(
+    'e2e-viewer-blocked-host@roomshare.dev',
+    'E2E Viewer Blocked Host'
+  );
+  const hostBlocksViewer = await upsertContactFixtureUser(
+    'e2e-host-blocks-viewer@roomshare.dev',
+    'E2E Host Blocks Viewer'
+  );
+  console.log('  ✓ Contact restriction fixture users seeded');
+
+  const contactRestrictionListings = {
+    suspendedHost: await upsertListingWithLocation(
+      suspendedHost.id,
+      CONTACT_RESTRICTION_SEEDS.suspendedHost
+    ),
+    viewerBlocksHost: await upsertListingWithLocation(
+      viewerBlockedHost.id,
+      CONTACT_RESTRICTION_SEEDS.viewerBlocksHost
+    ),
+    hostBlocksViewer: await upsertListingWithLocation(
+      hostBlocksViewer.id,
+      CONTACT_RESTRICTION_SEEDS.hostBlocksViewer
+    ),
+  };
+
+  await prisma.blockedUser.upsert({
+    where: {
+      blockerId_blockedId: {
+        blockerId: user.id,
+        blockedId: viewerBlockedHost.id,
+      },
+    },
+    update: {},
+    create: {
+      blockerId: user.id,
+      blockedId: viewerBlockedHost.id,
+    },
+  });
+  await prisma.blockedUser.upsert({
+    where: {
+      blockerId_blockedId: {
+        blockerId: hostBlocksViewer.id,
+        blockedId: user.id,
+      },
+    },
+    update: {},
+    create: {
+      blockerId: hostBlocksViewer.id,
+      blockedId: user.id,
+    },
+  });
+  console.log('  ✓ Contact restriction listings and block relationships seeded');
 
   const dedupeSingleton = await upsertListingWithLocation(
     reviewer.id,
@@ -1293,6 +1472,21 @@ async function main() {
         )
       ),
       buildProjectionInput(reviewerListing, REVIEWER_LISTING, reviewer.id),
+      buildProjectionInput(
+        contactRestrictionListings.suspendedHost,
+        CONTACT_RESTRICTION_SEEDS.suspendedHost,
+        suspendedHost.id
+      ),
+      buildProjectionInput(
+        contactRestrictionListings.viewerBlocksHost,
+        CONTACT_RESTRICTION_SEEDS.viewerBlocksHost,
+        viewerBlockedHost.id
+      ),
+      buildProjectionInput(
+        contactRestrictionListings.hostBlocksViewer,
+        CONTACT_RESTRICTION_SEEDS.hostBlocksViewer,
+        hostBlocksViewer.id
+      ),
       buildProjectionInput(dedupeSingleton, DEDUPE_SINGLETON_SEED, reviewer.id),
       ...dedupeGroupListings.map((listing, index) =>
         buildProjectionInput(listing, DEDUPE_GROUP_SEEDS[index], reviewer.id)
@@ -1435,6 +1629,7 @@ async function main() {
       [
         ...createdListings,
         reviewerListing,
+        ...Object.values(contactRestrictionListings),
         dedupeSingleton,
         ...dedupeGroupListings,
         ...crossOwnerListings,
@@ -1447,6 +1642,13 @@ async function main() {
       singletonId: dedupeSingleton.id,
       groupIds: dedupeGroupListings.map((listing) => listing.id),
       crossOwnerIds: crossOwnerListings.map((listing) => listing.id),
+    },
+    contactRestriction: {
+      suspendedViewerEmail: suspendedViewer.email,
+      suspendedViewerAuthState: 'playwright/.auth/suspended-viewer.json',
+      suspendedHostListingId: contactRestrictionListings.suspendedHost.id,
+      viewerBlocksHostListingId: contactRestrictionListings.viewerBlocksHost.id,
+      hostBlocksViewerListingId: contactRestrictionListings.hostBlocksViewer.id,
     },
   };
   const seedManifestDir = path.resolve(__dirname, '../playwright/.cache');

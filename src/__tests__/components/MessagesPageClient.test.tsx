@@ -174,6 +174,7 @@ jest.mock("@/components/ui/alert-dialog", () => ({
 }));
 
 import MessagesPageClient from "@/components/MessagesPageClient";
+import { toast } from "sonner";
 
 type MockMessage = {
   id: string;
@@ -525,6 +526,139 @@ describe("MessagesPageClient", () => {
         expect(screen.getByTestId("message-input")).toBeInTheDocument();
       });
       expect(mockPush).not.toHaveBeenCalledWith("/messages/conv-1");
+    } finally {
+      matchMediaSpy.mockRestore();
+    }
+  });
+
+  it("uses the shared 1000-character inbox composer cap", async () => {
+    mockUseMediaQuery.mockReturnValue(false);
+    const matchMediaSpy = mockDesktopMatchMedia(true);
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url === "/api/messages") {
+        return createJsonResponse({ success: true, count: 0 });
+      }
+      if (url.includes("/api/messages?")) {
+        return createJsonResponse({
+          messages: [],
+          typingUsers: [],
+          hasNewMessages: false,
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    try {
+      render(
+        <MessagesPageClient
+          currentUserId="user-123"
+          initialConversations={initialConversations}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId("conversation-item"));
+      const input = await screen.findByTestId("message-input");
+
+      expect(input).toHaveAttribute("maxlength", "1000");
+
+      fireEvent.change(input, { target: { value: "x".repeat(1000) } });
+
+      expect(screen.getByTestId("character-counter")).toHaveTextContent(
+        "1000/1000"
+      );
+    } finally {
+      matchMediaSpy.mockRestore();
+    }
+  });
+
+  it("sends a 1000-character inbox message", async () => {
+    mockUseMediaQuery.mockReturnValue(false);
+    const matchMediaSpy = mockDesktopMatchMedia(true);
+    const content = "x".repeat(1000);
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url === "/api/messages") {
+        return createJsonResponse({ success: true, count: 0 });
+      }
+      if (url.includes("/api/messages?")) {
+        return createJsonResponse({
+          messages: [],
+          typingUsers: [],
+          hasNewMessages: false,
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    mockSendMessage.mockResolvedValue({
+      id: "msg-sent",
+      content,
+      senderId: "user-123",
+      conversationId: "conv-1",
+      createdAt: new Date(),
+      read: false,
+    });
+
+    try {
+      render(
+        <MessagesPageClient
+          currentUserId="user-123"
+          initialConversations={initialConversations}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId("conversation-item"));
+      fireEvent.change(await screen.findByTestId("message-input"), {
+        target: { value: content },
+      });
+      fireEvent.click(screen.getByTestId("send-button"));
+
+      expect(mockSendMessage).toHaveBeenCalledWith("conv-1", content);
+    } finally {
+      matchMediaSpy.mockRestore();
+    }
+  });
+
+  it("rejects a 1001-character inbox message before send", async () => {
+    mockUseMediaQuery.mockReturnValue(false);
+    const matchMediaSpy = mockDesktopMatchMedia(true);
+    const content = "x".repeat(1001);
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url === "/api/messages") {
+        return createJsonResponse({ success: true, count: 0 });
+      }
+      if (url.includes("/api/messages?")) {
+        return createJsonResponse({
+          messages: [],
+          typingUsers: [],
+          hasNewMessages: false,
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    try {
+      render(
+        <MessagesPageClient
+          currentUserId="user-123"
+          initialConversations={initialConversations}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId("conversation-item"));
+      fireEvent.change(await screen.findByTestId("message-input"), {
+        target: { value: content },
+      });
+      fireEvent.click(screen.getByTestId("send-button"));
+
+      expect(mockSendMessage).not.toHaveBeenCalled();
+      expect(toast.error).toHaveBeenCalledWith("Message too long", {
+        description: "Maximum 1000 characters allowed.",
+      });
     } finally {
       matchMediaSpy.mockRestore();
     }

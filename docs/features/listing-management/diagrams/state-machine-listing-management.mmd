@@ -1,0 +1,15 @@
+%% Evidence: LM-E007, LM-E011, LM-E012, LM-E013, LM-E015, LM-E017, LM-E018
+stateDiagram-v2
+  [*] --> DraftClient: Form editing
+  DraftClient --> Creating: Submit with valid client state
+  Creating --> CollisionReview: 409 COLLISION_CANDIDATES
+  CollisionReview --> Creating: x-collision-ack
+  Creating --> Active: Listing created
+  Active --> Paused: Host pause or suppress
+  Paused --> Active: Host reopen when allowed
+  Active --> Rented: Host status update
+  Paused --> Suppressed: Reported delete or admin suppression
+  Active --> Deleted: Unreported owner delete
+  Suppressed --> Paused: Stored as PAUSED with SUPPRESSED reason
+  Active --> Locked: ADMIN_PAUSED or SUPPRESSED reason blocks host writes
+  Paused --> Locked: ADMIN_PAUSED or SUPPRESSED reason blocks host writes

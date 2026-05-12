@@ -165,11 +165,12 @@
       "file": "src/app/api/listings/[id]/viewer-state/route.ts",
       "responsibilities": [
         "viewer contact contract",
+        "suspended and blocked pre-click disabled reasons",
         "paywall summary",
         "privacy-first listing availability",
         "private no-store cache header"
       ],
-      "evidence": "src/app/api/listings/[id]/viewer-state/route.ts:69-307"
+      "evidence": "src/app/api/listings/[id]/viewer-state/route.ts:33-342"
     },
     {
       "path": "POST /api/payments/checkout",
@@ -360,15 +361,15 @@
     },
     {
       "name": "Resend/email",
-      "currentEvidence": "sendNotificationEmailWithPreference maps newMessage to emailMessages and calls sendEmail",
-      "evidence": "src/lib/email.ts:64-72, 209-271",
-      "runtimeStatus": "NOT VERIFIED"
+      "currentEvidence": "sendNotificationEmailWithPreference maps newMessage to emailMessages and calls sendEmail; CH-E072 verifies mocked invocation/provider-client behavior and blocks Contact Host runtime delivery on a local newMessage payload/template mismatch",
+      "evidence": "src/lib/email.ts:64-112, 188-271; src/lib/messaging/send-conversation-message.ts:194-223; src/lib/email-templates.ts:88-103; docs/features/contact-host/evidence-register.md CH-E072",
+      "runtimeStatus": "PARTIALLY VERIFIED; TEMPLATE_PAYLOAD_BLOCKED; PROVIDER_DELIVERY_NOT_VERIFIED"
     },
     {
       "name": "Supabase realtime",
-      "currentEvidence": "ChatWindow imports realtime/polling behavior",
-      "evidence": "src/app/messages/[id]/ChatWindow.tsx:1-151",
-      "runtimeStatus": "NOT VERIFIED"
+      "currentEvidence": "ChatWindow imports realtime/polling behavior; fallback polling and mocked realtime insert handling are locally tested, while provider-level delivery/RLS is blocked by missing local policy/provider harness evidence",
+      "evidence": "src/app/messages/[id]/ChatWindow.tsx:319-512; src/__tests__/components/ChatWindow.test.tsx:245-478; docs/features/contact-host/evidence-register.md CH-E062, CH-E070",
+      "runtimeStatus": "PARTIALLY VERIFIED; PROVIDER_RLS_BLOCKED"
     }
   ],
   "environmentVariables": [
@@ -455,25 +456,61 @@
       "path": "src/__tests__/api/messages.test.ts",
       "coverage": "messages API auth, rate limits, access, polling, send, notification/email calls, contactability failures",
       "evidence": "src/__tests__/api/messages.test.ts:93-621",
-      "phase1_2Status": "NOT RUN in Phase 1/2"
+      "phase1_2Status": "NOT RUN in Phase 1/2; focused commands passed in CH-E049, CH-E055, and CH-E062"
+    },
+    {
+      "path": "src/__tests__/api/messages-read.test.ts",
+      "coverage": "mark-read auth/access and inbound unread isolation for /api/messages",
+      "evidence": "src/__tests__/api/messages-read.test.ts:72-123",
+      "phase1_2Status": "DISCOVERED LATER; focused commands passed in CH-E049, CH-E055, and CH-E062"
+    },
+    {
+      "path": "src/__tests__/api/messages-unread.test.ts",
+      "coverage": "unread-count auth and participant-scoped query behavior",
+      "evidence": "src/__tests__/api/messages-unread.test.ts:43-87",
+      "phase1_2Status": "DISCOVERED LATER; focused command passed in CH-E062"
+    },
+    {
+      "path": "src/__tests__/api/messages-pagination.test.ts",
+      "coverage": "message/conversation pagination and approved direct-send 1000-character API boundary",
+      "evidence": "src/__tests__/api/messages-pagination.test.ts:104-105; src/__tests__/api/messages-pagination.test.ts:520-595",
+      "phase1_2Status": "DISCOVERED LATER; focused command initially failed due stale active-listing fixture, then passed after test-only freshness repair in CH-E062; CH-E066 updates 1000-limit boundary source, and CH-E067 passes focused Linux-side WSL Jest execution"
+    },
+    {
+      "path": "src/__tests__/components/ChatWindow.test.tsx",
+      "coverage": "thread fallback polling, mocked realtime insert subscription, conversation-id guard, inbound mark-read, unmount abort, back button, and approved 1000-character browser cap/send/reject behavior",
+      "evidence": "src/__tests__/components/ChatWindow.test.tsx:245-478; src/__tests__/components/ChatWindow.test.tsx:578-688",
+      "phase1_2Status": "DISCOVERED LATER; focused command passed in CH-E062; CH-E066 updates 1000-limit boundary source, and CH-E067 passes focused Linux-side WSL Jest execution"
+    },
+    {
+      "path": "src/__tests__/components/MessagesPageClient.test.tsx",
+      "coverage": "inbox/split-view safe polling, typing users, inbound mark-read, unmount abort, mobile/desktop navigation, and approved 1000-character browser cap/send/reject behavior",
+      "evidence": "src/__tests__/components/MessagesPageClient.test.tsx:269-350; src/__tests__/components/MessagesPageClient.test.tsx:534-661",
+      "phase1_2Status": "DISCOVERED LATER; focused commands passed in CH-E050, CH-E060, CH-E062, and CH-E067; CH-E066 updates 1000-limit boundary source"
     },
     {
       "path": "src/__tests__/api/private-feedback-no-public-bleed.test.ts",
       "coverage": "viewer-state privacy no-bleed behavior for private feedback report rows",
       "evidence": "src/__tests__/api/private-feedback-no-public-bleed.test.ts:538",
-            "phase1_2Status": "DISCOVERED LATER; focused command passed in CH-E044"
+            "phase1_2Status": "DISCOVERED LATER; focused command passed in CH-E046"
+    },
+    {
+      "path": "src/__tests__/api/listings-viewer-state-route.test.ts",
+      "coverage": "viewer-state route contract/status/cache, auth variants, privacy-safe fields, unavailable/moderation/paywall states, suspended and blocked disabled reasons, and fallback behavior",
+      "evidence": "src/__tests__/api/listings-viewer-state-route.test.ts:147-492",
+            "phase1_2Status": "DISCOVERED LATER; focused command passed in CH-E056; CH-E068 adds suspended/blocked route coverage and the focused route command passes"
     },
     {
       "path": "src/__tests__/api/payments-checkout-route.test.ts",
       "coverage": "checkout creation route for contact paywall sessions, metadata, and Stripe idempotency",
       "evidence": "src/__tests__/api/payments-checkout-route.test.ts:234-330",
-            "phase1_2Status": "DISCOVERED LATER; focused command passed in CH-E044"
+            "phase1_2Status": "DISCOVERED LATER; focused command passed after fixture freshness repair in CH-E053"
     },
     {
       "path": "src/__tests__/api/payments-checkout-session-route.test.ts",
       "coverage": "checkout-session polling route for pending, fulfilled, and context-specific status responses",
       "evidence": "src/__tests__/api/payments-checkout-session-route.test.ts:172-240",
-            "phase1_2Status": "DISCOVERED LATER; focused command passed in CH-E044"
+            "phase1_2Status": "DISCOVERED LATER; focused command passed in CH-E047"
     },
     {
       "path": "src/__tests__/lib/messaging/listing-contactable.test.ts",
@@ -490,8 +527,8 @@
     {
       "path": "tests/e2e/journeys/22-messaging-conversations.spec.ts",
       "coverage": "listing to contact host to messaging journey and inbox states",
-      "evidence": "tests/e2e/journeys/22-messaging-conversations.spec.ts:93-234",
-      "phase1_2Status": "NOT RUN in Phase 1/2; Chromium-only command passed later"
+      "evidence": "tests/e2e/journeys/22-messaging-conversations.spec.ts:24-286",
+      "phase1_2Status": "NOT RUN in Phase 1/2; Chromium-only command passed later; current full Chromium messaging rerun passed in CH-E057 after a test/setup synchronization fix; CH-E063 passed WebKit, Mobile Chrome, and Mobile Safari messaging specs; CH-E064 installed Firefox and reproduced the focused Firefox NS_BINDING_ABORTED navigation-race failure; CH-E065 adds narrow navigation-race handling and the focused Firefox messaging spec passed"
     },
     {
       "path": "tests/e2e/listing-detail/listing-detail.spec.ts",
@@ -501,9 +538,9 @@
     },
     {
       "path": "tests/e2e/listing-detail/contact-host-runtime.spec.ts",
-      "coverage": "focused listing-detail Contact Host runtime proof for authenticated non-owner contact-first sidebar and anonymous sign-in CTA, with external listing images mocked",
-      "evidence": "tests/e2e/listing-detail/contact-host-runtime.spec.ts:1-90",
-      "phase1_2Status": "DISCOVERED/ADDED LATER; Chromium command passed in CH-E045"
+      "coverage": "focused listing-detail Contact Host runtime proof for authenticated non-owner contact-first sidebar, checkout return / mocked paid-unlock runtime, anonymous sign-in CTA, paywall-required/unavailable/migration-review/moderation-locked state-matrix behavior, and suspended/blocked disabled pre-click states, with external listing images mocked",
+      "evidence": "tests/e2e/listing-detail/contact-host-runtime.spec.ts:15-97; tests/e2e/listing-detail/contact-host-runtime.spec.ts:153-223; tests/e2e/listing-detail/contact-host-runtime.spec.ts:231-289; tests/e2e/listing-detail/contact-host-runtime.spec.ts:302-376; tests/e2e/listing-detail/contact-host-runtime.spec.ts:367-487; tests/e2e/listing-detail/contact-host-runtime.spec.ts:591-662",
+      "phase1_2Status": "DISCOVERED/ADDED LATER; Chromium command passed in CH-E045; checkout-return browser command passed in CH-E058; focused state-matrix and full focused listing-detail browser commands passed in CH-E059; CH-E063 passed WebKit, Mobile Chrome, and Mobile Safari full focused specs; CH-E064 installed Firefox and reproduced the focused Firefox image decode clean-console failure; CH-E065 replaces the deterministic image mock with SVG and the focused Firefox listing-detail spec passed; CH-E068 adds suspended/blocked test source; CH-E073 passes focused suspended/blocked Chromium proof and the full listing-detail Contact Host Chromium spec"
     },
     {
       "path": "tests/e2e/mobile/mobile-messages.spec.ts",
@@ -513,12 +550,12 @@
     }
   ],
   "unknowns": [
-    "Runtime/browser behavior for listing detail contact CTA is partially verified by focused Chromium listing-detail Contact Host E2E; Mobile Chrome no-deps and setup-backed Mobile Chrome messages passed after the second-pass fix; paywall dialog, checkout browser return, realtime, email, suspended/paywall-required/unavailable listing states, and full browser matrix remain NOT VERIFIED.",
+    "Runtime/browser behavior for listing detail contact CTA is partially verified by focused Chromium/WebKit/Firefox/Mobile Chrome/Mobile Safari listing-detail Contact Host E2E; mocked Chromium checkout return / paid-unlock runtime passed in CH-E058; paywall-required/unavailable/migration-review/moderation-locked listing-detail states passed in CH-E059; CH-E068 implements suspended/blocked disabled pre-click contract, fixture, route proof, and test source; CH-E073 passes focused suspended/blocked Chromium proof and the full listing-detail Contact Host Chromium spec; focused WebKit/Firefox/Mobile Chrome/Mobile Safari messaging specs passed after CH-E065; CH-E064 installed Firefox and reproduced Firefox-specific test/setup failures, and CH-E065 closed those focused-spec blockers with narrow test/helper changes plus a passing practical combined Firefox two-spec run; Mobile Chrome no-deps and setup-backed Mobile Chrome messages passed after the second-pass fix; fallback polling and mocked realtime insert handling passed in CH-E062; provider-level Supabase realtime/RLS, email provider delivery, and real payment-provider fulfillment remain NOT VERIFIED. CH-E072 reduces email to mocked invocation/provider-client proof but blocks Contact Host runtime email on a newMessage payload/template mismatch.",
     "Search/map listing-card direct contact entry point is UNKNOWN.",
-    "Supabase realtime delivery and polling fallback are UNKNOWN at runtime.",
-    "Actual email delivery and notification preference behavior are NOT VERIFIED at runtime.",
-    "Release-blocking versus confidence-building test classification exists in 11-test-traceability-matrix.md; checkout browser return, realtime, email, suspended/paywall-required/unavailable listing states, and full matrix execution remain incomplete.",
-    "Client/server message length mismatch needs later evidence: ChatWindow uses 500, MessagesPageClient uses 1000, server action schema allows 2000.",
+    "Supabase fallback polling and mocked client-side realtime insert handling are locally verified in CH-E062; provider-level delivery/JWT/RLS remains blocked by missing local policy/provider evidence.",
+    "Actual email provider delivery is NOT VERIFIED. Notification preference behavior is source-observed and provider-client behavior is locally mocked, but CH-E072 proves Contact Host new-message runtime email is blocked by a payload/template mismatch before any provider call.",
+    "Release-blocking versus confidence-building test classification exists in 11-test-traceability-matrix.md; provider-level Supabase realtime/RLS, email provider delivery plus the Contact Host newMessage payload/template blocker, and real payment-provider fulfillment remain incomplete.",
+    "Message length product decision is resolved to a uniform 1000-character outbound limit in CH-E066; source and focused test files are aligned, and focused Linux-side WSL Jest execution passed in CH-E067.",
     "Broader profile-completion or user-verification gates beyond email verification and suspension are UNKNOWN until Phase 4 auth/profile tracing."
   ]
 }

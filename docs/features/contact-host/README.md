@@ -1,6 +1,33 @@
 # Contact Host Flow
 
-Status: evidence-backed draft from the current dirty worktree. Phase 1/2 source discovery and Phase 4 evidence passes are complete. Focused Contact Host Jest/API/security/component coverage, Chromium messaging journey, focused Chromium listing-detail Contact Host runtime, Mobile Chrome no-deps messaging, and setup-backed Mobile Chrome messaging now pass after the follow-up stabilization recorded in CH-E044 and CH-E045. Historical Mobile Chrome messages runs failed in setup-backed auth and in the first no-deps MM-02/MM-03 thread-navigation rerun, but the second-pass mobile activation fix passed both no-deps and setup-backed Mobile Chrome. Stripe checkout browser return, email delivery, Supabase realtime delivery, suspended/paywall-required/unavailable listing-detail state matrix, and the full Firefox/WebKit browser matrix remain documented runtime gaps. Evidence: `manifest.json`; `evidence-register.md` CH-E001-CH-E045; `phase-4/01-ui-interaction-census.md`; `phase-4/05-test-traceability.md`.
+Status: evidence-backed draft from the current dirty worktree. Phase 1/2 source
+discovery and Phase 4 evidence passes are complete. Latest verification passed
+deterministic viewer-state route/listing-page, checkout creation route,
+checkout-session, CSRF/messages API, messaging/contact-host action/component
+tests, affected contact/payment tests, direct `/api/messages` route-handler
+status/cache-header tests, historical message-length cap assertions,
+fallback polling, API read/unread isolation, mocked client-side realtime insert
+handling, plus focused listing-detail Contact Host Chromium runtime, the full
+Chromium messaging journey, mocked Chromium checkout return / paid-unlock
+runtime, the scoped listing-detail browser state matrix for paywall-required,
+unavailable, migration-review, and moderation-locked states, and focused
+WebKit/Firefox/Mobile Chrome/Mobile Safari listing-detail plus messaging matrix
+evidence. CH-E068 implements the approved suspended/blocked viewer-state
+contract, disabled listing-detail copy, route tests, and E2E fixture/test source;
+CH-E073 closes the historical CH-E068 execution gap with focused four-state
+Chromium listing-detail proof and a full listing-detail Contact Host Chromium
+spec rerun. CH-E064 closes the old Firefox missing-executable blocker and
+reproduces the focused Firefox image decode and `NS_BINDING_ABORTED` test/setup
+failures; CH-E065 closes those two focused Firefox blockers with narrow
+test/helper changes and records a passing practical combined Firefox two-spec
+run. Email delivery, provider-level Supabase
+realtime/RLS, optional direct HTTP live-server API parity, real Stripe/webhook
+provider fulfillment, and provider-level runtime behavior remain documented
+runtime gaps. Provider-level Supabase realtime/RLS is the only current Contact
+Host P1; email and real payment-provider fulfillment are P2. CH-E067 closes the
+message-length P1 with a passing focused Linux-side WSL Jest command. Evidence:
+`manifest.json`; `evidence-register.md` CH-E001-CH-E073;
+`phase-4/01-ui-interaction-census.md`; `phase-4/05-test-traceability.md`.
 
 ## Purpose
 
@@ -47,8 +74,8 @@ evidence.
 | Block relationships stop contact start and later message sending. | Verified by source | CH-E007, CH-E013, CH-E022 |
 | Existing conversations are reused or resurrected instead of creating duplicates when source conditions match. | Verified by source | CH-E008, CH-E009 |
 | Message-start paywall can require purchase, be unavailable, be bypassed, or consume an entitlement. | Verified by source | CH-E010, CH-E025 |
-| Message length contract is unresolved: inbox composer uses 1000, thread composer uses 500, server action/API allow 2000. | Known gap | CH-E030, CH-G007 |
-| Runtime behavior is not accepted until browser/tests prove each scoped flow. | Partially verified with current focused gates passing | CH-E027, CH-E032-CH-E045 |
+| Message length contract is approved as one 1000-character outbound limit across inbox, thread, server action, and direct API source; focused Linux-side WSL Jest execution passed. | Closed P1 | CH-E030, CH-E060, CH-E066, CH-E067, CH-G007 |
+| Runtime behavior is not accepted until browser/tests prove each scoped flow. | Partially verified with current deterministic gates, viewer-state route contract, checkout creation route, affected contact/payment tests, focused listing-detail runtime passing, CH-E055 message status/cache-header assertions passing, full Chromium messaging passing after CH-E057 test/setup synchronization, checkout-return browser runtime passing in CH-E058, scoped paywall/unavailable/migration/moderation listing-detail state-matrix proof in CH-E059/CH-E061, focused WebKit/Mobile Chrome/Mobile Safari listing-detail and messaging proof in CH-E063, Firefox install plus reduced post-install failure classification in CH-E064, CH-E068 suspended/blocked source/test/fixture proof plus CH-E073 focused four-state Chromium listing-detail execution and full listing-detail Contact Host Chromium rerun, historical message-length cap assertions in CH-E060, updated 1000-limit source/test coverage in CH-E066, and fallback/realtime/API isolation reduction in CH-E062 | CH-E027, CH-E032-CH-E073 |
 
 ## Quick Links
 

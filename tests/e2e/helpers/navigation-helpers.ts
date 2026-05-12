@@ -71,7 +71,9 @@ async function waitForSearchTransition(
           shell?.getAttribute("data-query-hash") ??
           null;
 
-        return onSearchPage && (currentUrl !== prevUrl || currentHash !== prevHash);
+        return (
+          onSearchPage && (currentUrl !== prevUrl || currentHash !== prevHash)
+        );
       },
       { prevUrl: previousUrl, prevHash: previousQueryHash },
       { timeout }
@@ -87,8 +89,17 @@ async function waitForSearchResultsSettled(page: Page) {
     .catch(() => {});
 }
 
+function isRetryableDirectNavigationRace(message: string): boolean {
+  return (
+    message.includes("net::ERR_ABORTED") ||
+    message.includes("NS_BINDING_ABORTED") ||
+    message.includes("is interrupted by another navigation")
+  );
+}
+
 async function navigateToListingHref(page: Page, href: string) {
   const targetUrl = new URL(href, page.url()).toString();
+  const targetPath = new URL(targetUrl).pathname;
   const maxAttempts = 2;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -100,14 +111,14 @@ async function navigateToListingHref(page: Page, href: string) {
       return;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      const alreadyOnListing = /\/listings\//.test(page.url());
-      const retryableAbort = message.includes("net::ERR_ABORTED");
+      const alreadyOnTarget = new URL(page.url()).pathname === targetPath;
+      const retryableNavigationRace = isRetryableDirectNavigationRace(message);
 
-      if (alreadyOnListing) {
+      if (alreadyOnTarget) {
         return;
       }
 
-      if (!retryableAbort || attempt === maxAttempts) {
+      if (!retryableNavigationRace || attempt === maxAttempts) {
         throw error;
       }
 
@@ -277,7 +288,8 @@ export function navigationHelpers(page: Page) {
     async goToBookings() {
       await page.goto("/bookings");
       await waitForPageReady(page, {
-        selector: 'main, h1, [data-testid="messages"], [data-testid="messages-page"]',
+        selector:
+          'main, h1, [data-testid="messages"], [data-testid="messages-page"]',
       });
     },
 
@@ -549,7 +561,10 @@ export function navigationHelpers(page: Page) {
       });
       // Wait for scroll and any triggered rendering to settle
       await page.evaluate(
-        () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+        () =>
+          new Promise((r) =>
+            requestAnimationFrame(() => requestAnimationFrame(r))
+          )
       );
     },
 
@@ -562,7 +577,10 @@ export function navigationHelpers(page: Page) {
       });
       // Wait for scroll and any triggered rendering to settle
       await page.evaluate(
-        () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+        () =>
+          new Promise((r) =>
+            requestAnimationFrame(() => requestAnimationFrame(r))
+          )
       );
     },
 

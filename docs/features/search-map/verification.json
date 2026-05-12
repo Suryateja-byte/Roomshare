@@ -1,0 +1,483 @@
+{
+  "claims": [
+    {
+      "claimId": "V001",
+      "claim": "`/search` is the primary server-rendered listing discovery entry point.",
+      "citation": "README.md; 01-source-map.md; evidence-register.md C001; src/app/search/page.tsx",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V002",
+      "claim": "`/search` parses URL params through `parseSearchParams`.",
+      "citation": "README.md; 02-user-flows.md; evidence-register.md C002-C003; src/app/search/page.tsx; src/lib/search-params.ts",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V003",
+      "claim": "`/search` applies server-side rate limiting before the main search path.",
+      "citation": "README.md; 08-auth-security-permissions.md; evidence-register.md C005; src/app/search/page.tsx",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V004",
+      "claim": "The search page uses the V2 search path first and still has a legacy fallback path.",
+      "citation": "README.md; 02-user-flows.md; evidence-register.md C006; src/app/search/page.tsx",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V005",
+      "claim": "Exact V2/search-doc versus legacy fallback branching and field parity remain incomplete.",
+      "citation": "06-data-model-and-invariants.md; 12-gaps-unknowns-and-questions.md G007; phase-4/02-api-data-flow.md",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V006",
+      "claim": "URL search params are treated as the canonical committed search input.",
+      "citation": "README.md; 06-data-model-and-invariants.md; 07-state-management.md; evidence-register.md C003",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V007",
+      "claim": "Text searches without usable bounds can enter a bounds-required or location-required state.",
+      "citation": "README.md; 09-errors-empty-loading-edge-cases.md; evidence-register.md C004, C010-C011",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V008",
+      "claim": "Filter controls write search state through URL/query navigation and focused desktop filter/URL behavior has passing E2E coverage; broader cross-project filter coverage remains unrun.",
+      "citation": "02-user-flows.md; 03-interaction-census.md; 04-runtime-sequences.md; unknowns.md G006; phase-4/03-state-model.md",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V009",
+      "claim": "Load-more pagination is implemented through `SearchResultsClient` and `fetchMoreListings`.",
+      "citation": "02-user-flows.md; 05-api-contracts.md; evidence-register.md C007; src/app/search/actions.ts",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V010",
+      "claim": "Focused desktop sort/load-more pagination reset behavior has passing E2E coverage, while broader root pagination/sort and map-bounds reset coverage remains incomplete.",
+      "citation": "06-data-model-and-invariants.md; 07-state-management.md; unknowns.md G006; phase-4/03-state-model.md",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V011",
+      "claim": "The `/search` layout hosts persistent map/list providers and the map wrapper.",
+      "citation": "README.md; 01-source-map.md; evidence-register.md C013; src/app/search/layout.tsx",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V012",
+      "claim": "`PersistentMapWrapper` can consume V2 map data and independently fetch `/api/map-listings`.",
+      "citation": "README.md; 02-user-flows.md; 10-performance-observability.md; evidence-register.md C014; src/components/PersistentMapWrapper.tsx",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V013",
+      "claim": "The map component contains clustering, marker, selected-listing preview, empty-state, and error-state code.",
+      "citation": "README.md; 01-source-map.md; evidence-register.md C015; src/components/Map.tsx",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V014",
+      "claim": "Desktop map preference, marker/list focus, pan/zoom URL state, mobile map/list behavior, and map error/a11y behavior have passing browser coverage; V1-only map API mock cases and provider terminology remain incomplete.",
+      "citation": "README.md; 02-user-flows.md; 12-gaps-unknowns-and-questions.md G001, G005, G011; evidence-register.md C031",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V015",
+      "claim": "`/api/map-listings` requires valid bounds or derived bounds and blocks unbounded map scans.",
+      "citation": "05-api-contracts.md; 06-data-model-and-invariants.md; evidence-register.md C011; src/app/api/map-listings/route.ts",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V016",
+      "claim": "Map provider terminology is not yet fully settled because code/config evidence points to MapLibre/Stadia while some comments mention Mapbox.",
+      "citation": "12-gaps-unknowns-and-questions.md G005; evidence-register.md C027",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V017",
+      "claim": "Listing cards link to listing detail pages and expose favorite plus show-on-map controls.",
+      "citation": "README.md; 02-user-flows.md; evidence-register.md C017; src/components/listings/ListingCard.tsx",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V018",
+      "claim": "A direct contact-host action from search cards was not verified.",
+      "citation": "README.md; 02-user-flows.md; 08-auth-security-permissions.md; 12-gaps-unknowns-and-questions.md G003; evidence-register.md C029",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V019",
+      "claim": "The favorite button posts to `/api/favorites` and the API requires authentication for POST.",
+      "citation": "02-user-flows.md; 05-api-contracts.md; 08-auth-security-permissions.md; evidence-register.md C018-C019; src/components/FavoriteButton.tsx; src/app/api/favorites/route.ts",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V020",
+      "claim": "Logged-out favorite POST handling redirects the client to `/login`, not a callback URL.",
+      "citation": "03-interaction-census.md; 08-auth-security-permissions.md; 09-errors-empty-loading-edge-cases.md; src/components/FavoriteButton.tsx:63-87",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V021",
+      "claim": "`/api/favorites` GET is public but returns private user-specific saved ids only when authenticated.",
+      "citation": "05-api-contracts.md; 08-auth-security-permissions.md; evidence-register.md C019; src/app/api/favorites/route.ts",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V022",
+      "claim": "Saved search is documented as an entry point/server action, with checkout/paywall details only partially traced.",
+      "citation": "README.md; 02-user-flows.md; 05-api-contracts.md; phase-4/02-api-data-flow.md; phase-4/04-auth-security-permissions.md",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V023",
+      "claim": "`/api/search/v2`, `/api/search/listings`, `/api/search/facets`, `/api/map-listings`, `/api/geocoding/autocomplete`, and `/api/favorites` are covered by API contract rows.",
+      "citation": "05-api-contracts.md; phase-4/02-api-data-flow.md",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V024",
+      "claim": "The final docs now include compact API response, public payload, error, and cache/header tables for the main search/map/favorites contracts; generated OpenAPI-level schemas remain out of scope.",
+      "citation": "05-api-contracts.md; 12-gaps-unknowns-and-questions.md G008; phase-4/02-api-data-flow.md; src/lib/search/types.ts; src/lib/search-types.ts; src/lib/search/search-response.ts; src/lib/public-cache/headers.ts",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V025",
+      "claim": "Public search/map cache behavior is separated from private favorite responses, and Phase 10/11/12 evidence records passing fixed public-payload PII scans for the main search/list/map/listings payloads.",
+      "citation": "06-data-model-and-invariants.md; 08-auth-security-permissions.md; 10-performance-observability.md; runtime-verification.md; evidence-register.md C050; phase-4/04-auth-security-permissions.md",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V026",
+      "claim": "The data model references listings, locations, saved listings, saved searches, search projections, semantic projections, and query snapshots.",
+      "citation": "06-data-model-and-invariants.md; evidence-register.md C025; prisma/schema.prisma",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V027",
+      "claim": "Search-doc, semantic search, saved-search, projection, and contact-first listing fields have related migrations, but migration SQL has not been fully line-mapped.",
+      "citation": "06-data-model-and-invariants.md; evidence-register.md C026; manifest.json migrations",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V028",
+      "claim": "Booking-mode/search-doc fields are treated as code/data history and not documented as active booking UX.",
+      "citation": "06-data-model-and-invariants.md; 12-gaps-unknowns-and-questions.md G010; evidence-register.md C030",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V029",
+      "claim": "`Search this area` is not documented as current behavior because only a removed-flow comment was found.",
+      "citation": "03-interaction-census.md; 06-data-model-and-invariants.md; 09-errors-empty-loading-edge-cases.md; evidence-register.md C016; src/contexts/MapBoundsContext.tsx",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V030",
+      "claim": "Focused result/error/loading/network resilience states and map error/a11y paths have passing E2E coverage, with V1-only map API mock cases still skipped in V2 mode.",
+      "citation": "03-interaction-census.md; 09-errors-empty-loading-edge-cases.md; 12-gaps-unknowns-and-questions.md G012; evidence-register.md C038, C042-C043; phase-4/03-state-model.md",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V031",
+      "claim": "The test matrix lists existing search/map/unit/API/E2E tests, marks the narrow smoke, filter, pagination, desktop map, results-state, URL-state, anonymous saved-listing redirect, mobile map/list, search error-resilience, and map error/a11y specs as passed, and leaves broader tests as `Not run`.",
+      "citation": "11-test-traceability-matrix.md; manifest.json tests; phase-4/05-test-traceability.md",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V032",
+      "claim": "The manifest now records grouped test-family entries rather than an exact per-file test index.",
+      "citation": "manifest.json tests; unknowns.md G013; 12-gaps-unknowns-and-questions.md G013",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V033",
+      "claim": "The docs are based on the current dirty worktree rather than a clean committed branch.",
+      "citation": "README.md; 00-feature-boundary.md; 12-gaps-unknowns-and-questions.md G009; manifest.json sourceOfTruth",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V034",
+      "claim": "The final documentation package includes README, numbered docs 00-12, manifest, evidence register, verification file, and Mermaid diagrams.",
+      "citation": "docs/features/search-map directory listing; diagrams directory listing",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V035",
+      "claim": "Phase 10 Playwright runtime verification was initially blocked because local Postgres was unavailable at `localhost:5433`.",
+      "citation": "runtime-verification.md; evidence-register.md C032",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V036",
+      "claim": "After Docker/Postgres became available, the first `/search` smoke test reached the browser, rendered 57 listings, and failed on unhandled page error `Invalid or unexpected token`.",
+      "citation": "runtime-verification.md; evidence-register.md C033; test-results/search-search-smoke-Group--8bb45-opens-search-without-errors-desktop-anonymous/error-context.md",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V037",
+      "claim": "A later rerun of the narrow desktop-anonymous `/search` smoke test passed with `1 passed (27.0s)` after rendering 57 listings.",
+      "citation": "runtime-verification.md; evidence-register.md C034; command output from `pnpm exec playwright test tests/e2e/search/search-smoke.spec.ts --project=desktop-anonymous --reporter=list`",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V038",
+      "claim": "The focused desktop-anonymous filter/URL Playwright spec passed after Docker/Postgres readiness.",
+      "citation": "runtime-verification.md; evidence-register.md C035; command output from `pnpm exec playwright test tests/e2e/search/search-filters.spec.ts --project=desktop-anonymous --reporter=list`",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V039",
+      "claim": "The focused desktop-anonymous sort/load-more pagination Playwright spec passed after Docker/Postgres readiness.",
+      "citation": "runtime-verification.md; evidence-register.md C036; command output from `pnpm exec playwright test tests/e2e/search/search-pagination.spec.ts --project=desktop-anonymous --reporter=list`",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V040",
+      "claim": "The focused desktop-anonymous desktop map Playwright spec passed after Docker/Postgres readiness.",
+      "citation": "runtime-verification.md; evidence-register.md C037; test-results/.last-run.json; command output from `pnpm exec playwright test tests/e2e/search/search-map-desktop.spec.ts --project=desktop-anonymous --reporter=list`",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V041",
+      "claim": "The focused desktop-anonymous results-state Playwright spec passed after Docker/Postgres readiness.",
+      "citation": "runtime-verification.md; evidence-register.md C038; command output from `pnpm exec playwright test tests/e2e/search/search-results-states.spec.ts --project=desktop-anonymous --reporter=list`",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V042",
+      "claim": "The focused desktop-anonymous URL-state Playwright spec passed after Docker/Postgres readiness.",
+      "citation": "runtime-verification.md; evidence-register.md C039; command output from `pnpm exec playwright test tests/e2e/search/search-url-state.spec.ts --project=desktop-anonymous --reporter=list`",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V043",
+      "claim": "The focused desktop-anonymous anonymous saved-listing redirect Playwright spec passed after Docker/Postgres readiness.",
+      "citation": "runtime-verification.md; evidence-register.md C040; test-results/.last-run.json; command output from `pnpm exec playwright test tests/e2e/search/search-saved-listing.spec.ts --project=desktop-anonymous --reporter=list`",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V044",
+      "claim": "The focused mobile-anonymous mobile map/list Playwright spec passed after Docker/Postgres readiness.",
+      "citation": "runtime-verification.md; evidence-register.md C041; test-results/.last-run.json; command output from `pnpm exec playwright test tests/e2e/search/search-map-mobile.spec.ts --project=mobile-anonymous --reporter=list`",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V045",
+      "claim": "The focused chromium-anon search error-resilience Playwright suite passed after Docker/Postgres readiness.",
+      "citation": "runtime-verification.md; evidence-register.md C042; test-results/.last-run.json; command output from `pnpm exec playwright test tests/e2e/search-error-resilience.anon.spec.ts --project=chromium-anon --reporter=list`",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V046",
+      "claim": "The focused chromium-anon map error/a11y Playwright suite passed after Docker/Postgres readiness, with V1-only 500/429 map API mock tests skipped in V2 mode.",
+      "citation": "runtime-verification.md; evidence-register.md C043; test-results/.last-run.json; command output from `pnpm exec playwright test tests/e2e/map-errors-a11y.anon.spec.ts --project=chromium-anon --reporter=list`",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V047",
+      "claim": "The focused desktop-authenticated saved-listing persistence Playwright path passed after Docker/Postgres readiness.",
+      "citation": "runtime-verification.md; evidence-register.md C044; test-results/.last-run.json; command output from `pnpm exec playwright test tests/e2e/search/search-saved-listing.spec.ts --project=desktop-authenticated --reporter=list`",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V048",
+      "claim": "The focused API/unit Jest command passed for favorites, map listings, search facets, search V2, map payload sanitization, and search params.",
+      "citation": "runtime-verification.md; evidence-register.md C045; command output from `pnpm test -- src/__tests__/api/favorites-get.test.ts src/__tests__/api/favorites.test.ts src/__tests__/api/map-listings-route.test.ts src/__tests__/api/map-listings.test.ts src/__tests__/api/search/facets/route.test.ts src/__tests__/api/search/v2/route.test.ts src/__tests__/lib/maps/sanitize-map-listings.test.ts src/__tests__/lib/search-params.test.ts`",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V049",
+      "claim": "The public-payload PII scanner works against clean/leak fixtures, and the bare package script requires explicit payload JSON input.",
+      "citation": "runtime-verification.md; evidence-register.md C046; command outputs from `pnpm scan:public-payload-pii`, `node scripts/scan-public-payload-pii.js scripts/fixtures/public-payload-clean.json`, and `node scripts/scan-public-payload-pii.js scripts/fixtures/public-payload-leak.json`",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V050",
+      "claim": "The full search release-gate command passed with separate SSR and client Playwright reports.",
+      "citation": "runtime-verification.md; evidence-register.md C047; test-results/search-release-gate-ssr/results.json; test-results/search-release-gate-client/results.json; test-results/.last-run.json; command output from `pnpm run test:e2e:search-release-gate`",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V051",
+      "claim": "The real search/map public-payload PII scan was attempted and failed, with violations in search V2 and map-listings payloads and none in facets.",
+      "citation": "runtime-verification.md; evidence-register.md C048; command output from temporary dev server payload capture plus `node scripts/scan-public-payload-pii.js /tmp/roomshare-search-v2.json /tmp/roomshare-map-listings.json /tmp/roomshare-facets.json`",
+      "verdict": "pass",
+      "discrepancy": "Historical claim remains true for the original scan, but it is superseded by the fixed payload scan evidence in C050.",
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V052",
+      "claim": "PII scan triage classifies rounded public coordinates and image URL matches as likely scanner false positives, `list.fullItems.*.location.lat/lng` as a potential real privacy risk, and group/context keys as requiring a privacy decision.",
+      "citation": "public-payload-pii-triage.md; evidence-register.md C048; src/lib/search/transform.ts:L99-L120; src/lib/search/public-coordinates.ts:L1-L18; src/lib/maps/sanitize-map-listings.ts:L87-L164; src/lib/search/search-v2-service.ts:L1127-L1130; src/lib/search/types.ts:L134-L138; src/lib/search-types.ts:L56-L81",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V053",
+      "claim": "Search V2 `fullItems` is used by the current client and multiple response producers, so removal without a migration is likely contract-breaking.",
+      "citation": "public-payload-pii-triage.md; evidence-register.md C049; src/components/search/SearchResultsClient.tsx:L433-L471; src/lib/search/search-v2-service.ts:L521-L524,L1127-L1130; src/lib/search/projection-search.ts:L722-L729; src/lib/search/types.ts:L134-L138; src/__tests__/lib/search/projection-search.test.ts:L198-L202,L393-L397",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V054",
+      "claim": "After the P0 public payload fix, real captured public payloads from `/api/search/v2`, `/api/search/listings`, `/api/map-listings`, and `/api/listings` scanned cleanly.",
+      "citation": "runtime-verification.md; evidence-register.md C050; public-payload-pii-triage.md; command output from `pnpm run scan:public-payload-pii -- /tmp/roomshare-payload-search-v2.json /tmp/roomshare-payload-search-listings.json /tmp/roomshare-payload-map-listings.json /tmp/roomshare-payload-listings.json`",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    }
+  ],
+  "coverageGaps": [
+    {
+      "manifestItem": "runtime browser behavior",
+      "gap": "The narrow smoke, filter/URL, sort/load-more pagination, desktop map, results-state, URL-state, anonymous/authenticated saved-listing, mobile map/list, search error-resilience, map error/a11y, focused API/unit Jest, PII scanner fixture, real payload PII scan, and release-gate commands now have evidence, but V1-only map API browser mock cases and non-gate broader E2E coverage remain not runtime-verified.",
+      "severity": "P1"
+    },
+    {
+      "manifestItem": "test inventory",
+      "gap": "Tests are discovered and grouped in the manifest; focused search/map harness commands, focused API/unit Jest, the P0 privacy suite, typecheck, the full search release gate, scanner fixture checks, and the real fixed payload scan have passed. Non-gate broader E2E commands have not passed in this session.",
+      "severity": "P1"
+    },
+    {
+      "manifestItem": "pagination and cursor reset behavior",
+      "gap": "The desktop search harness pagination spec verifies sort reset, unique appended cards, and retryable failure/rate-limit states, but root pagination/sort specs and map-bounds reset coverage remain unrun.",
+      "severity": "P1"
+    },
+    {
+      "manifestItem": "public payload privacy",
+      "gap": "The concrete search/list/map public payload leak is fixed and verified by real captured payload scanning. A deterministic no-arg payload-capture wrapper is still missing for the package scanner gate.",
+      "severity": "P1"
+    },
+    {
+      "manifestItem": "API response contracts",
+      "gap": "The docs now include compact field/cache/error tables for the main contracts, but they are not generated OpenAPI schemas and do not enumerate every optional debug-only field combination.",
+      "severity": "P2"
+    },
+    {
+      "manifestItem": "map provider/runtime rendering",
+      "gap": "Desktop, mobile, and map error/a11y behavior have passing search-harness coverage with mocked map resources, but provider terminology and V1-only map API mock cases still need verification because comments/config mix Mapbox, MapLibre, and Stadia terms.",
+      "severity": "P1"
+    },
+    {
+      "manifestItem": "contact-host entry point",
+      "gap": "Search-card direct contact was not found; listing detail/contact-host reachability should be verified in the separate contact-host feature pass.",
+      "severity": "P1"
+    },
+    {
+      "manifestItem": "dirty worktree source of truth",
+      "gap": "Docs intentionally use the current dirty worktree; reviewers should preserve or stage related source files before treating these docs as stable branch documentation.",
+      "severity": "P1"
+    },
+    {
+      "manifestItem": "exact file-level test index",
+      "gap": "The manifest uses grouped test-family entries; a machine-readable per-file test index can be generated later if needed.",
+      "severity": "P2"
+    }
+  ]
+}

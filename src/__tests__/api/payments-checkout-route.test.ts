@@ -107,6 +107,8 @@ const mockedFeatures = features as {
 
 describe("POST /api/payments/checkout", () => {
   const originalNodeEnv = process.env.NODE_ENV;
+  const dayInMs = 24 * 60 * 60 * 1000;
+  const freshLastConfirmedAt = () => new Date(Date.now() - dayInMs);
 
   const setNodeEnv = (value: string) => {
     Object.defineProperty(process.env, "NODE_ENV", {
@@ -143,7 +145,7 @@ describe("POST /api/payments/checkout", () => {
       moveInDate: new Date("2026-05-01T00:00:00.000Z"),
       availableUntil: null,
       minStayMonths: 1,
-      lastConfirmedAt: new Date("2026-04-20T00:00:00.000Z"),
+      lastConfirmedAt: freshLastConfirmedAt(),
     });
     mockEvaluateMessageStartPaywall.mockResolvedValue({
       summary: {
@@ -219,6 +221,106 @@ describe("POST /api/payments/checkout", () => {
       error: "Forbidden: missing Origin header",
     });
     expect(auth).not.toHaveBeenCalled();
+    expect(prisma.listing.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("rejects checkout mutation requests with a malformed Origin header when CSRF is active", async () => {
+    setNodeEnv("production");
+
+    const response = await POST(
+      new Request("http://localhost/api/payments/checkout", {
+        method: "POST",
+        headers: {
+          origin: "not a url",
+          host: "localhost",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          listingId: "listing-123",
+          productCode: "CONTACT_PACK_3",
+        }),
+      })
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "Forbidden: malformed Origin header",
+    });
+    expect(auth).not.toHaveBeenCalled();
+    expect(prisma.listing.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("rejects checkout mutation requests with a mismatched Origin header when CSRF is active", async () => {
+    setNodeEnv("production");
+
+    const response = await POST(
+      new Request("http://localhost/api/payments/checkout", {
+        method: "POST",
+        headers: {
+          origin: "https://evil.example",
+          host: "localhost",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          listingId: "listing-123",
+          productCode: "CONTACT_PACK_3",
+        }),
+      })
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "Forbidden: Origin mismatch",
+    });
+    expect(auth).not.toHaveBeenCalled();
+    expect(prisma.listing.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("allows same-origin checkout mutation requests through CSRF before auth", async () => {
+    setNodeEnv("production");
+    (auth as jest.Mock).mockResolvedValueOnce(null);
+
+    const response = await POST(
+      new Request("https://roomshare.test/api/payments/checkout", {
+        method: "POST",
+        headers: {
+          origin: "https://roomshare.test",
+          host: "roomshare.test",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          listingId: "listing-123",
+          productCode: "CONTACT_PACK_3",
+        }),
+      })
+    );
+
+    expect(response.status).toBe(401);
+    expect(auth).toHaveBeenCalled();
+    expect(prisma.listing.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("allows localhost development checkout mutation requests through CSRF before auth", async () => {
+    setNodeEnv("development");
+    (auth as jest.Mock).mockResolvedValueOnce(null);
+
+    const response = await POST(
+      new Request("http://127.0.0.1:3000/api/payments/checkout", {
+        method: "POST",
+        headers: {
+          origin: "http://localhost:3000",
+          host: "127.0.0.1:3000",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          listingId: "listing-123",
+          productCode: "CONTACT_PACK_3",
+        }),
+      })
+    );
+
+    expect(response.status).toBe(401);
+    expect(auth).toHaveBeenCalled();
     expect(prisma.listing.findUnique).not.toHaveBeenCalled();
   });
 

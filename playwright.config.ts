@@ -15,11 +15,31 @@ dotenv.config({ path: path.resolve(__dirname, ".env") });
 const runningDedupeSuite = process.argv.some(
   (arg) => arg.includes("tests/e2e/dedupe") || arg.includes("/dedupe/")
 );
+const runningSearchHarness = process.argv.some(
+  (arg) => arg.includes("tests/e2e/search") || arg.includes("/search/")
+);
+const shouldEnableE2eTestHelpers =
+  process.env.E2E_TEST_HELPERS === "true" || runningDedupeSuite;
+const LOCAL_E2E_TEST_SECRET = "roomshare-local-e2e-test-secret";
+
+if (shouldEnableE2eTestHelpers) {
+  process.env.E2E_TEST_HELPERS = "true";
+  process.env.E2E_TEST_SECRET =
+    process.env.E2E_TEST_SECRET || LOCAL_E2E_TEST_SECRET;
+}
+
+if (runningDedupeSuite && process.env.VERCEL_ENV !== "production") {
+  // Collision tests exercise the collision-specific moderation gate; the
+  // generic create-listing limiter is persistent and can mask that behavior.
+  process.env.E2E_DISABLE_RATE_LIMIT = "true";
+}
+
 const retiredBookingLifecycleSpecs = [
   /concurrent\/admin-host-race\.spec\.ts/,
   /concurrent\/held-slot-restoration\.spec\.ts/,
   /concurrent\/listing-deletion-cascade\.spec\.ts/,
 ];
+const searchHarnessSpecs = "search/**/*.spec.ts";
 const webServerEnv = Object.fromEntries(
   Object.entries(process.env).filter(
     (entry): entry is [string, string] => entry[1] != null
@@ -53,7 +73,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
 
   /* Limit workers to prevent overwhelming dev server */
-  workers: process.env.CI || runningDedupeSuite ? 1 : 3,
+  workers: process.env.CI || runningDedupeSuite || runningSearchHarness ? 1 : 3,
 
   /* Reporter to use */
   reporter: [
@@ -99,9 +119,58 @@ export default defineConfig({
       testMatch: /.*\.setup\.ts/,
     },
 
+    /* /search E2E harness projects. These are scoped to tests/e2e/search so
+       they do not duplicate the legacy suite when running all projects. */
+    {
+      name: "desktop-anonymous",
+      testMatch: searchHarnessSpecs,
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+    },
+
+    {
+      name: "desktop-authenticated",
+      testMatch: searchHarnessSpecs,
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: "playwright/.auth/user.json",
+      },
+      dependencies: ["setup"],
+    },
+
+    {
+      name: "mobile-anonymous",
+      testMatch: searchHarnessSpecs,
+      use: {
+        ...devices["Pixel 7"],
+      },
+    },
+
+    {
+      name: "mobile-authenticated",
+      testMatch: searchHarnessSpecs,
+      use: {
+        ...devices["Pixel 7"],
+        storageState: "playwright/.auth/user.json",
+      },
+      dependencies: ["setup"],
+    },
+
+    {
+      name: "failure-mocked",
+      testMatch: searchHarnessSpecs,
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+    },
+
     {
       name: "chromium",
-      testIgnore: [/(\.anon|\.admin)\.spec\.ts/, ...retiredBookingLifecycleSpecs],
+      testIgnore: [
+        /(\.anon|\.admin)\.spec\.ts/,
+        ...retiredBookingLifecycleSpecs,
+      ],
       use: {
         ...devices["Desktop Chrome"],
         storageState: "playwright/.auth/user.json",
@@ -111,7 +180,10 @@ export default defineConfig({
 
     {
       name: "firefox",
-      testIgnore: [/(\.anon|\.admin)\.spec\.ts/, ...retiredBookingLifecycleSpecs],
+      testIgnore: [
+        /(\.anon|\.admin)\.spec\.ts/,
+        ...retiredBookingLifecycleSpecs,
+      ],
       use: {
         ...devices["Desktop Firefox"],
         storageState: "playwright/.auth/user.json",
@@ -121,7 +193,10 @@ export default defineConfig({
 
     {
       name: "webkit",
-      testIgnore: [/(\.anon|\.admin)\.spec\.ts/, ...retiredBookingLifecycleSpecs],
+      testIgnore: [
+        /(\.anon|\.admin)\.spec\.ts/,
+        ...retiredBookingLifecycleSpecs,
+      ],
       use: {
         ...devices["Desktop Safari"],
         storageState: "playwright/.auth/user.json",
@@ -132,7 +207,10 @@ export default defineConfig({
     /* Mobile viewports */
     {
       name: "Mobile Chrome",
-      testIgnore: [/(\.anon|\.admin)\.spec\.ts/, ...retiredBookingLifecycleSpecs],
+      testIgnore: [
+        /(\.anon|\.admin)\.spec\.ts/,
+        ...retiredBookingLifecycleSpecs,
+      ],
       use: {
         ...devices["Pixel 7"],
         storageState: "playwright/.auth/user.json",
@@ -142,7 +220,10 @@ export default defineConfig({
 
     {
       name: "Mobile Safari",
-      testIgnore: [/(\.anon|\.admin)\.spec\.ts/, ...retiredBookingLifecycleSpecs],
+      testIgnore: [
+        /(\.anon|\.admin)\.spec\.ts/,
+        ...retiredBookingLifecycleSpecs,
+      ],
       use: {
         ...devices["iPhone 14"],
         storageState: "playwright/.auth/user.json",

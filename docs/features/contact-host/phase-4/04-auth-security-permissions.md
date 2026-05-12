@@ -85,7 +85,7 @@ Status: Phase 4 source-only evidence pass. This pass records source-observed gat
 
 ## Unknowns And Gaps
 
-- CSRF implementation was NOT VERIFIED during Phase 4. The routes call `validateCsrf`, but `src/lib/csrf.ts` was outside the Phase 4 manifest slice and was not inspected then. Later CH-E041/CH-E044 verified helper behavior and route-level missing-Origin rejection for `/api/messages` and `/api/payments/checkout`; per-route malformed/mismatched Origin variants remain optional confidence coverage.
+- CSRF implementation was NOT VERIFIED during Phase 4. The routes call `validateCsrf`, but `src/lib/csrf.ts` was outside the Phase 4 manifest slice and was not inspected then. Later CH-E041/CH-E049 verified helper/messages-route behavior, CH-E053 verified checkout missing-Origin rejection inside the current passing checkout-route suite, and CH-E071 verified missing/malformed/mismatched Origin plus valid same-origin and localhost-development route-handler variants for both documented Contact Host mutation routes.
 - Supabase realtime authorization is a high-priority unknown. The client code comments that there is no RLS on `Message` and relies on a client-side conversation-id guard for realtime inserts; channel helper implementation and database policies were not inspected.
 - Payment webhook fulfillment and refund/restoration permissions are NOT VERIFIED in this pass.
 - Profile-completion or identity-verification gates beyond email verification and suspension remain UNKNOWN.

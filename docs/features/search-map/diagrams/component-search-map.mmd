@@ -1,0 +1,19 @@
+flowchart LR
+  Params["URL Search Params"]
+  Parser["parseSearchParams"]
+  Page["SearchPage"]
+  Results["SearchResultsClient"]
+  Form["SearchForm / Filter UI"]
+  MapWrap["PersistentMapWrapper"]
+  Map["Map"]
+  Cards["ListingCard / SplitStayCard"]
+  Fav["FavoriteButton"]
+  APIs["/api/search/* / /api/map-listings / /api/favorites"]
+
+  Params --> Parser --> Page
+  Page --> Results --> Cards
+  Page --> MapWrap --> Map
+  Form --> Params
+  Cards --> Fav --> APIs
+  Results --> APIs
+  MapWrap --> APIs

@@ -508,6 +508,41 @@ describe("Chat Actions", () => {
       expect(result).toEqual(mockMessage);
     });
 
+    it("accepts messages at the 1000-character server action cap", async () => {
+      const content = "x".repeat(1000);
+      (prisma.message.create as jest.Mock).mockResolvedValue({
+        ...mockMessage,
+        content,
+      });
+
+      const result = await sendMessage("conv-123", content);
+
+      expect(prisma.message.create).toHaveBeenCalledWith({
+        data: {
+          content,
+          conversationId: "conv-123",
+          senderId: "user-123",
+        },
+      });
+      expect(result).toEqual({ ...mockMessage, content });
+    });
+
+    it("rejects messages over the 1000-character server action cap", async () => {
+      const result = await sendMessage("conv-123", "x".repeat(1001));
+
+      expect(result).toEqual({
+        error: "Message must be 1000 characters or less.",
+      });
+      expect(prisma.message.create).not.toHaveBeenCalled();
+    });
+
+    it("rejects whitespace-only messages", async () => {
+      const result = await sendMessage("conv-123", "   \n\t   ");
+
+      expect(result).toEqual({ error: "Message is required." });
+      expect(prisma.message.create).not.toHaveBeenCalled();
+    });
+
     it("updates conversation updatedAt", async () => {
       await sendMessage("conv-123", "Hello!");
 

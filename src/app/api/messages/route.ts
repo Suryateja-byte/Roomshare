@@ -18,13 +18,37 @@ import {
   buildPaginationResponse,
   buildPrismaQueryOptions,
 } from "@/lib/pagination-schema";
+import {
+  OUTBOUND_MESSAGE_MAX_LENGTH,
+  OUTBOUND_MESSAGE_REQUIRED_ERROR,
+  OUTBOUND_MESSAGE_TOO_LONG_ERROR,
+} from "@/lib/messaging/message-limits";
 import { z } from "zod";
 
 const sendMessageApiSchema = z.object({
   conversationId: z.string().trim().min(1).max(100),
-  content: z.string().trim().min(1).max(2000),
+  content: z
+    .string()
+    .trim()
+    .min(1, OUTBOUND_MESSAGE_REQUIRED_ERROR)
+    .max(OUTBOUND_MESSAGE_MAX_LENGTH, OUTBOUND_MESSAGE_TOO_LONG_ERROR),
   action: z.string().max(20).optional(),
 });
+
+function getSendMessageValidationError(error: z.ZodError): string {
+  const contentIssue = error.issues.find(
+    (issue) => issue.path[0] === "content"
+  );
+
+  if (
+    contentIssue?.message === OUTBOUND_MESSAGE_REQUIRED_ERROR ||
+    contentIssue?.message === OUTBOUND_MESSAGE_TOO_LONG_ERROR
+  ) {
+    return contentIssue.message;
+  }
+
+  return "Invalid message payload";
+}
 
 const markReadApiSchema = z.object({
   conversationId: z.string().trim().min(1).max(100),
@@ -354,7 +378,7 @@ export async function POST(request: Request) {
     const sendParsed = sendMessageApiSchema.safeParse(body);
     if (!sendParsed.success) {
       return NextResponse.json(
-        { error: "Invalid message payload" },
+        { error: getSendMessageValidationError(sendParsed.error) },
         { status: 400 }
       );
     }

@@ -1,0 +1,21 @@
+%% Harness filename alias for sequence-primary-search-flow.mmd.
+%% Evidence: docs/features/search-map/diagrams/sequence-primary-search-flow.mmd.
+sequenceDiagram
+  participant User
+  participant Page as /search
+  participant Parser as parseSearchParams
+  participant V2 as executeSearchV2
+  participant Legacy as getListingsPaginated
+  participant Client as SearchResultsClient
+
+  User->>Page: Visit /search?...
+  Page->>Parser: Parse URL params
+  Parser-->>Page: Normalized search state
+  Page->>V2: Fetch V2 result
+  alt V2 result available
+    V2-->>Page: Listings, meta, map data
+  else fallback
+    Page->>Legacy: Fetch legacy listings
+    Legacy-->>Page: Listings
+  end
+  Page-->>Client: Render initial results

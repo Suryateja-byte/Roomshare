@@ -1,0 +1,17 @@
+%% Evidence: LM-E001 through LM-E018
+flowchart LR
+  Host[Authenticated host]
+  CreatePage[/listings/create/]
+  EditPage[/listings/:id/edit/]
+  ListingAPI[Listing mutation APIs]
+  UploadAPI[/api/upload/]
+  DB[(Postgres and Prisma models)]
+  Search[Search and canonical projections]
+
+  Host --> CreatePage
+  Host --> EditPage
+  CreatePage --> UploadAPI
+  CreatePage --> ListingAPI
+  EditPage --> ListingAPI
+  ListingAPI --> DB
+  ListingAPI --> Search

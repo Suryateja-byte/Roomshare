@@ -95,6 +95,8 @@ describe("Messages API", () => {
     user: { id: "user-123", name: "Test User", email: "test@example.com" },
   };
   const originalNodeEnv = process.env.NODE_ENV;
+  const freshLastConfirmedAt = () =>
+    new Date(Date.now() - 24 * 60 * 60 * 1000);
 
   const setNodeEnv = (value: string) => {
     Object.defineProperty(process.env, "NODE_ENV", {
@@ -190,8 +192,24 @@ describe("Messages API", () => {
       const response = await GET(request);
 
       expect(response.status).toBe(200);
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store");
       const data = await response.json();
       expect(data.messages).toEqual(mockMessages);
+    });
+
+    it("returns unread count with a short private cache header", async () => {
+      (prisma.message.count as jest.Mock).mockResolvedValue(3);
+
+      const request = new Request(
+        "http://localhost/api/messages?view=unreadCount"
+      );
+      const response = await GET(request);
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("Cache-Control")).toBe(
+        "private, max-age=10, stale-while-revalidate=20"
+      );
+      await expect(response.json()).resolves.toEqual({ count: 3 });
     });
 
     it("returns 403 when user is not participant", async () => {
@@ -246,6 +264,7 @@ describe("Messages API", () => {
       const response = await GET(request);
 
       expect(response.status).toBe(200);
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store");
       const data = await response.json();
       expect(data).toEqual({
         messages: polledMessages,
@@ -277,6 +296,7 @@ describe("Messages API", () => {
       const response = await GET(request);
 
       expect(response.status).toBe(200);
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store");
       const data = await response.json();
       expect(data.conversations[0].id).toBe("conv-1");
     });
@@ -314,6 +334,86 @@ describe("Messages API", () => {
       expect(auth).not.toHaveBeenCalled();
     });
 
+    it("rejects mutation requests with a malformed Origin header when CSRF is active", async () => {
+      setNodeEnv("production");
+
+      const request = new Request("http://localhost/api/messages", {
+        method: "POST",
+        headers: {
+          origin: "not a url",
+          host: "localhost",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ conversationId: "conv-123", content: "Hello" }),
+      });
+      const response = await POST(request);
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toEqual({
+        error: "Forbidden: malformed Origin header",
+      });
+      expect(auth).not.toHaveBeenCalled();
+    });
+
+    it("rejects mutation requests with a mismatched Origin header when CSRF is active", async () => {
+      setNodeEnv("production");
+
+      const request = new Request("http://localhost/api/messages", {
+        method: "POST",
+        headers: {
+          origin: "https://evil.example",
+          host: "localhost",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ conversationId: "conv-123", content: "Hello" }),
+      });
+      const response = await POST(request);
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toEqual({
+        error: "Forbidden: Origin mismatch",
+      });
+      expect(auth).not.toHaveBeenCalled();
+    });
+
+    it("allows same-origin mutation requests through CSRF before auth", async () => {
+      setNodeEnv("production");
+      (auth as jest.Mock).mockResolvedValueOnce(null);
+
+      const request = new Request("https://roomshare.test/api/messages", {
+        method: "POST",
+        headers: {
+          origin: "https://roomshare.test",
+          host: "roomshare.test",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ conversationId: "conv-123", content: "Hello" }),
+      });
+      const response = await POST(request);
+
+      expect(response.status).toBe(401);
+      expect(auth).toHaveBeenCalled();
+    });
+
+    it("allows localhost development mutation requests through CSRF before auth", async () => {
+      setNodeEnv("development");
+      (auth as jest.Mock).mockResolvedValueOnce(null);
+
+      const request = new Request("http://127.0.0.1:3000/api/messages", {
+        method: "POST",
+        headers: {
+          origin: "http://localhost:3000",
+          host: "127.0.0.1:3000",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ conversationId: "conv-123", content: "Hello" }),
+      });
+      const response = await POST(request);
+
+      expect(response.status).toBe(401);
+      expect(auth).toHaveBeenCalled();
+    });
+
     it("returns 401 when not authenticated", async () => {
       (auth as jest.Mock).mockResolvedValue(null);
 
@@ -334,6 +434,24 @@ describe("Messages API", () => {
       const response = await POST(request);
 
       expect(response.status).toBe(400);
+    });
+
+    it("returns 400 when direct send content exceeds the 1000-character API cap", async () => {
+      const request = new Request("http://localhost/api/messages", {
+        method: "POST",
+        body: JSON.stringify({
+          conversationId: "conv-123",
+          content: "x".repeat(1001),
+        }),
+      });
+      const response = await POST(request);
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        error: "Message must be 1000 characters or less.",
+      });
+      expect(prisma.conversation.findUnique).not.toHaveBeenCalled();
+      expect(prisma.message.create).not.toHaveBeenCalled();
     });
 
     it("returns 403 when user is not participant", async () => {
@@ -381,7 +499,7 @@ describe("Messages API", () => {
           moveInDate: new Date("2026-05-01T00:00:00.000Z"),
           availableUntil: null,
           minStayMonths: 1,
-          lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
+          lastConfirmedAt: freshLastConfirmedAt(),
         },
       });
       (prisma.blockedUser.findFirst as jest.Mock).mockResolvedValueOnce({
@@ -412,7 +530,7 @@ describe("Messages API", () => {
           moveInDate: new Date("2026-05-01T00:00:00.000Z"),
           availableUntil: null,
           minStayMonths: 1,
-          lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
+          lastConfirmedAt: freshLastConfirmedAt(),
         },
       });
       (prisma.blockedUser.findFirst as jest.Mock).mockResolvedValueOnce({
@@ -449,7 +567,7 @@ describe("Messages API", () => {
           moveInDate: new Date("2026-05-01T00:00:00.000Z"),
           availableUntil: null,
           minStayMonths: 1,
-          lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
+          lastConfirmedAt: freshLastConfirmedAt(),
           owner: { isSuspended: true },
         },
       });
@@ -483,7 +601,7 @@ describe("Messages API", () => {
           moveInDate: new Date("2026-05-01T00:00:00.000Z"),
           availableUntil: null,
           minStayMonths: 1,
-          lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
+          lastConfirmedAt: freshLastConfirmedAt(),
         },
       };
       const mockMessage = {
@@ -505,6 +623,7 @@ describe("Messages API", () => {
       const response = await POST(request);
 
       expect(response.status).toBe(201);
+      expect(response.headers.get("Cache-Control")).toBe("no-store");
       expect(prisma.message.create).toHaveBeenCalled();
       expect(prisma.conversation.update).toHaveBeenCalled();
       expect(mockRecordOutboundContentSoftFlag).toHaveBeenCalledWith({
@@ -545,7 +664,7 @@ describe("Messages API", () => {
           moveInDate: new Date("2026-05-01T00:00:00.000Z"),
           availableUntil: null,
           minStayMonths: 1,
-          lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
+          lastConfirmedAt: freshLastConfirmedAt(),
         },
       });
       (prisma.message.create as jest.Mock).mockResolvedValue({

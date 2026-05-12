@@ -1,0 +1,18 @@
+%% Evidence: MRA-E008, MRA-E009, MRA-E004, MRA-E014
+sequenceDiagram
+  participant Admin
+  participant Page as Admin reports UI
+  participant Action as resolveReportAndRemoveListing
+  participant DB as Postgres
+  participant Audit as AuditLog
+
+  Admin->>Page: Resolve report and remove listing
+  Page->>Action: reportId and notes
+  Action->>Action: require admin and admin-delete rate limit
+  Action->>DB: Lock Report FOR UPDATE
+  Action->>DB: Lock Listing FOR UPDATE
+  Action->>DB: Resolve report and pause listing with SUPPRESSED
+  Action->>DB: Mark listing dirty and sync lifecycle
+  Action->>Audit: Log REPORT_RESOLVED
+  Action->>Audit: Log LISTING_HIDDEN
+  Action-->>Page: success

@@ -14,10 +14,46 @@ import {
   SF_BOUNDS,
   searchResultsContainer,
 } from "../helpers";
+import type { Page } from "@playwright/test";
 
 test.beforeEach(async () => {
   test.slow();
 });
+
+async function gotoConversationHref(page: Page, href: string) {
+  const targetUrl = new URL(href, page.url()).toString();
+  const targetPath = new URL(targetUrl).pathname;
+  const maxAttempts = 2;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await page.goto(targetUrl, {
+        waitUntil: "commit",
+        timeout: timeouts.navigation,
+      });
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const alreadyOnTarget = new URL(page.url()).pathname === targetPath;
+      const retryableNavigationRace =
+        message.includes("net::ERR_ABORTED") ||
+        message.includes("NS_BINDING_ABORTED") ||
+        message.includes("is interrupted by another navigation");
+
+      if (alreadyOnTarget) {
+        return;
+      }
+
+      if (!retryableNavigationRace || attempt === maxAttempts) {
+        throw error;
+      }
+
+      await page
+        .waitForLoadState("domcontentloaded", { timeout: 5000 })
+        .catch(() => {});
+    }
+  }
+}
 
 // ─── J25: Send Message in Conversation ────────────────────────────────────────
 test.describe("J25: Send Message in Conversation", () => {
@@ -37,7 +73,10 @@ test.describe("J25: Send Message in Conversation", () => {
 
     // Check we weren't redirected to login or signup
     const messagesUrl = page.url();
-    const onAuthPage = messagesUrl.includes("/login") || messagesUrl.includes("/signin") || messagesUrl.includes("/signup");
+    const onAuthPage =
+      messagesUrl.includes("/login") ||
+      messagesUrl.includes("/signin") ||
+      messagesUrl.includes("/signup");
     test.skip(onAuthPage, "Auth redirect — session not available in CI");
     if (onAuthPage) return;
 
@@ -61,7 +100,7 @@ test.describe("J25: Send Message in Conversation", () => {
     test.skip(!conversationHref, "No conversation href found — skipping");
     if (!conversationHref) return;
 
-    await page.goto(conversationHref, { waitUntil: "commit" });
+    await gotoConversationHref(page, conversationHref);
     await page.waitForURL(/\/messages\/[^/]+/, {
       timeout: timeouts.navigation,
       waitUntil: "commit",
@@ -84,19 +123,36 @@ test.describe("J25: Send Message in Conversation", () => {
     const input = msgInput.first();
     await input.waitFor({ state: "visible", timeout: 10_000 });
 
-    const testMsg = `E2E test message ${Date.now()}`;
-    await input.click();
-    await input.pressSequentially(testMsg, { delay: 5 });
-    await expect(input).toHaveValue(testMsg);
-
     const sendBtn = page
       .getByRole("button", { name: /send/i })
       .or(page.locator('[data-testid="send-button"]'))
       .or(page.locator('button[type="submit"]'));
+
+    await page
+      .waitForLoadState("networkidle", { timeout: 10_000 })
+      .catch(() => {});
+    await expect(async () => {
+      await input.fill("hydration probe");
+      await expect(input).toHaveValue("hydration probe", { timeout: 1_000 });
+      await expect(sendBtn.first()).toBeEnabled({ timeout: 1_000 });
+    }).toPass({
+      timeout: 15_000,
+      intervals: [250, 500, 1_000],
+    });
+    await input.fill("");
+    await expect(sendBtn.first()).toBeDisabled({ timeout: 5_000 });
+
+    const testMsg = `E2E test message ${Date.now()}`;
+    await input.fill(testMsg);
+    await expect(input).toHaveValue(testMsg);
     await expect(sendBtn.first()).toBeEnabled({ timeout: 10_000 });
     await sendBtn.first().click({ timeout: 30000 });
     // Wait for sent message to appear
-    await page.getByText(testMsg).last().waitFor({ state: "visible", timeout: 10_000 }).catch(() => {});
+    await page
+      .getByText(testMsg)
+      .last()
+      .waitFor({ state: "visible", timeout: 10_000 })
+      .catch(() => {});
 
     // Step 5: Verify message appears in thread
     // TODO: add data-testid="sent-message" to ChatWindow sent message bubbles
@@ -169,7 +225,10 @@ test.describe("J26: Start Conversation from Listing", () => {
         async () => {
           const onMessages = page.url().includes("/messages");
           const hasToast = await toast.isVisible().catch(() => false);
-          const canType = await msgInput.first().isVisible().catch(() => false);
+          const canType = await msgInput
+            .first()
+            .isVisible()
+            .catch(() => false);
           return onMessages || hasToast || canType;
         },
         {
@@ -235,7 +294,8 @@ test.describe("J27: Empty Messages Inbox", () => {
     await nav.goToMessages();
 
     // Check we weren't redirected to login
-    const onLoginPage = page.url().includes("/login") || page.url().includes("/signin");
+    const onLoginPage =
+      page.url().includes("/login") || page.url().includes("/signin");
     test.skip(onLoginPage, "Auth session expired - redirected to login");
     if (onLoginPage) return;
 

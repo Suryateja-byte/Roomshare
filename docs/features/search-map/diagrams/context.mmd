@@ -1,0 +1,13 @@
+flowchart LR
+  User["User"]
+  Search["Roomshare Search / Map / Listing Discovery"]
+  Listing["Listing Detail Page"]
+  Geo["Geocoding Autocomplete"]
+  Maps["Stadia / MapLibre Map Tiles"]
+  DB["Postgres / Prisma"]
+
+  User --> Search
+  Search --> Listing
+  Search --> Geo
+  Search --> Maps
+  Search --> DB

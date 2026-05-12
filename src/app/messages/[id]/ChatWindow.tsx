@@ -32,6 +32,10 @@ import { useDebouncedCallback } from "use-debounce";
 import { useBlockStatus } from "@/hooks/useBlockStatus";
 import { useRateLimitHandler } from "@/hooks/useRateLimitHandler";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
+import {
+  OUTBOUND_MESSAGE_MAX_LENGTH,
+  OUTBOUND_MESSAGE_TOO_LONG_DESCRIPTION,
+} from "@/lib/messaging/message-limits";
 import RateLimitCountdown from "@/components/RateLimitCountdown";
 import CharacterCounter from "@/components/CharacterCounter";
 import BlockedConversationBanner from "@/components/chat/BlockedConversationBanner";
@@ -65,8 +69,6 @@ type Message = {
     image: string | null;
   };
 };
-
-const MESSAGE_MAX_LENGTH = 500;
 
 interface ChatWindowProps {
   canLeavePrivateFeedback: boolean;
@@ -558,6 +560,13 @@ export default function ChatWindow({
     if (!input.trim() || isSending || isRateLimited) return;
 
     const content = input.trim();
+    if (content.length > OUTBOUND_MESSAGE_MAX_LENGTH) {
+      toast.error("Message too long", {
+        description: OUTBOUND_MESSAGE_TOO_LONG_DESCRIPTION,
+      });
+      return;
+    }
+
     setInput("");
     setIsSending(true);
     setIsTyping(false);
@@ -1041,7 +1050,7 @@ export default function ChatWindow({
               placeholder={
                 isOffline ? "You're offline..." : "Type a message..."
               }
-              maxLength={MESSAGE_MAX_LENGTH}
+              maxLength={OUTBOUND_MESSAGE_MAX_LENGTH}
               className="flex-1 bg-surface-container-high border-0 rounded-full px-5 py-3 text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 transition-all"
               disabled={isSending}
             />
@@ -1061,7 +1070,10 @@ export default function ChatWindow({
             </button>
           </form>
           {input.length > 0 && (
-            <CharacterCounter current={input.length} max={MESSAGE_MAX_LENGTH} />
+            <CharacterCounter
+              current={input.length}
+              max={OUTBOUND_MESSAGE_MAX_LENGTH}
+            />
           )}
         </div>
       )}

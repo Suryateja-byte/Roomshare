@@ -1,0 +1,75 @@
+{
+  "featureSlug": "moderation-reporting-admin",
+  "status": "partial",
+  "verifiedAt": "2026-05-10",
+  "method": "source audit plus test discovery; no runtime/browser/test commands executed",
+  "claims": [
+    {
+      "claimId": "V-MRA-001",
+      "claim": "Report and private-feedback submission behavior is documented from source evidence.",
+      "citation": "MRA-E001, MRA-E002, MRA-E015",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V-MRA-002",
+      "claim": "Admin auth, audit, user/listing/report actions, and admin page behavior are documented from source evidence.",
+      "citation": "MRA-E003, MRA-E004, MRA-E005, MRA-E006, MRA-E007, MRA-E008, MRA-E009, MRA-E010, MRA-E014",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V-MRA-003",
+      "claim": "Verification review and document access behavior is documented from source evidence.",
+      "citation": "MRA-E011, MRA-E012, MRA-E013, MRA-E015",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V-MRA-004",
+      "claim": "Browser/runtime behavior and focused tests have been verified.",
+      "citation": "runtime-verification.md; MRA-G001, MRA-G002, MRA-G003",
+      "verdict": "partial",
+      "discrepancy": "Source evidence and test inventory exist, but browser, direct HTTP, signed URL, provider-runtime, telemetry, and focused test commands were not run in this documentation pass.",
+      "recommendedFix": "Run the focused commands in 11-test-traceability-matrix.md and update runtime-verification.md."
+    },
+    {
+      "claimId": "V-MRA-005",
+      "claim": "Migration-backed moderation/reporting/verification invariants are fully line-audited.",
+      "citation": "MRA-E017; MRA-G004",
+      "verdict": "partial",
+      "discrepancy": "Relevant migration paths were discovered, but migration SQL was not line-audited in this pass.",
+      "recommendedFix": "Line-audit relevant migration SQL and update 06-data-model-and-invariants.md."
+    }
+  ],
+  "coverageGaps": [
+    {
+      "manifestItem": "Runtime browser behavior",
+      "gap": "Full browser admin/report/listing moderation/verification suites were not run.",
+      "severity": "P1"
+    },
+    {
+      "manifestItem": "Direct API verification",
+      "gap": "Direct HTTP checks for report/admin document route statuses, cache headers, CSRF variants, and signed URL behavior were not run.",
+      "severity": "P1"
+    },
+    {
+      "manifestItem": "Email and telemetry runtime",
+      "gap": "Verification email delivery and private-feedback telemetry/runtime behavior were not verified.",
+      "severity": "P1"
+    },
+    {
+      "manifestItem": "Migration SQL audit",
+      "gap": "Migration paths were discovered, but SQL line ranges were not audited for every invariant.",
+      "severity": "P2"
+    },
+    {
+      "manifestItem": "Audit failure behavior",
+      "gap": "Audit logging fail-open behavior is source-observed but not runtime-tested for operational visibility.",
+      "severity": "P2"
+    }
+  ]
+}

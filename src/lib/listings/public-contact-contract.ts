@@ -18,7 +18,11 @@ export type ContactDisabledReason =
   | "LISTING_UNAVAILABLE"
   | "MIGRATION_REVIEW"
   | "MODERATION_LOCKED"
-  | "PAYWALL_REQUIRED";
+  | "PAYWALL_REQUIRED"
+  | "VIEWER_SUSPENDED"
+  | "HOST_SUSPENDED"
+  | "VIEWER_BLOCKED_HOST"
+  | "HOST_BLOCKED_VIEWER";
 
 export type ListingAvailabilityGateReason =
   | "LISTING_UNAVAILABLE"
@@ -255,6 +259,10 @@ export function coerceViewerContactFields(
     input.contactDisabledReason === "MIGRATION_REVIEW" ||
     input.contactDisabledReason === "MODERATION_LOCKED" ||
     input.contactDisabledReason === "PAYWALL_REQUIRED" ||
+    input.contactDisabledReason === "VIEWER_SUSPENDED" ||
+    input.contactDisabledReason === "HOST_SUSPENDED" ||
+    input.contactDisabledReason === "VIEWER_BLOCKED_HOST" ||
+    input.contactDisabledReason === "HOST_BLOCKED_VIEWER" ||
     input.contactDisabledReason === null
       ? input.contactDisabledReason
       : fallback.contactDisabledReason;

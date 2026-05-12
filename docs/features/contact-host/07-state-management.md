@@ -27,7 +27,7 @@ Drift risk scale:
 | Block state | Database plus thread UI | `BlockedUser` relation | Start/send gates, `BlockedConversationBanner` | Block/unblock actions | Block/unblock dialogs/actions | High | CH-E022 |
 | Conversation deletion state | Database | `ConversationDeletion` per user | `/messages`, `/messages/[id]`, API reads | Delete conversation action; message send resurrects | User delete or new message | Medium | `phase-4/03-state-model.md` |
 | Checkout return phase | Listing detail client | URL params plus checkout-session API response | Listing detail notices and viewer state | Return effect and polling loop | Fulfilled, canceled, failed, expired, timeout, polling error | High | `phase-4/01-ui-interaction-census.md` |
-| Realtime/polling mode | `ChatWindow` | Local connection state plus Supabase/polling behavior | Thread UI | Realtime subscription and fallback timers | Close/error/timeout/offline | High | `phase-4/01-ui-interaction-census.md`; `unknowns.md` CH-U005 |
+| Realtime/polling mode | `ChatWindow` | Local connection state plus Supabase/polling behavior | Thread UI | Realtime subscription and fallback timers | Subscribe/close/error/timeout/offline | Medium | CH-E062; `phase-4/01-ui-interaction-census.md`; `unknowns.md` CH-U005 |
 
 ## Transition Matrix
 
@@ -44,14 +44,14 @@ Drift risk scale:
 | Paywall required | User selects offer | Offer available | POST `/api/payments/checkout` | Checkout opening | CH-E004; `phase-4/02-api-data-flow.md` | Component source/mock only |
 | Checkout return | Checkout fulfilled | Checkout-session classifies fulfilled | Update viewer state to contactable | Contact ready | `src/app/listings/[id]/ListingPageClient.tsx:818-852` | Source verified; runtime gap |
 | Checkout return | Canceled/failed/expired/timeout | Checkout-session not fulfilled | Show notice and keep/restore paywall state | Paywall required / retry | `phase-4/01-ui-interaction-census.md` | Source verified; runtime gap |
-| Message thread | User sends message | Participant, valid content, not blocked/listing-gated | Persist message and update conversation | Message thread | CH-E012-CH-E014, CH-E032, CH-E034 | Focused tests partial |
-| Message thread | Realtime unavailable | Channel close/error/timeout/offline | Fall back to polling | Polling | `phase-4/01-ui-interaction-census.md` | Realtime/RLS runtime gap |
+| Message thread | User sends message | Participant, valid content up to 1000 characters, not blocked/listing-gated | Persist message and update conversation | Message thread | CH-E012-CH-E014, CH-E032, CH-E034, CH-E060, CH-E066, CH-E067 | Source/test sources updated for approved 1000 limit; focused Linux-side WSL Jest command passed |
+| Message thread | Realtime unavailable | Channel close/error/timeout/offline | Fall back to polling | Polling | CH-E062; `phase-4/01-ui-interaction-census.md` | Fallback verified locally; provider/RLS blocked |
 | Message thread | Block relationship exists | Either participant blocked the other | Replace composer with blocked banner | Blocked | CH-E022 | UI runtime gap |
 | Blocked | Current user unblocks | User owns block action | Unblock action updates state | Message thread | CH-E022 | UI runtime gap |
 | Conversation visible | User hides/deletes conversation | Participant action | Upsert `ConversationDeletion` for current user | Conversation hidden for current user | `phase-4/03-state-model.md` | Runtime gap |
 
 ## State Gaps
 
-- Supabase realtime authorization and database policy behavior remain unknown. Evidence: `phase-4/04-auth-security-permissions.md`.
-- Message length state is inconsistent between inbox, thread, server action, and API. Evidence: CH-E030.
+- Supabase provider-level realtime authorization and database RLS behavior remain blocked/not verified. Local fallback polling, mocked realtime subscription handling, conversation-id guarding, and read marking are verified in CH-E062, but no local `Message`/conversation RLS policy setup or safe provider test path exists.
+- Message length state now has an approved 1000-character contract across inbox, thread, server action, and API source. Focused Linux-side WSL Jest execution for the updated boundary tests passed. Evidence: CH-E030, CH-E060, CH-E066, CH-E067.
 - Runtime visual state transitions are not verified. Evidence: CH-E029.

@@ -1,0 +1,17 @@
+%% Evidence: APS-E001 through APS-E016
+flowchart LR
+  Visitor[Visitor]
+  User[Authenticated user]
+  Auth[Auth.js and auth APIs]
+  Account[Profile and settings]
+  Saved[Saved listings and saved searches]
+  Providers[OAuth, Turnstile, email, checkout providers]
+  DB[(User, tokens, saved state)]
+
+  Visitor --> Auth
+  Auth --> Providers
+  Auth --> DB
+  User --> Account
+  User --> Saved
+  Account --> DB
+  Saved --> DB

@@ -1,0 +1,20 @@
+%% Evidence: LM-E002, LM-E003, LM-E004, LM-E007, LM-E011, LM-E012, LM-E015
+flowchart LR
+  Draft[Draft persistence]
+  Guard[Navigation guard]
+  Submit[Submit state]
+  Images[Image upload state]
+  Collision[Collision modal state]
+  Version[Expected version]
+  Lock[Moderation lock]
+  Dirty[Search dirty marker]
+  Canonical[Canonical availability sync]
+
+  Draft --> Submit
+  Guard --> Submit
+  Images --> Submit
+  Submit --> Collision
+  Submit --> Version
+  Version --> Lock
+  Lock --> Dirty
+  Dirty --> Canonical

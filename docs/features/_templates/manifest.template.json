@@ -1,0 +1,16 @@
+{
+  "feature": "",
+  "entryPoints": [],
+  "routes": [],
+  "serverComponents": [],
+  "clientComponents": [],
+  "apiRoutes": [],
+  "dataAccessFunctions": [],
+  "searchParamParsers": [],
+  "databaseModels": [],
+  "migrations": [],
+  "tests": [],
+  "externalServices": [],
+  "environmentVariables": [],
+  "unknowns": []
+}

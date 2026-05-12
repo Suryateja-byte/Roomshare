@@ -1,0 +1,13 @@
+sequenceDiagram
+  participant User
+  participant Map
+  participant Bounds as ActivePanBoundsContext
+  participant Wrapper as PersistentMapWrapper
+  participant API as /api/map-listings
+
+  User->>Map: Pan or zoom
+  Map->>Bounds: Set active pan bounds
+  Wrapper->>Bounds: Read active bounds
+  Wrapper->>API: Fetch map listings
+  API-->>Wrapper: SearchMapState
+  Wrapper-->>Map: Render marker data

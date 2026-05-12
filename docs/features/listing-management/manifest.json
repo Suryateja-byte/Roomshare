@@ -1,0 +1,96 @@
+{
+  "featureSlug": "listing-management",
+  "status": "complete_with_gaps",
+  "statusDate": "2026-05-11",
+  "sourceOfTruth": "Current dirty worktree source audit on 2026-05-10; runtime and test commands are marked not run unless listed in verification artifacts. Browser gate updates through 2026-05-11 include listing-edit/status/delete coverage passing and the latest create/listing-edit/dedupe Chromium gate passing with 117 passed and 2 skipped.",
+  "primaryArtifacts": [
+    "README.md",
+    "00-feature-boundary.md",
+    "source-map.md",
+    "evidence-register.md",
+    "interaction-census.md",
+    "01-source-map.md",
+    "02-user-flows.md",
+    "03-interaction-census.md",
+    "04-runtime-sequences.md",
+    "05-api-contracts.md",
+    "06-data-model-and-invariants.md",
+    "07-state-management.md",
+    "08-auth-security-permissions.md",
+    "09-errors-empty-loading-edge-cases.md",
+    "10-performance-observability.md",
+    "11-test-traceability-matrix.md",
+    "12-gaps-unknowns-and-questions.md",
+    "verification.json",
+    "runtime-verification.md",
+    "human-review-notes.md",
+    "claims-schema.json",
+    "diagrams/context.mmd",
+    "diagrams/container.mmd",
+    "diagrams/component-listing-management.mmd",
+    "diagrams/sequence-primary-flow.mmd",
+    "diagrams/state-machine-listing-management.mmd"
+  ],
+  "manifestItems": [
+    {
+      "id": "LM-M001",
+      "name": "Create listing page and form",
+      "status": "documented",
+      "evidence": ["LM-E001", "LM-E002", "LM-E003", "LM-E004"]
+    },
+    {
+      "id": "LM-M002",
+      "name": "Create listing API",
+      "status": "documented",
+      "evidence": ["LM-E005", "LM-E006", "LM-E007", "LM-E016", "LM-E017"]
+    },
+    {
+      "id": "LM-M003",
+      "name": "Edit listing page, form, and PATCH API",
+      "status": "documented",
+      "evidence": ["LM-E008", "LM-E009", "LM-E010", "LM-E011", "LM-E012", "LM-E018"]
+    },
+    {
+      "id": "LM-M004",
+      "name": "Delete and delete eligibility",
+      "status": "documented",
+      "evidence": ["LM-E013", "LM-E014"]
+    },
+    {
+      "id": "LM-M005",
+      "name": "Host status server action",
+      "status": "documented",
+      "evidence": ["LM-E015", "LM-E018"]
+    },
+    {
+      "id": "LM-M006",
+      "name": "Tests and runtime verification",
+      "status": "partial",
+      "evidence": ["LM-E019", "LM-E021", "LM-E022", "LM-E023", "LM-E024", "LM-E025", "LM-E026", "LM-E034", "LM-E035", "LM-E036", "LM-E037", "LM-E038", "LM-E039", "LM-E040", "LM-E041", "LM-E042", "LM-E043", "LM-E044", "LM-E045", "LM-E046", "LM-E047", "LM-E048", "LM-E049", "LM-G001", "LM-G002", "LM-G003"]
+    },
+    {
+      "id": "LM-M007",
+      "name": "Schema and migration inventory",
+      "status": "partial",
+      "evidence": ["LM-E017", "LM-E020", "LM-G004"]
+    }
+  ],
+  "claims": [
+    {
+      "id": "LM-C001",
+      "claim": "Create listing is an authenticated host flow with client-side draft/navigation protection and server-side CSRF, rate, auth, suspension, email, profile, validation, geocode, image, collision, idempotency, and side-effect controls.",
+      "evidence": ["LM-E001", "LM-E002", "LM-E003", "LM-E004", "LM-E005", "LM-E006", "LM-E007"]
+    },
+    {
+      "id": "LM-C002",
+      "claim": "Edit/listing update and status changes are owner-scoped and version-checked, with moderation write locks and search/canonical projection updates.",
+      "evidence": ["LM-E008", "LM-E009", "LM-E010", "LM-E011", "LM-E012", "LM-E015", "LM-E018"]
+    },
+    {
+      "id": "LM-C003",
+      "claim": "Delete suppresses reported listings and hard-deletes/tombstones listings without reports after confirmation and ownership checks.",
+      "evidence": ["LM-E013"]
+    }
+  ],
+  "knownGaps": ["LM-G002", "LM-G003", "LM-G004", "LM-G005"]
+}

@@ -550,6 +550,7 @@ function MessagingCta({
   const requiresUnlock =
     contactDisabledReason === "PAYWALL_REQUIRED" &&
     !!paywallSummary?.requiresPurchase;
+  const restrictionCopy = getContactRestrictionCopy(contactDisabledReason);
 
   if (primaryCta === "CONTACT_HOST" && (canContact || requiresUnlock)) {
     return (
@@ -562,6 +563,30 @@ function MessagingCta({
         disabledLabel={disabledLabel}
         className={className}
       />
+    );
+  }
+
+  if (primaryCta === "CONTACT_HOST" && !canContact && restrictionCopy) {
+    return (
+      <div
+        className="space-y-2"
+        data-testid="contact-host-disabled-state"
+      >
+        <ContactHostButton
+          listingId={listingId}
+          unitIdentityEpochObserved={unitIdentityEpochObserved}
+          paywallSummary={paywallSummary}
+          disabled
+          disabledLabel={restrictionCopy.buttonLabel}
+          className={className}
+        />
+        <p
+          className="text-xs text-on-surface-variant"
+          data-testid="contact-host-disabled-copy"
+        >
+          {restrictionCopy.message}
+        </p>
+      </div>
     );
   }
 
@@ -594,6 +619,33 @@ function MessagingCta({
   }
 
   return null;
+}
+
+function getContactRestrictionCopy(reason: ContactDisabledReason | null) {
+  switch (reason) {
+    case "VIEWER_SUSPENDED":
+      return {
+        buttonLabel: "Messaging Unavailable",
+        message: "Your account cannot start new conversations right now.",
+      };
+    case "HOST_SUSPENDED":
+      return {
+        buttonLabel: "Host Not Accepting Messages",
+        message: "This host is not accepting new conversations right now.",
+      };
+    case "VIEWER_BLOCKED_HOST":
+      return {
+        buttonLabel: "Unblock Host to Contact",
+        message: "Remove your block to start a new conversation with this host.",
+      };
+    case "HOST_BLOCKED_VIEWER":
+      return {
+        buttonLabel: "Contact Unavailable",
+        message: "Messaging is unavailable for this listing right now.",
+      };
+    default:
+      return null;
+  }
 }
 
 export default function ListingPageClient({
@@ -632,7 +684,7 @@ export default function ListingPageClient({
     sessionStatus === "authenticated"
       ? !!session?.user?.emailVerified
       : resolvedIsLoggedIn;
-  const viewerReady = isOwner || sessionStatus !== "loading";
+  const viewerReady = isOwner || resolvedIsLoggedIn || sessionStatus !== "loading";
   const canRenderGuestControls = viewerReady && !resolvedIsOwner;
   const [viewerState, setViewerState] = useState<ViewerState>(
     buildFallbackViewerState({
@@ -964,7 +1016,7 @@ export default function ListingPageClient({
       return;
     }
 
-    if (sessionStatus === "loading") {
+    if (sessionStatus === "loading" && !resolvedIsLoggedIn) {
       return;
     }
 

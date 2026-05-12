@@ -1,11 +1,20 @@
 import type { ReactNode } from "react";
 import "@testing-library/jest-dom";
-import { render, screen, waitFor, act, cleanup } from "@testing-library/react";
+import {
+  render,
+  screen,
+  waitFor,
+  act,
+  cleanup,
+  fireEvent,
+} from "@testing-library/react";
 
 const mockPush = jest.fn();
 const mockSendMessage = jest.fn();
 const mockCreateChatChannel = jest.fn();
+const mockTrackPresence = jest.fn();
 const mockSafeRemoveChannel = jest.fn();
+let mockSupabaseClient: unknown = null;
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -58,10 +67,12 @@ jest.mock("@/hooks/useNetworkStatus", () => ({
 }));
 
 jest.mock("@/lib/supabase", () => ({
-  supabase: null,
+  get supabase() {
+    return mockSupabaseClient;
+  },
   createChatChannel: (...args: unknown[]) => mockCreateChatChannel(...args),
   broadcastTyping: jest.fn(),
-  trackPresence: jest.fn(),
+  trackPresence: (...args: unknown[]) => mockTrackPresence(...args),
   safeRemoveChannel: (...args: unknown[]) => mockSafeRemoveChannel(...args),
 }));
 
@@ -172,6 +183,7 @@ jest.mock("@/components/ui/alert-dialog", () => ({
 }));
 
 import ChatWindow from "@/app/messages/[id]/ChatWindow";
+import { toast } from "sonner";
 
 type MockMessage = {
   id: string;
@@ -224,6 +236,7 @@ describe("Route ChatWindow", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    mockSupabaseClient = null;
     fetchMock.mockReset();
     global.fetch = fetchMock as unknown as typeof fetch;
     sessionStorage.clear();
@@ -356,6 +369,115 @@ describe("Route ChatWindow", () => {
     expect(screen.getAllByTestId("message-bubble")).toHaveLength(2);
   });
 
+  it("subscribes to realtime inserts, guards conversation id, and marks inbound messages as read", async () => {
+    mockSupabaseClient = {};
+    let realtimeInsertHandler:
+      | ((payload: { new: MockMessage & { conversationId: string } }) => void)
+      | undefined;
+    let channel: any;
+    channel = {
+      on: jest.fn(
+        (
+          event: string,
+          filter: Record<string, unknown>,
+          callback: (payload: {
+            new: MockMessage & { conversationId: string };
+          }) => void
+        ) => {
+          if (event === "postgres_changes") {
+            realtimeInsertHandler = callback;
+          }
+          return channel;
+        }
+      ),
+      presenceState: jest.fn(() => ({})),
+      subscribe: jest.fn((callback: (status: string) => void) => {
+        callback("SUBSCRIBED");
+        return channel;
+      }),
+    };
+    mockCreateChatChannel.mockReturnValue(channel);
+
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url === "/api/messages") {
+        return createJsonResponse({ success: true, count: 1 });
+      }
+      if (url.includes("/api/messages?")) {
+        return createJsonResponse({ messages: [], hasNewMessages: false });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    render(
+      <ChatWindow
+        canLeavePrivateFeedback={false}
+        initialMessages={[]}
+        conversationId="conv-123"
+        currentUserId="user-123"
+        currentUserName="Current User"
+        listingId="listing-1"
+        listingOwnerId="owner-1"
+        listingTitle="Listing One"
+        otherUserId="other-user"
+        otherUserName="Other User"
+        otherUserImage={null}
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockCreateChatChannel).toHaveBeenCalledWith("conv-123");
+      expect(channel.on).toHaveBeenCalledWith(
+        "postgres_changes",
+        expect.objectContaining({
+          event: "INSERT",
+          schema: "public",
+          table: "Message",
+          filter: "conversationId=eq.conv-123",
+        }),
+        expect.any(Function)
+      );
+      expect(mockTrackPresence).toHaveBeenCalledWith(
+        channel,
+        "user-123",
+        "Current User"
+      );
+    });
+
+    await act(async () => {
+      realtimeInsertHandler?.({
+        new: {
+          ...buildMessage("rt-other", "other-user", "Wrong conversation"),
+          conversationId: "other-conversation",
+        },
+      });
+    });
+    expect(screen.queryByText("Wrong conversation")).not.toBeInTheDocument();
+
+    await act(async () => {
+      realtimeInsertHandler?.({
+        new: {
+          ...buildMessage("rt-1", "other-user", "Realtime hello"),
+          conversationId: "conv-123",
+        },
+      });
+    });
+
+    expect(await screen.findByText("Realtime hello")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/messages",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            action: "markRead",
+            conversationId: "conv-123",
+          }),
+        })
+      );
+    });
+  });
+
   it("aborts in-flight polling on unmount without logging a polling error", async () => {
     const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
 
@@ -451,5 +573,118 @@ describe("Route ChatWindow", () => {
     backButton.click();
 
     expect(mockPush).toHaveBeenCalledWith("/messages");
+  });
+
+  it("uses the shared 1000-character thread composer cap", async () => {
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes("/api/messages?")) {
+        return createJsonResponse({ messages: [], hasNewMessages: false });
+      }
+      return createJsonResponse({ success: true, count: 0 });
+    });
+
+    render(
+      <ChatWindow
+        canLeavePrivateFeedback={false}
+        initialMessages={[]}
+        conversationId="conv-123"
+        currentUserId="user-123"
+        currentUserName="Current User"
+        listingId="listing-1"
+        listingOwnerId="owner-1"
+        listingTitle="Listing One"
+        otherUserId="other-user"
+        otherUserName="Other User"
+        otherUserImage={null}
+      />
+    );
+
+    const input = await screen.findByTestId("message-input");
+    expect(input).toHaveAttribute("maxlength", "1000");
+
+    fireEvent.change(input, { target: { value: "x".repeat(1000) } });
+
+    expect(screen.getByTestId("character-counter")).toHaveTextContent(
+      "1000/1000"
+    );
+  });
+
+  it("sends a 1000-character thread message", async () => {
+    const content = "x".repeat(1000);
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes("/api/messages?")) {
+        return createJsonResponse({ messages: [], hasNewMessages: false });
+      }
+      return createJsonResponse({ success: true, count: 0 });
+    });
+    mockSendMessage.mockResolvedValue({
+      id: "msg-sent",
+      content,
+      senderId: "user-123",
+      conversationId: "conv-123",
+      createdAt: new Date(),
+    });
+
+    render(
+      <ChatWindow
+        canLeavePrivateFeedback={false}
+        initialMessages={[]}
+        conversationId="conv-123"
+        currentUserId="user-123"
+        currentUserName="Current User"
+        listingId="listing-1"
+        listingOwnerId="owner-1"
+        listingTitle="Listing One"
+        otherUserId="other-user"
+        otherUserName="Other User"
+        otherUserImage={null}
+      />
+    );
+
+    fireEvent.change(await screen.findByTestId("message-input"), {
+      target: { value: content },
+    });
+    fireEvent.click(screen.getByTestId("send-button"));
+
+    expect(mockSendMessage).toHaveBeenCalledWith("conv-123", content);
+  });
+
+  it("rejects a 1001-character thread message before send", async () => {
+    const content = "x".repeat(1001);
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes("/api/messages?")) {
+        return createJsonResponse({ messages: [], hasNewMessages: false });
+      }
+      return createJsonResponse({ success: true, count: 0 });
+    });
+
+    render(
+      <ChatWindow
+        canLeavePrivateFeedback={false}
+        initialMessages={[]}
+        conversationId="conv-123"
+        currentUserId="user-123"
+        currentUserName="Current User"
+        listingId="listing-1"
+        listingOwnerId="owner-1"
+        listingTitle="Listing One"
+        otherUserId="other-user"
+        otherUserName="Other User"
+        otherUserImage={null}
+      />
+    );
+
+    fireEvent.change(await screen.findByTestId("message-input"), {
+      target: { value: content },
+    });
+    fireEvent.click(screen.getByTestId("send-button"));
+
+    expect(mockSendMessage).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith("Message too long", {
+      description: "Maximum 1000 characters allowed.",
+    });
   });
 });

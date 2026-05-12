@@ -1,0 +1,12 @@
+%% Evidence: MRA-E015, MRA-E006, MRA-E007, MRA-E008, MRA-E009, MRA-E012, MRA-E014
+stateDiagram-v2
+  [*] --> ReportOpen: Report created
+  ReportOpen --> ReportResolved: Resolve
+  ReportOpen --> ReportDismissed: Dismiss
+  ReportOpen --> ListingSuppressed: Resolve and suppress listing
+  ListingSuppressed --> ListingUnsuppressed: Unsuppress listing
+  ListingActive --> ListingAdminPaused: Admin pauses
+  ListingAdminPaused --> ListingUnsuppressed: Unsuppress if moderation locked
+  VerificationPending --> VerificationApproved: Approve
+  VerificationPending --> VerificationRejected: Reject
+  VerificationRejected --> VerificationPending: User resubmits after cooldown

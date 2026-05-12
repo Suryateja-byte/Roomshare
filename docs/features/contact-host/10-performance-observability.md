@@ -24,7 +24,7 @@ Status: source-backed performance and observability inventory; runtime persisten
 | Paywall telemetry | Contact paywall paths record or branch on entitlement/contact state. | CH-E010 | Full webhook/fulfillment telemetry not inspected |
 | Outbound content flags | Message send scans and records soft flags before persistence. | CH-E013 | Flag review flow not documented here |
 | Notifications | Internal notification rows are created after message persistence. | CH-E014 | Runtime row creation not executed |
-| Email | Preference-aware email send calls are made for new messages. | CH-E014 | Delivery not verified |
+| Email | Preference-aware email send calls are made for new messages, existing tests verify mocked invocation/provider-client failure modes, and CH-E072 proves the current Contact Host `newMessage` payload cannot render the real template locally. | CH-E014, CH-E072 | Real delivery not verified; template payload mismatch blocks local runtime close |
 | Realtime fallback | Client code switches from realtime to polling on failure states. | `phase-4/01-ui-interaction-census.md` | Supabase runtime not verified |
 
 ## Performance Gaps

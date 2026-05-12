@@ -1,0 +1,80 @@
+# Search / Map / Listing Discovery
+
+Status: evidence-backed draft from the current dirty documentation worktree,
+with post-merge fixed-code verification against `origin/main` at
+`89ad33ea58391452b03a2ff5c3a219503769edaa`. Runtime browser behavior was
+attempted in Phase 10; local Postgres is now available and the narrow smoke,
+filter/URL, sort/load-more pagination, desktop map, results-state, URL-state,
+anonymous/authenticated saved-listing, mobile map/list, search
+error-resilience, and map error/a11y specs now pass. A focused API/unit Jest
+command for favorites, map listings, search facets, search V2, map payload
+sanitization, and search params also passes. The full search release-gate
+command also passes. The original real search/map public-payload PII scan
+failed, but the P0 public payload fix now passes a real captured payload scan
+for `/api/search/v2`, `/api/search/listings`, `/api/map-listings`, and
+`/api/listings`; PR #119 is merged to `main` and all final PR checks pass.
+V1-only map API mock cases and non-gate broader E2E coverage are still not
+runtime-verified. See `runtime-verification.md` and
+`public-payload-pii-triage.md`.
+
+## Purpose
+
+This feature lets users discover listings from `/search`, using URL-backed search params, server-rendered result data, client-side filter/sort/pagination controls, a persistent map, listing cards, saved listings, and the saved-search entry point. Evidence: `evidence-register.md` C001, C003, C013, C017, C018; `phase-4/02-api-data-flow.md` saved-search row.
+
+## Current implementation summary
+
+`/search` is the main SSR entry point. It parses URL params, applies a server-side rate limit, runs the V2 search path first, and falls back to legacy listing data when needed. Evidence: `src/app/search/page.tsx`:L242-L623; `evidence-register.md` C001, C005, C006.
+
+The map is hosted by the `/search` layout and persistent map wrapper. The wrapper can use V2 map data or independently fetch `/api/map-listings`; the map component renders clusters, markers, selected listing previews, empty state, and error handling. Evidence: `src/app/search/layout.tsx`:L46-L93; `src/components/PersistentMapWrapper.tsx`:L4-L17, L365-L430; `src/components/Map.tsx`:L3876-L4573; `evidence-register.md` C013-C015.
+
+Search cards link to listing detail pages and include favorite and show-on-map actions. A direct contact-host action was not verified on search cards in this pass. Evidence: `src/components/listings/ListingCard.tsx`:L349-L352, L471-L499; `evidence-register.md` C017, C029.
+
+## Main entry points
+
+| Area | Entry point | Evidence |
+|---|---|---|
+| Route | `/search` via `src/app/search/page.tsx` | `evidence-register.md` C001 |
+| Layout | `src/app/search/layout.tsx` | `evidence-register.md` C013 |
+| Results client | `src/components/search/SearchResultsClient.tsx` | `phase-4/03-state-model.md` result-list row |
+| Search form | `src/components/SearchForm.tsx` | `phase-4/01-ui-interaction-census.md` location/filter rows |
+| Map wrapper | `src/components/PersistentMapWrapper.tsx` | `evidence-register.md` C014 |
+| Map | `src/components/Map.tsx` | `evidence-register.md` C015 |
+| Listing card | `src/components/listings/ListingCard.tsx` | `evidence-register.md` C017 |
+| APIs | `/api/search/v2`, `/api/search/listings`, `/api/search/facets`, `/api/map-listings`, `/api/geocoding/autocomplete`, `/api/favorites` | `phase-4/02-api-data-flow.md` |
+
+## Source of truth
+
+Committed search state is URL-first: raw URL params are parsed by `parseSearchParams`, producing normalized filters, sort, page, bounds, and bounds-required flags. Client components keep local pending or transient state for form fields, modal drafts, map viewport, selected listing, load-more cursor, and optimistic saved state. Evidence: `src/lib/search-params.ts`:L4-L47, L790-L906; `phase-4/03-state-model.md`.
+
+## Key invariants
+
+| Invariant | Evidence | Status |
+|---|---|---|
+| URL params are the canonical committed search input. | `evidence-register.md` C003 | Verified by code |
+| Text searches without usable bounds can enter a bounds-required state instead of scanning everything. | `evidence-register.md` C004, C011 | Verified by code |
+| V2/search-doc is primary, with legacy fallback paths still present. | `evidence-register.md` C006, C009 | Verified by code |
+| Public search/map APIs are rate-limited. | `phase-4/04-auth-security-permissions.md` | Verified by code |
+| Saved listing mutation requires auth on POST. | `evidence-register.md` C018-C019 | Verified by code |
+| Runtime behavior and test status must be scoped to checks that actually ran. | `unknowns.md` G001-G002; `runtime-verification.md` | Smoke/filter/pagination/desktop map/results-state/URL-state/saved-listing/mobile-map/error-resilience/map-error-a11y, focused API/unit Jest, release gate, and real captured public-payload PII scan passed; non-gate broader E2E remains unverified |
+
+## Quick links
+
+- [Feature boundary](./00-feature-boundary.md)
+- [Source map](./01-source-map.md)
+- [User flows](./02-user-flows.md)
+- [Interaction census](./03-interaction-census.md)
+- [Runtime sequences](./04-runtime-sequences.md)
+- [API contracts](./05-api-contracts.md)
+- [Data model and invariants](./06-data-model-and-invariants.md)
+- [State management](./07-state-management.md)
+- [URL/search-param reference](./13-url-search-param-reference.md)
+- [Auth/security/permissions](./08-auth-security-permissions.md)
+- [Errors, empty, loading, edge cases](./09-errors-empty-loading-edge-cases.md)
+- [Performance and observability](./10-performance-observability.md)
+- [Test traceability matrix](./11-test-traceability-matrix.md)
+- [Gaps and unknowns](./12-gaps-unknowns-and-questions.md)
+- [Runtime verification](./runtime-verification.md)
+- [Round-trip reconstruction review](./round-trip-review.md)
+- [Public payload PII triage](./public-payload-pii-triage.md)
+- [Evidence register](./evidence-register.md)
+- [Manifest](./manifest.json)

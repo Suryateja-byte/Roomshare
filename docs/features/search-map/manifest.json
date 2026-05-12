@@ -1,0 +1,877 @@
+{
+  "feature": "search-map-listing-discovery",
+  "sourceOfTruth": "current dirty worktree as of Phase 1/2 discovery",
+  "entryPoints": [
+    {
+      "path": "src/app/search/page.tsx",
+      "symbols": ["SearchPage", "generateMetadata"],
+      "responsibility": "Primary /search SSR entry point; parses URL params, applies rate limiting, runs V2 search with legacy fallback, and renders the list shell.",
+      "evidence": "L158-L162, L242-L271, L390-L452, L507-L623",
+      "confidence": "Verified"
+    },
+    {
+      "path": "src/app/search/layout.tsx",
+      "symbols": ["SearchLayout"],
+      "responsibility": "Persistent /search layout; wires search header, map/list split, map state providers, focus state, V2 map data provider, and mobile search provider.",
+      "evidence": "L2-L13, L24-L41, L46-L93",
+      "confidence": "Verified"
+    },
+    {
+      "path": "src/components/SearchHeaderWrapper.tsx",
+      "symbols": ["SearchHeaderWrapper"],
+      "responsibility": "Search header wrapper used by the /search layout.",
+      "evidence": "src/app/search/layout.tsx:L2-L13, L75-L78",
+      "confidence": "Partially verified"
+    },
+    {
+      "path": "src/components/SearchForm.tsx",
+      "symbols": ["SearchForm", "MAP_FLY_TO_EVENT"],
+      "responsibility": "Location/search form; reads URL params, handles selected location state, emits map fly-to events, and passes bounds-required state to filters.",
+      "evidence": "L161-L182, L238-L256, L386-L430, L1469-L1498, L1582",
+      "confidence": "Verified"
+    },
+    {
+      "path": "src/components/PersistentMapWrapper.tsx",
+      "symbols": ["PersistentMapWrapper"],
+      "responsibility": "Persistent client map wrapper; lazy-loads the map bundle and fetches map data independently through /api/map-listings.",
+      "evidence": "L4-L17, L66-L75, L200-L205, L365-L430",
+      "confidence": "Verified"
+    },
+    {
+      "path": "src/components/search/SearchResultsClient.tsx",
+      "symbols": ["SearchResultsClient"],
+      "responsibility": "Client list controller for initial SSR listings, client-side refresh/load-more behavior, map data handoff, empty/location-required states, and card rendering.",
+      "evidence": "L122-L180, L300-L575, L1000-L1295",
+      "confidence": "Verified"
+    }
+  ],
+  "routes": [
+    {
+      "route": "/search",
+      "path": "src/app/search/page.tsx",
+      "kind": "Next.js App Router page",
+      "evidence": "L242-L623",
+      "confidence": "Verified"
+    },
+    {
+      "route": "/search",
+      "path": "src/app/search/layout.tsx",
+      "kind": "Next.js App Router layout",
+      "evidence": "L46-L93",
+      "confidence": "Verified"
+    },
+    {
+      "route": "/search/loading",
+      "path": "src/app/search/loading.tsx",
+      "kind": "Route loading UI",
+      "evidence": "L1-L3",
+      "confidence": "Verified"
+    },
+    {
+      "route": "/search/error",
+      "path": "src/app/search/error.tsx",
+      "kind": "Route error UI",
+      "evidence": "L9-L58",
+      "confidence": "Verified"
+    },
+    {
+      "route": "/listings/[id]",
+      "path": "src/components/listings/ListingCard.tsx",
+      "kind": "Search card detail-link target",
+      "evidence": "L349-L352, L492-L499",
+      "confidence": "Verified"
+    }
+  ],
+  "serverComponents": [
+    {
+      "path": "src/app/search/page.tsx",
+      "symbols": ["SearchPage", "renderLocationRequiredState", "renderRateLimitedState", "generateMetadata"],
+      "responsibility": "SSR search result orchestration and fallback states.",
+      "evidence": "L91-L117, L158-L162, L242-L623",
+      "confidence": "Verified"
+    },
+    {
+      "path": "src/app/search/layout.tsx",
+      "symbols": ["SearchLayout"],
+      "responsibility": "Server layout that hosts client providers and persistent map/list regions.",
+      "evidence": "L46-L93",
+      "confidence": "Verified"
+    },
+    {
+      "path": "src/app/search/loading.tsx",
+      "symbols": ["Loading"],
+      "responsibility": "Search route loading skeleton.",
+      "evidence": "L1-L3",
+      "confidence": "Verified"
+    },
+    {
+      "path": "src/app/search/error.tsx",
+      "symbols": ["SearchError"],
+      "responsibility": "Search route error boundary UI with retry affordance.",
+      "evidence": "L9-L58",
+      "confidence": "Verified"
+    }
+  ],
+  "clientComponents": [
+    {
+      "path": "src/components/Map.tsx",
+      "symbols": ["Map", "MapMarkerItem", "MarkerPinContent"],
+      "responsibility": "Interactive map, clustering, markers, bounds fitting, selected listing previews, map controls, error and empty overlays.",
+      "evidence": "L4-L9, L248-L266, L331-L368, L667-L786, L804-L917, L1210-L1257, L3876-L4573",
+      "confidence": "Verified"
+    },
+    {
+      "path": "src/components/PersistentMapWrapper.tsx",
+      "symbols": ["PersistentMapWrapper", "getMapRelevantParams", "v2MapDataToListings"],
+      "responsibility": "Persistent map data and rendering wrapper.",
+      "evidence": "L4-L17, L66-L75, L95-L155, L200-L205, L365-L430",
+      "confidence": "Verified"
+    },
+    {
+      "path": "src/components/search/SearchResultsClient.tsx",
+      "symbols": ["SearchResultsClient"],
+      "responsibility": "Client search results list, load-more, refresh, empty state, and listing card rendering.",
+      "evidence": "L122-L180, L300-L575, L1000-L1295",
+      "confidence": "Verified"
+    },
+    {
+      "path": "src/components/SearchForm.tsx",
+      "symbols": ["SearchForm"],
+      "responsibility": "Header search form and location/filter interaction entry point.",
+      "evidence": "L161-L182, L238-L256, L386-L430, L1469-L1498, L1582",
+      "confidence": "Verified"
+    },
+    {
+      "path": "src/components/LocationSearchInput.tsx",
+      "symbols": ["LocationSearchInput"],
+      "responsibility": "Autocomplete input that calls /api/geocoding/autocomplete and emits location selections.",
+      "evidence": "L173-L236, L342-L405, L480-L501, L623, L752-L943",
+      "confidence": "Verified"
+    },
+    {
+      "path": "src/components/SortSelect.tsx",
+      "symbols": ["SortSelect"],
+      "responsibility": "Sort selector that writes normalized sort changes into the URL query.",
+      "evidence": "L24-L36, L41-L76, L97-L125",
+      "confidence": "Verified"
+    },
+    {
+      "path": "src/components/search/InlineFilterStrip.tsx",
+      "symbols": ["InlineFilterStrip"],
+      "responsibility": "Inline filter controls rendered by /search.",
+      "evidence": "src/app/search/page.tsx:L332-L355, L590-L623",
+      "confidence": "Partially verified"
+    },
+    {
+      "path": "src/components/search/SearchResultsToolbar.tsx",
+      "symbols": ["SearchResultsToolbar"],
+      "responsibility": "Search results toolbar rendered above the listing results.",
+      "evidence": "src/app/search/page.tsx:L332-L355, L590-L623",
+      "confidence": "Partially verified"
+    },
+    {
+      "path": "src/components/search/SearchResultsMobileHeading.tsx",
+      "symbols": ["SearchResultsMobileHeading"],
+      "responsibility": "Mobile heading/count state rendered by /search.",
+      "evidence": "src/app/search/page.tsx:L332-L355, L590-L623",
+      "confidence": "Partially verified"
+    },
+    {
+      "path": "src/components/search/V2MapDataSetter.tsx",
+      "symbols": ["V2MapDataSetter"],
+      "responsibility": "Hydrates V2 map data into client context from SSR search data.",
+      "evidence": "src/app/search/page.tsx:L48-L54, L590-L623",
+      "confidence": "Partially verified"
+    },
+    {
+      "path": "src/components/SearchLayoutView.tsx",
+      "symbols": ["SearchLayoutView"],
+      "responsibility": "Client layout view that coordinates map/list presentation.",
+      "evidence": "src/app/search/layout.tsx:L75-L93",
+      "confidence": "Partially verified"
+    },
+    {
+      "path": "src/components/SearchViewToggle.tsx",
+      "symbols": ["SearchViewToggle"],
+      "responsibility": "Desktop/mobile map/list visibility controls.",
+      "evidence": "L120-L136, L207-L219, L243-L317",
+      "confidence": "Verified"
+    },
+    {
+      "path": "src/hooks/useMapPreference.ts",
+      "symbols": ["useMapPreference"],
+      "responsibility": "Canonical map/list preference state; desktop split/list-only and mobile list/map behavior.",
+      "evidence": "L27-L29, L74-L117, L125-L149",
+      "confidence": "Verified"
+    },
+    {
+      "path": "src/components/listings/ListingCard.tsx",
+      "symbols": ["ListingCard"],
+      "responsibility": "Listing result card, detail link, favorite button, hover/focus state, and show-on-map action.",
+      "evidence": "L280-L352, L431-L499",
+      "confidence": "Verified"
+    },
+    {
+      "path": "src/components/FavoriteButton.tsx",
+      "symbols": ["FavoriteButton"],
+      "responsibility": "Optimistic favorite toggle used by search listing cards; redirects unauthorized users to login.",
+      "evidence": "L16-L24, L43-L87, L97-L100",
+      "confidence": "Verified"
+    },
+    {
+      "path": "src/components/SaveSearchButton.tsx",
+      "symbols": ["SaveSearchButton"],
+      "responsibility": "Saved-search action derived from current search params.",
+      "evidence": "L22-L34, L59-L63, L103-L120, L137-L178",
+      "confidence": "Verified"
+    },
+    {
+      "path": "src/components/search/SplitStayCard.tsx",
+      "symbols": ["SplitStayCard"],
+      "responsibility": "Split-stay result card variant with detail links and show-on-map interaction.",
+      "evidence": "L64-L71, L133-L176",
+      "confidence": "Verified"
+    },
+    {
+      "path": "src/components/search/HeaderFilterDrawer.tsx",
+      "symbols": ["HeaderFilterDrawer"],
+      "responsibility": "Untracked dirty-worktree filter drawer component; included because current dirty worktree is source of truth.",
+      "evidence": "file discovery",
+      "confidence": "Partially verified"
+    },
+    {
+      "path": "src/contexts/SearchListResultsContext.tsx",
+      "symbols": ["SearchListResultsProvider", "useSearchListResultIds"],
+      "responsibility": "Untracked dirty-worktree context for list result IDs.",
+      "evidence": "file discovery, src/components/search/SearchResultsClient.tsx:L984",
+      "confidence": "Partially verified"
+    }
+  ],
+  "apiRoutes": [
+    {
+      "route": "/api/search/v2",
+      "path": "src/app/api/search/v2/route.ts",
+      "methods": ["GET"],
+      "responsibility": "V2 search API using executeSearchV2 and Redis-backed rate limiting.",
+      "evidence": "L23-L29, L56-L95, L102-L171, L194",
+      "confidence": "Verified"
+    },
+    {
+      "route": "/api/search/facets",
+      "path": "src/app/api/search/facets/route.ts",
+      "methods": ["GET"],
+      "responsibility": "Facet/filter counts; parses search params, handles bounds-required cases, and returns private no-store responses.",
+      "evidence": "L22-L24, L594-L621, L646-L680, L711-L768",
+      "confidence": "Verified"
+    },
+    {
+      "route": "/api/search/listings",
+      "path": "src/app/api/search/listings/route.ts",
+      "methods": ["GET"],
+      "responsibility": "Client listing refresh/search API with V2 circuit-breaker path and V1 fallback.",
+      "evidence": "L9-L32, L57-L78, L112-L141, L295-L315, L374-L378",
+      "confidence": "Verified"
+    },
+    {
+      "route": "/api/map-listings",
+      "path": "src/app/api/map-listings/route.ts",
+      "methods": ["GET"],
+      "responsibility": "Map listing API; validates/derives bounds, prevents unbounded scans, applies filters, and returns map-safe data.",
+      "evidence": "L9-L25, L57-L61, L111-L117, L230-L277, L317-L364, L390-L411",
+      "confidence": "Verified"
+    },
+    {
+      "route": "/api/geocoding/autocomplete",
+      "path": "src/app/api/geocoding/autocomplete/route.ts",
+      "methods": ["GET"],
+      "responsibility": "Public geocoding autocomplete endpoint with rate limiting and no-store responses.",
+      "evidence": "L14-L18, L26-L36, L118-L165",
+      "confidence": "Verified"
+    },
+    {
+      "route": "/api/favorites",
+      "path": "src/app/api/favorites/route.ts",
+      "methods": ["GET", "POST"],
+      "responsibility": "Saved-listing lookup and toggle used by favorite buttons.",
+      "evidence": "L18-L70, L73-L171",
+      "confidence": "Verified"
+    }
+  ],
+  "dataAccessFunctions": [
+    {
+      "path": "src/app/search/actions.ts",
+      "symbols": ["fetchMoreListings"],
+      "responsibility": "Server action for search pagination/load-more; validates cursor, rate limits, executes V2 search, and returns no cursor support for V1 fallback.",
+      "evidence": "L48-L110, L115-L172, L236-L237, L263-L285",
+      "confidence": "Verified"
+    },
+    {
+      "path": "src/lib/search/search-v2-service.ts",
+      "symbols": ["executeSearchV2"],
+      "responsibility": "Primary V2 search service.",
+      "evidence": "L587",
+      "confidence": "Verified"
+    },
+    {
+      "path": "src/lib/data.ts",
+      "symbols": ["getListingsPaginated", "getMapListings", "getMapListingsResult"],
+      "responsibility": "Legacy listing and map listing data helpers; includes map bounds guard.",
+      "evidence": "L457-L464, L808-L845",
+      "confidence": "Verified"
+    },
+    {
+      "path": "src/lib/search/search-doc-queries.ts",
+      "symbols": ["getSearchDocListingsFirstPage", "getSearchDocMapListings", "getSearchDocLimitedCount", "semanticSearchQuery"],
+      "responsibility": "Search document query path for list results, map markers, counts, pagination cursors, and semantic search.",
+      "evidence": "L1099, L1438, L1955, L2097-L2115, L2155, L2250, L2349-L2384",
+      "confidence": "Verified"
+    },
+    {
+      "path": "src/lib/search/cursor.ts",
+      "symbols": ["encodeKeysetCursor", "decodeKeysetCursor", "buildCursorFromRow"],
+      "responsibility": "Keyset pagination cursor encoding/decoding/building.",
+      "evidence": "L214, L256, L419",
+      "confidence": "Verified"
+    },
+    {
+      "path": "src/lib/search/search-response.ts",
+      "symbols": ["createSearchResponseMeta", "getSearchQueryHash"],
+      "responsibility": "Search response metadata and query-hash helpers.",
+      "evidence": "L54-L67",
+      "confidence": "Verified"
+    },
+    {
+      "path": "src/lib/maps/sanitize-map-listings.ts",
+      "symbols": ["sanitizeMapListing", "sanitizeMapListings"],
+      "responsibility": "Sanitizes map-listing payloads before public API response.",
+      "evidence": "L87, L164",
+      "confidence": "Verified"
+    },
+    {
+      "path": "src/lib/search/public-coordinates.ts",
+      "symbols": ["toPublicCoordinates"],
+      "responsibility": "Public coordinate transformation/privacy helper.",
+      "evidence": "L11",
+      "confidence": "Verified"
+    },
+    {
+      "path": "src/lib/search/location-bounds.ts",
+      "symbols": ["deriveSearchBoundsFromPoint", "boundsTupleToObject"],
+      "responsibility": "Derives bounds from a search point and normalizes bound tuples.",
+      "evidence": "L17-L32",
+      "confidence": "Verified"
+    }
+  ],
+  "searchParamParsers": [
+    {
+      "path": "src/lib/search-params.ts",
+      "symbols": ["parseSearchParams", "normalizeSearchFilters", "buildRawParamsFromSearchParams", "buildCanonicalFilterParamsFromSearchParams", "isBoundsRequired", "normalizeSortOption"],
+      "responsibility": "Canonical URL-to-filter parsing and normalization for search.",
+      "evidence": "L4-L47, L54-L80, L110-L168, L207-L283, L534-L538, L582, L790-L906, L1021-L1024",
+      "confidence": "Verified"
+    },
+    {
+      "path": "src/lib/search/search-query.ts",
+      "symbols": ["applySearchQueryChange"],
+      "responsibility": "Applies query changes used by sort/filter controls.",
+      "evidence": "src/components/SortSelect.tsx:L61-L76",
+      "confidence": "Partially verified"
+    },
+    {
+      "path": "src/lib/search/search-spec.ts",
+      "symbols": ["search spec helpers"],
+      "responsibility": "Search specification helper layer used by saved-search/canonical query flows.",
+      "evidence": "file discovery",
+      "confidence": "Partially verified"
+    },
+    {
+      "path": "src/lib/search/saved-search-parser.ts",
+      "symbols": ["saved search parser helpers"],
+      "responsibility": "Saved-search parser support.",
+      "evidence": "file discovery",
+      "confidence": "Partially verified"
+    },
+    {
+      "path": "src/lib/search/saved-search-canonical.ts",
+      "symbols": ["saved search canonical helpers"],
+      "responsibility": "Canonical saved-search representation.",
+      "evidence": "file discovery",
+      "confidence": "Partially verified"
+    }
+  ],
+  "databaseModels": [
+    {
+      "model": "User",
+      "path": "prisma/schema.prisma",
+      "responsibility": "User relationship owner for saved listings and saved searches.",
+      "evidence": "L42-L74",
+      "confidence": "Verified"
+    },
+    {
+      "model": "Listing",
+      "path": "prisma/schema.prisma",
+      "responsibility": "Primary listing record with location and saved-listing relations plus search-relevant indexes.",
+      "evidence": "L107-L156",
+      "confidence": "Verified"
+    },
+    {
+      "model": "SavedListing",
+      "path": "prisma/schema.prisma",
+      "responsibility": "Saved/favorited listing join model.",
+      "evidence": "L159-L168",
+      "confidence": "Verified"
+    },
+    {
+      "model": "Location",
+      "path": "prisma/schema.prisma",
+      "responsibility": "Geospatial location model with GiST coordinate index.",
+      "evidence": "L237-L247",
+      "confidence": "Verified"
+    },
+    {
+      "model": "SavedSearch",
+      "path": "prisma/schema.prisma",
+      "responsibility": "Persisted saved-search specification and hash model.",
+      "evidence": "L397-L420",
+      "confidence": "Verified"
+    },
+    {
+      "model": "InventorySearchProjection",
+      "path": "prisma/schema.prisma",
+      "responsibility": "Projection table used by search/inventory search paths.",
+      "evidence": "L1106-L1136",
+      "confidence": "Verified"
+    },
+    {
+      "model": "SemanticInventoryProjection",
+      "path": "prisma/schema.prisma",
+      "responsibility": "Semantic search projection with vector/index support.",
+      "evidence": "L1183-L1186",
+      "confidence": "Verified"
+    },
+    {
+      "model": "QuerySnapshot",
+      "path": "prisma/schema.prisma",
+      "responsibility": "Search query snapshot/cache support.",
+      "evidence": "L1207-L1211",
+      "confidence": "Verified"
+    },
+    {
+      "model": "HostContactChannels",
+      "path": "prisma/schema.prisma",
+      "responsibility": "Adjacent contact-host support model; direct search-card contact entry point was not verified in Phase 1/2.",
+      "evidence": "L908-L909",
+      "confidence": "Partially verified"
+    }
+  ],
+  "migrations": [
+    "prisma/migrations/20260110000000_search_doc",
+    "prisma/migrations/20260116000000_search_doc_fts",
+    "prisma/migrations/20260121000000_search_doc_lower_indexes",
+    "prisma/migrations/20260131000000_search_doc_composite_indexes",
+    "prisma/migrations/20260208000000_search_doc_gender_columns",
+    "prisma/migrations/20260221000000_search_doc_price_decimal",
+    "prisma/migrations/20260314000000_add_pgvector_semantic_search",
+    "prisma/migrations/20260314100000_update_get_similar_listings",
+    "prisma/migrations/20260314200000_fix_semantic_price_cast",
+    "prisma/migrations/20260414000000_add_listing_day_inventory",
+    "prisma/migrations/20260415000000_add_contact_first_listing_fields",
+    "prisma/migrations/20260416000000_add_search_doc_projection_version",
+    "prisma/migrations/20260501020000_phase01_add_listing_physical_unit_id",
+    "prisma/migrations/20260502000000_phase02_projection_tables",
+    "prisma/migrations/20260502010000_phase02_physical_units_geocode_columns",
+    "prisma/migrations/20260502020000_phase02_listing_inventories_publish_status_check",
+    "prisma/migrations/20260503000000_phase03_semantic_projection",
+    "prisma/migrations/20260503010000_phase03_semantic_projection_hnsw",
+    "prisma/migrations/20260504000000_phase04_projection_search_snapshots",
+    "prisma/migrations/20260507000000_phase07_saved_search_alerts",
+    "prisma/migrations/20260510000000_backfill_search_doc_booking_mode",
+    "prisma/migrations/20260515030000_fix_semantic_score_casts"
+  ],
+  "tests": [
+    {
+      "area": "Package test commands",
+      "paths": ["package.json"],
+      "commands": [
+        "pnpm test",
+        "pnpm test:api",
+        "pnpm test:components",
+        "pnpm test:e2e:chromium",
+        "pnpm test:e2e:mobile",
+        "pnpm run test:e2e:search-release-gate",
+        "pnpm scan:public-payload-pii"
+      ],
+      "evidence": "package.json scripts discovered in Phase 4",
+      "status": "Partially run: focused `pnpm test -- ...` Jest command passed for selected API/unit files; `pnpm scan:public-payload-pii` still requires explicit payload JSON when run bare; direct scanner fixture commands behaved as expected; original real search/map payload scan failed; after the P0 privacy fix, real captured `/api/search/v2`, `/api/search/listings`, `/api/map-listings`, and `/api/listings` payloads scanned cleanly; `pnpm run typecheck` and `pnpm run test:e2e:search-release-gate` passed locally; PR #119 is merged to `main` and final GitHub Actions checks passed for public payload PII scan, search release gates, all E2E shards, Stability E2E, Unit/API/Component/Type/Lint/Build, Search Smoke, Lighthouse, Vercel, and related search/filter checks; other package scripts not run locally"
+    },
+    {
+      "area": "Search route and server action tests",
+      "paths": [
+        "src/__tests__/app/search/actions.test.ts",
+        "src/__tests__/app/search/layout.test.tsx"
+      ],
+      "evidence": "Phase 4 test discovery; focused Jest command in runtime-verification.md",
+      "status": "Partially passed: search V2 route, facets route, map-listings route/helper, and favorites GET/POST tests passed; search-count and search-telemetry not run"
+    },
+    {
+      "area": "Search API route tests",
+      "paths": [
+        "src/__tests__/api/search/v2/route.test.ts",
+        "src/__tests__/api/search/facets/route.test.ts",
+        "src/__tests__/api/search-count.test.ts",
+        "src/__tests__/api/search-telemetry.test.ts",
+        "src/__tests__/api/map-listings-route.test.ts",
+        "src/__tests__/api/map-listings.test.ts",
+        "src/__tests__/api/favorites-get.test.ts",
+        "src/__tests__/api/favorites.test.ts"
+      ],
+      "evidence": "Phase 4 test discovery; focused Jest command in runtime-verification.md",
+      "status": "Partially passed: sanitize-map-listings test passed; map component/wrapper/adapter/marker tests not run"
+    },
+    {
+      "area": "Search component tests",
+      "paths": [
+        "src/__tests__/components/SearchForm.test.tsx",
+        "src/__tests__/components/SearchViewToggle.test.tsx",
+        "src/__tests__/components/FavoriteButton.test.tsx",
+        "src/__tests__/components/SaveSearchButton.test.tsx",
+        "src/__tests__/components/LocationSearchInput/LocationSearchInput.api-errors.test.tsx",
+        "src/__tests__/components/LocationSearchInput/LocationSearchInput.ime.test.tsx",
+        "src/__tests__/components/LocationSearchInput/LocationSearchInput.integration.test.tsx",
+        "src/__tests__/components/LocationSearchInput/LocationSearchInput.keyboard.test.tsx",
+        "src/__tests__/components/LocationSearchInput/LocationSearchInput.sanitization.test.tsx",
+        "src/__tests__/components/search/DesktopHeaderSearch.test.tsx",
+        "src/__tests__/components/search/DrawerZeroState.test.tsx",
+        "src/__tests__/components/search/FilterModal.test.tsx",
+        "src/__tests__/components/search/FloatingMapButton.test.tsx",
+        "src/__tests__/components/search/InlineFilterStrip.test.tsx",
+        "src/__tests__/components/search/MobileSearchOverlay.test.tsx",
+        "src/__tests__/components/search/SearchResultsClient.test.tsx",
+        "src/__tests__/components/search/SearchResultsClient.public-cache.test.tsx",
+        "src/__tests__/components/search/SearchResultsLoadingWrapper.test.tsx",
+        "src/__tests__/components/search/SearchResultsToolbar.test.tsx",
+        "src/__tests__/components/search/SearchUrlCanonicalizer.test.tsx",
+        "src/__tests__/components/search/SplitStayCard.test.tsx",
+        "src/__tests__/components/search/V1PathResetSetter.test.tsx"
+      ],
+      "evidence": "Phase 4 test discovery; focused Jest command in runtime-verification.md",
+      "status": "Partially passed: search-params test passed; search query/cursor/projection/dedupe/semantic/cache tests not run"
+    },
+    {
+      "area": "Map component and map helper tests",
+      "paths": [
+        "src/__tests__/components/Map.test.tsx",
+        "src/__tests__/components/PersistentMapWrapper.networking.test.tsx",
+        "src/__tests__/components/PersistentMapWrapper.sanitization.test.tsx",
+        "src/__tests__/components/map/DesktopListingPreviewCard.test.tsx",
+        "src/__tests__/components/map/DesktopMapControls.test.tsx",
+        "src/__tests__/components/map/MapEmptyState.test.tsx",
+        "src/__tests__/components/map/MapErrorBoundary.test.tsx",
+        "src/__tests__/components/map/MobileMapStatusCard.test.tsx",
+        "src/__tests__/components/map/MobileMapToolsSheet.test.tsx",
+        "src/__tests__/components/map/POILayer.test.tsx",
+        "src/__tests__/components/map/touch-gestures.test.tsx",
+        "src/__tests__/lib/maps/mapAdapter.test.ts",
+        "src/__tests__/lib/maps/marker-utils.test.ts",
+        "src/__tests__/lib/maps/sanitize-map-listings.test.ts"
+      ],
+      "evidence": "Phase 4 test discovery",
+      "status": "Not run"
+    },
+    {
+      "area": "Search state/context/hook tests",
+      "paths": [
+        "src/__tests__/contexts/MapBoundsContext.test.tsx",
+        "src/__tests__/contexts/MobileSearchContext.test.tsx",
+        "src/__tests__/contexts/SearchMapUIContext.test.tsx",
+        "src/__tests__/contexts/SearchTransitionContext.test.tsx",
+        "src/__tests__/contexts/SearchV2DataContext.test.tsx",
+        "src/__tests__/hooks/useMapPreference.test.ts",
+        "src/__tests__/hooks/useRecentSearches.test.ts"
+      ],
+      "evidence": "Phase 4 test discovery",
+      "status": "Not run"
+    },
+    {
+      "area": "Search parser, query, cursor, projection, dedupe, semantic, and cache tests",
+      "paths": [
+        "src/__tests__/lib/search-params.test.ts",
+        "src/__tests__/lib/search-types.test.ts",
+        "src/__tests__/lib/search-utils.test.ts",
+        "src/__tests__/lib/search/*.test.ts",
+        "src/__tests__/integration/search-doc-dirty-integration.test.ts",
+        "src/__tests__/fixes/cfm-406-list-map-parity.test.ts",
+        "src/__tests__/fixes/cfm-602-map-eligibility.test.ts",
+        "src/__tests__/fixes/v2-map-stale-nearmatches.test.tsx",
+        "src/__tests__/edge-cases/search-filter-edge-cases-v2.test.ts",
+        "src/__tests__/edge-cases/search-filter-edge-cases.test.ts",
+        "src/__tests__/edge-cases/search-filters-edge-cases.test.ts"
+      ],
+      "evidence": "Phase 4 test discovery",
+      "status": "Not run"
+    },
+    {
+      "area": "Saved listing and saved search tests",
+      "paths": [
+        "src/__tests__/actions/saved-listings.test.ts",
+        "src/__tests__/actions/saved-search.test.ts",
+        "src/__tests__/actions/saved-search-reopen.test.ts",
+        "src/__tests__/lib/search-alerts.test.ts",
+        "src/__tests__/lib/search-alerts-telemetry.test.ts",
+        "src/__tests__/lib/payments/search-alert-paywall.test.ts",
+        "src/__tests__/app/saved-searches/error.test.tsx",
+        "src/__tests__/app/saved-searches/SavedSearchList.test.tsx",
+        "tests/e2e/saved/saved-searches.spec.ts",
+        "tests/e2e/session-expiry/session-expiry-favorites.spec.ts"
+      ],
+      "evidence": "Phase 4 test discovery",
+      "status": "Not run"
+    },
+    {
+      "area": "Focused search E2E specs",
+      "paths": [
+        "tests/e2e/search/search-budget-validation.spec.ts",
+        "tests/e2e/search/search-filters.spec.ts",
+        "tests/e2e/search/search-listing-card.spec.ts",
+        "tests/e2e/search/search-location.spec.ts",
+        "tests/e2e/search/search-map-desktop.spec.ts",
+        "tests/e2e/search/search-map-mobile.spec.ts",
+        "tests/e2e/search/search-pagination.spec.ts",
+        "tests/e2e/search/search-results-states.spec.ts",
+        "tests/e2e/search/search-saved-listing.spec.ts",
+        "tests/e2e/search/search-saved-search.spec.ts",
+        "tests/e2e/search/search-security.spec.ts",
+        "tests/e2e/search/search-smoke.spec.ts",
+        "tests/e2e/search/search-url-state.spec.ts"
+      ],
+      "evidence": "Phase 4 test traceability table; Phase 10 runtime-verification.md",
+      "status": "Partially passed: search-smoke, search-filters, search-map-desktop, search-map-mobile, search-pagination, search-results-states, search-saved-listing anonymous/authenticated project paths, and search-url-state passed; budget-validation, listing-card, location, saved-search, and security not run"
+    },
+    {
+      "area": "Additional search, map, URL, accessibility, resilience, and visual E2E specs",
+      "paths": [
+        "tests/e2e/search-p0-smoke.anon.spec.ts",
+        "tests/e2e/search-smoke.spec.ts",
+        "tests/e2e/search-location-warning.anon.spec.ts",
+        "tests/e2e/search-map-list-sync.anon.spec.ts",
+        "tests/e2e/search-error-resilience.anon.spec.ts",
+        "tests/e2e/search-loading-states.spec.ts",
+        "tests/e2e/search-sort-ordering.anon.spec.ts",
+        "tests/e2e/search-url-*.spec.ts",
+        "tests/e2e/search-a11y*.spec.ts",
+        "tests/e2e/map-*.spec.ts",
+        "tests/e2e/mobile-map-tools.anon.spec.ts",
+        "tests/e2e/visual/map-visual.anon.spec.ts",
+        "tests/e2e/performance/search-interaction-perf.spec.ts",
+        "tests/e2e/seo/search-seo-meta.anon.spec.ts"
+      ],
+      "evidence": "Phase 4 test discovery; Phase 10 runtime-verification.md",
+      "status": "Partially passed: search-error-resilience.anon and map-errors-a11y.anon passed with their owning projects; other listed additional specs not run"
+    },
+    {
+      "area": "Search filter E2E suite",
+      "paths": ["tests/e2e/search-filters/*.anon.spec.ts"],
+      "evidence": "Phase 4 test discovery",
+      "status": "Not run"
+    },
+    {
+      "area": "Pagination E2E suite",
+      "paths": ["tests/e2e/pagination/*.spec.ts"],
+      "evidence": "Phase 4 test discovery",
+      "status": "Not run"
+    },
+    {
+      "area": "Semantic search E2E suite",
+      "paths": ["tests/e2e/semantic-search/*.anon.spec.ts"],
+      "evidence": "Phase 4 test discovery",
+      "status": "Not run"
+    },
+    {
+      "area": "Search stability and release-gate E2E suites",
+      "paths": [
+        "tests/e2e/search-stability/*.anon.spec.ts",
+        "tests/e2e/search-release-gate/*.spec.ts",
+        "tests/e2e/search-release-gate/README.md"
+      ],
+      "evidence": "Phase 4 test discovery, package.json release-gate scripts, and Phase 10 runtime-verification.md",
+      "status": "Partially passed: `pnpm run test:e2e:search-release-gate` passed; search-stability suite not run separately"
+    },
+    {
+      "area": "Search journey E2E specs",
+      "paths": [
+        "tests/e2e/journeys/01-discovery-search.spec.ts",
+        "tests/e2e/journeys/02-search-critical-journeys.spec.ts",
+        "tests/e2e/journeys/03-search-advanced-journeys.spec.ts",
+        "tests/e2e/journeys/04-favorites-saved-searches.spec.ts",
+        "tests/e2e/journeys/12-map-error-handling.spec.ts",
+        "tests/e2e/journeys/27-search-refinement.spec.ts",
+        "tests/e2e/journeys/list-map-sync.spec.ts",
+        "tests/e2e/journeys/map-pin-tiering.spec.ts",
+        "tests/e2e/journeys/search-*.spec.ts"
+      ],
+      "evidence": "Phase 4 test discovery",
+      "status": "Not run"
+    },
+    {
+      "area": "Search/list dedupe E2E specs",
+      "paths": [
+        "tests/e2e/dedupe/search-list-*.dedupe.spec.ts",
+        "tests/e2e/dedupe/dedupe-helpers.ts"
+      ],
+      "evidence": "Phase 4 test discovery",
+      "status": "Not run"
+    },
+    {
+      "area": "Search E2E fixtures, helpers, and page objects",
+      "paths": [
+        "tests/e2e/pages/SearchPage.ts",
+        "tests/e2e/pages/MapPanel.ts",
+        "tests/e2e/pages/MobileSearchOverlay.ts",
+        "tests/e2e/pages/SavedSearchModal.ts",
+        "tests/e2e/fixtures/search-data.fixture.ts",
+        "tests/e2e/fixtures/mapbox.fixture.ts",
+        "tests/e2e/helpers/map-mock-helpers.ts",
+        "tests/e2e/helpers/pagination-mock-factory.ts",
+        "tests/e2e/helpers/search-release-gate-helpers.ts",
+        "tests/e2e/utils/seedSearchData.ts"
+      ],
+      "evidence": "Phase 4 test discovery",
+      "status": "Not run"
+    }
+  ],
+  "groupedCoverage": [
+    {
+      "manifestArea": "entryPoints/routes/serverComponents/clientComponents",
+      "coverageDoc": "README.md; 00-feature-boundary.md; 01-source-map.md; 02-user-flows.md; 03-interaction-census.md; 04-runtime-sequences.md; 07-state-management.md",
+      "status": "Documented directly in final docs; partial entries are identified as partially verified instead of asserted as complete."
+    },
+    {
+      "manifestArea": "apiRoutes/dataAccessFunctions/searchParamParsers",
+      "coverageDoc": "05-api-contracts.md; 06-data-model-and-invariants.md; 13-url-search-param-reference.md; phase-4/02-api-data-flow.md",
+      "status": "Main public route contracts now have compact response/cache/error tables; generated schemas and every internal helper permutation remain explicit P2 follow-up coverage rather than final-gate blockers."
+    },
+    {
+      "manifestArea": "databaseModels/migrations",
+      "coverageDoc": "06-data-model-and-invariants.md; evidence-register.md; 12-gaps-unknowns-and-questions.md G010",
+      "status": "Grouped as data-model and migration evidence; booking-related fields are documented only as parser/query/migration data fields, not current booking UX."
+    },
+    {
+      "manifestArea": "tests",
+      "coverageDoc": "11-test-traceability-matrix.md; runtime-verification.md; phase-4/05-test-traceability.md; 12-gaps-unknowns-and-questions.md G001, G002, G011, G012, G013",
+      "status": "Grouped into release-blocking tests and confidence-building inventory. Release-blocking commands have Phase 10/11/12 evidence; broader non-gate families are explicitly listed as confidence-building gaps."
+    },
+    {
+      "manifestArea": "externalServices/environmentVariables",
+      "coverageDoc": "08-auth-security-permissions.md; 10-performance-observability.md; 12-gaps-unknowns-and-questions.md G005",
+      "status": "Provider/env references are documented with the remaining Mapbox/MapLibre/Stadia terminology cleanup kept as a P1 wording/verification gap."
+    },
+    {
+      "manifestArea": "unknowns",
+      "coverageDoc": "unknowns.md; 12-gaps-unknowns-and-questions.md; round-trip-review.md",
+      "status": "Open unknowns are carried forward as P1/P2 gaps; stale Phase 1/2 unknowns were superseded by Phase 10/11/12 runtime evidence where applicable."
+    }
+  ],
+  "externalServices": [
+    {
+      "name": "Stadia Maps / MapLibre style tiles",
+      "evidence": ".env.example:L176-L193, src/lib/maps/stadia.ts:L22-L61, src/lib/csp.ts:L14-L15",
+      "confidence": "Verified"
+    },
+    {
+      "name": "Photon geocoding autocomplete",
+      "evidence": "src/app/api/geocoding/autocomplete/route.ts:L14-L18, L118-L165; .env.example:L110-L111",
+      "confidence": "Verified"
+    },
+    {
+      "name": "Nominatim geocoding fallback/config",
+      "evidence": ".env.example:L110-L111, src/lib/geocoding/nominatim.ts",
+      "confidence": "Partially verified"
+    },
+    {
+      "name": "Mapbox terminology / optional scripts",
+      "evidence": "src/app/search/layout.tsx:L24-L41, .env.example:L196-L200",
+      "confidence": "Contradicted"
+    },
+    {
+      "name": "Redis-backed rate limiting",
+      "evidence": "src/app/api/search/v2/route.ts:L23-L29, src/app/api/search/facets/route.ts:L22-L24, src/app/api/map-listings/route.ts:L15",
+      "confidence": "Verified"
+    }
+  ],
+  "environmentVariables": [
+    {
+      "name": "ENABLE_SEARCH_DOC",
+      "evidence": "src/lib/env.ts:L105-L110, L637-L638, L866-L878",
+      "confidence": "Verified"
+    },
+    {
+      "name": "ENABLE_SEARCH_DOC_RESCAN",
+      "evidence": "src/lib/env.ts:L105-L110",
+      "confidence": "Verified"
+    },
+    {
+      "name": "ENABLE_SEARCH_SNAPSHOT_CONTRACT",
+      "evidence": "src/lib/env.ts:L105-L110",
+      "confidence": "Verified"
+    },
+    {
+      "name": "FEATURE_PUBLIC_AUTOCOMPLETE_CONTRACT",
+      "evidence": "src/lib/env.ts:L136",
+      "confidence": "Verified"
+    },
+    {
+      "name": "FEATURE_SEARCH_LISTING_DEDUP",
+      "evidence": "src/lib/env.ts:L157",
+      "confidence": "Verified"
+    },
+    {
+      "name": "ENABLE_SEMANTIC_SEARCH",
+      "evidence": "src/lib/env.ts:L164, L806-L809, L866-L878",
+      "confidence": "Verified"
+    },
+    {
+      "name": "ENABLE_CLIENT_SIDE_SEARCH",
+      "evidence": "src/lib/env.ts:L166, L803-L804",
+      "confidence": "Verified"
+    },
+    {
+      "name": "ENABLE_SEARCH_TEST_SCENARIOS",
+      "evidence": "src/lib/env.ts:L167",
+      "confidence": "Verified"
+    },
+    {
+      "name": "KILL_SWITCH_DISABLE_SEMANTIC_SEARCH",
+      "evidence": "src/lib/env.ts:L170, L806-L809",
+      "confidence": "Verified"
+    },
+    {
+      "name": "KILL_SWITCH_PAUSE_GEOCODE_PUBLISH",
+      "evidence": "src/lib/env.ts:L174",
+      "confidence": "Verified"
+    },
+    {
+      "name": "SEMANTIC_WEIGHT",
+      "evidence": "src/lib/env.ts:L187",
+      "confidence": "Verified"
+    },
+    {
+      "name": "NEXT_PUBLIC_STADIA_MAPS_API_KEY",
+      "evidence": ".env.example:L176-L193, src/lib/env.ts:L357-L370, L449-L456, L596-L598",
+      "confidence": "Verified"
+    },
+    {
+      "name": "GOOGLE_GEOCODING_API_KEY",
+      "evidence": "src/lib/env.ts:L357-L370, L449-L456, L571-L572",
+      "confidence": "Partially verified"
+    }
+  ],
+  "unknowns": [
+    "Runtime/browser behavior is now verified for the Phase 10/11/12 release-blocking search/map commands, but V1-only map API mock cases and broader non-gate E2E families remain confidence-building gaps.",
+    "Discovered tests are grouped in this manifest; the release-blocking subset and focused API/unit/privacy checks have passing evidence, while broader grouped families are listed as not run.",
+    "Direct contact-host entry point from search cards was not verified; listing cards link to listing detail pages.",
+    "\"Search this area\" appears only in a comment describing a removed deferred flow.",
+    "Map provider terminology is inconsistent: code comments mention Mapbox while env/config evidence points to Stadia Maps / MapLibre for the main app.",
+    "Some search-related files are untracked in the dirty worktree and must be preserved as source-of-truth inputs for later phases.",
+    "Grouped manifest entries are covered by the groupedCoverage table rather than by a generated per-file index; exact per-file inventory generation remains optional P2 follow-up work."
+  ]
+}

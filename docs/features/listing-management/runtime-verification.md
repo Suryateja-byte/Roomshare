@@ -1,0 +1,39 @@
+# Listing Management Runtime Verification
+
+Status: PARTIAL with browser gate green. Focused and broader Jest direct API/security coverage passed on 2026-05-10. Local E2E database readiness was repaired on 2026-05-11. The listing-edit/status/delete coverage gap is closed: the rewritten listing-edit spec passed 10 with 1 retained dev-server redirect skip, the dedicated status/delete spec passed 2/2, and the full listing-edit folder passed 12 with 1 skipped. The latest full create/listing-edit/dedupe Chromium gate now passes with 117 passed and 2 skipped after the LM-G006 dedupe rate-limit isolation fix and expired-draft focused rerun.
+
+| Verification target | Result | Evidence |
+| --- | --- | --- |
+| Browser create listing happy path | PASS/PARTIAL: the representative happy path passes and `create-listing.spec.ts` passed 20/20 after the local-date fix. The latest broad Chromium gate passed; broader component/action tests remain separate inventory. | LM-E034, LM-E039, LM-E040, LM-E044, LM-E049 |
+| Browser create listing validation, upload, draft, navigation guard, and visual paths | PASS/PARTIAL: focused visual verification passed 7/7 after stale baselines were refreshed and V-003 was pinned to a deterministic scroll position. The expired-draft focused rerun passed 1/1, and the latest broad Chromium gate passed. | LM-E034, LM-E038, LM-E039, LM-E040, LM-E044, LM-E048, LM-E049 |
+| Browser edit listing profile and availability paths | PASS/PARTIAL: listing-edit coverage now targets the current host-managed availability edit form. The focused file passed 10 with 1 skipped, and the listing-edit folder passed 12 with 1 skipped; the remaining skip is LE-01's dev-server unauthenticated redirect instability. Legacy full-profile, image-management, and draft assertions were removed or rewritten because those controls are not present on the current edit surface. | LM-E031, LM-E041, LM-E043, LM-G001 |
+| Browser collision/dedupe modal paths | PASS: the focused five-spec dedupe collision rerun passed after the non-production generic rate-limit isolation fix, and the latest broad Chromium gate passed. The collision-specific moderation 429 path remains covered separately from generic create-listing rate limits. | LM-E029, LM-E030, LM-E036, LM-E040, LM-E044, LM-E045, LM-E046, LM-E047, LM-E049 |
+| Browser status-management and delete-listing flows | PASS: dedicated user-visible owner-management coverage now passes 2/2. It verifies pause/reactivate from listing detail plus delete preflight, active-conversation warning, password-confirmation modal, and cancellation before destructive deletion. | LM-E024, LM-E042, LM-E043, LM-G001 |
+| Direct API route-handler/security suite for `POST /api/listings`, `PATCH /api/listings/[id]`, `GET /api/listings/[id]/status`, `GET /api/listings/[id]/can-delete`, `DELETE /api/listings/[id]`, status action, collision duplicate-submit behavior, XSS/validation, IDOR/ownership, CSRF helper rejection, status cache header, and idempotency replay/conflict headers | PASS: 9 suites passed, 228 tests passed, 0 failures on 2026-05-10 | LM-E022 |
+| Live Next server/curl checks for listing mutation cache/header behavior and route-level CSRF rejection through `POST`, `PATCH`, and `DELETE` routes | NOT RUN | LM-G002 |
+| Focused Jest/API/action tests: `listings-post`, `listings-host-managed-patch`, `listing-can-delete`, `listing-status` action | PASS: 4 suites passed, 117 tests passed, 0 failures on 2026-05-10 | LM-E021 |
+| Broader discovered component/schema tests outside the focused and broader direct API/security commands | NOT RUN | LM-E019, LM-G003 |
+
+## Failure Taxonomy
+
+| Cluster | Count / scope | Classification | Evidence |
+| --- | --- | --- | --- |
+| Create-listing move-in date helper remains placeholder after clicking `Today` | 0 failures in the latest broad gate; previously 41 failures | Fixed. The form and schema now use local date-only boundaries, and the page object asserts the selected browser-local `Today` label. | LM-E028, LM-E034, LM-E035, LM-E037, LM-E040, LM-E044, LM-E049 |
+| Post-publish search create/redirect cleanup | 0 failures in the latest broad gate; intermittent failures in create-listing-folder reruns | Unknown/intermittent. The create-listing-folder command twice created an orphan listing after a 201 response but did not redirect within the assertion window; targeted rerun after cleanup passed, and later broad gates did not report this cluster. | LM-E039, LM-E040, LM-E044, LM-E049 |
+| Dedupe collision helper returns 404 `Not found` | 0 failures in the latest broad gate; previously 6 failures | Fixed/verified for Playwright-managed server runs. The config now enables helpers for dedupe runs and supplies a non-production local fallback secret to both Playwright workers and the managed Next server when no caller secret is set. | LM-E029, LM-E036, LM-E037, LM-E040, LM-E044, LM-E049 |
+| Dedupe canonical card body click does not navigate | 0 failures in the latest broad gate; 1 prior focused failure | Not reproduced in the dedupe folder rerun or later broad gates. No product-code fix was made for this prior failure in this slice. | LM-E030, LM-E036, LM-E037, LM-E040, LM-E044, LM-E049 |
+| Create-listing visual snapshots differ | 0 failures in the latest broad gate; previously 4 visual snapshot mismatches | Fixed/verified as stale or incorrect visual baselines plus one scroll-state issue. V-002/V-002m/V-005 baselines were refreshed to current UI behavior; V-003 now scrolls back to the title field after `fillRequiredFields()` scrolls to move-in date. | LM-E032, LM-E037, LM-E038, LM-E039, LM-E040, LM-E044, LM-E049 |
+| Create-listing expired draft clearing | 0 current failures; 1 prior broad-gate failure | Not reproduced. The focused expired-draft test passed 1/1, and the final broad Chromium gate passed. No product-code fix was made for this path in this slice. | LM-E044, LM-E048, LM-E049 |
+| Dedupe collision modal requests rate-limited | 0 current failures; 5 prior broad-gate failures | Fixed/verified as a test-environment rate-limit isolation issue. Persistent generic create-listing `RateLimitEntry` state masked collision behavior; dedupe runs now opt into the existing non-production generic limiter bypass so the collision-specific 409 and moderation 429 paths are exercised. | LM-E044, LM-E045, LM-E046, LM-E047, LM-E049 |
+| Listing-edit browser file | 10 passed, 1 skipped in `listing-edit.spec.ts`; 12 passed, 1 skipped in the listing-edit folder | Coverage gap closed for current behavior. Legacy retired-surface skips were removed or rewritten for host-managed availability, while LE-01 remains a documented dev-server unauthenticated redirect skip. | LM-E031, LM-E041, LM-E043, LM-G001 |
+| Listing status/delete browser file | 2 passed | New dedicated coverage for owner status changes and non-destructive delete confirmation/cancel flow. | LM-E042, LM-E043, LM-G001 |
+| Runtime console/server logs | Non-fatal warnings plus one page error in the full run | Unknown/non-blocking for the current failure taxonomy. No focused failure was attributed to these logs. | LM-E033 |
+
+## Recommended Fix Order
+
+1. Keep the full create/listing-edit/dedupe Chromium command in the release gate; it is green as of LM-E049.
+2. Revisit LE-01 if the Next dev-server unauthenticated redirect behavior can be made deterministic in E2E.
+3. Track the post-publish redirect/cleanup flake if the create-listing-folder command reproduces it again.
+4. Run the remaining live HTTP/curl, broader component/schema, migration SQL, and storage-provider checks when those P2 gaps are in scope.
+
+Source, focused test, broader direct API/security, environment-repair, and browser execution evidence are recorded in the listing-management evidence register. LM-G001 is closed for listing-edit/status/delete browser coverage, and LM-G006 is closed for the selected create/listing-edit/dedupe Chromium browser gate.

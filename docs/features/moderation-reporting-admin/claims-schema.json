@@ -1,0 +1,14 @@
+{
+  "featureSlug": "moderation-reporting-admin",
+  "claimFields": [
+    "claimId",
+    "claim",
+    "citation",
+    "verdict",
+    "discrepancy",
+    "recommendedFix"
+  ],
+  "allowedVerdicts": ["pass", "partial", "fail", "unsupported", "contradicted"],
+  "severityLevels": ["P0", "P1", "P2", "P3"],
+  "evidenceRule": "Every current-behavior claim must cite an MRA-E evidence ID or an MRA-G gap ID."
+}

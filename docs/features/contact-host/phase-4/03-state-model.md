@@ -73,4 +73,4 @@ Status: Phase 4 source-only evidence pass. This is a model of observed source st
 - Inventory/listing freshness state uses `PhysicalUnit` and availability fields, but the availability resolver internals are outside the current manifest and were not inspected.
 - Realtime channel state is represented in `ChatWindow`, but the Supabase helper/channel implementation and database policy model are not included in this state pass.
 - Message retention/deletion beyond sender soft-delete and per-user conversation deletion is not fully mapped here.
-- Client/server message length limits conflict and need a product decision before final docs: inbox 1000, thread 500, server/API 2000.
+- Message length is now approved as a uniform 1000-character outbound contract in CH-E066; this Phase 4 note is historical context and focused Linux-side WSL Jest execution passed in CH-E067.

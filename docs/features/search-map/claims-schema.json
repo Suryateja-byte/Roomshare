@@ -1,0 +1,39 @@
+{
+  "type": "object",
+  "properties": {
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "claimId": { "type": "string" },
+          "claim": { "type": "string" },
+          "citation": { "type": "string" },
+          "verdict": {
+            "type": "string",
+            "enum": ["pass", "fail", "partial", "unsupported", "contradicted"]
+          },
+          "discrepancy": { "type": ["string", "null"] },
+          "recommendedFix": { "type": ["string", "null"] }
+        },
+        "required": ["claimId", "claim", "citation", "verdict"]
+      }
+    },
+    "coverageGaps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "manifestItem": { "type": "string" },
+          "gap": { "type": "string" },
+          "severity": {
+            "type": "string",
+            "enum": ["P0", "P1", "P2"]
+          }
+        },
+        "required": ["manifestItem", "gap", "severity"]
+      }
+    }
+  },
+  "required": ["claims", "coverageGaps"]
+}

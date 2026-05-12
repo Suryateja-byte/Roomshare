@@ -34,6 +34,10 @@ import { useBlockStatus } from "@/hooks/useBlockStatus";
 import BlockedConversationBanner from "@/components/chat/BlockedConversationBanner";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import {
+  OUTBOUND_MESSAGE_MAX_LENGTH,
+  OUTBOUND_MESSAGE_TOO_LONG_DESCRIPTION,
+} from "@/lib/messaging/message-limits";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -49,8 +53,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-
-const MESSAGE_MAX_LENGTH = 1000;
 
 interface TypingUser {
   id: string;
@@ -566,9 +568,9 @@ export default function MessagesPageClient({
     const content = input.trim();
 
     // Length validation
-    if (content.length > MESSAGE_MAX_LENGTH) {
+    if (content.length > OUTBOUND_MESSAGE_MAX_LENGTH) {
       toast.error("Message too long", {
-        description: `Maximum ${MESSAGE_MAX_LENGTH} characters allowed.`,
+        description: OUTBOUND_MESSAGE_TOO_LONG_DESCRIPTION,
       });
       return;
     }
@@ -1254,7 +1256,7 @@ export default function MessagesPageClient({
                     placeholder={
                       isOffline ? "You're offline..." : "Type a message..."
                     }
-                    maxLength={MESSAGE_MAX_LENGTH}
+                    maxLength={OUTBOUND_MESSAGE_MAX_LENGTH}
                     className="flex-1 bg-transparent border-none outline-none py-3 px-2 text-on-surface placeholder:text-on-surface-variant"
                   />
                   <button
@@ -1271,7 +1273,7 @@ export default function MessagesPageClient({
                 {input.length > 0 && (
                   <CharacterCounter
                     current={input.length}
-                    max={MESSAGE_MAX_LENGTH}
+                    max={OUTBOUND_MESSAGE_MAX_LENGTH}
                   />
                 )}
               </div>

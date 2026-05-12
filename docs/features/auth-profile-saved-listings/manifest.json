@@ -1,0 +1,96 @@
+{
+  "featureSlug": "auth-profile-saved-listings",
+  "status": "complete_with_gaps",
+  "statusDate": "2026-05-10",
+  "sourceOfTruth": "Current dirty worktree source audit on 2026-05-10; runtime and test commands are marked not run unless listed in verification artifacts.",
+  "primaryArtifacts": [
+    "README.md",
+    "00-feature-boundary.md",
+    "source-map.md",
+    "evidence-register.md",
+    "interaction-census.md",
+    "01-source-map.md",
+    "02-user-flows.md",
+    "03-interaction-census.md",
+    "04-runtime-sequences.md",
+    "05-api-contracts.md",
+    "06-data-model-and-invariants.md",
+    "07-state-management.md",
+    "08-auth-security-permissions.md",
+    "09-errors-empty-loading-edge-cases.md",
+    "10-performance-observability.md",
+    "11-test-traceability-matrix.md",
+    "12-gaps-unknowns-and-questions.md",
+    "verification.json",
+    "runtime-verification.md",
+    "human-review-notes.md",
+    "claims-schema.json",
+    "diagrams/context.mmd",
+    "diagrams/container.mmd",
+    "diagrams/component-auth-profile-saved-listings.mmd",
+    "diagrams/sequence-primary-flow.mmd",
+    "diagrams/state-machine-auth-profile-saved-listings.mmd"
+  ],
+  "manifestItems": [
+    {
+      "id": "APS-M001",
+      "name": "Authentication/session/login/signup",
+      "status": "documented",
+      "evidence": ["APS-E001", "APS-E002", "APS-E003", "APS-E004", "APS-E005", "APS-E006"]
+    },
+    {
+      "id": "APS-M002",
+      "name": "Email verification and password recovery",
+      "status": "documented",
+      "evidence": ["APS-E007", "APS-E008", "APS-E009"]
+    },
+    {
+      "id": "APS-M003",
+      "name": "Profile view/edit",
+      "status": "documented",
+      "evidence": ["APS-E010", "APS-E011"]
+    },
+    {
+      "id": "APS-M004",
+      "name": "Saved listings and favorites",
+      "status": "documented",
+      "evidence": ["APS-E012", "APS-E013", "APS-E016"]
+    },
+    {
+      "id": "APS-M005",
+      "name": "Saved searches and alert unlock",
+      "status": "documented",
+      "evidence": ["APS-E014", "APS-E016"]
+    },
+    {
+      "id": "APS-M006",
+      "name": "Settings and account deletion",
+      "status": "documented",
+      "evidence": ["APS-E015", "APS-E016"]
+    },
+    {
+      "id": "APS-M007",
+      "name": "Tests and runtime verification",
+      "status": "gapped",
+      "evidence": ["APS-E017", "APS-G001", "APS-G002", "APS-G003"]
+    }
+  ],
+  "claims": [
+    {
+      "id": "APS-C001",
+      "claim": "Authentication uses JWT-backed Auth.js sessions with protected/admin route guards, account-state checks, password-change revocation, Google verified-email protection, and credentials rate limit plus Turnstile.",
+      "evidence": ["APS-E001", "APS-E002", "APS-E003"]
+    },
+    {
+      "id": "APS-C002",
+      "claim": "Registration, email verification, password reset, and resend flows use CSRF or rate limits as applicable, hashed tokens, expiration checks, and transaction boundaries.",
+      "evidence": ["APS-E006", "APS-E007", "APS-E008", "APS-E009"]
+    },
+    {
+      "id": "APS-C003",
+      "claim": "Profile, settings, saved listings, favorites, and saved searches are auth-scoped account surfaces with source-backed validation, persistence, and mutation controls.",
+      "evidence": ["APS-E010", "APS-E011", "APS-E012", "APS-E013", "APS-E014", "APS-E015", "APS-E016"]
+    }
+  ],
+  "knownGaps": ["APS-G001", "APS-G002", "APS-G003", "APS-G004", "APS-G005"]
+}
