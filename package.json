@@ -48,6 +48,8 @@
     "supabase:start": "supabase start",
     "supabase:status": "supabase status",
     "supabase:rls-proof:preflight": "node scripts/supabase-rls-proof/preflight.mjs",
+    "supabase:rls-proof:apply-schema": "node scripts/supabase-rls-proof/apply-schema.mjs",
+    "supabase:rls-proof:audit-schema": "node scripts/supabase-rls-proof/audit-schema.mjs",
     "geocode:compare": "npx ts-node scripts/geocode-accuracy-check.ts",
     "geocode:compare:extended": "npx ts-node scripts/geocode-accuracy-extended.ts",
     "geocode:compare:json": "npx ts-node scripts/geocode-accuracy-extended.ts --json",
