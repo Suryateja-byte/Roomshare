@@ -44,6 +44,7 @@
     "test:e2e:search-release-gate:client": "node scripts/run-search-release-gate.js client",
     "test:e2e:search-release-gate": "pnpm run test:e2e:search-release-gate:ssr && pnpm run test:e2e:search-release-gate:client",
     "scan:public-payload-pii": "node scripts/scan-public-payload-pii.js",
+    "supabase:rls-proof:preflight": "node scripts/supabase-rls-proof/preflight.mjs",
     "geocode:compare": "npx ts-node scripts/geocode-accuracy-check.ts",
     "geocode:compare:extended": "npx ts-node scripts/geocode-accuracy-extended.ts",
     "geocode:compare:json": "npx ts-node scripts/geocode-accuracy-extended.ts --json",
