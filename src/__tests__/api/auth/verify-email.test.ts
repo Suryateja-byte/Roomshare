@@ -110,6 +110,22 @@ describe("Verify Email API", () => {
   });
 
   describe("POST /api/auth/verify-email", () => {
+    it("returns the CSRF response before rate limiting or token lookup", async () => {
+      const csrfResponse = {
+        status: 403,
+        json: async () => ({ error: "Forbidden: Origin mismatch" }),
+        headers: new Map(),
+      };
+      (validateCsrf as jest.Mock).mockReturnValueOnce(csrfResponse);
+
+      const response = await POST(createPostRequest({ token: VALID_TOKEN }));
+
+      expect(response).toBe(csrfResponse);
+      expect(withRateLimit).not.toHaveBeenCalled();
+      expect(findVerificationTokenByHash).not.toHaveBeenCalled();
+      expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    });
+
     it("verifies email successfully with a valid active token", async () => {
       const expires = new Date(Date.now() + 3600000);
       const mockUser = { id: "user-123", email: "test@example.com" };

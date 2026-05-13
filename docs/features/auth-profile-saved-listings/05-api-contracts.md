@@ -14,4 +14,4 @@
 | Saved-search actions | Auth, suspension, mutation rate limit, canonical filter storage, user limit advisory lock, alert subscription create/upsert, paywall-derived effective state, delete/toggle/rename, revalidation. | APS-E014 |
 | Settings actions | Notification preference schema/update, password change with rate/current-password/new length/token cleanup/password invalidation, verify password, password presence, account delete with password/fresh session/row locks/tombstone cleanup. | APS-E015 |
 
-Direct HTTP checks for statuses, headers, CSRF variants, provider failures, and checkout return are not run in this pass; see APS-G002 and APS-G003.
+Focused route/action status and CSRF checks passed in APS-E018 for register, auth recovery, resend/verify email, favorites, saved-listing, saved-search, and settings coverage; favorites private no-store headers are asserted. Auth recovery explicit no-store headers, live HTTP transport parity, provider failures, and checkout return remain unverified; see APS-G002 and APS-G003.

@@ -1,6 +1,6 @@
 # Auth, Profile, And Saved Listings
 
-Status: COMPLETE with P1 verification gaps.
+Status: COMPLETE with reduced P1 verification gaps.
 
 Evidence base: this package is source-audited from `src/auth.ts`, `src/lib/auth-helpers.ts`, login/signup clients, registration and auth recovery APIs, profile pages/actions, settings pages/actions, saved listings/actions/favorites API, saved searches page/client/actions, `prisma/schema.prisma`, and discovered auth/profile/saved tests. Exact ranges are in `evidence-register.md`.
 
@@ -8,4 +8,4 @@ Saved searches are included because `/saved-searches` is a protected account col
 
 ## Verification
 
-Current-behavior claims are source-backed. Runtime/browser, direct HTTP, email delivery, OAuth provider, Turnstile provider, and payment checkout runtime checks were not run during this pass; those gaps are tracked in `verification.json` and `runtime-verification.md`.
+Current-behavior claims are source-backed. Focused route/action tests now cover APS-E018, including auth/favorites CSRF short-circuiting and favorites private no-store headers. Runtime browser flows, auth recovery explicit no-store headers, live HTTP transport parity, email delivery, OAuth provider, Turnstile provider, and payment checkout runtime checks remain tracked in `verification.json` and `runtime-verification.md`.

@@ -1,8 +1,8 @@
 {
   "featureSlug": "auth-profile-saved-listings",
   "status": "complete_with_gaps",
-  "statusDate": "2026-05-10",
-  "sourceOfTruth": "Current dirty worktree source audit on 2026-05-10; runtime and test commands are marked not run unless listed in verification artifacts.",
+  "statusDate": "2026-05-13",
+  "sourceOfTruth": "Current dirty worktree source audit on 2026-05-10 plus focused route/action test evidence on 2026-05-13; runtime and test commands are marked not run unless listed in verification artifacts.",
   "primaryArtifacts": [
     "README.md",
     "00-feature-boundary.md",
@@ -71,8 +71,8 @@
     {
       "id": "APS-M007",
       "name": "Tests and runtime verification",
-      "status": "gapped",
-      "evidence": ["APS-E017", "APS-G001", "APS-G002", "APS-G003"]
+      "status": "partially-verified",
+      "evidence": ["APS-E017", "APS-E018", "APS-G001", "APS-G002", "APS-G003"]
     }
   ],
   "claims": [

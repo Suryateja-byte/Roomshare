@@ -47,6 +47,10 @@ jest.mock("@/lib/with-rate-limit", () => ({
   withRateLimit: jest.fn(() => null),
 }));
 
+jest.mock("@/lib/csrf", () => ({
+  validateCsrf: jest.fn(() => null),
+}));
+
 jest.mock("@/lib/password-security", () => ({
   preparePasswordUpdate: jest.fn(async (newPassword: string) => {
     const bcrypt = require("bcryptjs") as {
@@ -86,6 +90,8 @@ jest.mock("@/lib/password-security", () => ({
 
 import { POST, GET } from "@/app/api/auth/reset-password/route";
 import { prisma } from "@/lib/prisma";
+import { validateCsrf } from "@/lib/csrf";
+import { withRateLimit } from "@/lib/with-rate-limit";
 import {
   invalidatePasswordState,
   preparePasswordUpdate,
@@ -119,6 +125,7 @@ describe("Reset Password API", () => {
         return fn(tx);
       }
     );
+    (validateCsrf as jest.Mock).mockReturnValue(null);
   });
 
   describe("POST /api/auth/reset-password", () => {
@@ -127,6 +134,26 @@ describe("Reset Password API", () => {
         method: "POST",
         body: JSON.stringify(body),
       }) as unknown as NextRequest;
+
+    it("returns the CSRF response before rate limiting or token lookup", async () => {
+      const csrfResponse = {
+        status: 403,
+        json: async () => ({ error: "Forbidden: Origin mismatch" }),
+        headers: new Map(),
+      };
+      (validateCsrf as jest.Mock).mockReturnValueOnce(csrfResponse);
+
+      const request = createRequest({
+        token: VALID_TOKEN,
+        password: "newpassword123",
+      });
+      const response = await POST(request);
+
+      expect(response).toBe(csrfResponse);
+      expect(withRateLimit).not.toHaveBeenCalled();
+      expect(prisma.passwordResetToken.findUnique).not.toHaveBeenCalled();
+      expect(preparePasswordUpdate).not.toHaveBeenCalled();
+    });
 
     it("resets password successfully with valid token", async () => {
       const validToken = {

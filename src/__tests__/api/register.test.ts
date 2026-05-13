@@ -29,6 +29,10 @@ jest.mock("@/lib/with-rate-limit", () => ({
   withRateLimit: jest.fn().mockResolvedValue(null),
 }));
 
+jest.mock("@/lib/csrf", () => ({
+  validateCsrf: jest.fn(() => null),
+}));
+
 jest.mock("@/lib/email", () => ({
   sendNotificationEmail: jest.fn().mockResolvedValue(undefined),
 }));
@@ -54,6 +58,8 @@ jest.mock("next/server", () => ({
 
 import { POST } from "@/app/api/register/route";
 import { prisma } from "@/lib/prisma";
+import { validateCsrf } from "@/lib/csrf";
+import { withRateLimit } from "@/lib/with-rate-limit";
 import bcrypt from "bcryptjs";
 
 async function flushMicrotasks() {
@@ -74,6 +80,7 @@ describe("Register API", () => {
     jest.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
     jest.clearAllMocks();
     jest.spyOn(Math, "random").mockReturnValue(0);
+    (validateCsrf as jest.Mock).mockReturnValue(null);
   });
 
   afterEach(() => {
@@ -82,6 +89,31 @@ describe("Register API", () => {
   });
 
   describe("POST", () => {
+    it("returns the CSRF response before rate limiting or user lookup", async () => {
+      const csrfResponse = {
+        status: 403,
+        json: async () => ({ error: "Forbidden: Origin mismatch" }),
+        headers: new Map(),
+      };
+      (validateCsrf as jest.Mock).mockReturnValueOnce(csrfResponse);
+
+      const request = new Request("http://localhost/api/register", {
+        method: "POST",
+        body: JSON.stringify({
+          name: "Test User",
+          email: "test@test.com",
+          password: "password12345",
+        }),
+      });
+
+      const response = await POST(request);
+
+      expect(response).toBe(csrfResponse);
+      expect(withRateLimit).not.toHaveBeenCalled();
+      expect(prisma.user.findUnique).not.toHaveBeenCalled();
+      expect(prisma.user.create).not.toHaveBeenCalled();
+    });
+
     it("returns 400 for invalid input - missing name", async () => {
       const request = new Request("http://localhost/api/register", {
         method: "POST",

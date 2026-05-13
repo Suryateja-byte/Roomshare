@@ -11,4 +11,4 @@
 | Saved searches | APS-E014 | Saved searches are auth-scoped, canonicalized, capped, alert-aware, paywall-aware, and expose checkout-return polling UI. |
 | Settings and account deletion | APS-E015 | Settings supports notification preferences, password change, blocked user management UI, and account deletion/tombstone behavior. |
 | Data model | APS-E016 | Prisma models back user identity/session fields, token hashes, saved listing uniqueness, saved search alert fields, blocked users, and audit logs. |
-| Tests | APS-E017 | Relevant tests were discovered but not run in this pass. |
+| Tests | APS-E017, APS-E018 | Relevant tests were discovered; focused route/action API tests passed for APS-G002 reduction while browser/provider coverage remains unrun. |

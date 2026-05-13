@@ -22,6 +22,10 @@ jest.mock("@/lib/with-rate-limit", () => ({
   withRateLimit: jest.fn(() => null),
 }));
 
+jest.mock("@/lib/csrf", () => ({
+  validateCsrf: jest.fn(() => null),
+}));
+
 jest.mock("@/lib/verification-token-store", () => ({
   clearPendingVerificationToken: jest.fn(),
   prepareVerificationTokenRotation: jest.fn(),
@@ -43,6 +47,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { sendNotificationEmail } from "@/lib/email";
 import { withRateLimit } from "@/lib/with-rate-limit";
+import { validateCsrf } from "@/lib/csrf";
 import {
   clearPendingVerificationToken,
   prepareVerificationTokenRotation,
@@ -62,12 +67,29 @@ describe("Resend Verification API", () => {
     (promotePendingVerificationToken as jest.Mock).mockResolvedValue(true);
     (clearPendingVerificationToken as jest.Mock).mockResolvedValue(true);
     (sendNotificationEmail as jest.Mock).mockResolvedValue({ success: true });
+    (validateCsrf as jest.Mock).mockReturnValue(null);
   });
 
   const createRequest = () =>
     new Request("http://localhost:3000/api/auth/resend-verification", {
       method: "POST",
     }) as unknown as NextRequest;
+
+  it("returns the CSRF response before rate limiting or auth lookup", async () => {
+    const csrfResponse = {
+      status: 403,
+      json: async () => ({ error: "Forbidden: Origin mismatch" }),
+      headers: new Map(),
+    };
+    (validateCsrf as jest.Mock).mockReturnValueOnce(csrfResponse);
+
+    const response = await POST(createRequest());
+
+    expect(response).toBe(csrfResponse);
+    expect(withRateLimit).not.toHaveBeenCalled();
+    expect(auth).not.toHaveBeenCalled();
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+  });
 
   it("sends verification email for authenticated user with unverified email", async () => {
     const mockSession = { user: { email: "test@example.com" } };

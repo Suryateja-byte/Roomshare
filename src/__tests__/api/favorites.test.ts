@@ -37,6 +37,10 @@ jest.mock("@/lib/with-rate-limit", () => ({
   withRateLimit: jest.fn().mockResolvedValue(null),
 }));
 
+jest.mock("@/lib/csrf", () => ({
+  validateCsrf: jest.fn(() => null),
+}));
+
 // Mock logger and captureApiError
 jest.mock("@/lib/logger", () => ({
   logger: { sync: { error: jest.fn(), warn: jest.fn(), info: jest.fn() } },
@@ -62,6 +66,8 @@ jest.mock("@/app/actions/suspension", () => ({
 import { POST } from "@/app/api/favorites/route";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { validateCsrf } from "@/lib/csrf";
+import { withRateLimit } from "@/lib/with-rate-limit";
 
 describe("POST /api/favorites", () => {
   const mockSession = {
@@ -76,6 +82,7 @@ describe("POST /api/favorites", () => {
     jest.clearAllMocks();
     (auth as jest.Mock).mockResolvedValue(mockSession);
     mockCheckSuspension.mockResolvedValue({ suspended: false });
+    (validateCsrf as jest.Mock).mockReturnValue(null);
   });
 
   const createRequest = (body: any): Request => {
@@ -85,6 +92,22 @@ describe("POST /api/favorites", () => {
   };
 
   describe("authentication", () => {
+    it("returns the CSRF response before rate limiting, auth, or mutation", async () => {
+      const csrfResponse = {
+        status: 403,
+        json: async () => ({ error: "Forbidden: Origin mismatch" }),
+        headers: new Map(),
+      };
+      (validateCsrf as jest.Mock).mockReturnValueOnce(csrfResponse);
+
+      const response = await POST(createRequest({ listingId: "listing-123" }));
+
+      expect(response).toBe(csrfResponse);
+      expect(withRateLimit).not.toHaveBeenCalled();
+      expect(auth).not.toHaveBeenCalled();
+      expect(prisma.savedListing.findUnique).not.toHaveBeenCalled();
+    });
+
     it("returns 401 when not authenticated", async () => {
       (auth as jest.Mock).mockResolvedValue(null);
 
@@ -152,6 +175,7 @@ describe("POST /api/favorites", () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store");
       expect(data.saved).toBe(true);
       expect(prisma.savedListing.create).toHaveBeenCalledWith({
         data: {
@@ -176,6 +200,7 @@ describe("POST /api/favorites", () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store");
       expect(data.saved).toBe(false);
       expect(prisma.savedListing.delete).toHaveBeenCalledWith({
         where: { id: "saved-123" },

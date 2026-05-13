@@ -71,6 +71,7 @@ describe("GET /api/favorites", () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(data.savedIds).toEqual([]);
   });
 
@@ -79,6 +80,7 @@ describe("GET /api/favorites", () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(data.savedIds).toEqual([]);
     expect(prisma.savedListing.findMany).not.toHaveBeenCalled();
   });

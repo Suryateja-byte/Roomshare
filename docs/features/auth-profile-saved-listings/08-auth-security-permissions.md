@@ -15,4 +15,4 @@
 | Favorites cache privacy | Favorites API returns private no-store responses for saved-state reads and writes. | APS-E013 |
 | Account deletion confirmation | Settings requires typed confirmation plus password or fresh OAuth session before tombstoning account state. | APS-E015 |
 
-Security verification gap: direct HTTP CSRF/status/cache checks and external provider runtime checks were not run; see APS-G002 and APS-G003.
+Security verification gap: APS-E018 reduces direct route/action CSRF/status/cache coverage, but auth recovery explicit no-store headers, live HTTP transport parity, and external provider runtime checks remain unverified; see APS-G002 and APS-G003.

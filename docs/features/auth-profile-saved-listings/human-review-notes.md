@@ -9,7 +9,7 @@ Human/adversarial review status: PARTIAL.
 | Source evidence exists for auth callbacks, route guards, login/signup, registration, verification/recovery, profile, settings, saved listings, favorites, saved searches, and data models. | PASS | APS-E001 through APS-E016 |
 | Test inventory separates discovered tests from executed tests. | PASS | APS-E017; `11-test-traceability-matrix.md` |
 | Browser runtime verification is complete. | NOT VERIFIED | APS-G001 |
-| Direct HTTP status/header/CSRF verification is complete. | NOT VERIFIED | APS-G002 |
+| Direct route/action status/header/CSRF verification is complete. | PARTIAL | APS-E018 reduces APS-G002 with route-handler CSRF/status and favorites private no-store assertions; auth recovery explicit no-store headers and live HTTP transport parity remain unverified. |
 | External provider runtime verification is complete. | NOT VERIFIED | APS-G003 |
 | Account deletion data-retention expectations are policy-verified. | UNKNOWN | APS-G004 |
 

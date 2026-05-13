@@ -80,6 +80,7 @@ import { prisma } from "@/lib/prisma";
 import { sendNotificationEmail } from "@/lib/email";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { verifyTurnstileToken } from "@/lib/turnstile";
+import { validateCsrf } from "@/lib/csrf";
 import { after as nextAfter } from "next/server";
 import type { NextRequest } from "next/server";
 
@@ -90,6 +91,7 @@ describe("Forgot Password API", () => {
     jest.clearAllMocks();
     jest.useRealTimers();
     mockAfterCallbacks.length = 0;
+    (validateCsrf as jest.Mock).mockReturnValue(null);
   });
 
   const createRequest = (body: object) =>
@@ -101,6 +103,24 @@ describe("Forgot Password API", () => {
       },
       body: JSON.stringify({ turnstileToken: "test-token", ...body }),
     }) as unknown as NextRequest;
+
+  it("returns the CSRF response before rate limiting, Turnstile, or DB lookup", async () => {
+    const csrfResponse = {
+      status: 403,
+      json: async () => ({ error: "Forbidden: Origin mismatch" }),
+      headers: new Headers(),
+    };
+    (validateCsrf as jest.Mock).mockReturnValueOnce(csrfResponse);
+
+    const request = createRequest({ email: "test@example.com" });
+    const response = await POST(request);
+
+    expect(response).toBe(csrfResponse);
+    expect(withRateLimit).not.toHaveBeenCalled();
+    expect(verifyTurnstileToken).not.toHaveBeenCalled();
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    expect(mockAfter).not.toHaveBeenCalled();
+  });
 
   it("schedules reset email for existing user after returning success", async () => {
     const mockUser = {
@@ -135,7 +155,9 @@ describe("Forgot Password API", () => {
         getIdentifier: expect.any(Function),
       })
     );
-    expect(emailRateLimitOptions.getIdentifier(request)).toBe("test@example.com");
+    expect(emailRateLimitOptions.getIdentifier(request)).toBe(
+      "test@example.com"
+    );
 
     expect(mockAfter).toHaveBeenCalledTimes(1);
     expect(sendNotificationEmail).not.toHaveBeenCalled();
@@ -307,7 +329,9 @@ describe("Forgot Password API", () => {
   });
 
   it("does not consume the email-scoped limiter when Turnstile fails", async () => {
-    (verifyTurnstileToken as jest.Mock).mockResolvedValueOnce({ success: false });
+    (verifyTurnstileToken as jest.Mock).mockResolvedValueOnce({
+      success: false,
+    });
 
     const request = createRequest({ email: "test@example.com" });
     const response = await POST(request);

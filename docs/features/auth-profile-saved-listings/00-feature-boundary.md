@@ -25,5 +25,5 @@
 | Unknown | Severity | Evidence |
 | --- | --- | --- |
 | Full browser auth/profile/settings/saved-listings/saved-searches suite was not run in this documentation pass. | P1 | APS-G001 |
-| Direct HTTP checks for auth recovery, favorites, saved-search actions, settings actions, CSRF variants, and cache headers were not run in this pass. | P1 | APS-G002 |
+| Direct route/action checks for auth recovery, favorites, saved-search actions, settings actions, CSRF variants, and favorites cache headers are reduced by APS-E018; auth recovery explicit no-store headers and live HTTP transport parity remain unverified. | P1 | APS-G002 |
 | External provider behavior for Google OAuth, Turnstile, email delivery, and checkout return was not runtime verified in this pass. | P1 | APS-G003 |

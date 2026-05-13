@@ -1,8 +1,8 @@
 {
   "featureSlug": "auth-profile-saved-listings",
   "status": "partial",
-  "verifiedAt": "2026-05-10",
-  "method": "source audit plus test discovery; no runtime/browser/test commands executed",
+  "verifiedAt": "2026-05-13",
+  "method": "source audit plus test discovery plus focused route/action Jest command recorded in APS-E018",
   "claims": [
     {
       "claimId": "V-APS-001",
@@ -31,10 +31,10 @@
     {
       "claimId": "V-APS-004",
       "claim": "Browser/runtime behavior and focused tests have been verified.",
-      "citation": "runtime-verification.md; APS-G001, APS-G002, APS-G003",
+      "citation": "runtime-verification.md; APS-E018, APS-G001, APS-G002, APS-G003",
       "verdict": "partial",
-      "discrepancy": "Source evidence and test inventory exist, but browser, direct HTTP, provider-runtime, and focused test commands were not run in this documentation pass.",
-      "recommendedFix": "Run the focused commands in 11-test-traceability-matrix.md and update runtime-verification.md."
+      "discrepancy": "Focused route/action Jest coverage passed in APS-E018, but browser, provider-runtime, auth recovery explicit no-store headers, and live HTTP transport parity remain unverified.",
+      "recommendedFix": "Run the browser/provider checks in 11-test-traceability-matrix.md and, after approval, add or verify auth recovery no-store/live HTTP transport coverage."
     },
     {
       "claimId": "V-APS-005",
@@ -53,7 +53,7 @@
     },
     {
       "manifestItem": "Direct API verification",
-      "gap": "Direct HTTP checks for statuses, cache headers, CSRF variants, favorites, saved-search actions, and auth recovery routes were not run.",
+      "gap": "Focused route/action status, CSRF, and favorites cache checks passed in APS-E018; auth recovery explicit no-store headers and live HTTP transport parity remain unverified.",
       "severity": "P1"
     },
     {
