@@ -72,6 +72,9 @@ WHERE "id" LIKE 'rls-proof:%'
 DELETE FROM public."User"
 WHERE "email" LIKE 'rls-proof+%@example.invalid';
 
+DELETE FROM auth.users
+WHERE email LIKE 'rls-proof+%@example.invalid';
+
 DROP POLICY IF EXISTS "roomshare_rls_proof_conversation_select" ON public."Conversation";
 DROP POLICY IF EXISTS "roomshare_rls_proof_participants_select" ON public."_ConversationParticipants";
 DROP POLICY IF EXISTS "roomshare_rls_proof_message_select" ON public."Message";

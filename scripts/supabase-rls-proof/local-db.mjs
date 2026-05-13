@@ -25,6 +25,20 @@ const REQUIRED_STATUS_LABELS = new Map([
   ["Studio URL", "studioUrl"],
 ]);
 
+const STATUS_LABELS = new Map([
+  ...REQUIRED_STATUS_LABELS,
+  ["Project URL", "apiUrl"],
+  ["Studio", "studioUrl"],
+  ["anon key", "anonKey"],
+  ["Anon key", "anonKey"],
+  ["ANON_KEY", "anonKey"],
+  ["anon_key", "anonKey"],
+  ["Publishable", "anonKey"],
+  ["Publishable Key", "anonKey"],
+  ["publishable", "anonKey"],
+  ["publishable key", "anonKey"],
+]);
+
 const REMOTE_HINT_ENV_NAMES = [
   /^SUPABASE_ACCESS_TOKEN$/i,
   /^SUPABASE_PROJECT_REF$/i,
@@ -46,9 +60,9 @@ const NON_LOCAL_TARGET_ENV_PATTERN =
   /(?:^|_)(?:STAGING|PRODUCTION|PROD)(?:_|$)/i;
 
 const SECRET_LINE_PATTERN =
-  /\b(secret|anon key|service_role key|service role key|jwt|password|token)\b/i;
+  /\b(secret|anon key|anonymous key|service_role key|service role key|jwt|password|token|publishable|publishable key|access key|public key)\b/i;
 const SECRET_VALUE_PATTERN =
-  /\b(eyJ[a-zA-Z0-9_-]+?\.[a-zA-Z0-9_-]+?\.[a-zA-Z0-9_-]+|sbp_[a-zA-Z0-9_-]+|sb_secret_[a-zA-Z0-9_-]+)\b/g;
+  /\b(eyJ[a-zA-Z0-9_-]+?\.[a-zA-Z0-9_-]+?\.[a-zA-Z0-9_-]+|sbp_[a-zA-Z0-9_-]+|sb_secret_[a-zA-Z0-9_-]+|sb_publishable_[a-zA-Z0-9_-]+)\b/g;
 const URL_USERINFO_PATTERN =
   /\b([a-z][a-z0-9+.-]*:\/\/)([^/\s:@]+):([^@\s/]+)@/gi;
 
@@ -408,7 +422,7 @@ function parseStatus(output) {
 
     const label = match ? match[1].trim() : tableCells[0];
     const value = match ? match[2].trim() : tableCells[1];
-    let key = REQUIRED_STATUS_LABELS.get(label);
+    let key = STATUS_LABELS.get(label);
 
     if (!key && section === "developmentTools" && label === "Studio") {
       key = "studioUrl";
@@ -422,6 +436,14 @@ function parseStatus(output) {
       key = "dbUrl";
     }
 
+    if (
+      !key &&
+      section === "authenticationKeys" &&
+      /^(?:anon key|publishable(?: key)?)$/i.test(label)
+    ) {
+      key = "anonKey";
+    }
+
     if (!key || parsed[key]) {
       continue;
     }
@@ -432,7 +454,7 @@ function parseStatus(output) {
   return parsed;
 }
 
-export function discoverLocalDatabaseUrl() {
+function readLocalSupabaseStatus() {
   checkEnvironment(process.env);
 
   const result = runCommand("supabase", ["status"]);
@@ -454,14 +476,50 @@ export function discoverLocalDatabaseUrl() {
     ]);
   }
 
-  const status = parseStatus(`${result.stdout || ""}\n${result.stderr || ""}`);
+  return {
+    status: parseStatus(`${result.stdout || ""}\n${result.stderr || ""}`),
+    redactedOutput: output,
+  };
+}
+
+export function discoverLocalDatabaseUrl() {
+  const { status, redactedOutput } = readLocalSupabaseStatus();
+
   if (!status.dbUrl) {
     fail("LOCAL_STATUS_INCOMPLETE", "Supabase status did not include DB URL.", [
-      output || "No Supabase status output.",
+      redactedOutput || "No Supabase status output.",
     ]);
   }
 
   const dbUrl = assertLocalUrl(status.dbUrl, "Supabase status DB URL");
   info(`using local DB ${sanitizeUrl(dbUrl.toString())}`);
   return dbUrl.toString();
+}
+
+export function discoverLocalSupabaseApi() {
+  const { status, redactedOutput } = readLocalSupabaseStatus();
+
+  if (!status.apiUrl || !status.anonKey) {
+    const missing = [
+      !status.apiUrl ? "apiUrl" : null,
+      !status.anonKey ? "anonKey" : null,
+    ].filter(Boolean);
+
+    fail(
+      "LOCAL_STATUS_INCOMPLETE",
+      "Supabase status did not include the local API URL and anon key.",
+      [
+        `Missing: ${missing.join(", ")}`,
+        redactedOutput || "No Supabase status output.",
+      ]
+    );
+  }
+
+  const apiUrl = assertLocalUrl(status.apiUrl, "Supabase status API URL");
+  info(`using local API ${sanitizeUrl(apiUrl.toString())}`);
+
+  return {
+    apiUrl: apiUrl.toString(),
+    anonKey: status.anonKey,
+  };
 }

@@ -52,6 +52,7 @@
     "supabase:rls-proof:apply-local-rls": "node scripts/supabase-rls-proof/apply-local-rls-proof.mjs",
     "supabase:rls-proof:audit-schema": "node scripts/supabase-rls-proof/audit-schema.mjs",
     "supabase:rls-proof:verify-local-rls": "node scripts/supabase-rls-proof/verify-local-rls-proof.mjs",
+    "supabase:rls-proof:verify-local-realtime": "node scripts/supabase-rls-proof/verify-local-realtime-proof.mjs",
     "supabase:rls-proof:rollback-local-rls": "node scripts/supabase-rls-proof/rollback-local-rls-proof.mjs",
     "geocode:compare": "npx ts-node scripts/geocode-accuracy-check.ts",
     "geocode:compare:extended": "npx ts-node scripts/geocode-accuracy-extended.ts",

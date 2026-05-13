@@ -29,9 +29,9 @@ const NON_LOCAL_TARGET_ENV_PATTERN =
   /(?:^|_)(?:STAGING|PRODUCTION|PROD)(?:_|$)/i;
 
 const SECRET_LINE_PATTERN =
-  /\b(secret|anon key|service_role key|service role key|jwt|password|token)\b/i;
+  /\b(secret|anon key|anonymous key|service_role key|service role key|jwt|password|token|publishable|publishable key|access key|public key)\b/i;
 const SECRET_VALUE_PATTERN =
-  /\b(eyJ[a-zA-Z0-9_-]+?\.[a-zA-Z0-9_-]+?\.[a-zA-Z0-9_-]+|sbp_[a-zA-Z0-9_-]+|sb_secret_[a-zA-Z0-9_-]+)\b/g;
+  /\b(eyJ[a-zA-Z0-9_-]+?\.[a-zA-Z0-9_-]+?\.[a-zA-Z0-9_-]+|sbp_[a-zA-Z0-9_-]+|sb_secret_[a-zA-Z0-9_-]+|sb_publishable_[a-zA-Z0-9_-]+)\b/g;
 const URL_USERINFO_PATTERN =
   /\b([a-z][a-z0-9+.-]*:\/\/)([^/\s:@]+):([^@\s/]+)@/gi;
 
@@ -117,7 +117,7 @@ function sanitizeUrl(rawValue) {
 }
 
 function redactSecrets(output) {
-  return output
+  return String(output)
     .split(/\r?\n/)
     .map((line) => {
       if (line.includes("│")) {
