@@ -132,8 +132,9 @@ A fresh reader can reconstruct the concept:
 - `parseSearchParams` normalizes raw URL params into filters, sort, page,
   bounds, and bounds-required flags.
 - Client filter controls hold draft state before applying changes to URL.
-- Sort and load-more reset behavior has focused runtime coverage, while
-  broader reset/bounds coverage remains partial.
+- Sort, load-more, root pagination reset, and map-bounds round-trip behavior
+  have focused runtime coverage; broader cross-browser/mobile reset coverage
+  remains confidence coverage.
 
 Useful docs: `README.md`, `07-state-management.md`,
 `13-url-search-param-reference.md`, `06-data-model-and-invariants.md`,

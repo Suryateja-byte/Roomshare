@@ -4,7 +4,8 @@ Status: evidence-backed draft from mixed committed/runtime evidence and
 explicitly marked local discovery caveats, with post-merge fixed-code verification against `origin/main` at
 `89ad33ea58391452b03a2ff5c3a219503769edaa`. Runtime browser behavior was
 attempted in Phase 10; local Postgres is now available and the narrow smoke,
-filter/URL, sort/load-more pagination, desktop map/list parity, results-state, URL-state,
+filter/URL, sort/load-more pagination, root pagination/sort reset,
+map-bounds round-trip, desktop map/list parity, results-state, URL-state,
 anonymous/authenticated saved-listing, mobile map/list, search
 error-resilience, and map error/a11y specs now pass. A focused API/unit Jest
 command for favorites, map listings, search facets, search V2, map payload
@@ -19,8 +20,9 @@ narrows the old dirty-worktree source warning to a P2 branch-hygiene caveat:
 remaining dirty or untracked files are local-only discovery inputs unless a
 specific evidence row cites them.
 The existing failure-mocked desktop map tests now verify `/api/map-listings`
-500/429 browser retry behavior as C058. Non-gate broader E2E coverage is still
-not runtime-verified. See `runtime-verification.md` and
+500/429 browser retry behavior as C058. C062 verifies focused root
+pagination/sort reset and map-bounds round-trip browser behavior. Non-gate
+broader E2E coverage is still not runtime-verified. See `runtime-verification.md` and
 `public-payload-pii-triage.md`.
 
 ## Purpose
@@ -61,7 +63,7 @@ Committed search state is URL-first: raw URL params are parsed by `parseSearchPa
 | V2/search-doc is primary, with legacy fallback paths still present. | `evidence-register.md` C006, C009 | Verified by code |
 | Public search/map APIs are rate-limited. | `phase-4/04-auth-security-permissions.md` | Verified by code |
 | Saved listing mutation requires auth on POST. | `evidence-register.md` C018-C019 | Verified by code |
-| Runtime behavior and test status must be scoped to checks that actually ran. | `unknowns.md` G001-G002; `runtime-verification.md`; `evidence-register.md` C056 | Smoke/filter/pagination/desktop map-list parity/results-state/URL-state/saved-listing/mobile-map/error-resilience/map-error-a11y, focused API/unit Jest, release gate, and real captured public-payload PII scan passed; non-gate broader E2E remains unverified |
+| Runtime behavior and test status must be scoped to checks that actually ran. | `unknowns.md` G001-G002; `runtime-verification.md`; `evidence-register.md` C056, C062 | Smoke/filter/pagination/root pagination-sort reset/map-bounds round-trip/desktop map-list parity/results-state/URL-state/saved-listing/mobile-map/error-resilience/map-error-a11y, focused API/unit Jest, release gate, and real captured public-payload PII scan passed; non-gate broader E2E remains unverified |
 
 ## Quick links
 

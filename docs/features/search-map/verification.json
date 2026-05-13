@@ -74,8 +74,8 @@
     },
     {
       "claimId": "V010",
-      "claim": "Focused desktop sort/load-more pagination reset behavior has passing E2E coverage, while broader root pagination/sort and map-bounds reset coverage remains incomplete.",
-      "citation": "06-data-model-and-invariants.md; 07-state-management.md; unknowns.md G006; phase-4/03-state-model.md",
+      "claim": "Focused desktop sort/load-more, root pagination/sort reset, and map-bounds round-trip behavior have passing E2E coverage; broader cross-browser/mobile and non-gate pagination families remain confidence coverage.",
+      "citation": "06-data-model-and-invariants.md; 07-state-management.md; unknowns.md G006; phase-4/03-state-model.md; evidence-register.md C062; runtime-verification.md",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -306,8 +306,8 @@
     },
     {
       "claimId": "V039",
-      "claim": "The focused desktop-anonymous sort/load-more pagination Playwright spec passed after Docker/Postgres readiness.",
-      "citation": "runtime-verification.md; evidence-register.md C036; command output from `pnpm exec playwright test tests/e2e/search/search-pagination.spec.ts --project=desktop-anonymous --reporter=list`",
+      "claim": "The focused desktop-anonymous sort/load-more pagination Playwright spec and focused root pagination/sort reset plus map-bounds round-trip Playwright specs passed.",
+      "citation": "runtime-verification.md; evidence-register.md C036, C062; command output from `pnpm exec playwright test tests/e2e/search/search-pagination.spec.ts --project=desktop-anonymous --reporter=list`; command output from `pnpm exec playwright test tests/e2e/pagination/pagination-sort-reset.spec.ts --project=chromium --reporter=list --workers=1`; command output from `pnpm exec playwright test tests/e2e/map-bounds-roundtrip.anon.spec.ts --project=chromium-anon --reporter=list --workers=1`",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -446,8 +446,8 @@
     },
     {
       "manifestItem": "pagination and cursor reset behavior",
-      "gap": "The desktop search harness pagination spec verifies sort reset, unique appended cards, and retryable failure/rate-limit states, but root pagination/sort specs and map-bounds reset coverage remain unrun.",
-      "severity": "P1"
+      "gap": "The desktop search harness pagination spec verifies sort reset, unique appended cards, and retryable failure/rate-limit states. C062 adds focused root pagination/sort reset and map-bounds round-trip browser proof; broader cross-browser/mobile and non-gate pagination families remain optional confidence coverage.",
+      "severity": "P2"
     },
     {
       "manifestItem": "public payload privacy",
@@ -466,8 +466,8 @@
     },
     {
       "manifestItem": "contact-host entry point",
-      "gap": "Search-card direct contact was not found; listing detail/contact-host reachability should be verified in the separate contact-host feature pass.",
-      "severity": "P1"
+      "gap": "Search-card direct contact was not found; C060 source-verifies the indirect search card -> listing detail -> Contact Host CTA handoff. A full search-to-messages browser journey remains optional product/runtime confidence coverage unless release owners promote it.",
+      "severity": "P2"
     },
     {
       "manifestItem": "dirty worktree source of truth",

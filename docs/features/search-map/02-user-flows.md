@@ -1,6 +1,6 @@
 # User Flows
 
-These flows combine current code evidence with Phase 10 runtime evidence where it exists. Focused smoke, filter/URL, sort/load-more, desktop map, results-state, URL-state, saved-listing, mobile map/list, search error-resilience, map error/a11y, focused API/unit, release-gate, captured public-payload PII checks, and failure-mocked `/api/map-listings` 500/429 browser checks have passed. Broader non-gate E2E coverage remains a gap.
+These flows combine current code evidence with Phase 10 runtime evidence where it exists. Focused smoke, filter/URL, sort/load-more, root pagination/sort reset, map-bounds round-trip, desktop map, results-state, URL-state, saved-listing, mobile map/list, search error-resilience, map error/a11y, focused API/unit, release-gate, captured public-payload PII checks, and failure-mocked `/api/map-listings` 500/429 browser checks have passed. Broader non-gate E2E coverage remains a gap.
 
 ## Primary Search Load
 
@@ -26,7 +26,7 @@ Evidence: `src/components/LocationSearchInput.tsx`:L173-L236, L342-L405, L479-L5
 
 Filters are edited in `SearchForm` and filter UI components, then committed into search state through URL/query navigation. Sort is updated through `SortSelect` and `applySearchQueryChange`. Evidence: `src/components/SearchForm.tsx`:L733-L863, L1504-L1583; `src/components/search/FilterModal.tsx`:L30-L89, L240-L655; `src/components/SortSelect.tsx`:L61-L76; `phase-4/01-ui-interaction-census.md`.
 
-Runtime status: Phase 10 verified desktop sort/load-more reset behavior. Code evidence also shows `applySearchQueryChange` clears `page` and `cursor` for location, filter, sort, map-pan, and saved-search reopen changes. Remaining gap: broader map-bounds reset coverage remains incomplete. Evidence: `runtime-verification.md`; `src/lib/search/search-query.ts`:L317-L375; `unknowns.md` G006.
+Runtime status: Phase 10 verified desktop sort/load-more reset behavior, and C062 verifies focused root pagination/sort reset plus map-bounds round-trip behavior. Code evidence also shows `applySearchQueryChange` clears `page` and `cursor` for location, filter, sort, map-pan, and saved-search reopen changes. Remaining broader cross-browser/mobile and non-gate pagination families are confidence coverage. Evidence: `runtime-verification.md`; `src/lib/search/search-query.ts`:L317-L375; `unknowns.md` G006; `evidence-register.md` C062.
 
 ## Pagination / Load More
 

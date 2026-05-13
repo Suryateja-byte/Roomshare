@@ -47,4 +47,4 @@ Important rules:
 
 ## Known Gaps
 
-The URL parser and helper behavior above is code/test verified. Runtime coverage is focused, not exhaustive: C056 verifies focused desktop list/map parity and C058 verifies `/api/map-listings` 500/429 browser retry behavior, while broader non-gate E2E coverage, broader map/list synchronization coverage beyond those focused paths, and stale map/list data prevention remain documented gaps. Evidence: `runtime-verification.md`; `unknowns.md` G001, G006, G011.
+The URL parser and helper behavior above is code/test verified. Runtime coverage is focused, not exhaustive: C056 verifies focused desktop list/map parity, C058 verifies `/api/map-listings` 500/429 browser retry behavior, and C062 verifies focused root pagination/sort reset plus map-bounds round-trip behavior. Broader non-gate E2E coverage and broader map/list synchronization coverage beyond those focused paths remain documented gaps. Evidence: `runtime-verification.md`; `unknowns.md` G001, G006, G011.

@@ -7,7 +7,8 @@ Slug: `search-map`
 Status: scope boundary for the evidence-backed documentation package. Runtime
 browser behavior was attempted after local Postgres became available, and the
 narrow desktop-anonymous `/search` smoke, filter/URL, sort/load-more
-pagination, desktop map, results-state, URL-state, anonymous saved-listing
+pagination, focused root pagination/sort reset, map-bounds round-trip,
+desktop map, results-state, URL-state, anonymous saved-listing
 redirect, mobile map/list, and search error-resilience specs now pass.
 Authenticated saved-listing persistence, map error/a11y, and focused API/unit
 Jest checks also pass. The full search release gate passes. The original real

@@ -1,6 +1,6 @@
 # Runtime Sequences
 
-These are code-evidence sequences with Phase 10 runtime evidence called out where it exists. Focused smoke, filter/URL, sort/load-more, desktop map, results-state, URL-state, saved-listing, mobile map/list, search error-resilience, map error/a11y, focused API/unit, release-gate, captured public-payload PII checks, and failure-mocked `/api/map-listings` 500/429 browser checks have passed. Broader non-gate E2E coverage remains a gap.
+These are code-evidence sequences with Phase 10 runtime evidence called out where it exists. Focused smoke, filter/URL, sort/load-more, root pagination/sort reset, map-bounds round-trip, desktop map, results-state, URL-state, saved-listing, mobile map/list, search error-resilience, map error/a11y, focused API/unit, release-gate, captured public-payload PII checks, and failure-mocked `/api/map-listings` 500/429 browser checks have passed. Broader non-gate E2E coverage remains a gap.
 
 ## Primary Search Load
 
@@ -48,7 +48,7 @@ sequenceDiagram
   SearchPage->>SearchPage: Re-parse and fetch results
 ```
 
-Evidence: `src/components/SearchForm.tsx`:L733-L863; `src/components/SortSelect.tsx`:L61-L76; `phase-4/01-ui-interaction-census.md`; `runtime-verification.md`. Phase 10 verified desktop sort/load-more reset behavior, while bounds and broader reset coverage remain incomplete (`unknowns.md` G006).
+Evidence: `src/components/SearchForm.tsx`:L733-L863; `src/components/SortSelect.tsx`:L61-L76; `phase-4/01-ui-interaction-census.md`; `runtime-verification.md`. Phase 10 verified desktop sort/load-more reset behavior, and C062 verifies focused root pagination/sort reset plus map-bounds round-trip behavior. Broader cross-browser/mobile and non-gate pagination families remain P2 confidence coverage (`unknowns.md` G006).
 
 ## Pagination
 
