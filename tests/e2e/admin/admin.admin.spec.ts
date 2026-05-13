@@ -197,9 +197,9 @@ test.describe("ADM: Listing Management", () => {
       page.getByPlaceholder(/search by title or owner/i).first()
     ).toBeVisible();
 
-    // Status filter buttons
-    await expect(page.getByRole("button", { name: /^all$/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /active/i })).toBeVisible();
+    // Status filter links
+    await expect(page.getByRole("link", { name: /^all$/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /active/i })).toBeVisible();
   });
 
   test("ADM-15: Listing cards displayed", async ({ page }) => {
@@ -232,14 +232,16 @@ test.describe("ADM: Report Management", () => {
       page.getByRole("heading", { name: /reports management/i })
     ).toBeVisible({ timeout: 30_000 });
 
-    // ReportList has filter buttons: All, Open (may include count badge), Resolved, Dismissed
-    await expect(page.getByRole("button", { name: /^all$/i })).toBeVisible();
+    // ReportList has status filter links: All, Open (may include count badge), Resolved, Dismissed
     await expect(
-      page.getByRole("button", { name: /open/i }).first()
+      page.getByRole("link", { name: /^all$/i }).first()
     ).toBeVisible();
-    await expect(page.getByRole("button", { name: /resolved/i })).toBeVisible();
     await expect(
-      page.getByRole("button", { name: /dismissed/i })
+      page.getByRole("link", { name: /open/i }).first()
+    ).toBeVisible();
+    await expect(page.getByRole("link", { name: /resolved/i })).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /dismissed/i })
     ).toBeVisible();
   });
 

@@ -7,6 +7,7 @@ const suspendedViewerAuthFile = path.join(
   __dirname,
   "../../playwright/.auth/suspended-viewer.json"
 );
+const adminAuthFile = path.join(__dirname, "../../playwright/.auth/admin.json");
 
 /**
  * Shared login helper — authenticates via the Auth.js credentials callback,
@@ -106,19 +107,9 @@ setup("authenticate", async ({ page }) => {
  * Creates a separate authenticated session for admin tests
  * Uses seed credentials from scripts/seed-e2e.js
  */
-// fixme: Admin route (/admin) does not exist in current build; admin login blocks on Turnstile
-// in the E2E environment. Pagination and other tests that need "setup" project do not require
-// admin auth — only the chromium-admin project uses playwright/.auth/admin.json.
-setup.fixme("authenticate as admin", async ({ page }) => {
-  const adminAuthFile = path.join(
-    __dirname,
-    "../../playwright/.auth/admin.json"
-  );
-
-  const adminEmail =
-    process.env.E2E_ADMIN_EMAIL || "e2e-admin@roomshare.dev";
-  const adminPassword =
-    process.env.E2E_ADMIN_PASSWORD || "TestPassword123!";
+setup("authenticate as admin", async ({ page }) => {
+  const adminEmail = process.env.E2E_ADMIN_EMAIL || "e2e-admin@roomshare.dev";
+  const adminPassword = process.env.E2E_ADMIN_PASSWORD || "TestPassword123!";
 
   await loginAndSaveState(page, adminEmail, adminPassword, adminAuthFile);
 
