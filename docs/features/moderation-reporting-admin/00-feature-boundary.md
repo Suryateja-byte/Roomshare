@@ -26,5 +26,5 @@
 | Unknown | Severity | Evidence |
 | --- | --- | --- |
 | Full browser admin/report/verification/moderation suites were not run in this documentation pass. | P1 | MRA-G001 |
-| Direct HTTP report/admin/document route checks, CSRF variants, cache headers, and signed URL behavior were not run in this pass. | P1 | MRA-G002 |
+| Route-handler/direct API Jest checks passed for reports, verification documents, private-feedback no-public-bleed, abuse hardening, and injection prevention; optional live-server HTTP transport parity was not run. | P2 | MRA-E019, MRA-G002 |
 | Email delivery for verification approval/rejection and private-feedback telemetry/runtime behavior were not verified in this pass. | P1 | MRA-G003 |

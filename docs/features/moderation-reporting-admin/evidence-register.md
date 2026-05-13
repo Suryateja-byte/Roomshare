@@ -1,6 +1,6 @@
 # Moderation, Reporting, And Admin Evidence Register
 
-Status date: 2026-05-10.
+Status date: 2026-05-13.
 
 | Evidence ID | Type | Source | What it supports |
 | --- | --- | --- | --- |
@@ -22,13 +22,14 @@ Status date: 2026-05-10.
 | MRA-E016 | Test inventory | 2026-05-10 command `rg --files tests/e2e src/__tests__ \| rg '(admin|report|moderation|verification|private-feedback|abuse|Audit|moderation-write-lock)'` | Existing admin/report/moderation/verification/private-feedback tests were discovered. They were not executed in this pass. |
 | MRA-E017 | Migration inventory | 2026-05-10 command `rg --files prisma/migrations \| rg '(moderation|report|verification|abuse)'` | Relevant moderation, reporting, private-feedback, and verification migrations were discovered. Migration SQL line audit remains a gap. |
 | MRA-E018 | Schema | `prisma/schema.prisma:42-82`, `prisma/schema.prisma:107-157` | User and Listing fields/relations used by admin/user/listing/report/verification actions. |
+| MRA-E019 | Test execution | 2026-05-13 WSL command `pnpm test -- src/__tests__/api/reports.test.ts src/__tests__/api/reports-route.test.ts src/__tests__/api/reports-edge-cases.test.ts src/__tests__/api/verification-documents.test.ts src/__tests__/api/private-feedback-no-public-bleed.test.ts src/__tests__/schema/reporting-abuse-hardening.test.ts src/__tests__/security/injection-prevention.test.ts --runInBand` | Passed 7 suites / 79 tests. Covers route-handler/direct API Jest checks for reports route behavior, verification document route behavior, private-feedback no-public-bleed, reporting abuse hardening, and injection prevention. Does not claim browser admin coverage, live-server HTTP transport parity, real storage/provider signed URL behavior, provider email delivery, telemetry runtime, or migration SQL audit. |
 
 ## Gap IDs
 
 | Gap ID | Severity | Description | Evidence |
 | --- | --- | --- | --- |
 | MRA-G001 | P1 | Full browser admin/report/listing moderation/verification suites were not executed in this documentation pass. | MRA-E016 |
-| MRA-G002 | P1 | Direct HTTP checks for reports, admin document route, status/cache headers, CSRF variants, and signed URL behavior were not executed. | MRA-E001, MRA-E013 |
+| MRA-G002 | P2 | Route-handler/direct API Jest checks for reports, verification documents, abuse hardening, and injection prevention passed in MRA-E019; optional live-server HTTP transport parity for report/admin document route status/cache/header/CSRF/signed URL behavior was not executed. | MRA-E001, MRA-E013, MRA-E019 |
 | MRA-G003 | P1 | Email delivery and private-feedback telemetry/runtime behavior were source-observed but not runtime verified. | MRA-E002, MRA-E012 |
 | MRA-G004 | P2 | Migration SQL paths were discovered but not line-audited for every report/moderation/verification invariant. | MRA-E017 |
 | MRA-G005 | P2 | Audit logging intentionally fails open; no runtime assertion was run that failed audit writes are observable without breaking admin operations. | MRA-E004 |

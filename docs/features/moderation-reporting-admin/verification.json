@@ -1,13 +1,13 @@
 {
   "featureSlug": "moderation-reporting-admin",
   "status": "partial",
-  "verifiedAt": "2026-05-10",
-  "method": "source audit plus test discovery; no runtime/browser/test commands executed",
+  "verifiedAt": "2026-05-13",
+  "method": "source audit plus test discovery plus route-handler/direct API Jest command MRA-E019; browser, live-server HTTP parity, provider, telemetry runtime, and migration SQL audit commands were not executed",
   "claims": [
     {
       "claimId": "V-MRA-001",
       "claim": "Report and private-feedback submission behavior is documented from source evidence.",
-      "citation": "MRA-E001, MRA-E002, MRA-E015",
+      "citation": "MRA-E001, MRA-E002, MRA-E015, MRA-E019",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -23,7 +23,7 @@
     {
       "claimId": "V-MRA-003",
       "claim": "Verification review and document access behavior is documented from source evidence.",
-      "citation": "MRA-E011, MRA-E012, MRA-E013, MRA-E015",
+      "citation": "MRA-E011, MRA-E012, MRA-E013, MRA-E015, MRA-E019",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -31,10 +31,10 @@
     {
       "claimId": "V-MRA-004",
       "claim": "Browser/runtime behavior and focused tests have been verified.",
-      "citation": "runtime-verification.md; MRA-G001, MRA-G002, MRA-G003",
+      "citation": "runtime-verification.md; MRA-E019, MRA-G001, MRA-G002, MRA-G003",
       "verdict": "partial",
-      "discrepancy": "Source evidence and test inventory exist, but browser, direct HTTP, signed URL, provider-runtime, telemetry, and focused test commands were not run in this documentation pass.",
-      "recommendedFix": "Run the focused commands in 11-test-traceability-matrix.md and update runtime-verification.md."
+      "discrepancy": "Source evidence, test inventory, and route-handler/direct API Jest evidence exist. Browser admin flows, optional live-server HTTP transport parity, real storage/provider signed URL behavior, provider email delivery, and telemetry runtime commands were not run.",
+      "recommendedFix": "Run the remaining browser, live-server HTTP parity, provider, and telemetry commands in 11-test-traceability-matrix.md and update runtime-verification.md."
     },
     {
       "claimId": "V-MRA-005",
@@ -53,8 +53,8 @@
     },
     {
       "manifestItem": "Direct API verification",
-      "gap": "Direct HTTP checks for report/admin document route statuses, cache headers, CSRF variants, and signed URL behavior were not run.",
-      "severity": "P1"
+      "gap": "Route-handler/direct API Jest checks passed in MRA-E019; optional live-server HTTP transport parity for report/admin document route statuses, cache headers, CSRF variants, and signed URL behavior was not run.",
+      "severity": "P2"
     },
     {
       "manifestItem": "Email and telemetry runtime",

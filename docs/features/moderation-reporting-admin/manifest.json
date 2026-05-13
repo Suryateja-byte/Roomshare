@@ -1,8 +1,8 @@
 {
   "featureSlug": "moderation-reporting-admin",
   "status": "complete_with_gaps",
-  "statusDate": "2026-05-10",
-  "sourceOfTruth": "Current dirty worktree source audit on 2026-05-10; runtime and test commands are marked not run unless listed in verification artifacts.",
+  "statusDate": "2026-05-13",
+  "sourceOfTruth": "Current dirty worktree source audit on 2026-05-10 plus 2026-05-13 route-handler/direct API Jest evidence; runtime and test commands are marked not run unless listed in verification artifacts.",
   "primaryArtifacts": [
     "README.md",
     "00-feature-boundary.md",
@@ -65,8 +65,8 @@
     {
       "id": "MRA-M006",
       "name": "Tests and runtime verification",
-      "status": "gapped",
-      "evidence": ["MRA-E016", "MRA-G001", "MRA-G002", "MRA-G003"]
+      "status": "partial",
+      "evidence": ["MRA-E016", "MRA-E019", "MRA-G001", "MRA-G002", "MRA-G003"]
     },
     {
       "id": "MRA-M007",
@@ -79,7 +79,7 @@
     {
       "id": "MRA-C001",
       "claim": "Report submission and private feedback are server-validated, auth-scoped, duplicate-protected, and constrained by private-feedback eligibility gates.",
-      "evidence": ["MRA-E001", "MRA-E002", "MRA-E015"]
+      "evidence": ["MRA-E001", "MRA-E002", "MRA-E015", "MRA-E019"]
     },
     {
       "id": "MRA-C002",
@@ -89,7 +89,7 @@
     {
       "id": "MRA-C003",
       "claim": "Verification document access is admin-only, rate-limited, document-availability checked, audit-logged, and returned through a no-store signed URL redirect.",
-      "evidence": ["MRA-E013"]
+      "evidence": ["MRA-E013", "MRA-E019"]
     }
   ],
   "knownGaps": ["MRA-G001", "MRA-G002", "MRA-G003", "MRA-G004", "MRA-G005"]

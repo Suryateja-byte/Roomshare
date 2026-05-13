@@ -635,6 +635,10 @@ describe("private feedback no-public-bleed contract", () => {
         booking: { findFirst: jest.fn().mockResolvedValue(null) },
         conversation: { findFirst: jest.fn().mockResolvedValue({ id: "conv-1" }) },
         report: { findFirst: reportFindFirst },
+        user: {
+          findUnique: jest.fn().mockResolvedValue({ isSuspended: false }),
+        },
+        blockedUser: { findMany: jest.fn().mockResolvedValue([]) },
       },
     }));
 
