@@ -106,8 +106,8 @@
     },
     {
       "claimId": "V014",
-      "claim": "Desktop map preference, focused list-backed map parity, marker/list focus, pan/zoom URL state, mobile map/list behavior, and map error/a11y behavior have passing browser coverage; V1-only map API mock cases and provider terminology remain incomplete.",
-      "citation": "README.md; 02-user-flows.md; 12-gaps-unknowns-and-questions.md G001, G005, G011; evidence-register.md C031, C056",
+      "claim": "Desktop map preference, focused list-backed map parity, marker/list focus, pan/zoom URL state, mobile map/list behavior, map error/a11y behavior, and /api/map-listings 500/429 retry behavior have passing browser coverage; provider terminology remains incomplete.",
+      "citation": "README.md; 02-user-flows.md; 12-gaps-unknowns-and-questions.md G001, G005, G011; evidence-register.md C031, C056, C058",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -234,8 +234,8 @@
     },
     {
       "claimId": "V030",
-      "claim": "Focused result/error/loading/network resilience states and map error/a11y paths have passing E2E coverage, with V1-only map API mock cases still skipped in V2 mode.",
-      "citation": "03-interaction-census.md; 09-errors-empty-loading-edge-cases.md; 12-gaps-unknowns-and-questions.md G012; evidence-register.md C038, C042-C043; phase-4/03-state-model.md",
+      "claim": "Focused result/error/loading/network resilience states, map error/a11y paths, and /api/map-listings 500/429 retry behavior have passing E2E coverage.",
+      "citation": "03-interaction-census.md; 09-errors-empty-loading-edge-cases.md; 12-gaps-unknowns-and-questions.md G012; evidence-register.md C038, C042-C043, C058; phase-4/03-state-model.md",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -362,8 +362,8 @@
     },
     {
       "claimId": "V046",
-      "claim": "The focused chromium-anon map error/a11y Playwright suite passed after Docker/Postgres readiness, with V1-only 500/429 map API mock tests skipped in V2 mode.",
-      "citation": "runtime-verification.md; evidence-register.md C043; test-results/.last-run.json; command output from `pnpm exec playwright test tests/e2e/map-errors-a11y.anon.spec.ts --project=chromium-anon --reporter=list`",
+      "claim": "The focused chromium-anon map error/a11y Playwright suite passed after Docker/Postgres readiness, and C058 separately covers /api/map-listings 500/429 browser behavior.",
+      "citation": "runtime-verification.md; evidence-register.md C043, C058; test-results/.last-run.json; command output from `pnpm exec playwright test tests/e2e/map-errors-a11y.anon.spec.ts --project=chromium-anon --reporter=list`; command output from `ENABLE_SEARCH_SNAPSHOT_CONTRACT=false pnpm exec playwright test tests/e2e/search/search-map-desktop.spec.ts --project=failure-mocked --grep '@failure-mocked' --reporter=list`",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -436,7 +436,7 @@
   "coverageGaps": [
     {
       "manifestItem": "runtime browser behavior",
-      "gap": "The narrow smoke, filter/URL, sort/load-more pagination, desktop map, results-state, URL-state, anonymous/authenticated saved-listing, mobile map/list, search error-resilience, map error/a11y, focused API/unit Jest, PII scanner fixture, real payload PII scan, and release-gate commands now have evidence, but V1-only map API browser mock cases and non-gate broader E2E coverage remain not runtime-verified.",
+      "gap": "The narrow smoke, filter/URL, sort/load-more pagination, desktop map, results-state, URL-state, anonymous/authenticated saved-listing, mobile map/list, search error-resilience, map error/a11y, /api/map-listings 500/429 browser error, focused API/unit Jest, PII scanner fixture, real payload PII scan, and release-gate commands now have evidence, but non-gate broader E2E coverage remains not runtime-verified.",
       "severity": "P1"
     },
     {
@@ -461,7 +461,7 @@
     },
     {
       "manifestItem": "map provider/runtime rendering",
-      "gap": "Desktop, mobile, and map error/a11y behavior have passing search-harness coverage with mocked map resources, but provider terminology and V1-only map API mock cases still need verification because comments/config mix Mapbox, MapLibre, and Stadia terms.",
+      "gap": "Desktop, mobile, map error/a11y, and /api/map-listings 500/429 browser behavior have passing search-harness coverage with mocked map resources, but provider terminology still needs cleanup because comments/config mix Mapbox, MapLibre, and Stadia terms.",
       "severity": "P1"
     },
     {

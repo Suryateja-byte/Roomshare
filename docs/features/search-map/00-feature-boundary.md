@@ -14,8 +14,9 @@ Jest checks also pass. The full search release gate passes. The original real
 feature-payload PII scan failed, but the P0 public payload fix now passes a
 real captured payload scan for the main search/list/map public API responses.
 PR #119 is merged to `main` at `89ad33ea58391452b03a2ff5c3a219503769edaa`,
-and all final PR checks pass. V1-only map API mock cases and non-gate broader
-E2E coverage remain outside verified evidence until they are run.
+and all final PR checks pass. C058 verifies `/api/map-listings` 500/429 browser
+retry behavior through the existing failure-mocked desktop map tests. Non-gate
+broader E2E coverage remains outside verified evidence until it is run.
 
 ## Included
 

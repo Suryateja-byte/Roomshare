@@ -190,8 +190,8 @@ A fresh reader can reconstruct major scenarios:
 - Invalid bounds, huge bounds, invalid cursor, and rate limiting have parser,
   route, or runtime evidence.
 - V2 unavailable can fall back or show unavailable state depending path.
-- Map API/style/tile errors have focused map error/a11y coverage, with V1-only
-  mocked cases still skipped/unverified.
+- Map API/style/tile errors have focused map error/a11y coverage, and C058
+  verifies `/api/map-listings` 500/429 retryable browser behavior.
 - Anonymous favorite redirects to login; suspended favorite returns 403;
   save-search invalid/unauthorized returns errors.
 
@@ -250,7 +250,7 @@ The docs now pass the round-trip test for high-level feature understanding, P0
 verification status, compact API/cache/payload reconstruction, state-machine
 coverage, and release-blocking test traceability. Remaining work is limited to
 P1/P2 confidence-building gaps already listed in `12-gaps-unknowns-and-questions.md`
-and `unknowns.md`: V1-only map API mock cases if that path matters, broader
-non-gate map/list/filter/pagination/mobile coverage, provider terminology
-cleanup, direct contact-host handoff verification, saved-search auth/paywall
-runtime coverage, and optional generated API/test-index artifacts.
+and `unknowns.md`: broader non-gate map/list/filter/pagination/mobile coverage,
+provider terminology cleanup, direct contact-host handoff verification,
+saved-search auth/paywall runtime coverage, and optional generated API/test-index
+artifacts.

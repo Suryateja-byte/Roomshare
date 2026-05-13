@@ -866,7 +866,7 @@
     }
   ],
   "unknowns": [
-    "Runtime/browser behavior is now verified for the Phase 10/11/12 release-blocking search/map commands, but V1-only map API mock cases and broader non-gate E2E families remain confidence-building gaps.",
+    "Runtime/browser behavior is now verified for the Phase 10/11/12 release-blocking search/map commands, including failure-mocked /api/map-listings 500/429 browser checks; broader non-gate E2E families remain confidence-building gaps.",
     "Discovered tests are grouped in this manifest; the release-blocking subset and focused API/unit/privacy checks have passing evidence, while broader grouped families are listed as not run.",
     "Direct contact-host entry point from search cards was not verified; listing cards link to listing detail pages.",
     "\"Search this area\" appears only in a comment describing a removed deferred flow.",

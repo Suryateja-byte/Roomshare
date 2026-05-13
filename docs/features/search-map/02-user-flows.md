@@ -1,6 +1,6 @@
 # User Flows
 
-These flows combine current code evidence with Phase 10 runtime evidence where it exists. Focused smoke, filter/URL, sort/load-more, desktop map, results-state, URL-state, saved-listing, mobile map/list, search error-resilience, map error/a11y, focused API/unit, release-gate, and captured public-payload PII checks have passed. V1-only map API mock cases and broader non-gate E2E coverage remain gaps.
+These flows combine current code evidence with Phase 10 runtime evidence where it exists. Focused smoke, filter/URL, sort/load-more, desktop map, results-state, URL-state, saved-listing, mobile map/list, search error-resilience, map error/a11y, focused API/unit, release-gate, captured public-payload PII checks, and failure-mocked `/api/map-listings` 500/429 browser checks have passed. Broader non-gate E2E coverage remains a gap.
 
 ## Primary Search Load
 
@@ -36,7 +36,7 @@ Runtime status: Phase 10 verified desktop sort/load-more reset behavior. Code ev
 
 The `/search` layout hosts a persistent map wrapper. `PersistentMapWrapper` can consume V2 map data or fetch `/api/map-listings`. `Map` renders clusters, markers, selected listing previews, and map empty/error states. Evidence: `src/app/search/layout.tsx`:L46-L93; `src/components/PersistentMapWrapper.tsx`:L4-L17, L365-L430; `src/components/Map.tsx`:L667-L786, L3655-L3749, L3876-L4573.
 
-Runtime status: Phase 10 verified focused desktop map, mobile map/list, map error/a11y, and search release-gate paths. C056 adds committed focused desktop list/map parity evidence. Remaining gap: V1-only map API mock cases and broader non-gate map/list synchronization coverage remain incomplete. Evidence: `runtime-verification.md`; `evidence-register.md` C037, C041, C043, C047, C056; `unknowns.md` G001, G011.
+Runtime status: Phase 10 verified focused desktop map, mobile map/list, map error/a11y, and search release-gate paths. C056 adds committed focused desktop list/map parity evidence, and C058 verifies `/api/map-listings` 500/429 browser retry behavior. Remaining gap: broader non-gate map/list synchronization coverage remains incomplete. Evidence: `runtime-verification.md`; `evidence-register.md` C037, C041, C043, C047, C056, C058; `unknowns.md` G001, G011.
 
 ## Listing Card To Detail
 

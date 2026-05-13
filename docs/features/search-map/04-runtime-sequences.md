@@ -1,6 +1,6 @@
 # Runtime Sequences
 
-These are code-evidence sequences with Phase 10 runtime evidence called out where it exists. Focused smoke, filter/URL, sort/load-more, desktop map, results-state, URL-state, saved-listing, mobile map/list, search error-resilience, map error/a11y, focused API/unit, release-gate, and captured public-payload PII checks have passed. V1-only map API mock cases and broader non-gate E2E coverage remain gaps.
+These are code-evidence sequences with Phase 10 runtime evidence called out where it exists. Focused smoke, filter/URL, sort/load-more, desktop map, results-state, URL-state, saved-listing, mobile map/list, search error-resilience, map error/a11y, focused API/unit, release-gate, captured public-payload PII checks, and failure-mocked `/api/map-listings` 500/429 browser checks have passed. Broader non-gate E2E coverage remains a gap.
 
 ## Primary Search Load
 
@@ -92,7 +92,7 @@ sequenceDiagram
   Wrapper-->>Map: Render listings/markers
 ```
 
-Evidence: `src/components/Map.tsx`:L3614-L3650; `src/contexts/ActivePanBoundsContext.tsx`:L52-L68; `src/components/PersistentMapWrapper.tsx`:L382-L430; `src/app/api/map-listings/route.ts`:L230-L397; `runtime-verification.md`; `evidence-register.md` C037, C041, C043, C056. C056 verifies the focused desktop list-backed map parity path. V1-only map API mock cases and broader non-gate map/list synchronization coverage remain gaps.
+Evidence: `src/components/Map.tsx`:L3614-L3650; `src/contexts/ActivePanBoundsContext.tsx`:L52-L68; `src/components/PersistentMapWrapper.tsx`:L382-L430; `src/app/api/map-listings/route.ts`:L230-L397; `runtime-verification.md`; `evidence-register.md` C037, C041, C043, C056, C058. C056 verifies the focused desktop list-backed map parity path, and C058 verifies `/api/map-listings` 500/429 browser retry behavior. Broader non-gate map/list synchronization coverage remains a gap.
 
 ## Save Listing
 

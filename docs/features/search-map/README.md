@@ -18,8 +18,9 @@ parity with focused browser and `SearchResultsClient` Jest evidence. C057
 narrows the old dirty-worktree source warning to a P2 branch-hygiene caveat:
 remaining dirty or untracked files are local-only discovery inputs unless a
 specific evidence row cites them.
-V1-only map API mock cases and non-gate broader E2E coverage are still not
-runtime-verified. See `runtime-verification.md` and
+The existing failure-mocked desktop map tests now verify `/api/map-listings`
+500/429 browser retry behavior as C058. Non-gate broader E2E coverage is still
+not runtime-verified. See `runtime-verification.md` and
 `public-payload-pii-triage.md`.
 
 ## Purpose
