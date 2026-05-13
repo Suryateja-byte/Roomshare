@@ -44,6 +44,7 @@ import {
   usePendingV2QueryHash,
   type V2MapData,
 } from "@/contexts/SearchV2DataContext";
+import { useSearchListResultIds } from "@/contexts/SearchListResultsContext";
 import { useActivePanBoundsState } from "@/contexts/ActivePanBoundsContext";
 import { useSearchTestScenario } from "@/contexts/SearchTestScenarioContext";
 import { MapErrorBoundary } from "@/components/map/MapErrorBoundary";
@@ -380,6 +381,7 @@ export default function PersistentMapWrapper({
   const shellInstanceId = useId();
   const searchParams = useSearchParams();
   const testScenario = useSearchTestScenario();
+  const listResultIds = useSearchListResultIds();
   const [listings, setListings] = useState<MapListingData[]>([]);
   // mapSource tracks whether the most recent data came from a client fetch ('v1') or SSR payload ('v2')
   const [mapSource, setMapSource] = useState<"v1" | "v2">("v1");
@@ -435,8 +437,7 @@ export default function PersistentMapWrapper({
       ? lastV2Data
       : null;
   const hasV2Data = matchingV2Data !== null;
-  const hasAnyV2Data =
-    matchingV2Data !== null || matchingLastV2Data !== null;
+  const hasAnyV2Data = matchingV2Data !== null || matchingLastV2Data !== null;
   const isAwaitingCurrentV2Data =
     isV2Enabled && pendingV2QueryHash === currentQueryHash;
 
@@ -550,6 +551,15 @@ export default function PersistentMapWrapper({
     prevEffectiveListingsRef.current = effectiveListings;
     return effectiveListings;
   }, [effectiveListings]);
+  const listBackedEffectiveListings = useMemo(() => {
+    if (listResultIds === null) return stableEffectiveListings;
+    if (listResultIds.length === 0) return [];
+
+    const listIdSet = new Set(listResultIds);
+    return stableEffectiveListings.filter((listing) =>
+      listIdSet.has(listing.id)
+    );
+  }, [listResultIds, stableEffectiveListings]);
 
   // UX-13 FIX: Compute effective truncation status.
   // V1 path uses explicit `truncated` flag from API response (LIMIT+1 detection).
@@ -1098,7 +1108,9 @@ export default function PersistentMapWrapper({
   // P2-FIX (#115): Also show placeholder when data path hasn't been determined yet.
   // This prevents the brief empty map flash between mount and v2 signal.
   const showInitialPlaceholder =
-    !dataPathDetermined || isAwaitingCurrentV2Data || (isV2Enabled && !hasAnyV2Data);
+    !dataPathDetermined ||
+    isAwaitingCurrentV2Data ||
+    (isV2Enabled && !hasAnyV2Data);
   const showV2LoadingOverlay =
     isAwaitingCurrentV2Data || (isV2Enabled && !hasV2Data && hasAnyV2Data);
 
@@ -1150,7 +1162,7 @@ export default function PersistentMapWrapper({
       <MapErrorBoundary>
         <Suspense fallback={<MapLoadingPlaceholder />}>
           <LazyDynamicMap
-            listings={stableEffectiveListings}
+            listings={listBackedEffectiveListings}
             suppressEmptyState={Boolean(infoMessage)}
             selectionPresentation={isDesktop === false ? "preview" : "popup"}
           />

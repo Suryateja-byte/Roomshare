@@ -8,6 +8,7 @@ import { ActivePanBoundsProvider } from "@/contexts/ActivePanBoundsContext";
 import { SearchTransitionProvider } from "@/contexts/SearchTransitionContext";
 import { FilterStateProvider } from "@/contexts/FilterStateContext";
 import { ListingFocusProvider } from "@/contexts/ListingFocusContext";
+import { SearchListResultsProvider } from "@/contexts/SearchListResultsContext";
 import { SearchV2DataProvider } from "@/contexts/SearchV2DataContext";
 import { MobileSearchProvider } from "@/contexts/MobileSearchContext";
 import { SearchTestScenarioProvider } from "@/contexts/SearchTestScenarioContext";
@@ -62,9 +63,7 @@ export default async function SearchLayout({
               <SkipLink href="#search-results">Skip to search results</SkipLink>
               {/* Search Header - Persistent across navigations, fixed position */}
               <header className="fixed top-0 left-0 right-0 z-[1100] w-full bg-surface-container-lowest/95 shadow-ambient-sm backdrop-blur-xl pointer-events-auto">
-                <nav
-                  aria-label="Search navigation"
-                >
+                <nav aria-label="Search navigation">
                   <SearchHeaderWrapper />
                 </nav>
                 <AccountNoticeHost placement="search" />
@@ -82,7 +81,9 @@ export default async function SearchLayout({
                   <ActivePanBoundsProvider>
                     <ListingFocusProvider>
                       <SearchV2DataProvider>
-                        <SearchLayoutView>{children}</SearchLayoutView>
+                        <SearchListResultsProvider>
+                          <SearchLayoutView>{children}</SearchLayoutView>
+                        </SearchListResultsProvider>
                       </SearchV2DataProvider>
                     </ListingFocusProvider>
                   </ActivePanBoundsProvider>

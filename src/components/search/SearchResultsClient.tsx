@@ -27,6 +27,7 @@ import { findSplitStays } from "@/lib/search/split-stay";
 import { getFilterSuggestions } from "@/app/actions/filter-suggestions";
 import { useMobileSearch } from "@/contexts/MobileSearchContext";
 import { useSearchMapUI } from "@/contexts/SearchMapUIContext";
+import { useSearchListResultsActions } from "@/contexts/SearchListResultsContext";
 import { useSearchTestScenario } from "@/contexts/SearchTestScenarioContext";
 import type { FilterSuggestion } from "@/lib/data";
 import type { FilterParams, PublicSearchListing } from "@/lib/search-types";
@@ -159,7 +160,8 @@ export function SearchResultsClient({
   const router = useRouter();
   const { setIsV2Enabled, setPendingQueryHash } = useSearchV2Setters();
   const { setV2MapData, dataVersion } = useV2MapDataSetter();
-  const { setSearchResultsLabel } = useMobileSearch();
+  const { openFilters, setSearchResultsLabel } = useMobileSearch();
+  const { setListResultIds } = useSearchListResultsActions();
   const { shouldShowMap } = useSearchMapUI();
   const testScenario = useSearchTestScenario();
   const [isHydrated, setIsHydrated] = useState(false);
@@ -454,9 +456,7 @@ export function SearchResultsClient({
           };
 
           setResponseMeta(meta);
-          setSearchStateKind(
-            searchResponse.list.total === 0 ? "zero-results" : "ok"
-          );
+          setSearchStateKind(fullItems.length === 0 ? "zero-results" : "ok");
           setClientFetchedListings(fullItems);
           setClientFetchedTotal(searchResponse.list.total ?? null);
           setClientFetchedNearMatch(undefined);
@@ -576,8 +576,12 @@ export function SearchResultsClient({
 
   // Use client-fetched data when available, otherwise fall back to SSR props
   const effectiveListings = clientFetchedListings ?? initialListings;
-  const effectiveTotal =
+  const rawEffectiveTotal =
     clientFetchedListings !== null ? clientFetchedTotal : initialTotal;
+  const effectiveTotal =
+    rawEffectiveTotal === 0 && effectiveListings.length > 0
+      ? effectiveListings.length
+      : rawEffectiveTotal;
   const effectiveNearMatch =
     clientFetchedListings !== null
       ? clientFetchedNearMatch
@@ -629,6 +633,7 @@ export function SearchResultsClient({
     [allListings]
   );
   const reachedCap = allListings.length >= MAX_ACCUMULATED;
+  const isResultCapReached = reachedCap && Boolean(nextCursor);
 
   // Near-match items are appended at the end by expandWithNearMatches
   const nearMatchCount = useMemo(
@@ -821,9 +826,16 @@ export function SearchResultsClient({
         );
       }
 
+      let appendedItems = dedupedItems;
       setExtraListings((prev) => {
-        const next = [...prev, ...dedupedItems];
         const currentEffectiveListings = effectiveListingsRef.current;
+        const currentCount = dedupeListingsForDisplay([
+          ...currentEffectiveListings,
+          ...prev,
+        ]).length;
+        const remainingSlots = Math.max(MAX_ACCUMULATED - currentCount, 0);
+        appendedItems = dedupedItems.slice(0, remainingSlots);
+        const next = [...prev, ...appendedItems];
         // F2 FIX: Update ref inside setState for deterministic count
         totalCountRef.current = dedupeListingsForDisplay([
           ...currentEffectiveListings,
@@ -839,7 +851,7 @@ export function SearchResultsClient({
       const totalLabel =
         effectiveTotal !== null ? ` of ~${effectiveTotal}` : "";
       setLoadMoreAnnouncement(
-        `Loaded ${dedupedItems.length} more listing${dedupedItems.length === 1 ? "" : "s"}, showing ${newCount}${totalLabel}`
+        `Loaded ${appendedItems.length} more listing${appendedItems.length === 1 ? "" : "s"}, showing ${newCount}${totalLabel}`
       );
     } catch (err) {
       const raw =
@@ -858,13 +870,7 @@ export function SearchResultsClient({
       setIsLoadingMore(false);
     }
     // F2 FIX: Removed allListings dep — count read from totalCountRef instead
-  }, [
-    nextCursor,
-    rawParams,
-    effectiveTotal,
-    router,
-    testScenario,
-  ]);
+  }, [nextCursor, rawParams, effectiveTotal, router, testScenario]);
 
   const total = effectiveTotal;
   const effectiveLocationRequired = searchStateKind === "location-required";
@@ -976,6 +982,10 @@ export function SearchResultsClient({
     };
   }, [activeFilterParams, effectiveZeroResults]);
 
+  useEffect(() => {
+    setListResultIds(allListings.map((listing) => listing.id));
+  }, [allListingIdsKey, allListings, setListResultIds]);
+
   return (
     <div
       id="search-results"
@@ -1008,10 +1018,10 @@ export function SearchResultsClient({
         {effectiveLocationRequired
           ? "Select a location or move the map to search this area"
           : effectiveZeroResults
-          ? `No listings found${query ? ` for "${query}"` : ""}`
-          : total === null
-            ? `Found more than 100 listings${query ? ` for "${query}"` : ""}`
-            : `Found ${total} ${total === 1 ? "listing" : "listings"}${query ? ` for "${query}"` : ""}`}
+            ? `No listings found${query ? ` for "${query}"` : ""}`
+            : total === null
+              ? `Found more than 100 listings${query ? ` for "${query}"` : ""}`
+              : `Found ${total} ${total === 1 ? "listing" : "listings"}${query ? ` for "${query}"` : ""}`}
       </div>
 
       {/* Load-more announcement — separate from initial status to avoid re-announcing on mount */}
@@ -1213,7 +1223,7 @@ export function SearchResultsClient({
           )}
 
           {/* Load more section with progress indicator */}
-          {isHydrated && nextCursor && !reachedCap && !isDegraded && (
+          {isHydrated && nextCursor && !isResultCapReached && !isDegraded && (
             <div className="mb-4 mt-8 flex flex-col items-center gap-2">
               <p className="text-xs text-on-surface-variant">
                 Showing {allListings.length} of{" "}
@@ -1246,11 +1256,30 @@ export function SearchResultsClient({
           )}
 
           {/* Cap reached — nudge user to refine */}
-          {reachedCap && nextCursor && (
-            <p className="text-center text-sm text-on-surface-variant mt-6">
-              Showing {allListings.length} results. Try adjusting your filters
-              or zooming into a specific area to find more relevant listings.
-            </p>
+          {isResultCapReached && (
+            <section
+              aria-labelledby="result-cap-heading"
+              className="mx-auto mt-6 max-w-md rounded-2xl border border-outline-variant/35 bg-surface-container-high/45 p-4 text-center"
+            >
+              <h3
+                id="result-cap-heading"
+                className="text-sm font-semibold text-on-surface"
+              >
+                You&apos;ve reached the 60-result browsing limit
+              </h3>
+              <p className="mt-1 text-sm text-on-surface-variant">
+                Narrow your filters
+                {shouldShowMap ? " or zoom into a smaller map area" : ""} to
+                keep browsing the most relevant places.
+              </p>
+              <button
+                type="button"
+                onClick={openFilters}
+                className="touch-target mt-4 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-on-primary shadow-ambient-sm transition-colors hover:bg-primary-container"
+              >
+                Refine search
+              </button>
+            </section>
           )}
 
           {/* Load error */}
