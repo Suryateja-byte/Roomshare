@@ -12,12 +12,21 @@ jest.mock("@/lib/prisma", () => ({
   },
 }));
 
+jest.mock("@/lib/logger", () => ({
+  logger: {
+    sync: {
+      error: jest.fn(),
+    },
+  },
+}));
+
 import {
   logAdminAction,
   getAuditLogs,
   getTargetAuditHistory,
   getAdminActionHistory,
 } from "@/lib/audit";
+import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 
 describe("Audit Logging", () => {
@@ -72,7 +81,7 @@ describe("Audit Logging", () => {
       });
     });
 
-    it("does not throw on database error (silent fail)", async () => {
+    it("does not throw on database error and logs visibility metadata", async () => {
       (prisma.auditLog.create as jest.Mock).mockRejectedValue(
         new Error("DB Error")
       );
@@ -85,6 +94,18 @@ describe("Audit Logging", () => {
           targetId: "user-456",
         })
       ).resolves.toBeUndefined();
+
+      expect(logger.sync.error).toHaveBeenCalledWith(
+        "Failed to log admin action",
+        expect.objectContaining({
+          action: "logAdminAction",
+          adminId: "admin-123",
+          targetType: "User",
+          targetId: "user-456",
+          auditAction: "USER_DELETED",
+          error: "DB Error",
+        })
+      );
     });
 
     it("logs USER_SUSPENDED action type", async () => {

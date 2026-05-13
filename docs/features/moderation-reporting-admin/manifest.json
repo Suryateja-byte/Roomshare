@@ -2,7 +2,7 @@
   "featureSlug": "moderation-reporting-admin",
   "status": "complete_with_gaps",
   "statusDate": "2026-05-13",
-  "sourceOfTruth": "Current dirty worktree source audit on 2026-05-10 plus 2026-05-13 route-handler/direct API Jest evidence; MRA-E020 records the authoritative WSL focused local mocked telemetry/notification invocation pass; MRA-E021 records controlled Chromium admin-boundary and verification-admin journey passes; MRA-E022 records route-handler baseline plus live-server negative/status/header parity while admin-auth .admin.spec.ts suites, ignored admin-host race, admin report/listing moderation browser coverage, authenticated admin signed-URL success, and real storage/provider behavior remain unverified.",
+  "sourceOfTruth": "Current dirty worktree source audit on 2026-05-10 plus 2026-05-13 route-handler/direct API Jest evidence; MRA-E020 records the authoritative WSL focused local mocked telemetry/notification invocation pass; MRA-E021 records controlled Chromium admin-boundary and verification-admin journey passes; MRA-E022 records route-handler baseline plus live-server negative/status/header parity; MRA-E023 records local audit helper fail-open/error visibility proof while admin-auth .admin.spec.ts suites, ignored admin-host race, admin report/listing moderation browser coverage, authenticated admin signed-URL success, real storage/provider behavior, live browser/admin-operation audit failure injection, production observability delivery, provider telemetry, and database outage runtime proof remain unverified.",
   "primaryArtifacts": [
     "README.md",
     "00-feature-boundary.md",
@@ -42,7 +42,7 @@
       "id": "MRA-M002",
       "name": "Admin auth and audit logging",
       "status": "documented",
-      "evidence": ["MRA-E003", "MRA-E004", "MRA-E015"]
+      "evidence": ["MRA-E003", "MRA-E004", "MRA-E015", "MRA-E023"]
     },
     {
       "id": "MRA-M003",
@@ -66,7 +66,7 @@
       "id": "MRA-M006",
       "name": "Tests and runtime verification",
       "status": "partial",
-      "evidence": ["MRA-E016", "MRA-E019", "MRA-E020", "MRA-E021", "MRA-E022", "MRA-G001", "MRA-G002", "MRA-G003"]
+      "evidence": ["MRA-E016", "MRA-E019", "MRA-E020", "MRA-E021", "MRA-E022", "MRA-E023", "MRA-G001", "MRA-G002", "MRA-G003", "MRA-G005"]
     },
     {
       "id": "MRA-M007",
@@ -84,7 +84,7 @@
     {
       "id": "MRA-C002",
       "claim": "Admin user, listing, report, and verification actions require admin auth and use rate limits, row locks or state checks where relevant, audit logging, and revalidation.",
-      "evidence": ["MRA-E003", "MRA-E004", "MRA-E005", "MRA-E006", "MRA-E007", "MRA-E008", "MRA-E009", "MRA-E012"]
+      "evidence": ["MRA-E003", "MRA-E004", "MRA-E005", "MRA-E006", "MRA-E007", "MRA-E008", "MRA-E009", "MRA-E012", "MRA-E023"]
     },
     {
       "id": "MRA-C003",
