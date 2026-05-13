@@ -8,6 +8,15 @@
  */
 
 import { test, expect, timeouts } from "../helpers";
+import type { Page } from "@playwright/test";
+
+async function waitForSavedSearchListHydration(page: Page) {
+  await expect(page.getByTestId("saved-search-list")).toHaveAttribute(
+    "data-hydrated",
+    "true",
+    { timeout: timeouts.upload }
+  );
+}
 
 // ─── Block 1: Read-only ─────────────────────────────────────────────────────
 test.describe("SS: Saved Searches Read-only", () => {
@@ -215,6 +224,7 @@ test.describe("SS: Saved Searches Mutations", () => {
     await expect(
       page.getByRole("heading", { name: /saved searches/i, level: 1 })
     ).toBeVisible({ timeout: timeouts.navigation });
+    await waitForSavedSearchListHydration(page);
 
     const deleteBtn = page.locator('button[title="Delete search"]').first();
     try {
@@ -225,7 +235,7 @@ test.describe("SS: Saved Searches Mutations", () => {
     }
 
     const countBefore = await page
-      .getByText(/SF Under|Mission District/i)
+      .locator('button[title="Delete search"]')
       .count();
 
     // Handle native browser confirm dialog — accept it
@@ -237,12 +247,13 @@ test.describe("SS: Saved Searches Mutations", () => {
 
     await deleteBtn.click();
 
-    // Count should decrease
+    // One saved-search row should be removed, regardless of which seeded or
+    // test-created search appears first in the current suite order.
     await expect(async () => {
       const countAfter = await page
-        .getByText(/SF Under|Mission District/i)
+        .locator('button[title="Delete search"]')
         .count();
-      expect(countAfter).toBeLessThan(countBefore);
+      expect(countAfter).toBe(countBefore - 1);
     }).toPass({ timeout: timeouts.action });
   });
 

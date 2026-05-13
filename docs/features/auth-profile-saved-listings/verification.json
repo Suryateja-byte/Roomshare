@@ -2,7 +2,7 @@
   "featureSlug": "auth-profile-saved-listings",
   "status": "partial",
   "verifiedAt": "2026-05-13",
-  "method": "source audit plus test discovery plus focused route/action Jest commands recorded in APS-E018 and APS-E019",
+  "method": "source audit plus test discovery, focused route/action Jest commands recorded in APS-E018 and APS-E019, focused Chromium browser gate recorded in APS-E020, and local/mocked provider-adjacent Jest command recorded in APS-E021 through APS-E024",
   "claims": [
     {
       "claimId": "V-APS-001",
@@ -31,10 +31,10 @@
     {
       "claimId": "V-APS-004",
       "claim": "Browser/runtime behavior and focused tests have been verified.",
-      "citation": "runtime-verification.md; APS-E018, APS-E019, APS-G001, APS-G002, APS-G003",
+      "citation": "runtime-verification.md; APS-E018, APS-E019, APS-E020, APS-E021, APS-E022, APS-E023, APS-E024, APS-G001, APS-G002, APS-G003, APS-G005",
       "verdict": "partial",
-      "discrepancy": "Focused route/action Jest coverage passed in APS-E018 and APS-E019, but browser, provider-runtime, and optional live HTTP transport parity remain unverified.",
-      "recommendedFix": "Run the browser/provider checks in 11-test-traceability-matrix.md and optionally add live HTTP transport parity coverage."
+      "discrepancy": "Focused route/action Jest coverage passed in APS-E018 and APS-E019, the focused Chromium browser gate passed in APS-E020, and local/mocked provider-adjacent checks passed in APS-E021 through APS-E024. Real Google IdP OAuth, Cloudflare Turnstile siteverify, Resend delivery/inbox receipt, Stripe hosted checkout/webhook/provider fulfillment, and optional live HTTP transport parity remain unverified.",
+      "recommendedFix": "Run real-provider checks for Google, Cloudflare Turnstile, Resend, and Stripe in a non-production-safe environment with test credentials, and optionally add live HTTP transport parity coverage."
     },
     {
       "claimId": "V-APS-005",
@@ -47,19 +47,14 @@
   ],
   "coverageGaps": [
     {
-      "manifestItem": "Runtime browser behavior",
-      "gap": "Full browser auth/profile/settings/saved-listings/saved-searches suite was not run.",
-      "severity": "P1"
-    },
-    {
       "manifestItem": "Direct API verification",
       "gap": "Focused route/action status, CSRF, and auth/favorites private no-store checks passed in APS-E019. Optional live HTTP transport parity remains unrun.",
       "severity": "P2"
     },
     {
       "manifestItem": "External providers",
-      "gap": "Google OAuth, Turnstile, email delivery, and checkout return behavior were not runtime verified.",
-      "severity": "P1"
+      "gap": "Local/mocked provider-adjacent paths passed in APS-E021 through APS-E024, but real Google IdP OAuth, Cloudflare Turnstile siteverify, Resend delivery/inbox receipt, and Stripe hosted checkout/webhook/provider fulfillment were not runtime verified.",
+      "severity": "P2"
     },
     {
       "manifestItem": "Account deletion retention",
@@ -68,7 +63,7 @@
     },
     {
       "manifestItem": "Saved-search checkout",
-      "gap": "Saved-search alert paywall and checkout fulfillment are source-observed but not payment-runtime verified.",
+      "gap": "Saved-search alert paywall and checkout routes/components have local mocked coverage, but real Stripe hosted checkout, webhook, and provider fulfillment are not payment-runtime verified.",
       "severity": "P2"
     }
   ]

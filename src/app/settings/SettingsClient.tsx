@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { signOut } from "next-auth/react";
 import { toast } from "sonner";
@@ -51,6 +51,7 @@ export default function SettingsClient({
 }: SettingsClientProps) {
   const [preferences, setPreferences] =
     useState<NotificationPreferences>(initialPreferences);
+  const [isHydrated, setIsHydrated] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -72,6 +73,10 @@ export default function SettingsClient({
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   const handleToggle = (key: keyof NotificationPreferences) => {
     setPreferences((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -194,7 +199,11 @@ export default function SettingsClient({
   ];
 
   return (
-    <div className="space-y-8">
+    <div
+      className="space-y-8"
+      data-hydrated={isHydrated ? "true" : "false"}
+      data-testid="settings-client"
+    >
       {/* Notification Preferences */}
       <section className="bg-surface-container-lowest rounded-lg border border-outline-variant/20 overflow-hidden">
         <div className="p-6 pb-6">
@@ -428,8 +437,8 @@ export default function SettingsClient({
             <div>
               <p className="text-sm text-on-surface-variant mb-4">
                 Once you delete your account, there is no going back. Your
-                sign-in access and personal profile data will be removed; safety,
-                fraud, and legal records may be retained when required.
+                sign-in access and personal profile data will be removed;
+                safety, fraud, and legal records may be retained when required.
               </p>
               <Button
                 variant="destructive"
@@ -448,8 +457,8 @@ export default function SettingsClient({
                   </p>
                   <p className="text-sm text-red-700 mt-1">
                     This will delete your account ({userEmail}) and remove
-                    personal access. Some safety, fraud, and legal records may be
-                    retained when required.
+                    personal access. Some safety, fraud, and legal records may
+                    be retained when required.
                   </p>
                 </div>
               </div>

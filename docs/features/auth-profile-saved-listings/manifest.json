@@ -2,7 +2,7 @@
   "featureSlug": "auth-profile-saved-listings",
   "status": "complete_with_gaps",
   "statusDate": "2026-05-13",
-  "sourceOfTruth": "Current dirty worktree source audit on 2026-05-10 plus focused route/action test evidence APS-E018 and APS-E019 on 2026-05-13; runtime and test commands are marked not run unless listed in verification artifacts.",
+  "sourceOfTruth": "Current dirty worktree source audit on 2026-05-10 plus focused route/action test evidence APS-E018 and APS-E019, focused Chromium browser evidence APS-E020, and local/mocked provider-adjacent evidence APS-E021 through APS-E024 on 2026-05-13; runtime and test commands are marked not run unless listed in verification artifacts.",
   "primaryArtifacts": [
     "README.md",
     "00-feature-boundary.md",
@@ -72,25 +72,25 @@
       "id": "APS-M007",
       "name": "Tests and runtime verification",
       "status": "partially-verified",
-      "evidence": ["APS-E017", "APS-E018", "APS-E019", "APS-G001", "APS-G002", "APS-G003"]
+      "evidence": ["APS-E017", "APS-E018", "APS-E019", "APS-E020", "APS-E021", "APS-E022", "APS-E023", "APS-E024", "APS-G001", "APS-G002", "APS-G003", "APS-G005"]
     }
   ],
   "claims": [
     {
       "id": "APS-C001",
       "claim": "Authentication uses JWT-backed Auth.js sessions with protected/admin route guards, account-state checks, password-change revocation, Google verified-email protection, and credentials rate limit plus Turnstile.",
-      "evidence": ["APS-E001", "APS-E002", "APS-E003"]
+      "evidence": ["APS-E001", "APS-E002", "APS-E003", "APS-E021", "APS-E022"]
     },
     {
       "id": "APS-C002",
       "claim": "Registration, email verification, password reset, and resend flows use CSRF or rate limits as applicable, hashed tokens, expiration checks, and transaction boundaries.",
-      "evidence": ["APS-E006", "APS-E007", "APS-E008", "APS-E009"]
+      "evidence": ["APS-E006", "APS-E007", "APS-E008", "APS-E009", "APS-E023"]
     },
     {
       "id": "APS-C003",
       "claim": "Profile, settings, saved listings, favorites, and saved searches are auth-scoped account surfaces with source-backed validation, persistence, and mutation controls.",
-      "evidence": ["APS-E010", "APS-E011", "APS-E012", "APS-E013", "APS-E014", "APS-E015", "APS-E016"]
+      "evidence": ["APS-E010", "APS-E011", "APS-E012", "APS-E013", "APS-E014", "APS-E015", "APS-E016", "APS-E024"]
     }
   ],
-  "knownGaps": ["APS-G001", "APS-G002", "APS-G003", "APS-G004", "APS-G005"]
+  "knownGaps": ["APS-G002", "APS-G003", "APS-G004", "APS-G005"]
 }

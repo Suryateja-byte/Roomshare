@@ -24,6 +24,6 @@
 
 | Unknown | Severity | Evidence |
 | --- | --- | --- |
-| Full browser auth/profile/settings/saved-listings/saved-searches suite was not run in this documentation pass. | P1 | APS-G001 |
+| Focused Chromium auth/profile/settings/saved-listings/saved-searches browser gate passed. | Closed | APS-E020, APS-G001 |
 | Direct route/action checks for auth recovery, favorites, saved-search actions, settings actions, CSRF variants, and private no-store headers are verified by APS-E018 and APS-E019. Optional live HTTP transport parity remains unrun. | P2 | APS-G002 |
-| External provider behavior for Google OAuth, Turnstile, email delivery, and checkout return was not runtime verified in this pass. | P1 | APS-G003 |
+| Local/mocked provider-adjacent behavior is verified by APS-E021 through APS-E024, but real Google IdP OAuth, Cloudflare Turnstile `siteverify`, Resend delivery/inbox receipt, and Stripe hosted checkout/webhook/provider fulfillment remain unverified. | P2 | APS-G003 |

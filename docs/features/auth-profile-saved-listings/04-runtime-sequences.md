@@ -36,4 +36,4 @@
 | 2 | Delete action validates auth, rate limit, password or fresh OAuth session. | APS-E015 |
 | 3 | Transaction locks user and owned listings, suppresses reported listings, tombstones/deletes unreported listings, removes account-owned records, clears identity fields, marks user suspended, and returns summary. | APS-E015 |
 
-Runtime/browser observation gap: no browser session was run in this pass; see APS-G001 and `runtime-verification.md`.
+Runtime/browser observation: the focused Chromium browser gate passed in APS-E020; provider-backed OAuth, Turnstile, email delivery, and saved-search checkout fulfillment remain unverified in APS-G003/APS-G005.

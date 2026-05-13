@@ -75,9 +75,11 @@ export default function SavedSearchList({
   const [alertPaywallSummary, setAlertPaywallSummary] = useState(
     initialAlertPaywallSummary
   );
+  const [isHydrated, setIsHydrated] = useState(false);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [isOpeningCheckout, setIsOpeningCheckout] = useState(false);
-  const [checkoutPhase, setCheckoutPhase] = useState<AlertsCheckoutPhase>("IDLE");
+  const [checkoutPhase, setCheckoutPhase] =
+    useState<AlertsCheckoutPhase>("IDLE");
   const [checkoutNotice, setCheckoutNotice] =
     useState<CheckoutReturnNotice | null>(null);
   const router = useRouter();
@@ -94,6 +96,10 @@ export default function SavedSearchList({
   );
   const disableUnlockActions =
     isOpeningCheckout || checkoutPhase !== "IDLE" || unlockOffer === null;
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   const replaceWithoutCheckoutParams = useCallback(() => {
     const params = new URLSearchParams(searchParamsString);
@@ -138,9 +144,10 @@ export default function SavedSearchList({
         }),
       });
 
-      const payload = (await response.json().catch(() => null)) as
-        | { error?: string; checkoutUrl?: string }
-        | null;
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string;
+        checkoutUrl?: string;
+      } | null;
 
       if (response.status === 401) {
         router.push("/login");
@@ -161,10 +168,7 @@ export default function SavedSearchList({
     }
   };
 
-  const handleToggleAlert = async (
-    id: string,
-    currentEnabled: boolean
-  ) => {
+  const handleToggleAlert = async (id: string, currentEnabled: boolean) => {
     setLoadingId(id);
     try {
       const result = await toggleSearchAlert(id, !currentEnabled);
@@ -183,7 +187,9 @@ export default function SavedSearchList({
           )
         );
         if (!currentEnabled && result.effectiveAlertState === "LOCKED") {
-          toast.info("Alerts are saved, but locked until you unlock Mover's Pass.");
+          toast.info(
+            "Alerts are saved, but locked until you unlock Mover's Pass."
+          );
         }
       } else if ("error" in result && result.error) {
         toast.error(result.error);
@@ -216,6 +222,10 @@ export default function SavedSearchList({
   };
 
   useEffect(() => {
+    if (!isHydrated) {
+      return;
+    }
+
     if (alertsCheckoutParam === "cancelled") {
       setCheckoutPhase("IDLE");
       setCheckoutNotice({
@@ -368,6 +378,7 @@ export default function SavedSearchList({
   }, [
     alertsCheckoutParam,
     checkoutSessionId,
+    isHydrated,
     markAlertStatesActive,
     pathname,
     replaceWithoutCheckoutParams,
@@ -429,7 +440,11 @@ export default function SavedSearchList({
   };
 
   return (
-    <div className="space-y-4">
+    <div
+      className="space-y-4"
+      data-hydrated={isHydrated ? "true" : "false"}
+      data-testid="saved-search-list"
+    >
       {checkoutNotice && (
         <div
           className={`rounded-2xl border px-4 py-3 text-sm ${

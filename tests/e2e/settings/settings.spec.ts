@@ -10,6 +10,7 @@
  */
 
 import { test, expect, timeouts, waitForHydration } from "../helpers";
+import type { Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { A11Y_CONFIG } from "../helpers/test-utils";
 
@@ -18,6 +19,33 @@ import { A11Y_CONFIG } from "../helpers/test-utils";
 // ---------------------------------------------------------------------------
 
 const SETTINGS_URL = "/settings";
+
+async function waitForSettingsClientHydration(page: Page) {
+  const settingsClient = page.getByTestId("settings-client");
+  await settingsClient.waitFor({
+    state: "visible",
+    timeout: timeouts.navigation,
+  });
+
+  const hydrated = await expect(settingsClient)
+    .toHaveAttribute("data-hydrated", "true", { timeout: 15_000 })
+    .then(() => true)
+    .catch(() => false);
+
+  if (hydrated) {
+    return;
+  }
+
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await waitForHydration(page);
+  await settingsClient.waitFor({
+    state: "visible",
+    timeout: timeouts.navigation,
+  });
+  await expect(settingsClient).toHaveAttribute("data-hydrated", "true", {
+    timeout: timeouts.navigation,
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Block 1: Read-only tests (parallel safe)
@@ -141,6 +169,7 @@ test.describe("Settings — Read-only", () => {
   }) => {
     await page.goto(SETTINGS_URL, { waitUntil: "domcontentloaded" });
     await waitForHydration(page);
+    await waitForSettingsClientHydration(page);
 
     await expect(
       page.getByRole("heading", { name: "Email Notifications" })
@@ -256,6 +285,7 @@ test.describe("Settings — Notification Preferences", () => {
     await expect(
       page.getByRole("heading", { name: "Email Notifications" })
     ).toBeVisible({ timeout: timeouts.navigation });
+    await waitForSettingsClientHydration(page);
 
     // Toggle the last switch (Marketing — least likely to cause side effects)
     const toggles = page.getByRole("switch");
@@ -263,10 +293,19 @@ test.describe("Settings — Notification Preferences", () => {
     await expect(lastToggle).toBeVisible();
 
     const initialChecked = await lastToggle.getAttribute("aria-checked");
+    if (initialChecked === null) {
+      throw new Error("Marketing notification toggle is missing aria-checked");
+    }
+
+    const expectedChecked = initialChecked === "true" ? "false" : "true";
     await lastToggle.click();
+    await expect(lastToggle).toHaveAttribute("aria-checked", expectedChecked, {
+      timeout: timeouts.action,
+    });
 
     // Save
     const saveButton = page.getByRole("button", { name: "Save Preferences" });
+    await expect(saveButton).toBeEnabled();
     await saveButton.click();
     await expect(page.getByRole("button", { name: "Saved!" })).toBeVisible({
       timeout: timeouts.action,
@@ -277,18 +316,30 @@ test.describe("Settings — Notification Preferences", () => {
     await expect(
       page.getByRole("heading", { name: "Email Notifications" })
     ).toBeVisible({ timeout: timeouts.navigation });
+    await waitForSettingsClientHydration(page);
 
     // Page loaded without error — verify the setting persisted
     const reloadedToggle = page.getByRole("switch").last();
     const reloadedChecked = await reloadedToggle.getAttribute("aria-checked");
 
     // The toggled value should have persisted
-    const expectedChecked = initialChecked === "true" ? "false" : "true";
     expect(reloadedChecked).toBe(expectedChecked);
 
     // Toggle it back to original state to avoid polluting other tests
     await reloadedToggle.click();
-    await saveButton.click();
+    await expect(reloadedToggle).toHaveAttribute(
+      "aria-checked",
+      initialChecked,
+      {
+        timeout: timeouts.action,
+      }
+    );
+
+    const resetSaveButton = page.getByRole("button", {
+      name: "Save Preferences",
+    });
+    await expect(resetSaveButton).toBeEnabled();
+    await resetSaveButton.click();
     await expect(page.getByRole("button", { name: "Saved!" })).toBeVisible({
       timeout: timeouts.action,
     });
@@ -438,6 +489,7 @@ test.describe("Settings — Password Change", () => {
   test("ST-08: wrong current password shows error", async ({ page }) => {
     await page.goto(SETTINGS_URL, { waitUntil: "domcontentloaded" });
     await waitForHydration(page);
+    await waitForSettingsClientHydration(page);
 
     const changePasswordHeading = page.getByRole("heading", {
       name: "Change Password",
@@ -452,9 +504,21 @@ test.describe("Settings — Password Change", () => {
     }
 
     // Fill with deliberately wrong current password
-    await page.locator("#currentPassword").fill("TotallyWrongPassword999!");
-    await page.locator("#newPassword").fill("NewStrongPassword123!");
-    await page.locator("#confirmPassword").fill("NewStrongPassword123!");
+    const currentPwField = page.locator("#currentPassword");
+    const newPwField = page.locator("#newPassword");
+    const confirmPwField = page.locator("#confirmPassword");
+
+    await currentPwField.click();
+    await currentPwField.fill("TotallyWrongPassword999!");
+    await expect(currentPwField).toHaveValue("TotallyWrongPassword999!");
+
+    await newPwField.click();
+    await newPwField.fill("NewStrongPassword123!");
+    await expect(newPwField).toHaveValue("NewStrongPassword123!");
+
+    await confirmPwField.click();
+    await confirmPwField.fill("NewStrongPassword123!");
+    await expect(confirmPwField).toHaveValue("NewStrongPassword123!");
 
     // Submit
     await page.getByRole("button", { name: "Change Password" }).click();
@@ -478,6 +542,7 @@ test.describe("Settings — Password Change", () => {
   }) => {
     await page.goto(SETTINGS_URL, { waitUntil: "domcontentloaded" });
     await waitForHydration(page);
+    await waitForSettingsClientHydration(page);
 
     const changePasswordHeading = page.getByRole("heading", {
       name: "Change Password",
