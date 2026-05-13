@@ -106,8 +106,8 @@
     },
     {
       "claimId": "V014",
-      "claim": "Desktop map preference, focused list-backed map parity, marker/list focus, pan/zoom URL state, mobile map/list behavior, map error/a11y behavior, and /api/map-listings 500/429 retry behavior have passing browser coverage; provider terminology remains incomplete.",
-      "citation": "README.md; 02-user-flows.md; 12-gaps-unknowns-and-questions.md G001, G005, G011; evidence-register.md C031, C056, C058",
+      "claim": "Desktop map preference, focused list-backed map parity, marker/list focus, pan/zoom URL state, mobile map/list behavior, map error/a11y behavior, and /api/map-listings 500/429 retry behavior have passing browser coverage; provider terminology is documented as MapLibre runtime with OpenFreeMap/OpenStreetMap map resources.",
+      "citation": "README.md; 02-user-flows.md; 12-gaps-unknowns-and-questions.md G001, G005, G011; evidence-register.md C031, C056, C058, C059",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -122,8 +122,8 @@
     },
     {
       "claimId": "V016",
-      "claim": "Map provider terminology is not yet fully settled because code/config evidence points to MapLibre/Stadia while some comments mention Mapbox.",
-      "citation": "12-gaps-unknowns-and-questions.md G005; evidence-register.md C027",
+      "claim": "The current Search Map provider stack is documented as MapLibre runtime with OpenFreeMap light style, local dark style, and OpenStreetMap fallback; Stadia config exists but is not proven active for Search Map; remaining Mapbox wording is stale comments, optional scripts, compatibility wording, or fixture naming.",
+      "citation": "12-gaps-unknowns-and-questions.md G005; evidence-register.md C059; src/components/Map.tsx; src/app/layout.tsx; src/lib/csp.ts; src/lib/maps/stadia.ts; .env.example",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -461,8 +461,8 @@
     },
     {
       "manifestItem": "map provider/runtime rendering",
-      "gap": "Desktop, mobile, map error/a11y, and /api/map-listings 500/429 browser behavior have passing search-harness coverage with mocked map resources, but provider terminology still needs cleanup because comments/config mix Mapbox, MapLibre, and Stadia terms.",
-      "severity": "P1"
+      "gap": "Desktop, mobile, map error/a11y, and /api/map-listings 500/429 browser behavior have passing search-harness coverage with mocked map resources. Provider terminology is now documented as MapLibre runtime with OpenFreeMap/OpenStreetMap map resources; dormant Stadia config and stale Mapbox comments/fixture names remain optional maintenance cleanup.",
+      "severity": "P2"
     },
     {
       "manifestItem": "contact-host entry point",

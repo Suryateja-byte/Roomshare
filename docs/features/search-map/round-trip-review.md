@@ -251,6 +251,6 @@ verification status, compact API/cache/payload reconstruction, state-machine
 coverage, and release-blocking test traceability. Remaining work is limited to
 P1/P2 confidence-building gaps already listed in `12-gaps-unknowns-and-questions.md`
 and `unknowns.md`: broader non-gate map/list/filter/pagination/mobile coverage,
-provider terminology cleanup, direct contact-host handoff verification,
-saved-search auth/paywall runtime coverage, and optional generated API/test-index
-artifacts.
+direct contact-host handoff verification, saved-search auth/paywall runtime
+coverage, optional stale Mapbox comment/fixture cleanup, and optional generated
+API/test-index artifacts.

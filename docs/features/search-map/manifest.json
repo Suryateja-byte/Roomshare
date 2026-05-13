@@ -763,7 +763,7 @@
     {
       "manifestArea": "externalServices/environmentVariables",
       "coverageDoc": "08-auth-security-permissions.md; 10-performance-observability.md; 12-gaps-unknowns-and-questions.md G005",
-      "status": "Provider/env references are documented with the remaining Mapbox/MapLibre/Stadia terminology cleanup kept as a P1 wording/verification gap."
+      "status": "Provider/env references are documented as MapLibre runtime plus OpenFreeMap light style, local dark style, and OpenStreetMap fallback. Stadia config exists but is not proven active for Search Map. Remaining Mapbox wording is stale source-comment, optional-script, compatibility, or fixture naming cleanup and is no longer a P1 documentation blocker."
     },
     {
       "manifestArea": "unknowns",
@@ -773,9 +773,14 @@
   ],
   "externalServices": [
     {
-      "name": "Stadia Maps / MapLibre style tiles",
-      "evidence": ".env.example:L176-L193, src/lib/maps/stadia.ts:L22-L61, src/lib/csp.ts:L14-L15",
+      "name": "MapLibre runtime + OpenFreeMap/OpenStreetMap map resources",
+      "evidence": "src/components/Map.tsx:L6-L23, L1073-L1081, L3441-L3469, L3528-L3539; src/app/layout.tsx:L72-L74; src/lib/csp.ts:L1-L20, L80-L86; .env.example:L110-L112",
       "confidence": "Verified"
+    },
+    {
+      "name": "Stadia Maps dormant config",
+      "evidence": ".env.example:L176-L193, src/lib/maps/stadia.ts:L1-L62, src/lib/csp.ts:L14-L15",
+      "confidence": "Partially verified"
     },
     {
       "name": "Photon geocoding autocomplete",
@@ -788,9 +793,9 @@
       "confidence": "Partially verified"
     },
     {
-      "name": "Mapbox terminology / optional scripts",
+      "name": "Mapbox optional scripts / stale terminology",
       "evidence": "src/app/search/layout.tsx:L24-L41, .env.example:L196-L200",
-      "confidence": "Contradicted"
+      "confidence": "Partially verified"
     },
     {
       "name": "Redis-backed rate limiting",
@@ -855,7 +860,7 @@
       "confidence": "Verified"
     },
     {
-      "name": "NEXT_PUBLIC_STADIA_MAPS_API_KEY",
+      "name": "NEXT_PUBLIC_STADIA_API_KEY",
       "evidence": ".env.example:L176-L193, src/lib/env.ts:L357-L370, L449-L456, L596-L598",
       "confidence": "Verified"
     },
@@ -870,7 +875,7 @@
     "Discovered tests are grouped in this manifest; the release-blocking subset and focused API/unit/privacy checks have passing evidence, while broader grouped families are listed as not run.",
     "Direct contact-host entry point from search cards was not verified; listing cards link to listing detail pages.",
     "\"Search this area\" appears only in a comment describing a removed deferred flow.",
-    "Map provider terminology is inconsistent: code comments mention Mapbox while env/config evidence points to Stadia Maps / MapLibre for the main app.",
+    "Map provider terminology is reduced to a P2 maintenance cleanup: current docs identify MapLibre runtime with OpenFreeMap light style, local dark style, and OpenStreetMap fallback. Stadia config exists but is not proven active for Search Map, while stale Mapbox wording remains in comments, optional scripts, compatibility language, or fixture names.",
     "Some search-related files remain dirty or untracked; C057 records them as local-only discovery caveats, not standalone passing evidence.",
     "Grouped manifest entries are covered by the groupedCoverage table rather than by a generated per-file index; exact per-file inventory generation remains optional P2 follow-up work."
   ]

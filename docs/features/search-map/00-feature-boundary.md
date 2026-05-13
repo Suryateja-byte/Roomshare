@@ -27,7 +27,7 @@ broader E2E coverage remains outside verified evidence until it is run.
 - sorting
 - pagination, cursor, or page logic
 - map markers
-- Mapbox interactions
+- MapLibre map interactions and OpenFreeMap/OpenStreetMap style/tile paths
 - bounds updates
 - listing cards
 - save or favorite behavior if connected to search cards
