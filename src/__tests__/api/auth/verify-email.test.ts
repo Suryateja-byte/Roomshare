@@ -88,6 +88,7 @@ describe("Verify Email API", () => {
       const response = await GET(createGetRequest(VALID_TOKEN));
 
       expect(response.status).toBe(307);
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store");
       expect(response.headers.get("location")).toBe(
         `http://localhost:3000/verify-email?token=${VALID_TOKEN}`
       );
@@ -121,6 +122,7 @@ describe("Verify Email API", () => {
       const response = await POST(createPostRequest({ token: VALID_TOKEN }));
 
       expect(response).toBe(csrfResponse);
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store");
       expect(withRateLimit).not.toHaveBeenCalled();
       expect(findVerificationTokenByHash).not.toHaveBeenCalled();
       expect(prisma.user.findUnique).not.toHaveBeenCalled();
@@ -161,6 +163,7 @@ describe("Verify Email API", () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store");
       expect(data.status).toBe("verified");
       expect(findVerificationTokenByHash).toHaveBeenCalledWith(
         hashToken(VALID_TOKEN)
@@ -222,6 +225,7 @@ describe("Verify Email API", () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store");
       expect(data.code).toBe("missing_token");
       expect(findVerificationTokenByHash).not.toHaveBeenCalled();
     });
@@ -329,6 +333,7 @@ describe("Verify Email API", () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store");
       expect(data.status).toBe("already_verified");
     });
 
@@ -412,6 +417,7 @@ describe("Verify Email API", () => {
 
     it("returns the rate-limit response when limited", async () => {
       const mockRateLimitResponse = {
+        headers: new Headers(),
         status: 429,
         json: async () => ({ error: "Too many requests" }),
       };
@@ -420,6 +426,7 @@ describe("Verify Email API", () => {
       const response = await POST(createPostRequest({ token: VALID_TOKEN }));
 
       expect(response).toBe(mockRateLimitResponse);
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store");
       expect(findVerificationTokenByHash).not.toHaveBeenCalled();
     });
 

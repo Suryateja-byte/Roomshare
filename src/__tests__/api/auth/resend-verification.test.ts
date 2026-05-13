@@ -86,6 +86,7 @@ describe("Resend Verification API", () => {
     const response = await POST(createRequest());
 
     expect(response).toBe(csrfResponse);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(withRateLimit).not.toHaveBeenCalled();
     expect(auth).not.toHaveBeenCalled();
     expect(prisma.user.findUnique).not.toHaveBeenCalled();
@@ -108,6 +109,7 @@ describe("Resend Verification API", () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(data.message).toBe("Verification email sent successfully");
     expect(prepareVerificationTokenRotation).toHaveBeenCalledWith(
       "test@example.com"
@@ -158,6 +160,7 @@ describe("Resend Verification API", () => {
     const data = await response.json();
 
     expect(response.status).toBe(401);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(data.error).toBe(
       "You must be logged in to resend verification email"
     );
@@ -206,6 +209,7 @@ describe("Resend Verification API", () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(data.error).toBe("Email is already verified");
   });
 
@@ -253,6 +257,7 @@ describe("Resend Verification API", () => {
 
   it("returns rate limit response when limited", async () => {
     const mockRateLimitResponse = {
+      headers: new Headers(),
       status: 429,
       json: async () => ({ error: "Too many requests" }),
     };
@@ -262,6 +267,7 @@ describe("Resend Verification API", () => {
     const response = await POST(request);
 
     expect(response).toBe(mockRateLimitResponse);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(auth).not.toHaveBeenCalled();
   });
 
@@ -279,6 +285,7 @@ describe("Resend Verification API", () => {
     const data = await response.json();
 
     expect(response.status).toBe(500);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(data.error).toBe("Failed to send verification email");
   });
 
@@ -304,6 +311,7 @@ describe("Resend Verification API", () => {
     const data = await response.json();
 
     expect(response.status).toBe(503);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(data.error).toBe("Email service temporarily unavailable");
     expect(clearPendingVerificationToken).toHaveBeenCalledWith(
       "test@example.com",

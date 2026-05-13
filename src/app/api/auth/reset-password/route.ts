@@ -20,6 +20,16 @@ const resetPasswordSchema = z.object({
 
 const RESET_LINK_INVALIDATED_ERROR =
   "This reset link is no longer valid. Please request a new one.";
+const PRIVATE_NO_STORE = "private, no-store";
+
+function withPrivateNoStore<T extends Response>(response: T): T {
+  response.headers.set("Cache-Control", PRIVATE_NO_STORE);
+  return response;
+}
+
+function privateNoStoreJson(body: unknown, init?: ResponseInit) {
+  return withPrivateNoStore(NextResponse.json(body, init));
+}
 
 type ResetValidationErrorCode =
   | "invalid"
@@ -97,20 +107,20 @@ async function validateResetToken(
 function buildPostError(code: ResetValidationErrorCode) {
   switch (code) {
     case "expired":
-      return NextResponse.json(
+      return privateNoStoreJson(
         { error: "Reset link has expired. Please request a new one." },
         { status: 400 }
       );
     case "stale":
-      return NextResponse.json(
+      return privateNoStoreJson(
         { error: RESET_LINK_INVALIDATED_ERROR },
         { status: 400 }
       );
     case "userNotFound":
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return privateNoStoreJson({ error: "User not found" }, { status: 404 });
     case "invalid":
     default:
-      return NextResponse.json(
+      return privateNoStoreJson(
         { error: "Invalid or expired reset link" },
         { status: 400 }
       );
@@ -120,19 +130,19 @@ function buildPostError(code: ResetValidationErrorCode) {
 function buildGetError(code: ResetValidationErrorCode) {
   switch (code) {
     case "expired":
-      return NextResponse.json(
+      return privateNoStoreJson(
         { valid: false, error: "Reset link has expired" },
         { status: 400 }
       );
     case "stale":
-      return NextResponse.json(
+      return privateNoStoreJson(
         { valid: false, error: RESET_LINK_INVALIDATED_ERROR },
         { status: 400 }
       );
     case "userNotFound":
     case "invalid":
     default:
-      return NextResponse.json(
+      return privateNoStoreJson(
         { valid: false, error: "Invalid reset link" },
         { status: 400 }
       );
@@ -141,13 +151,13 @@ function buildGetError(code: ResetValidationErrorCode) {
 
 export async function POST(request: NextRequest) {
   const csrfResponse = validateCsrf(request);
-  if (csrfResponse) return csrfResponse;
+  if (csrfResponse) return withPrivateNoStore(csrfResponse);
 
   // P1-2 FIX: Add rate limiting to prevent token brute-forcing
   const rateLimitResponse = await withRateLimit(request, {
     type: "resetPassword",
   });
-  if (rateLimitResponse) return rateLimitResponse;
+  if (rateLimitResponse) return withPrivateNoStore(rateLimitResponse);
 
   try {
     const body = await request.json();
@@ -155,7 +165,7 @@ export async function POST(request: NextRequest) {
     // Validate input
     const result = resetPasswordSchema.safeParse(body);
     if (!result.success) {
-      return NextResponse.json(
+      return privateNoStoreJson(
         { error: result.error.issues[0].message },
         { status: 400 }
       );
@@ -163,7 +173,7 @@ export async function POST(request: NextRequest) {
 
     const { token, password } = result.data;
     if (!isValidTokenFormat(token)) {
-      return NextResponse.json(
+      return privateNoStoreJson(
         { error: "Invalid or expired reset link" },
         { status: 400 }
       );
@@ -207,13 +217,13 @@ export async function POST(request: NextRequest) {
 
     invalidatePasswordState(validation.user.id);
 
-    return NextResponse.json({
+    return privateNoStoreJson({
       message: "Password has been reset successfully",
     });
   } catch (error) {
     // P0-2 FIX: Discriminate expected race condition from real errors
     if (error instanceof Error && error.message === "RESET_LINK_INVALIDATED") {
-      return NextResponse.json(
+      return privateNoStoreJson(
         { error: RESET_LINK_INVALIDATED_ERROR },
         { status: 400 }
       );
@@ -224,7 +234,7 @@ export async function POST(request: NextRequest) {
       route: "/api/auth/reset-password",
     });
     Sentry.captureException(error);
-    return NextResponse.json(
+    return privateNoStoreJson(
       { error: "An error occurred. Please try again." },
       { status: 500 }
     );
@@ -237,20 +247,20 @@ export async function GET(request: NextRequest) {
   const rateLimitResponse = await withRateLimit(request, {
     type: "resetPasswordVerify",
   });
-  if (rateLimitResponse) return rateLimitResponse;
+  if (rateLimitResponse) return withPrivateNoStore(rateLimitResponse);
 
   const { searchParams } = new URL(request.url);
   const token = searchParams.get("token");
 
   if (!token) {
-    return NextResponse.json(
+    return privateNoStoreJson(
       { valid: false, error: "Token is required" },
       { status: 400 }
     );
   }
 
   if (!isValidTokenFormat(token)) {
-    return NextResponse.json(
+    return privateNoStoreJson(
       { valid: false, error: "Invalid reset link" },
       { status: 400 }
     );
@@ -261,5 +271,5 @@ export async function GET(request: NextRequest) {
     return buildGetError(validation.code);
   }
 
-  return NextResponse.json({ valid: true });
+  return privateNoStoreJson({ valid: true });
 }

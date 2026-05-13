@@ -150,6 +150,7 @@ describe("Reset Password API", () => {
       const response = await POST(request);
 
       expect(response).toBe(csrfResponse);
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store");
       expect(withRateLimit).not.toHaveBeenCalled();
       expect(prisma.passwordResetToken.findUnique).not.toHaveBeenCalled();
       expect(preparePasswordUpdate).not.toHaveBeenCalled();
@@ -187,6 +188,7 @@ describe("Reset Password API", () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store");
       expect(data.message).toBe("Password has been reset successfully");
       expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: "user-123" },
@@ -215,6 +217,7 @@ describe("Reset Password API", () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store");
       expect(data.error).toBeDefined();
     });
 
@@ -248,6 +251,7 @@ describe("Reset Password API", () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store");
       expect(data.error).toBe("Invalid or expired reset link");
       expect(prisma.passwordResetToken.findUnique).not.toHaveBeenCalled();
     });
@@ -352,6 +356,7 @@ describe("Reset Password API", () => {
       const data = await response.json();
 
       expect(response.status).toBe(500);
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store");
       expect(data.error).toBe("An error occurred. Please try again.");
     });
 
@@ -490,6 +495,7 @@ describe("Reset Password API", () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store");
       expect(data.valid).toBe(true);
       expect(prisma.passwordResetToken.findUnique).toHaveBeenCalledWith({
         where: { tokenHash: hashToken(VALID_TOKEN) },
@@ -502,6 +508,7 @@ describe("Reset Password API", () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store");
       expect(data.valid).toBe(false);
       expect(data.error).toBe("Token is required");
     });

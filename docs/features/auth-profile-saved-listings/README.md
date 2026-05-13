@@ -8,4 +8,4 @@ Saved searches are included because `/saved-searches` is a protected account col
 
 ## Verification
 
-Current-behavior claims are source-backed. Focused route/action tests now cover APS-E018, including auth/favorites CSRF short-circuiting and favorites private no-store headers. Runtime browser flows, auth recovery explicit no-store headers, live HTTP transport parity, email delivery, OAuth provider, Turnstile provider, and payment checkout runtime checks remain tracked in `verification.json` and `runtime-verification.md`.
+Current-behavior claims are source-backed. Focused route/action tests now cover APS-E018 and APS-E019, including auth/favorites CSRF short-circuiting and auth recovery plus favorites private no-store headers. Runtime browser flows, optional live HTTP transport parity, email delivery, OAuth provider, Turnstile provider, and payment checkout runtime checks remain tracked in `verification.json` and `runtime-verification.md`.

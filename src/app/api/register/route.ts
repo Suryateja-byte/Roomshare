@@ -23,9 +23,19 @@ const registerSchema = z.object({
 
 const REGISTRATION_ACCEPTED_MIN_RESPONSE_MS = 1000;
 const REGISTRATION_ACCEPTED_JITTER_MS = 250;
+const PRIVATE_NO_STORE = "private, no-store";
+
+function withPrivateNoStore<T extends Response>(response: T): T {
+  response.headers.set("Cache-Control", PRIVATE_NO_STORE);
+  return response;
+}
+
+function privateNoStoreJson(body: unknown, init?: ResponseInit) {
+  return withPrivateNoStore(NextResponse.json(body, init));
+}
 
 const registrationAcceptedResponse = () =>
-  NextResponse.json(
+  privateNoStoreJson(
     { success: true, verificationEmailSent: true },
     { status: 201 }
   );
@@ -101,11 +111,11 @@ function isDuplicateRegistrationUniqueConstraintError(error: unknown) {
 
 export async function POST(request: Request) {
   const csrfResponse = validateCsrf(request);
-  if (csrfResponse) return csrfResponse;
+  if (csrfResponse) return withPrivateNoStore(csrfResponse);
 
   // Rate limit: 5 registrations per hour per IP
   const rateLimitResponse = await withRateLimit(request, { type: "register" });
-  if (rateLimitResponse) return rateLimitResponse;
+  if (rateLimitResponse) return withPrivateNoStore(rateLimitResponse);
 
   try {
     const body = await request.json();
@@ -114,7 +124,7 @@ export async function POST(request: Request) {
     const { turnstileToken, ...registrationData } = body;
     const turnstileResult = await verifyTurnstileToken(turnstileToken);
     if (!turnstileResult.success) {
-      return NextResponse.json(
+      return privateNoStoreJson(
         { error: "Bot verification failed. Please try again." },
         { status: 403 }
       );
@@ -131,7 +141,7 @@ export async function POST(request: Request) {
         password:
           firstIssue?.message || "Password must be at least 12 characters.",
       };
-      return NextResponse.json(
+      return privateNoStoreJson(
         {
           error:
             messages[field as string] ||
@@ -159,7 +169,10 @@ export async function POST(request: Request) {
     // Prevent user enumeration: valid existing and new emails get the same
     // accepted response shape/status. Do not churn tokens or send email here.
     if (existingUser) {
-      return registrationAcceptedAfterTiming(acceptedStartedAt, acceptedDelayMs);
+      return registrationAcceptedAfterTiming(
+        acceptedStartedAt,
+        acceptedDelayMs
+      );
     }
 
     // Generate token pair before transaction (pure computation)
@@ -226,6 +239,8 @@ export async function POST(request: Request) {
     // email delivery state to the client.
     return registrationAcceptedAfterTiming(acceptedStartedAt, acceptedDelayMs);
   } catch (error) {
-    return captureApiError(error, { route: "/api/register", method: "POST" });
+    return withPrivateNoStore(
+      captureApiError(error, { route: "/api/register", method: "POST" })
+    );
   }
 }

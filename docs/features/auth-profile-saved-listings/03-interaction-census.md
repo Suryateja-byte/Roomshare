@@ -5,9 +5,9 @@ This file is the final-form copy of `interaction-census.md`.
 | Interaction | Primary state owner | Current behavior | Evidence | Gap |
 | --- | --- | --- | --- | --- |
 | Login | Login client plus Auth.js credentials provider | Safe callback redirect, stale-session clearing, rate/credential errors, Turnstile reset, provider schema/rate/Turnstile/bcrypt. | APS-E004, APS-E002 | APS-G001, APS-G003 |
-| Signup/register | Signup client plus register API | Client validation and generic duplicate-safe server registration with verification token. | APS-E005, APS-E006 | APS-G001, APS-G002, APS-G003 |
-| Email verify/reset | Auth API routes | Hashed tokens, expiration, transaction consumption, status/error mapping. | APS-E007, APS-E008, APS-E009 | APS-G002, APS-G003 |
+| Signup/register | Signup client plus register API | Client validation and generic duplicate-safe server registration with verification token and private no-store route responses. | APS-E005, APS-E006, APS-E019 | APS-G001, APS-G003 |
+| Email verify/reset | Auth API routes | Hashed tokens, expiration, transaction consumption, status/error mapping, and private no-store route responses. | APS-E007, APS-E008, APS-E009, APS-E019 | APS-G003 |
 | Profile view/edit | Server page, profile client, profile action | Safe selected fields, edit/upload/draft/update/revalidate. | APS-E010, APS-E011 | APS-G001 |
-| Saved listings/favorites | Server page, client, server action, API route | Auth-scoped list/sort/remove/toggle/private no-store saved IDs. | APS-E012, APS-E013 | APS-G001, APS-G002 |
+| Saved listings/favorites | Server page, client, server action, API route | Auth-scoped list/sort/remove/toggle/private no-store saved IDs. | APS-E012, APS-E013, APS-E019 | APS-G001, APS-G002 |
 | Saved searches | Server page, client, actions | Auth-scoped saved search list/save/delete/toggle/rename/alert/paywall/checkout polling. | APS-E014 | APS-G001, APS-G003, APS-G005 |
-| Settings/delete account | Settings page/client/actions | Preferences, password change, blocked users UI, delete account tombstone and cleanup. | APS-E015 | APS-G001, APS-G002, APS-G004 |
+| Settings/delete account | Settings page/client/actions | Preferences, password change, blocked users UI, delete account tombstone and cleanup. | APS-E015, APS-E019 | APS-G001, APS-G004 |

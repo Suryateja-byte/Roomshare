@@ -2,7 +2,7 @@
   "featureSlug": "auth-profile-saved-listings",
   "status": "partial",
   "verifiedAt": "2026-05-13",
-  "method": "source audit plus test discovery plus focused route/action Jest command recorded in APS-E018",
+  "method": "source audit plus test discovery plus focused route/action Jest commands recorded in APS-E018 and APS-E019",
   "claims": [
     {
       "claimId": "V-APS-001",
@@ -31,10 +31,10 @@
     {
       "claimId": "V-APS-004",
       "claim": "Browser/runtime behavior and focused tests have been verified.",
-      "citation": "runtime-verification.md; APS-E018, APS-G001, APS-G002, APS-G003",
+      "citation": "runtime-verification.md; APS-E018, APS-E019, APS-G001, APS-G002, APS-G003",
       "verdict": "partial",
-      "discrepancy": "Focused route/action Jest coverage passed in APS-E018, but browser, provider-runtime, auth recovery explicit no-store headers, and live HTTP transport parity remain unverified.",
-      "recommendedFix": "Run the browser/provider checks in 11-test-traceability-matrix.md and, after approval, add or verify auth recovery no-store/live HTTP transport coverage."
+      "discrepancy": "Focused route/action Jest coverage passed in APS-E018 and APS-E019, but browser, provider-runtime, and optional live HTTP transport parity remain unverified.",
+      "recommendedFix": "Run the browser/provider checks in 11-test-traceability-matrix.md and optionally add live HTTP transport parity coverage."
     },
     {
       "claimId": "V-APS-005",
@@ -53,8 +53,8 @@
     },
     {
       "manifestItem": "Direct API verification",
-      "gap": "Focused route/action status, CSRF, and favorites cache checks passed in APS-E018; auth recovery explicit no-store headers and live HTTP transport parity remain unverified.",
-      "severity": "P1"
+      "gap": "Focused route/action status, CSRF, and auth/favorites private no-store checks passed in APS-E019. Optional live HTTP transport parity remains unrun.",
+      "severity": "P2"
     },
     {
       "manifestItem": "External providers",

@@ -10,6 +10,17 @@ import {
 } from "@/lib/verification-token-store";
 import * as Sentry from "@sentry/nextjs";
 
+const PRIVATE_NO_STORE = "private, no-store";
+
+function withPrivateNoStore<T extends Response>(response: T): T {
+  response.headers.set("Cache-Control", PRIVATE_NO_STORE);
+  return response;
+}
+
+function privateNoStoreJson(body: unknown, init?: ResponseInit) {
+  return withPrivateNoStore(NextResponse.json(body, init));
+}
+
 async function clearExpiredVerificationToken(
   identifier: string,
   slot: "active" | "pending",
@@ -47,7 +58,7 @@ function buildVerificationError(
   error: string,
   status: number
 ) {
-  return NextResponse.json(
+  return privateNoStoreJson(
     {
       status: "error",
       code,
@@ -58,17 +69,19 @@ function buildVerificationError(
 }
 
 export async function GET(request: NextRequest) {
-  return NextResponse.redirect(verificationRedirectUrl(request));
+  return withPrivateNoStore(
+    NextResponse.redirect(verificationRedirectUrl(request))
+  );
 }
 
 export async function POST(request: NextRequest) {
   const csrfResponse = validateCsrf(request);
-  if (csrfResponse) return csrfResponse;
+  if (csrfResponse) return withPrivateNoStore(csrfResponse);
 
   const rateLimitResponse = await withRateLimit(request, {
     type: "verifyEmail",
   });
-  if (rateLimitResponse) return rateLimitResponse;
+  if (rateLimitResponse) return withPrivateNoStore(rateLimitResponse);
 
   try {
     const body = (await request.json()) as { token?: unknown };
@@ -167,7 +180,7 @@ export async function POST(request: NextRequest) {
       });
     } catch (error) {
       if (error instanceof Error && error.message === "TOKEN_ALREADY_USED") {
-        return NextResponse.json({
+        return privateNoStoreJson({
           status: "already_verified",
           message: "This email address has already been verified.",
         });
@@ -197,7 +210,7 @@ export async function POST(request: NextRequest) {
       throw error;
     }
 
-    return NextResponse.json({
+    return privateNoStoreJson({
       status: "verified",
       message: "Your email address has been verified.",
     });

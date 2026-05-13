@@ -17,9 +17,19 @@ const forgotPasswordSchema = z.object({
 
 const PASSWORD_RESET_ACCEPTED_MIN_RESPONSE_MS = 1000;
 const PASSWORD_RESET_ACCEPTED_JITTER_MS = 250;
+const PRIVATE_NO_STORE = "private, no-store";
+
+function withPrivateNoStore<T extends Response>(response: T): T {
+  response.headers.set("Cache-Control", PRIVATE_NO_STORE);
+  return response;
+}
+
+function privateNoStoreJson(body: unknown, init?: ResponseInit) {
+  return withPrivateNoStore(NextResponse.json(body, init));
+}
 
 const passwordResetAcceptedResponse = () =>
-  NextResponse.json({
+  privateNoStoreJson({
     message:
       "If an account with that email exists, a password reset link has been sent.",
   });
@@ -51,16 +61,16 @@ async function passwordResetAcceptedAfterTiming(
 
 export async function POST(request: NextRequest) {
   const csrfResponse = validateCsrf(request);
-  if (csrfResponse) return csrfResponse;
+  if (csrfResponse) return withPrivateNoStore(csrfResponse);
 
   const ipRateLimitResponse = await withRateLimit(request, {
     type: "forgotPasswordByIp",
     endpoint: "forgotPasswordByIp",
   });
-  if (ipRateLimitResponse) return ipRateLimitResponse;
+  if (ipRateLimitResponse) return withPrivateNoStore(ipRateLimitResponse);
 
   if (process.env.NODE_ENV === "production" && !process.env.RESEND_API_KEY) {
-    return NextResponse.json(
+    return privateNoStoreJson(
       { error: "Password reset is temporarily unavailable" },
       { status: 503 }
     );
@@ -70,14 +80,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const parsed = forgotPasswordSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+      return privateNoStoreJson({ error: "Invalid input" }, { status: 400 });
     }
     const { email, turnstileToken } = parsed.data;
     const normalizedEmail = normalizeEmail(email);
 
     const turnstileResult = await verifyTurnstileToken(turnstileToken);
     if (!turnstileResult.success) {
-      return NextResponse.json(
+      return privateNoStoreJson(
         { error: "Bot verification failed. Please try again." },
         { status: 403 }
       );
@@ -88,7 +98,8 @@ export async function POST(request: NextRequest) {
       getIdentifier: () => normalizedEmail,
       endpoint: "forgotPasswordByEmail",
     });
-    if (emailRateLimitResponse) return emailRateLimitResponse;
+    if (emailRateLimitResponse)
+      return withPrivateNoStore(emailRateLimitResponse);
 
     const acceptedStartedAt = Date.now();
     const acceptedDelayMs = getPasswordResetAcceptedDelayMs();
@@ -165,17 +176,14 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    return passwordResetAcceptedAfterTiming(
-      acceptedStartedAt,
-      acceptedDelayMs
-    );
+    return passwordResetAcceptedAfterTiming(acceptedStartedAt, acceptedDelayMs);
   } catch (error) {
     logger.sync.error("Forgot password error", {
       error: sanitizeErrorMessage(error),
       route: "/api/auth/forgot-password",
     });
     Sentry.captureException(error);
-    return NextResponse.json(
+    return privateNoStoreJson(
       { error: "An error occurred. Please try again." },
       { status: 500 }
     );

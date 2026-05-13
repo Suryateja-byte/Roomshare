@@ -109,6 +109,7 @@ describe("Register API", () => {
       const response = await POST(request);
 
       expect(response).toBe(csrfResponse);
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store");
       expect(withRateLimit).not.toHaveBeenCalled();
       expect(prisma.user.findUnique).not.toHaveBeenCalled();
       expect(prisma.user.create).not.toHaveBeenCalled();
@@ -125,6 +126,7 @@ describe("Register API", () => {
       const response = await POST(request);
 
       expect(response.status).toBe(400);
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     });
 
     it("returns 400 for invalid input - invalid email", async () => {
@@ -171,6 +173,7 @@ describe("Register API", () => {
       const response = await resolveAcceptedRegistration(POST(request));
 
       expect(response.status).toBe(201);
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store");
       const data = await response.json();
       expect(data).toEqual({ success: true, verificationEmailSent: true });
       expect(bcrypt.hash).toHaveBeenCalledWith("password12345", 12);
@@ -201,6 +204,7 @@ describe("Register API", () => {
       const response = await resolveAcceptedRegistration(POST(request));
 
       expect(response.status).toBe(201);
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store");
       expect(bcrypt.hash).toHaveBeenCalledWith("password12345", 12);
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
       expect(mockAfter).toHaveBeenCalledTimes(1);
@@ -226,6 +230,7 @@ describe("Register API", () => {
       const response = await POST(request);
 
       expect(response.status).toBe(500);
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     });
   });
 });

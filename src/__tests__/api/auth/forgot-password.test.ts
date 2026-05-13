@@ -116,6 +116,7 @@ describe("Forgot Password API", () => {
     const response = await POST(request);
 
     expect(response).toBe(csrfResponse);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(withRateLimit).not.toHaveBeenCalled();
     expect(verifyTurnstileToken).not.toHaveBeenCalled();
     expect(prisma.user.findUnique).not.toHaveBeenCalled();
@@ -139,6 +140,7 @@ describe("Forgot Password API", () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(data.message).toContain("If an account with that email exists");
     expect(withRateLimit).toHaveBeenNthCalledWith(1, request, {
       type: "forgotPasswordByIp",
@@ -182,6 +184,7 @@ describe("Forgot Password API", () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(data.message).toContain("If an account with that email exists");
     expect(prisma.passwordResetToken.deleteMany).not.toHaveBeenCalled();
     expect(prisma.passwordResetToken.create).not.toHaveBeenCalled();
@@ -218,6 +221,7 @@ describe("Forgot Password API", () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(data.error).toBe("Invalid input");
   });
 
@@ -305,6 +309,7 @@ describe("Forgot Password API", () => {
     const data = await response.json();
 
     expect(response.status).toBe(500);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(data.error).toBe("An error occurred. Please try again.");
   });
 
@@ -346,6 +351,7 @@ describe("Forgot Password API", () => {
 
   it("returns rate limit response when limited", async () => {
     const mockRateLimitResponse = {
+      headers: new Headers(),
       status: 429,
       json: async () => ({ error: "Too many requests" }),
     };
@@ -355,11 +361,13 @@ describe("Forgot Password API", () => {
     const response = await POST(request);
 
     expect(response).toBe(mockRateLimitResponse);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(prisma.user.findUnique).not.toHaveBeenCalled();
   });
 
   it("short-circuits before DB lookup when email rate limited after Turnstile succeeds", async () => {
     const mockRateLimitResponse = {
+      headers: new Headers(),
       status: 429,
       json: async () => ({ error: "Too many requests" }),
     };
@@ -371,6 +379,7 @@ describe("Forgot Password API", () => {
     const response = await POST(request);
 
     expect(response).toBe(mockRateLimitResponse);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(verifyTurnstileToken).toHaveBeenCalledWith("test-token");
     expect(prisma.user.findUnique).not.toHaveBeenCalled();
     expect(mockAfter).not.toHaveBeenCalled();
