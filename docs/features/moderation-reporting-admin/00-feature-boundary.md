@@ -25,6 +25,6 @@
 
 | Unknown | Severity | Evidence |
 | --- | --- | --- |
-| Controlled Chromium admin-boundary and verification-admin journey coverage passed, and focused plus combined `chromium-admin` `.admin.spec.ts` admin browser coverage passed. Ignored admin-host race coverage remains unverified. | P1 residual | MRA-E021, MRA-E025, MRA-G001 |
+| Controlled Chromium admin-boundary and verification-admin journey coverage passed, and focused plus combined `chromium-admin` `.admin.spec.ts` admin browser coverage passed. Ignored admin-host race coverage is reclassified as retired booking/lifecycle-era coverage, not current MRA browser coverage. | Reclassified; not an active P1 | MRA-E021, MRA-E025, MRA-E026, MRA-G001 |
 | Route-handler/direct API Jest checks passed for reports, verification documents, private-feedback no-public-bleed, abuse hardening, and injection prevention; selected live-server negative/status/header parity passed for missing Origin/CSRF, OPTIONS, invalid document kind, and unauthenticated valid-kind document access. Authenticated admin signed-URL success, real storage/provider behavior, and admin-session success paths remain unverified. | P2 residual | MRA-E019, MRA-E022, MRA-G002 |
 | Local mocked private-feedback telemetry invocation and verification approval/rejection notification email invocation are verified; real email provider delivery, inbox/bounce/webhook proof, provider observability/telemetry runtime, and other provider/runtime proof remain unverified. | P2 residual | MRA-E020, MRA-G003 |

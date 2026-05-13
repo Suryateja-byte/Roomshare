@@ -8,11 +8,11 @@ Human/adversarial review status: PARTIAL.
 | --- | --- | --- |
 | Source evidence exists for report submission, admin auth, audit logging, user/listing/report actions, admin pages, verification review, document access, schemas, and migrations inventory. | PASS | MRA-E001 through MRA-E018 |
 | Test inventory separates discovered tests from executed tests. | PASS | MRA-E016; `11-test-traceability-matrix.md` |
-| Browser runtime verification is complete. | PARTIAL / NOT COMPLETE | MRA-E021 reduced MRA-G001 with controlled Chromium admin-boundary and verification-admin journey passes, and MRA-E025 passed the focused and combined `chromium-admin` `.admin.spec.ts` admin browser gate. Ignored admin-host race coverage remains unverified. |
+| Browser runtime verification is complete. | PARTIAL / NOT COMPLETE | MRA-E021 reduced MRA-G001 with controlled Chromium admin-boundary and verification-admin journey passes, and MRA-E025 passed the focused and combined `chromium-admin` `.admin.spec.ts` admin browser gate. MRA-E026 reclassifies ignored admin-host race coverage as retired booking/lifecycle-era coverage, not current MRA browser coverage. |
 | Route-handler/direct API Jest verification is complete for the focused reports, verification documents, private-feedback no-public-bleed, abuse hardening, and injection prevention command. | PASS | MRA-E019 |
 | Local mocked private-feedback telemetry helper and verification approval/rejection notification helper invocation checks are complete after the new rejection assertion. | PASS | MRA-E020 |
 | Live-server HTTP transport parity for selected negative/status/header cases is complete. | PASS/PARTIAL | MRA-E022; MRA-G002 residual for authenticated admin signed-URL success, real storage/provider behavior, and admin-session success paths |
 | Real provider email delivery, inbox/bounce/webhook behavior, and provider telemetry/observability verification is complete. | NOT VERIFIED | MRA-G003 |
 | Migration SQL invariant audit is complete. | PASS/PARTIAL | MRA-E024 completes tracked source SQL line audit; MRA-G004 remains only for production/staging database migration-state proof. |
 
-Reviewer note: do not treat this package as release-signoff evidence until the remaining MRA-G001 admin-host race residual is closed or explicitly accepted; MRA-G002 is reduced to P2 authenticated admin signed-URL, real storage/provider, and admin-session success-path residuals, and MRA-G003 remains a P2 provider/runtime residual gap.
+Reviewer note: do not treat this package as full release-signoff evidence while MRA-G002, MRA-G003, MRA-G004, and MRA-G005 residuals remain. MRA-G001 admin-host race is reclassified retired/obsolete coverage by MRA-E026, not release-blocking current MRA browser evidence.
