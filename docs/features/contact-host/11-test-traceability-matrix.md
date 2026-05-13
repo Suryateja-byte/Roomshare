@@ -36,9 +36,10 @@ CH-E072 to mocked local invocation/provider-client evidence, and CH-E074 fixes
 the local Contact Host `newMessage` payload/template mismatch with focused
 payload and template coverage. Real provider delivery remains not verified.
 Optional direct HTTP live-server API parity, real Stripe/webhook provider
-fulfillment, and provider-level Supabase realtime/RLS remain blocked/not
-verified. The message-length product decision and execution gate are closed; the
-approved limit is a uniform 1000-character limit.
+fulfillment, and optional production/staging Supabase provider proof remain not
+verified. Local Supabase Option A provider/RLS proof is closed by CH-E076. The
+message-length product decision and execution gate are closed; the approved
+limit is a uniform 1000-character limit.
 
 ## Release-Blocking Criteria
 
@@ -50,13 +51,15 @@ The latest deterministic tests for these areas passed. The earlier
 setup-sensitive full Chromium messaging J25 failure recorded in CH-E052 is
 closed by CH-E057 as a test/setup synchronization issue.
 
-Provider-level realtime/RLS proof remains the Contact Host P1 because it is
-clearly marked as provider-blocked. CH-E073 closes suspended/blocked
-listing-detail Chromium execution, and CH-E070 confirms the provider-level blocker is not a test
-omission that can be closed locally: this repo state has no committed
-`Message`/conversation RLS policies, no local Supabase config, no Supabase
-provider test script, and only a plain Postgres docker service. The
-message-length product-decision P1 is resolved by
+Local Supabase Option A realtime/RLS proof is closed by CH-E076. The local proof
+includes local Supabase stack preflight with redacted endpoints, schema apply,
+RLS/policy audit for `Conversation`, `_ConversationParticipants`, `Message`,
+`ConversationDeletion`, and `TypingStatus`, `Message`-only
+`supabase_realtime` publication membership, 28 direct RLS assertions, 34 local
+Realtime assertions, rollback, and cleanup. It does not claim production or
+staging RLS policies exist, and production Prisma migration/RLS rollout would
+require separate approval. CH-E073 closes suspended/blocked listing-detail
+Chromium execution. The message-length product-decision P1 is resolved by
 CH-E066 and closed by the focused Linux-side WSL Jest pass in CH-E067. CH-E065 closes the focused Firefox browser-matrix
 blockers, including the practical combined two-spec Firefox run.
 Fallback polling, API read/unread isolation, and mocked client-side realtime
@@ -98,11 +101,11 @@ or Firefox browser coverage as launch blockers.
 | Checkout-session polling API | `src/__tests__/api/payments-checkout-session-route.test.ts`; `src/__tests__/lib/payments/checkout-session-status.test.ts` | `pnpm test -- src/__tests__/api/payments-checkout-session-route.test.ts src/__tests__/lib/payments/checkout-session-status.test.ts --runInBand` | Passed in CH-E047: 2 suites, 14 tests; supporting rerun in CH-E058 passed with ListingPageClient component coverage: 3 suites, 28 tests | Browser return is covered in CH-E058; real Stripe/webhook provider fulfillment timing is not covered | P2 |
 | CSRF helper and route-level variants | `src/__tests__/security/injection-prevention.test.ts`; `src/__tests__/api/messages.test.ts`; `src/__tests__/api/payments-checkout-route.test.ts` | Messages/security command in CH-E049; checkout route command in CH-E053; CH-E071 focused route command: `pnpm test -- src/__tests__/api/messages.test.ts src/__tests__/api/payments-checkout-route.test.ts --runInBand` | Helper/messages tests passed in CH-E049. Checkout missing-Origin rejection passed inside the current passing CH-E053 checkout-route suite. CH-E071 passed 2 suites and 42 tests, covering missing-Origin, malformed Origin, mismatched Origin, valid same-origin, and localhost-development allowance for both documented Contact Host mutation routes. | Deterministic route-handler CSRF variant coverage is closed; optional live-server transport parity remains separate P2 confidence coverage | Closed |
 | `startConversation` branch matrix | `src/__tests__/actions/chat.test.ts`; `src/__tests__/actions/chat-dedup.test.ts`; `src/__tests__/components/ContactHostButton.test.tsx`; `src/__tests__/lib/messaging/listing-contactable.test.ts` | Focused action/component command in CH-E050 | Passed in CH-E050: 5 suites, 73 tests | Browser-visible suspended host/viewer and block pre-click branch copy is implemented in CH-E068 and the scoped listing-detail Chromium proof is closed by CH-E073; unverified/stale epoch copy remains separate | Closed for scoped Chromium listing-detail proof |
-| Block/unblock UI | No manifest-listed focused test | Add component/E2E coverage | Not run | Composer replacement and unblock UX is future confidence coverage; provider-level Supabase realtime/RLS remains the only current Contact Host P1 inventory gap | P2 |
+| Block/unblock UI | No manifest-listed focused test | Add component/E2E coverage | Not run | Composer replacement and unblock UX is future confidence coverage; local Option A provider/RLS is closed by CH-E076 | P2 |
 | Conversation search | `tests/e2e/journeys/22-messaging-conversations.spec.ts`; `MessagesPageClient` source behavior | Add focused browser/component assertion for search-empty and match filtering | Not run as a dedicated behavior | Existing journey touches messages page; search behavior lacks explicit traceability row until this future coverage gap | P2 |
-| Typing indicator/status | `src/__tests__/api/messages.test.ts`; `src/__tests__/components/MessagesPageClient.test.tsx` partial polling coverage | Add focused typing-status action/realtime/polling coverage | Not run as a dedicated behavior | Polling test covers typing users; realtime typing behavior rolls into the provider-level Supabase realtime/RLS P1 gap; dedicated UI typing assertions are P2 confidence coverage | P2 |
+| Typing indicator/status | `src/__tests__/api/messages.test.ts`; `src/__tests__/components/MessagesPageClient.test.tsx` partial polling coverage | Add focused typing-status action/realtime/polling coverage | Not run as a dedicated behavior | Polling test covers typing users; local provider/RLS proof is covered by CH-E076; dedicated UI typing assertions are P2 confidence coverage | P2 |
 | Delete/hide conversation | No manifest-listed focused test | Add action/API/browser coverage for per-user hide and resurrection on new message | Not run | Conversation deletion state affects inbox/thread access; no evidence in this cleanup promotes it above future P2 coverage | P2 |
-| Supabase realtime/presence/fallback | `src/__tests__/components/ChatWindow.test.tsx`; `src/__tests__/components/MessagesPageClient.test.tsx`; `src/__tests__/api/messages*.test.ts`; `src/__tests__/hooks/useBlockStatus.test.ts`; `src/__tests__/schema/reporting-abuse-hardening.test.ts`; `goal-progress-provider-rls.md`; `supabase-rls-proof-plan.md` | Focused commands in CH-E062; provider-path audit in CH-E070; future approved provider commands from `supabase-rls-proof-plan.md` | Reduced in CH-E062 and provider-blocked in CH-E070: ChatWindow realtime mock/fallback passed 6 tests, MessagesPageClient polling passed 6 tests, combined messages API passed 49 tests, and Supabase-adjacent BlockedUser tests passed 9 tests. CH-E070 found zero Prisma RLS/policy statements, no local Supabase config, no Supabase provider test command, and no Supabase Realtime/Auth docker service. `supabase-rls-proof-plan.md` now defines the docs-only approval path for Option A local provider proof or Option B staging fallback. | Provider-level Supabase delivery/JWT/RLS and two-user realtime browser/provider behavior remain blocked/not verified until an approved local/staging provider harness or approved policy work exists and records evidence | P1 blocked |
+| Supabase realtime/presence/fallback | `src/__tests__/components/ChatWindow.test.tsx`; `src/__tests__/components/MessagesPageClient.test.tsx`; `src/__tests__/api/messages*.test.ts`; `src/__tests__/hooks/useBlockStatus.test.ts`; `src/__tests__/schema/reporting-abuse-hardening.test.ts`; `goal-progress-provider-rls.md`; `supabase-rls-proof-plan.md` | Focused commands in CH-E062; historical provider-path audit in CH-E070; local Option A provider/RLS proof in CH-E076 | Reduced in CH-E062 and locally closed for Option A in CH-E076: ChatWindow realtime mock/fallback passed 6 tests, MessagesPageClient polling passed 6 tests, combined messages API passed 49 tests, and Supabase-adjacent BlockedUser tests passed 9 tests. CH-E076 records local Supabase stack preflight, schema apply, local-only RLS/publication audit, 28 direct RLS assertions, 34 local Realtime assertions, rollback, and cleanup. | Local Option A provider/RLS P1 is closed. Production/staging provider proof and production Prisma migration/RLS policy rollout are not claimed and require separate approval if pursued. | Local P1 closed; P2 production-hardening |
 | Message length boundaries | `src/__tests__/components/ChatWindow.test.tsx`; `src/__tests__/components/MessagesPageClient.test.tsx`; `src/__tests__/actions/chat.test.ts`; `src/__tests__/api/messages.test.ts`; `src/__tests__/api/messages-pagination.test.ts` | `pnpm test -- src/__tests__/components/ChatWindow.test.tsx src/__tests__/components/MessagesPageClient.test.tsx src/__tests__/actions/chat.test.ts src/__tests__/api/messages.test.ts src/__tests__/api/messages-pagination.test.ts --runInBand` | CH-E060 historical command passed; CH-E066 source/test update completed; CH-E067 focused Linux-side WSL command passed: 5 suites and 97 tests | Product decision is approved as uniform 1000 and the focused execution gate is closed | Closed P1 |
 | Actual email delivery | `src/lib/messaging/send-conversation-message.ts`; `src/lib/email.ts`; `src/lib/email-templates.ts`; `src/__tests__/api/messages.test.ts`; `src/__tests__/lib/email.test.ts`; `src/__tests__/lib/email-templates.test.ts` | CH-E072 focused mocked command and historical local template render blocker; CH-E074 payload/template fix and focused mocked/template coverage | Reduced in CH-E072: focused mocked Jest passed 3 suites/72 tests; local template render with the old Contact Host send-path payload failed before provider I/O. Fixed locally in CH-E074: focused command passed 4 suites/76 tests, covering complete payload, whitespace normalization, 160-visible-character truncation, fallback listing title, provider-client behavior, and template escaping. | Real provider acceptance/inbox delivery, bounce/webhook handling, and provider observability remain not verified; no real provider call was made | P2 not verified |
 
@@ -153,8 +156,7 @@ Chromium messaging after a J25 test/setup synchronization fix, mocked Chromium
 checkout return / paid-unlock runtime, scoped listing-detail
 paywall-required/unavailable/migration-review/moderation-locked states,
 historical message-length assertions, fallback polling, API read/unread isolation, mocked
-client-side realtime insert handling, provider-path audit that blocks
-provider-level Supabase RLS closure without approved harness/policy work, and
+client-side realtime insert handling, local Option A Supabase provider/RLS proof, and
 focused WebKit/Mobile Chrome/Mobile
 Safari listing-detail plus messaging specs. CH-E064 installed Firefox and
 reproduced the Firefox image decode and `NS_BINDING_ABORTED` failures as
@@ -163,5 +165,5 @@ test/helper changes and passed the individual Firefox listing-detail and
 messaging specs. The practical combined Firefox two-spec run also passed.
 CH-E073 closes the suspended/blocked listing-detail Chromium proof with passing
 focused four-state and full listing-detail Contact Host Chromium commands.
-Evidence: CH-E027, CH-E032-CH-E074;
+Evidence: CH-E027, CH-E032-CH-E076;
 `phase-4/05-test-traceability.md`.

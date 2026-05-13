@@ -8,8 +8,8 @@ Chrome messaging, mocked checkout return, paywall/unavailable/migration/
 moderation listing-detail states, and CH-E068 source/test/fixture coverage for
 suspended/blocked listing-detail pre-click states. CH-E073 closes that
 historical CH-E068 execution gap with focused four-state Chromium proof and a
-full listing-detail Contact Host Chromium spec rerun. Provider-level Supabase
-realtime/RLS remains the only current Contact Host P1; email delivery and real
+full listing-detail Contact Host Chromium spec rerun. Local Supabase Option A
+provider/RLS proof is closed by CH-E076; email delivery and real
 payment-provider fulfillment remain P2 confidence gaps. Evidence:
 CH-E032-CH-E073.
 

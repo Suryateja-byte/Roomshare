@@ -113,7 +113,7 @@ modified.
 - Private feedback is adjacent to messaging threads and included only as route
   context, not as part of conversation creation. Evidence:
   `src/app/messages/[id]/page.tsx:76-125`.
-- Runtime UX, real email delivery, real Stripe checkout, Supabase realtime, and
+- Runtime UX, real email delivery, real Stripe checkout, optional production/staging Supabase realtime, and
   production database behavior were not verified in Phase 1/2. Current runtime
   evidence is partial: focused Jest/API/security/component checks, Chromium
   messaging, Mobile Chrome no-deps, setup-backed Mobile Chrome, focused
@@ -128,7 +128,7 @@ modified.
   the suspended/blocked listing-detail contract, disabled UI copy, fixtures, and
   focused test source; CH-E073 closes the focused and full listing-detail
   Chromium proof for those states. Realtime, email, real provider checkout fulfillment, and
-  provider-level Supabase behavior remain gaps.
+  production/staging Supabase provider behavior remain gaps.
 
 ## Documentation Rules
 
@@ -145,9 +145,9 @@ modified.
 | Question | Why it matters | Status |
 |---|---|---|
 | Does any search/map listing card trigger contact host directly, or only navigate to listing detail? | A direct card action would expand the feature boundary and interaction census. | `UNKNOWN`; needs Phase 4 source and browser pass. |
-| Which tests are release-blocking for contact-host versus confidence-building? | Later docs need a test matrix that does not overstate unrun tests. | Classified in `11-test-traceability-matrix.md`; mocked checkout browser return passed in CH-E058; paywall/unavailable/migration/moderation listing-detail states passed in CH-E059; historical message-length cap assertions passed in CH-E060, the approved 1000-character source/test update is recorded in CH-E066, and focused Linux-side WSL Jest execution passed in CH-E067; CH-E068 implements suspended/blocked source/test/fixture coverage with route proof passing, and CH-E073 closes the focused/full listing-detail Chromium proof; fallback/API/mocked realtime evidence passed in CH-E062; provider-level Supabase RLS, email, full matrix, and real payment-provider fulfillment remain gaps. |
+| Which tests are release-blocking for contact-host versus confidence-building? | Later docs need a test matrix that does not overstate unrun tests. | Classified in `11-test-traceability-matrix.md`; mocked checkout browser return passed in CH-E058; paywall/unavailable/migration/moderation listing-detail states passed in CH-E059; historical message-length cap assertions passed in CH-E060, the approved 1000-character source/test update is recorded in CH-E066, and focused Linux-side WSL Jest execution passed in CH-E067; CH-E068 implements suspended/blocked source/test/fixture coverage with route proof passing, and CH-E073 closes the focused/full listing-detail Chromium proof; fallback/API/mocked realtime evidence passed in CH-E062; local Supabase Option A provider/RLS proof passed in CH-E076; email, full matrix, optional production/staging provider proof, and real payment-provider fulfillment remain gaps. |
 | Is the visible contact-host UI a modal/form or a direct button-to-thread flow for all states? | User-action docs must describe actual visible behavior. | Partially verified: contact button, focused listing-detail Chromium states, mocked checkout return, paywall dialog, unavailable/migration/moderation warning/no-CTA states, Chromium messaging journey, Mobile Chrome no-deps, and setup-backed Mobile Chrome inbox/thread passed; suspended/blocked listing-detail pre-click source/test/fixture coverage is implemented in CH-E068 and focused/full listing-detail Chromium proof is closed by CH-E073. |
 | Are notification emails actually delivered in runtime environments? | Source queues email send calls, but delivery depends on environment/configuration. | `NOT VERIFIED`; requires runtime/email evidence. |
-| Does Supabase realtime work, and when does polling take over? | Messaging UX depends on realtime or fallback behavior. | Reduced in CH-E062: fallback polling and mocked client-side realtime insert handling are locally verified; provider-level Supabase delivery/RLS remains blocked. |
+| Does Supabase realtime work, and when does polling take over? | Messaging UX depends on realtime or fallback behavior. | Reduced in CH-E062 and locally closed for Option A in CH-E076: fallback polling, mocked client-side realtime insert handling, local RLS/publication audit, direct RLS assertions, and local Realtime delivery/non-delivery assertions are verified. Production/staging provider proof is not claimed. |
 | Are booking-system assumptions fully removed from contact-host docs? | Contact-host appears to be contact-first, not booking-first. | Current boundary excludes booking/holds; later docs should keep historical booking references explicitly marked if they appear. |
 | Is there any broader profile-completion or user-verification gate beyond email verification and suspension? | The requested profile/suspension boundary needs accurate requirements without inventing a guard. | `UNKNOWN`; needs Phase 4 auth/profile pass. |

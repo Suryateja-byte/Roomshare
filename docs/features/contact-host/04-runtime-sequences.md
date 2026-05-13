@@ -12,8 +12,8 @@ and CH-E065 passes the focused Firefox listing-detail and messaging specs after
 narrow test/helper fixes. CH-E068 implements suspended/blocked listing-detail
 pre-click contract, UI, fixture, and focused test source; CH-E073 closes the
 historical CH-E068 execution gap with focused four-state Chromium proof and a
-full listing-detail Contact Host Chromium spec rerun. Provider-level Supabase
-realtime/RLS remains the only current Contact Host P1; email delivery and real
+full listing-detail Contact Host Chromium spec rerun. Local Supabase Option A
+provider/RLS proof is closed by CH-E076; email delivery and real
 provider fulfillment remain P2 confidence gaps.
 
 ## Primary Contact Flow

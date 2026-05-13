@@ -47,4 +47,4 @@ No production code changed.
 - Real payment-provider/webhook fulfillment.
 - Email delivery runtime verification.
 - Suspended/blocked listing-detail Chromium execution.
-- Provider-level Supabase realtime/RLS.
+- Optional production/staging Supabase provider proof.

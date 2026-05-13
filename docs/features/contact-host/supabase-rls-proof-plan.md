@@ -1,25 +1,51 @@
 # Supabase Realtime/RLS Proof Plan
 
-Status date: 2026-05-12.
+Status date: 2026-05-13.
 
-Status: `PLAN ONLY / P1 BLOCKED`.
+Status: `LOCAL OPTION A VERIFIED / PRODUCTION-STAGING OPTIONAL`.
 
-This document is an approval-ready proof path for Contact Host messaging
-delivery and isolation at the Supabase provider/RLS layer. It does not prove the
-provider path. It does not close the current P1. It does not edit production
-code, tests, schema, migrations, provider configuration, or secrets.
+This document was the approval-ready proof path for Contact Host messaging
+delivery and isolation at the Supabase provider/RLS layer. The local Option A
+path has now been executed and verified in CH-E076. This proof is local provider
+evidence only: it does not claim production or staging RLS policies exist, and
+it does not promote local proof policies into production Prisma migrations or
+RLS rollout.
 
-Current evidence remains CH-E062 and CH-E070: fallback polling, API
-read/unread isolation, and mocked client-side realtime insert handling are
-locally verified, but provider-level Supabase realtime delivery, JWT
-authorization, publication behavior, and database RLS are blocked because this
-repo state has no committed `Message`/conversation RLS policies, no
-`supabase/config.toml`, no local Supabase directory, no Supabase provider test
-script, and no Supabase Realtime/Auth docker service.
+Current evidence is CH-E062, CH-E070, CH-E075, and CH-E076: fallback polling,
+API read/unread isolation, and mocked client-side realtime insert handling are
+locally verified; CH-E070 records the historical pre-harness blocker; CH-E075
+records the proof plan; and CH-E076 records the local Supabase Option A
+provider/RLS proof.
+
+## Local Option A Result
+
+Local Option A passed:
+
+- Local Supabase stack started and preflight passed with redacted local
+  endpoints.
+- Apply schema passed against the local Supabase DB.
+- The unrelated untracked local workspace migration
+  `prisma/migrations/20260515030000_fix_semantic_score_casts/` produced a
+  warning and is not staged evidence.
+- Local-only RLS proof SQL passed: audit showed RLS/policies for
+  `Conversation`, `_ConversationParticipants`, `Message`,
+  `ConversationDeletion`, and `TypingStatus`.
+- Only `Message` was in `supabase_realtime`; forbidden tables were absent.
+- Direct RLS verifier passed 28 assertions.
+- Local Realtime verifier passed with 4 local Auth actors, 9 `Message`
+  subscriptions, 2 allowed inserts, 2 denied writes, 4 delivery assertions,
+  15 non-delivery assertions, and 34 total assertions.
+- Rollback passed; post-rollback audit returned the expected blocker state and
+  cleanup checks passed.
+- Critic approved local RLS proof and local Realtime proof.
+
+Real staging/provider proof is optional P2 or production-hardening evidence.
+Production Prisma migrations/RLS policy rollout requires separate approval.
 
 ## Decision Needed
 
-Approve one safe verification path before any provider proof work starts.
+The local Option A path is now executed. Approve another safe verification path
+only if production/staging provider proof is required as a hardening gate.
 
 | Option | Path | Use when | Approval required |
 |---|---|---|---|
@@ -303,16 +329,17 @@ pnpm supabase:rls-proof:assert-realtime
 pnpm supabase:rls-proof:cleanup
 
 # Stale status scan after evidence is recorded
-grep -RIn "provider-level Supabase realtime/RLS.*verified\|P1.*closed" docs/features/contact-host docs/features/documentation-inventory.md
+grep -RIn "provider-level Supabase realtime/RLS.*blocked\|P1[[:space:]]+BLOCKED" docs/features/contact-host docs/features/documentation-inventory.md
 ```
 
-The placeholder `pnpm supabase:rls-proof:*` commands are not present in the
-current repo and must not be described as available until implemented and
-approved.
+The placeholder `pnpm supabase:rls-proof:*` commands were plan-time names. Use
+the actual approved local harness commands and redacted output from the proof
+run when recording evidence.
 
 ## Acceptance Criteria
 
-The current P1 can be proposed for closure only when all of these are true:
+The local Option A P1 is closed by CH-E076 because these criteria were met
+locally:
 
 - Approved Option A or Option B path exists.
 - Provider proof runs with user-scoped JWTs for at least two participants and
@@ -322,15 +349,16 @@ The current P1 can be proposed for closure only when all of these are true:
 - Evidence includes provider version, run id, redacted actor map, commands,
   pass/fail output, cleanup proof, and caveats.
 - No production credentials, secrets, or customer PII are used or recorded.
-- Any required schema/RLS/publication change was separately approved,
-  implemented, tested, and documented.
+- Any production schema/RLS/publication promotion remains separate and was not
+  claimed by the local proof.
 - `goal-progress-provider-rls.md`, `goal-progress-realtime-rls.md`,
   `runtime-verification.md`, `11-test-traceability-matrix.md`,
   `12-gaps-unknowns-and-questions.md`, `evidence-register.md`,
   `verification.json`, `manifest.json`, and `documentation-inventory.md` are
-  updated from blocked to the exact proven status.
+  updated from historical blocker wording to the exact proven local status.
 
-Until then, status remains `P1 BLOCKED`.
+Until production/staging proof is separately approved and run, status remains
+`LOCAL OPTION A VERIFIED; PRODUCTION/STAGING NOT CLAIMED`.
 
 ## Rollback And Cleanup
 
@@ -352,17 +380,17 @@ Future provider-proof cleanup:
 
 ## Documentation Updates After Approval
 
-After an approved proof run, update the Contact Host package with evidence, not
-claims:
+After any future production/staging proof run, update the Contact Host package
+with evidence, not claims:
 
 - Add a new evidence-register row with command output and provider run id.
 - Update `verification.json` with pass/partial/fail verdicts for the exact
   provider assertions.
 - Update `runtime-verification.md` and `11-test-traceability-matrix.md` to
   distinguish direct RLS, realtime delivery, and fallback/API proof.
-- Update `12-gaps-unknowns-and-questions.md` only if the P1 is actually closed
-  or narrowed.
+- Update `12-gaps-unknowns-and-questions.md` only if production/staging proof
+  changes the current P2/hardening status.
 - Update `docs/features/documentation-inventory.md` with the new status.
 
-Do not mark provider-level Supabase realtime/RLS as verified until the approved
-provider proof evidence exists.
+Do not mark production/staging Supabase realtime/RLS as verified until approved
+production/staging provider proof evidence exists.

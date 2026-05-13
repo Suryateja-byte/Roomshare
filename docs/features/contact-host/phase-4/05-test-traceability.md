@@ -3,7 +3,7 @@
 Status: historical Phase 4 source-only evidence pass. No tests were run during
 this pass. Later focused command results supersede the `NOT RUN` cells below and
 are recorded in `../11-test-traceability-matrix.md` and
-`../evidence-register.md` CH-E032-CH-E067. Current passing evidence includes
+`../evidence-register.md` CH-E032-CH-E076. Current passing evidence includes
 deterministic viewer-state route/listing-page, checkout creation route,
 checkout-session, CSRF/messages API, messaging/contact-host action/component,
 affected contact/payment tests, and direct `/api/messages` route-handler
@@ -15,10 +15,11 @@ coverage in CH-E059, plus historical message-length cap assertions in CH-E060,
 approved 1000-character source/test alignment in CH-E066, focused Linux-side
 WSL message-limit Jest pass in CH-E067, and suspended/blocked listing-detail
 Chromium proof plus the full listing-detail Contact Host Chromium spec in
-CH-E073. CH-E061 is historical and superseded by CH-E073 for
+CH-E073, and local Option A Supabase provider/RLS proof in CH-E076. CH-E061 is historical and superseded by CH-E073 for
 suspended/blocked listing-detail pre-click browser proof; broader browser
-matrix work is reduced to P2 confidence coverage. The only active P1 gap is
-provider-level Supabase realtime/RLS.
+matrix work is reduced to P2 confidence coverage. Local Option A provider/RLS is
+closed by CH-E076; production/staging provider proof is optional P2 or
+production-hardening evidence.
 Optional direct HTTP live-server API parity, email
 delivery verification, and real payment-provider fulfillment are P2 confidence
 coverage.

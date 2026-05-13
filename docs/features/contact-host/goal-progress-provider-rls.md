@@ -1,11 +1,12 @@
 # Contact Host Provider Realtime/RLS Goal Progress
 
-Status date: 2026-05-12.
+Status date: 2026-05-13.
 
-Outcome: `P1 BLOCKED`. The remaining provider-level Supabase realtime/RLS proof
-cannot be closed from this repo state without approved provider/schema/policy
-setup. This slice did not edit production code, migrations, schema, Supabase
-policies, or auth/security behavior.
+Outcome: `LOCAL OPTION A VERIFIED / P1 CLOSED LOCALLY`. The local Supabase
+provider/RLS proof now passes for Contact Host messaging isolation. This is
+local provider evidence only; it does not claim production or staging RLS
+policies exist. Promoting the local proof policies into production Prisma
+migrations or RLS policy rollout requires separate approval.
 
 ## Checklist
 
@@ -17,9 +18,8 @@ policies, or auth/security behavior.
   `src/lib/supabase.ts`, `ChatWindow`, `MessagesPageClient`, message
   APIs/actions/helpers, Prisma migrations/schema, env/config/scripts, docker
   config, and tests mentioning Supabase/RLS/realtime.
-- [x] Determine whether the repo has a safe local/test provider path to prove
-  Supabase realtime auth/RLS without real credentials or production provider
-  calls.
+- [x] Determine and execute the safe local/test provider path to prove Supabase
+  realtime auth/RLS without real credentials or production provider calls.
 - [x] Do not invent live-provider verification.
 - [x] Do not edit production/security/migration/schema/policy behavior.
 - [x] Update docs with exact evidence and disposition.
@@ -36,35 +36,40 @@ policies, or auth/security behavior.
 | Thread realtime path | `src/app/messages/[id]/ChatWindow.tsx` imports Supabase helpers, subscribes to realtime, falls back to polling, and locally guards message payload `conversationId`. Existing CH-E062 mocked tests cover fallback and mocked insert handling. | Local client handling is already reduced/verified. | Does not prove Supabase JWT authorization or database RLS. |
 | Inbox path | `src/components/MessagesPageClient.tsx` uses authenticated `/api/messages` polling; no provider realtime subscription was observed there. | Inbox delivery is API/polling based. | Provider realtime proof not applicable to this component. |
 | Server API isolation | `/api/messages`, `src/lib/messages.ts`, and `sendConversationMessage` enforce session, participant access, unread/read scoping, and send authorization through Next/Prisma code. | Server-side application isolation exists and is locally tested in earlier evidence. | Separate from provider RLS. |
-| Database RLS/policies | Focused search of `prisma/` returned `0` matches for `ENABLE ROW LEVEL SECURITY`, `CREATE POLICY`, `ALTER POLICY`, `DROP POLICY`, and `FORCE ROW LEVEL SECURITY`. | No committed local `Message`/conversation RLS policy evidence found. | Blocks provider-level RLS proof. |
-| Supabase local provider harness | No `supabase/config.toml` exists and recursive search found no `supabase/` directory. `package.json` has no Supabase CLI/provider test script. `docker-compose.yml` starts only a Postgres service, not Supabase Realtime/auth. | No safe local Supabase provider path found. | Blocks provider-level delivery/JWT/RLS proof. |
-| Realtime publication evidence | `prisma/migrations/20260514000000_reporting_abuse_controls_hardening/migration.sql` removes `BlockedUser` from `supabase_realtime` when present. | Adjacent hardening exists for BlockedUser exposure. | Does not prove `Message`/conversation provider authorization/RLS. |
-| CI/env evidence | `.github` workflows use fake Supabase URL values; env examples expose variable names only. | Test env does not provide a real or local provider proof target. | Not provider proof. |
+| Database RLS/policies | Historical CH-E070 focused search of `prisma/` returned `0` matches for policy statements. CH-E076 local-only audit then showed RLS/policies for `Conversation`, `_ConversationParticipants`, `Message`, `ConversationDeletion`, and `TypingStatus` in the local Supabase proof DB. | Local proof policies verified in the disposable/local context. | Production Prisma migration/RLS rollout is not claimed and requires separate approval. |
+| Supabase local provider harness | Commits `76db6d8a`, `8d53e4bd`, `5204d14f`, `4a1268ab`, `7a483ca1`, and `252e2c4e` add and verify the local-only harness/proof path. Local Supabase stack started and preflight passed with redacted local endpoints. | Safe local Supabase provider path executed. | Local Option A proof is verified. |
+| Realtime publication evidence | Historical adjacent hardening removes `BlockedUser` from `supabase_realtime` when present. CH-E076 local-only audit showed only `Message` in `supabase_realtime` and forbidden tables absent. | Local publication scope verified for Option A. | Production/staging publication state is not claimed. |
+| CI/env evidence | `.github` workflows use fake Supabase URL values; env examples expose variable names only. CH-E076 used local redacted endpoints and local Auth actors. | CI/env examples remain non-provider evidence; local proof used disposable local provider state. | Do not infer production/staging state from CI/env examples. |
 
 ## Current Disposition
 
-This P1 remains blocked, not closed. The blocker is precise:
+This local Option A P1 is closed. The closure is precise:
 
-- No local `Message`, `Conversation`, `_ConversationParticipants`, or
-  participant-join RLS policies are committed.
-- No local Supabase provider configuration or command exists to run Realtime
-  with auth/RLS semantics.
-- Existing deterministic tests use mocked Supabase client behavior or
-  application-level `/api/messages` polling/API isolation.
-- Proving provider behavior would require either approved schema/RLS/policy
-  work or an approved staging/local Supabase provider harness with credentials
-  and seeded users.
+- Local Supabase stack preflight passed with redacted local endpoints.
+- Schema apply passed against the local Supabase DB.
+- Local-only RLS proof SQL passed: audit showed RLS/policies for
+  `Conversation`, `_ConversationParticipants`, `Message`,
+  `ConversationDeletion`, and `TypingStatus`.
+- Only `Message` was in `supabase_realtime`; forbidden tables were absent.
+- Direct RLS verifier passed 28 assertions.
+- Local Realtime verifier passed with 4 local Auth actors, 9 `Message`
+  subscriptions, 2 allowed inserts, 2 denied writes, 4 delivery assertions,
+  15 non-delivery assertions, and 34 total assertions.
+- Rollback passed; post-rollback audit returned the expected blocker state and
+  cleanup checks passed.
+- Critic approved both local RLS proof and local Realtime proof.
+
+The warning for the unrelated untracked local migration
+`prisma/migrations/20260515030000_fix_semantic_score_casts/` is a workspace
+caveat, not staged evidence for this proof.
 
 ## Safe Next Step
 
-Add an approved local Supabase verification harness or approved staging
-verification plan that can seed two users and one nonparticipant, subscribe with
-user-scoped JWTs, and prove authorized participants receive only their own
-conversation events while nonparticipants receive none. Do not mark this P1
-closed until provider-level delivery/JWT/RLS behavior is proven by that harness.
-The docs-only approval plan is now captured in
-`docs/features/contact-host/supabase-rls-proof-plan.md`; it is a plan artifact,
-not provider proof.
+Keep production/staging proof optional unless a release gate requires it. Do not
+claim production/staging RLS policies exist. If the local proof policies are to
+be promoted, require a separate approved schema/RLS migration and rollout plan.
+`docs/features/contact-host/supabase-rls-proof-plan.md` now records both the
+historical plan and the local Option A evidence caveats.
 
 ## Validation
 

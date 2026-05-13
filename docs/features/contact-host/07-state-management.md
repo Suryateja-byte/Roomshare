@@ -45,13 +45,13 @@ Drift risk scale:
 | Checkout return | Checkout fulfilled | Checkout-session classifies fulfilled | Update viewer state to contactable | Contact ready | `src/app/listings/[id]/ListingPageClient.tsx:818-852` | Source verified; runtime gap |
 | Checkout return | Canceled/failed/expired/timeout | Checkout-session not fulfilled | Show notice and keep/restore paywall state | Paywall required / retry | `phase-4/01-ui-interaction-census.md` | Source verified; runtime gap |
 | Message thread | User sends message | Participant, valid content up to 1000 characters, not blocked/listing-gated | Persist message and update conversation | Message thread | CH-E012-CH-E014, CH-E032, CH-E034, CH-E060, CH-E066, CH-E067 | Source/test sources updated for approved 1000 limit; focused Linux-side WSL Jest command passed |
-| Message thread | Realtime unavailable | Channel close/error/timeout/offline | Fall back to polling | Polling | CH-E062; `phase-4/01-ui-interaction-census.md` | Fallback verified locally; provider/RLS blocked |
+| Message thread | Realtime unavailable | Channel close/error/timeout/offline | Fall back to polling | Polling | CH-E062; CH-E076; `phase-4/01-ui-interaction-census.md` | Fallback verified locally; local Option A provider/RLS proof closed by CH-E076 |
 | Message thread | Block relationship exists | Either participant blocked the other | Replace composer with blocked banner | Blocked | CH-E022 | UI runtime gap |
 | Blocked | Current user unblocks | User owns block action | Unblock action updates state | Message thread | CH-E022 | UI runtime gap |
 | Conversation visible | User hides/deletes conversation | Participant action | Upsert `ConversationDeletion` for current user | Conversation hidden for current user | `phase-4/03-state-model.md` | Runtime gap |
 
 ## State Gaps
 
-- Supabase provider-level realtime authorization and database RLS behavior remain blocked/not verified. Local fallback polling, mocked realtime subscription handling, conversation-id guarding, and read marking are verified in CH-E062, but no local `Message`/conversation RLS policy setup or safe provider test path exists.
+- Supabase local Option A provider/RLS behavior is verified in CH-E076. Local fallback polling, mocked realtime subscription handling, conversation-id guarding, and read marking are verified in CH-E062. Production/staging provider proof and production RLS policy rollout are not claimed.
 - Message length state now has an approved 1000-character contract across inbox, thread, server action, and API source. Focused Linux-side WSL Jest execution for the updated boundary tests passed. Evidence: CH-E030, CH-E060, CH-E066, CH-E067.
 - Runtime visual state transitions are not verified. Evidence: CH-E029.

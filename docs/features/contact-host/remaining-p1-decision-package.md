@@ -1,6 +1,6 @@
 # Contact Host Remaining P1 Decision Package
 
-Status date: 2026-05-12.
+Status date: 2026-05-13.
 
 Decision update: P1-3 Message-Length Authoritative Limit is approved as
 Option A, one uniform 1000-character outbound message limit. Implementation
@@ -13,6 +13,11 @@ Option A. Implementation progress is tracked in
 `goal-progress-suspended-blocked-contract.md`, CH-E068, and CH-E073. The
 focused/full listing-detail Chromium proof for the four suspended/blocked states
 is now closed by CH-E073.
+
+Decision update: P1-2 Provider-Level Supabase Realtime/RLS Proof is locally
+verified for Option A in CH-E076. Production/staging provider proof remains
+optional P2 or production-hardening evidence, and production Prisma
+migration/RLS policy rollout requires separate approval.
 
 Scope: decision package only. This document does not change production code,
 tests, schema, fixtures, or provider configuration.
@@ -31,7 +36,7 @@ Decision owners:
 | P1 | Current status | Recommended decision |
 |---|---|---|
 | Suspended/blocked listing-detail proof | Approved Option A implemented in source/test/fixtures; focused/full listing-detail Chromium proof closed by CH-E073. | Historical decision retained; no current P1 gate remains for the scoped listing-detail Chromium proof. |
-| Provider-level Supabase realtime/RLS proof | Local fallback/API/mocked-realtime proof exists; provider delivery/JWT/RLS proof is blocked. | Approve a safe local Supabase provider harness as the primary path; use an isolated staging/provider runbook only if local provider fidelity is insufficient. |
+| Provider-level Supabase realtime/RLS proof | Local fallback/API/mocked-realtime proof exists and local Option A provider/RLS proof is verified by CH-E076. | Historical decision retained; no active local Option A P1 remains. Use isolated staging/provider verification only as optional production-hardening evidence. |
 | Message-length authoritative limit | Historical pre-approval behavior was verified as inconsistent. | Adopt one uniform 1000-character outbound message limit across thread, inbox, server action, API, and docs. Approved after this package; see CH-E066. |
 
 ## P1-1: Suspended/Blocked Listing-Detail Proof
@@ -103,7 +108,7 @@ through the viewer-state contract? Recommended answer: yes, approve Option A.
 
 ### Current Evidence
 
-- The realtime/RLS/fallback P1 is reduced: fallback polling, API access
+- The historical realtime/RLS/fallback P1 was reduced: fallback polling, API access
   isolation, read/unread isolation, and mocked client-side realtime subscription
   handling are locally verified. Evidence:
   `docs/features/contact-host/goal-progress-realtime-rls.md:5`.
@@ -113,7 +118,7 @@ through the viewer-state contract? Recommended answer: yes, approve Option A.
   `docs/features/contact-host/goal-progress-realtime-rls.md:25-28`.
 - API/message isolation tests pass locally. Evidence:
   `docs/features/contact-host/goal-progress-realtime-rls.md:29`.
-- RLS/provider authorization remains blocked because no `Message`,
+- Historical RLS/provider authorization remained blocked because no `Message`,
   `Conversation`, or `_ConversationParticipants` RLS policy evidence was found,
   and no safe local provider path or live credentials were used. Evidence:
   `docs/features/contact-host/goal-progress-realtime-rls.md:30` and
@@ -123,9 +128,9 @@ through the viewer-state contract? Recommended answer: yes, approve Option A.
 
 ### Exact Blocker
 
-There is no approved safe path to verify provider-level realtime delivery,
-Supabase JWT authorization, and database RLS behavior. Local tests verify app
-fallback and client guards, but not Supabase provider authorization boundaries.
+CH-E076 verifies the local Option A provider/RLS boundary with direct RLS and
+local Realtime assertions. Production/staging verification is optional
+hardening evidence and is not claimed here.
 
 ### Risk If Left Open
 
@@ -138,8 +143,9 @@ subscriptions.
 
 Mocked realtime tests do not execute Supabase provider authorization, JWT
 claims, publication behavior, or database RLS. API tests prove server route
-isolation, not realtime subscription isolation. Closing this P1 requires either
-a local Supabase provider harness or an approved isolated provider/staging run.
+isolation, not realtime subscription isolation. CH-E076 closes the local Option
+A P1 with a local Supabase provider harness. Production/staging verification
+remains optional hardening evidence.
 
 ### Options
 
@@ -149,15 +155,14 @@ a local Supabase provider harness or an approved isolated provider/staging run.
 | B. Run an isolated staging/provider verification runbook | Use a locked-down staging Supabase project with disposable users, seeded conversations, scoped credentials, and an auditable manual/automated runbook. | Medium. Avoids local fidelity gaps but introduces credential, cleanup, and environment drift risk. | Same authorization matrix as Option A, plus cleanup verification and provider logs/screenshots as evidence. | Add provider-run evidence with date, environment, command/runbook, cleanup result, and remaining non-reproducibility caveats. | Recommended fallback only if local provider realtime/JWT fidelity is insufficient. |
 | C. Accept local mock/API proof and waive provider proof | Keep current tests and document provider authorization as not verified. | High release risk for a security-sensitive message channel. | No new provider tests. Existing fallback/API/mocked realtime tests remain. | Reclassify the P1 as an accepted security risk or release exception. | Not recommended. Requires explicit security-owner risk acceptance. |
 
-Decision needed: should the team invest in a repeatable local provider harness
-or approve an isolated staging/provider runbook? Recommended answer: approve
-Option A first, with Option B as fallback.
+Decision resolved locally: Option A was executed and verified in CH-E076.
+Option B remains available only if production/staging provider proof is required.
 
 Approval-ready plan artifact:
 `docs/features/contact-host/supabase-rls-proof-plan.md` defines the docs-only
 proof path, prerequisites, evidence, PII constraints, validation commands,
-cleanup, rollback, and closure decision points. It does not mark provider proof
-complete and does not close this P1.
+cleanup, rollback, and closure decision points. CH-E076 supersedes the local
+Option A blocker with passing local proof evidence.
 
 ## P1-3: Message-Length Authoritative Limit
 
@@ -206,8 +211,9 @@ implementation goal should be:
 1. Update the viewer-state disabled-reason contract and listing-detail fixtures
    for suspended/blocked states, then add route, component, and focused browser
    proof.
-2. Build the safe Supabase realtime/RLS provider verification path approved by
-   security, stopping for explicit approval before any schema/RLS migration.
+2. Treat the safe local Supabase realtime/RLS provider verification path as
+   closed by CH-E076; build staging/provider proof only if required as
+   production hardening.
 3. Message-length production behavior, tests, and docs are aligned to the
    approved authoritative limit and verified in CH-E067.
 

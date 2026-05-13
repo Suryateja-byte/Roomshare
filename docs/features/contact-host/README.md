@@ -20,13 +20,14 @@ spec rerun. CH-E064 closes the old Firefox missing-executable blocker and
 reproduces the focused Firefox image decode and `NS_BINDING_ABORTED` test/setup
 failures; CH-E065 closes those two focused Firefox blockers with narrow
 test/helper changes and records a passing practical combined Firefox two-spec
-run. Email delivery, provider-level Supabase
-realtime/RLS, optional direct HTTP live-server API parity, real Stripe/webhook
-provider fulfillment, and provider-level runtime behavior remain documented
-runtime gaps. Provider-level Supabase realtime/RLS is the only current Contact
-Host P1; email and real payment-provider fulfillment are P2. CH-E067 closes the
+run. Local Supabase Option A provider/RLS proof is closed by CH-E076. Email
+delivery, optional production/staging Supabase provider proof, optional direct
+HTTP live-server API parity, real Stripe/webhook provider fulfillment, and
+provider-level runtime behavior remain documented runtime gaps. Production and
+staging RLS policies are not claimed; email and real payment-provider
+fulfillment are P2. CH-E067 closes the
 message-length P1 with a passing focused Linux-side WSL Jest command. Evidence:
-`manifest.json`; `evidence-register.md` CH-E001-CH-E073;
+`manifest.json`; `evidence-register.md` CH-E001-CH-E076;
 `phase-4/01-ui-interaction-census.md`; `phase-4/05-test-traceability.md`.
 
 ## Purpose
@@ -75,7 +76,7 @@ evidence.
 | Existing conversations are reused or resurrected instead of creating duplicates when source conditions match. | Verified by source | CH-E008, CH-E009 |
 | Message-start paywall can require purchase, be unavailable, be bypassed, or consume an entitlement. | Verified by source | CH-E010, CH-E025 |
 | Message length contract is approved as one 1000-character outbound limit across inbox, thread, server action, and direct API source; focused Linux-side WSL Jest execution passed. | Closed P1 | CH-E030, CH-E060, CH-E066, CH-E067, CH-G007 |
-| Runtime behavior is not accepted until browser/tests prove each scoped flow. | Partially verified with current deterministic gates, viewer-state route contract, checkout creation route, affected contact/payment tests, focused listing-detail runtime passing, CH-E055 message status/cache-header assertions passing, full Chromium messaging passing after CH-E057 test/setup synchronization, checkout-return browser runtime passing in CH-E058, scoped paywall/unavailable/migration/moderation listing-detail state-matrix proof in CH-E059/CH-E061, focused WebKit/Mobile Chrome/Mobile Safari listing-detail and messaging proof in CH-E063, Firefox install plus reduced post-install failure classification in CH-E064, CH-E068 suspended/blocked source/test/fixture proof plus CH-E073 focused four-state Chromium listing-detail execution and full listing-detail Contact Host Chromium rerun, historical message-length cap assertions in CH-E060, updated 1000-limit source/test coverage in CH-E066, and fallback/realtime/API isolation reduction in CH-E062 | CH-E027, CH-E032-CH-E073 |
+| Runtime behavior is not accepted until browser/tests prove each scoped flow. | Partially verified with current deterministic gates, viewer-state route contract, checkout creation route, affected contact/payment tests, focused listing-detail runtime passing, CH-E055 message status/cache-header assertions passing, full Chromium messaging passing after CH-E057 test/setup synchronization, checkout-return browser runtime passing in CH-E058, scoped paywall/unavailable/migration/moderation listing-detail state-matrix proof in CH-E059/CH-E061, focused WebKit/Mobile Chrome/Mobile Safari listing-detail and messaging proof in CH-E063, Firefox install plus reduced post-install failure classification in CH-E064, CH-E068 suspended/blocked source/test/fixture proof plus CH-E073 focused four-state Chromium listing-detail execution and full listing-detail Contact Host Chromium rerun, historical message-length cap assertions in CH-E060, updated 1000-limit source/test coverage in CH-E066, fallback/realtime/API isolation reduction in CH-E062, and local Supabase Option A provider/RLS proof in CH-E076 | CH-E027, CH-E032-CH-E076 |
 
 ## Quick Links
 

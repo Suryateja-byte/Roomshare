@@ -127,7 +127,7 @@ source evidence and mark direct HTTP/runtime gaps explicitly.
 | Branch | Successful response fields | Error/status families | Cache/header status | Evidence | Verification status |
 |---|---|---|---|---|---|
 | `GET ?view=unreadCount` | Unread-count payload for the current user. | `401` without auth; rate-limit failures. | Private cached branch observed in source and asserted in passing focused Jest. | CH-E015, CH-E032, CH-E055; `phase-4/02-api-data-flow.md` Flow 4 | CH-E055 WSL focused command passed after stale fixture repair |
-| `GET ?conversationId=...&poll=1` | New messages after optional cursor plus typing users. | `401` unauthenticated; `403` inaccessible conversation; rate/validation/server errors. | `private, no-store` observed in source and asserted in passing focused Jest. | CH-E015, CH-E032, CH-E055; `phase-4/02-api-data-flow.md` Flow 4 | CH-E055 WSL focused command passed; browser fallback is a P2/future confidence gap, while provider-level Supabase realtime/RLS remains P1 |
+| `GET ?conversationId=...&poll=1` | New messages after optional cursor plus typing users. | `401` unauthenticated; `403` inaccessible conversation; rate/validation/server errors. | `private, no-store` observed in source and asserted in passing focused Jest. | CH-E015, CH-E032, CH-E055; `phase-4/02-api-data-flow.md` Flow 4 | CH-E055 WSL focused command passed; browser fallback is a P2/future confidence gap, while local Option A provider/RLS is closed by CH-E076 |
 | `GET ?conversationId=...` | Paginated thread messages. | `401` unauthenticated; `403` inaccessible conversation; pagination/server errors. | `private, no-store` observed in source and asserted in passing focused Jest. | CH-E015, CH-E032, CH-E055 | CH-E055 WSL focused command passed |
 | `GET` with no conversation id | Conversation list excluding admin-deleted and per-user-deleted conversations, with latest message/listing/participants and pagination. | `401` unauthenticated; rate/server errors. | `private, no-store` observed in source and asserted in passing focused Jest. | CH-E015, CH-E032, CH-E055 | CH-E055 WSL focused command passed; inbox search/mark-all-read browser gaps remain |
 | `POST action=markRead` | Mark-read success result. | `400` invalid body; `401`; `403`; `429`; server errors. | `no-store` observed in source and asserted in passing focused Jest. | CH-E016, CH-E032, CH-E055 | CH-E055 WSL focused command passed; UI mark-all-read is a P2/future confidence gap |
@@ -158,10 +158,11 @@ source evidence and mark direct HTTP/runtime gaps explicitly.
 
 ## Current Provider-Level Classification
 
-Provider-level Supabase realtime/RLS remains P1 because the docs do not assert
-provider delivery/RLS as fully verified. Checkout browser return is closed by
-CH-E058 for mocked Chromium runtime; real provider fulfillment remains P2
-confidence coverage.
+Local Supabase Option A provider/RLS proof is closed by CH-E076. This is local
+provider evidence only; production/staging RLS policies are not claimed, and
+production Prisma migration/RLS rollout requires separate approval. Checkout
+browser return is closed by CH-E058 for mocked Chromium runtime; real provider
+fulfillment remains P2 confidence coverage.
 Direct `/api/messages` route-handler status/cache proof is closed by CH-E055,
 and direct viewer-state route-handler status/cache/contract proof is closed by
 CH-E056. The clean full Chromium messaging rerun is closed by CH-E057 after a
