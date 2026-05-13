@@ -258,8 +258,8 @@
     },
     {
       "claimId": "V033",
-      "claim": "The docs are based on the current dirty worktree rather than a clean committed branch.",
-      "citation": "README.md; 00-feature-boundary.md; 12-gaps-unknowns-and-questions.md G009; manifest.json sourceOfTruth",
+      "claim": "The docs now distinguish committed/runtime evidence from remaining local-only dirty worktree discovery entries.",
+      "citation": "README.md; 00-feature-boundary.md; 12-gaps-unknowns-and-questions.md G009; dirty-worktree-source-inventory.md; evidence-register.md C057; manifest.json sourceOfTruth",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -471,8 +471,8 @@
     },
     {
       "manifestItem": "dirty worktree source of truth",
-      "gap": "Docs intentionally use the current dirty worktree; reviewers should preserve or stage related source files before treating these docs as stable branch documentation.",
-      "severity": "P1"
+      "gap": "Docs distinguish committed/runtime evidence from local-only dirty worktree discovery entries; reviewers should preserve or stage remaining related source files before treating the whole local branch as stable.",
+      "severity": "P2"
     },
     {
       "manifestItem": "exact file-level test index",

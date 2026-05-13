@@ -1,6 +1,6 @@
 # Search / Map Source Map
 
-Source of truth: current dirty worktree plus committed desktop parity slice `7e80c899`. This is a Phase 1/2 source map, not final feature documentation.
+Source of truth: mixed committed/runtime evidence plus explicitly marked local discovery caveats. The desktop parity slice is committed as `7e80c899`; remaining dirty or untracked files are inventoried in C057 and are not standalone passing evidence. This is a Phase 1/2 source map, not final feature documentation.
 
 | Area | File | Symbols / components | Responsibility | Evidence | Confidence |
 |---|---|---|---|---|---|

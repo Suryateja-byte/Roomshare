@@ -1,6 +1,6 @@
 {
   "feature": "search-map-listing-discovery",
-  "sourceOfTruth": "current dirty worktree as of Phase 1/2 discovery",
+  "sourceOfTruth": "mixed committed/runtime evidence plus explicitly marked local discovery snapshot; dirty-worktree caveat reduced in C057",
   "entryPoints": [
     {
       "path": "src/app/search/page.tsx",
@@ -235,8 +235,8 @@
     {
       "path": "src/components/search/HeaderFilterDrawer.tsx",
       "symbols": ["HeaderFilterDrawer"],
-      "responsibility": "Untracked dirty-worktree filter drawer component; included because current dirty worktree is source of truth.",
-      "evidence": "file discovery",
+      "responsibility": "Local-only untracked filter drawer component observed during discovery; not standalone passing evidence.",
+      "evidence": "file discovery; evidence-register.md C057",
       "confidence": "Partially verified"
     },
     {
@@ -871,7 +871,7 @@
     "Direct contact-host entry point from search cards was not verified; listing cards link to listing detail pages.",
     "\"Search this area\" appears only in a comment describing a removed deferred flow.",
     "Map provider terminology is inconsistent: code comments mention Mapbox while env/config evidence points to Stadia Maps / MapLibre for the main app.",
-    "Some search-related files are untracked in the dirty worktree and must be preserved as source-of-truth inputs for later phases.",
+    "Some search-related files remain dirty or untracked; C057 records them as local-only discovery caveats, not standalone passing evidence.",
     "Grouped manifest entries are covered by the groupedCoverage table rather than by a generated per-file index; exact per-file inventory generation remains optional P2 follow-up work."
   ]
 }

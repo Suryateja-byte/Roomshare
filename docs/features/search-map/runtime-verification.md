@@ -15,12 +15,14 @@ still not run.
 
 Date: 2026-05-07, with post-merge check update on 2026-05-08 and desktop list/map parity update on 2026-05-13.
 
-Source of truth: current dirty documentation worktree plus post-merge
-`origin/main` at `89ad33ea58391452b03a2ff5c3a219503769edaa`. The local branch
-`codex/search-ux-fixes` is dirty and overlaps updated `main`, so the fixed-code
-confirmation below uses `origin/main` and GitHub Actions evidence rather than a
-local merge into this worktree. The desktop list/map parity code and test slice
-itself is committed locally as `7e80c899`.
+Source of truth: mixed focused runtime evidence, post-merge `origin/main`
+evidence at `89ad33ea58391452b03a2ff5c3a219503769edaa`, and explicitly marked
+local discovery caveats. The local branch `codex/search-ux-fixes` is still
+dirty and overlaps updated `main`, so the fixed-code confirmation below uses
+`origin/main` and GitHub Actions evidence rather than a local merge into this
+worktree. The desktop list/map parity code and test slice itself is committed
+locally as `7e80c899`. Remaining dirty or untracked files are inventoried in
+C057 and are not standalone passing evidence.
 
 ## Summary
 

@@ -1,7 +1,7 @@
 # Search / Map / Listing Discovery
 
-Status: evidence-backed draft from the current dirty documentation worktree,
-with post-merge fixed-code verification against `origin/main` at
+Status: evidence-backed draft from mixed committed/runtime evidence and
+explicitly marked local discovery caveats, with post-merge fixed-code verification against `origin/main` at
 `89ad33ea58391452b03a2ff5c3a219503769edaa`. Runtime browser behavior was
 attempted in Phase 10; local Postgres is now available and the narrow smoke,
 filter/URL, sort/load-more pagination, desktop map/list parity, results-state, URL-state,
@@ -14,7 +14,10 @@ failed, but the P0 public payload fix now passes a real captured payload scan
 for `/api/search/v2`, `/api/search/listings`, `/api/map-listings`, and
 `/api/listings`; PR #119 is merged to `main` and all final PR checks pass.
 The committed C056 slice (`7e80c899`) also verifies desktop list-backed map
-parity with focused browser and `SearchResultsClient` Jest evidence.
+parity with focused browser and `SearchResultsClient` Jest evidence. C057
+narrows the old dirty-worktree source warning to a P2 branch-hygiene caveat:
+remaining dirty or untracked files are local-only discovery inputs unless a
+specific evidence row cites them.
 V1-only map API mock cases and non-gate broader E2E coverage are still not
 runtime-verified. See `runtime-verification.md` and
 `public-payload-pii-triage.md`.
@@ -76,6 +79,7 @@ Committed search state is URL-first: raw URL params are parsed by `parseSearchPa
 - [Test traceability matrix](./11-test-traceability-matrix.md)
 - [Gaps and unknowns](./12-gaps-unknowns-and-questions.md)
 - [Runtime verification](./runtime-verification.md)
+- [Dirty worktree source inventory](./dirty-worktree-source-inventory.md)
 - [Round-trip reconstruction review](./round-trip-review.md)
 - [Public payload PII triage](./public-payload-pii-triage.md)
 - [Evidence register](./evidence-register.md)

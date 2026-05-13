@@ -60,6 +60,6 @@ E2E coverage remain outside verified evidence until they are run.
 
 | Question | Why it matters | Status |
 |---|---|---|
-| Does current search documentation target committed `main`, the current dirty worktree, or a dedicated docs worktree snapshot? | Runtime and code evidence can differ while `codex/search-ux-fixes` has uncommitted search changes. | Not verified |
+| Does current search documentation target committed `main`, the current dirty worktree, or a dedicated docs worktree snapshot? | Runtime and code evidence can differ while `codex/search-ux-fixes` has uncommitted search changes. | Partially resolved by C057: pass claims cite committed/runtime evidence, while remaining dirty or untracked entries are local-only discovery caveats. |
 | Is contact-host behavior reachable from search cards in the current UI? | It determines whether contact-host entry points belong in this feature doc or only in a separate contact-host doc. | Not verified |
 | Are booking references historical, removed, or still active in search/listing discovery code? | The doc must not describe removed booking behavior as current behavior. | Not verified |
