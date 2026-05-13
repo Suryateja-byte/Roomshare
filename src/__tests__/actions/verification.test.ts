@@ -424,6 +424,14 @@ describe("Verification Actions", () => {
           documentsExpireAt: expect.any(Date),
         },
       });
+      expect(sendNotificationEmail).toHaveBeenCalledWith(
+        "verificationRejected",
+        "target@example.com",
+        {
+          userName: "Target User",
+          reason: "Blurry image",
+        }
+      );
       expect(result).toEqual({ success: true });
     });
   });

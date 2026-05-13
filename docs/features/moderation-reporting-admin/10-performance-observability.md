@@ -10,4 +10,4 @@
 | Audit logs | Admin actions and document views attempt to write audit records with action/target/details/IP where available. | MRA-E004, MRA-E005, MRA-E006, MRA-E007, MRA-E008, MRA-E009, MRA-E012, MRA-E013 |
 | Logging | Admin/report/verification actions log failure paths with action context. | MRA-E004, MRA-E005, MRA-E006, MRA-E007, MRA-E008, MRA-E009, MRA-E012, MRA-E013 |
 
-Observability gap: no runtime audit/log/telemetry capture was executed in this pass; see MRA-G003 and MRA-G005.
+Observability gap: local mocked telemetry invocation is verified by MRA-E020, but provider telemetry/observability runtime and audit-failure runtime capture were not executed in this pass; see MRA-G003 and MRA-G005.

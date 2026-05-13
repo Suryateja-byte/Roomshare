@@ -10,8 +10,9 @@ Human/adversarial review status: PARTIAL.
 | Test inventory separates discovered tests from executed tests. | PASS | MRA-E016; `11-test-traceability-matrix.md` |
 | Browser runtime verification is complete. | NOT VERIFIED | MRA-G001 |
 | Route-handler/direct API Jest verification is complete for the focused reports, verification documents, private-feedback no-public-bleed, abuse hardening, and injection prevention command. | PASS | MRA-E019 |
+| Local mocked private-feedback telemetry helper and verification approval/rejection notification helper invocation checks are complete after the new rejection assertion. | PASS | MRA-E020 |
 | Optional live-server HTTP transport parity for status/header/CSRF/signed URL behavior is complete. | NOT VERIFIED | MRA-G002 |
-| Email delivery and telemetry runtime verification is complete. | NOT VERIFIED | MRA-G003 |
+| Real provider email delivery, inbox/bounce/webhook behavior, and provider telemetry/observability verification is complete. | NOT VERIFIED | MRA-G003 |
 | Migration SQL invariant audit is complete. | PARTIAL | MRA-G004 |
 
-Reviewer note: do not treat this package as release-signoff evidence until P1 gaps MRA-G001 and MRA-G003 are closed or explicitly accepted; MRA-G002 is now an optional P2 live-server HTTP parity gap.
+Reviewer note: do not treat this package as release-signoff evidence until P1 gap MRA-G001 is closed or explicitly accepted; MRA-G002 remains an optional P2 live-server HTTP parity gap, and MRA-G003 remains a P2 provider/runtime residual gap.
