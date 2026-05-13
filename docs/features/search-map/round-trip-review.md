@@ -15,11 +15,11 @@ follow-up documentation improvements.
 
 | Area | Result | Summary |
 |---|---|---|
-| Main user flows | Clear from docs | The primary `/search`, filter/sort, pagination, map, listing-card, saved-listing, saved-search, and indirect listing-detail Contact Host handoff paths can be reconstructed. Direct Contact Host from search cards and Search-this-area are correctly excluded from current behavior. |
+| Main user flows | Clear from docs | The primary `/search`, filter/sort, pagination, automatic map-pan search, listing-card, saved-listing, saved-search, and indirect listing-detail Contact Host handoff paths can be reconstructed. Direct Contact Host from search cards and a manual Search-this-area button/toggle are correctly excluded from current behavior. |
 | Public API contracts | Partially clear | Endpoint list, high-level inputs, auth, errors, and verification status are clear. Exact response schemas, cache semantics, and per-field public/private payload contracts are still incomplete. |
 | State machine | Partially clear | URL-first search, SSR search, client result state, V2 map data, load-more, and map pan/fetch loops are reconstructable. Error, empty, auth, save, mobile sheet, and privacy states are not integrated into the state-machine diagram. |
 | URL/search param model | Clear after P0 follow-up | The docs make the URL the canonical committed search state, and `13-url-search-param-reference.md` now provides the exact param list, legacy aliases, allowed values, defaults, invalid-input handling, serialization, and reset rules. |
-| Key invariants | Clear from docs | The invariants table is useful and grounded: URL-first state, bounded geography, auth-protected saved mutations, public payload privacy, V2/legacy fallback caution, no Search-this-area claim, and no active booking UX claim. |
+| Key invariants | Clear from docs | The invariants table is useful and grounded: URL-first state, bounded geography, auth-protected saved mutations, public payload privacy, V2/legacy fallback caution, automatic map-pan search separated from the removed manual Search-this-area control, and no active booking UX claim. |
 | Error/empty/loading states | Partially clear | Important scenarios and test coverage are listed. Exact user-visible UI copy, route/API status behavior, retry behavior, and ownership by component/API are not always reconstructable without source. |
 | Minimum test plan | Clear from docs | The test traceability matrix and runtime verification file give a practical P0/P1 test plan and clearly separate passed, not-run, skipped, and remaining coverage gaps. |
 
@@ -61,7 +61,9 @@ Remaining ambiguity:
   behavior is still unverified.
 - Contact-host is correctly marked as not directly verified from search cards,
   but the reader cannot reconstruct the handoff beyond “open listing detail.”
-- Search-this-area is correctly treated as not implemented/currently absent.
+- Automatic map-pan search is documented as current source behavior, while the
+  removed manual Search-this-area button/toggle is excluded from current
+  behavior.
 
 ### 2. Public API Contracts
 
@@ -164,9 +166,9 @@ A fresh reader can reconstruct these invariants:
   or private listing/location data.
 - Public payloads should not expose exact coordinates, owner IDs, addresses,
   zips, raw group keys, or raw context keys.
-- Search-this-area and direct search-card Contact Host must not be documented as
-  current behavior without more evidence; current source-backed contact-host
-  handoff is through listing detail.
+- A manual Search-this-area button/toggle and direct search-card Contact Host
+  must not be documented as current behavior without more evidence; current
+  source-backed contact-host handoff is through listing detail.
 - Booking references must remain labeled as current code/data history, not
   active booking UX.
 

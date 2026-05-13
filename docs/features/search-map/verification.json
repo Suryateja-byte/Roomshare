@@ -226,8 +226,8 @@
     },
     {
       "claimId": "V029",
-      "claim": "`Search this area` is not documented as current behavior because only a removed-flow comment was found.",
-      "citation": "03-interaction-census.md; 06-data-model-and-invariants.md; 09-errors-empty-loading-edge-cases.md; evidence-register.md C016; src/contexts/MapBoundsContext.tsx",
+      "claim": "Automatic map-pan search-as-move is documented as current source behavior, while the old manual/deferred Search-this-area button or toggle is excluded from current behavior.",
+      "citation": "03-interaction-census.md; 06-data-model-and-invariants.md; 09-errors-empty-loading-edge-cases.md; evidence-register.md C016 and C061; src/contexts/MapBoundsContext.tsx; src/components/Map.tsx",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
