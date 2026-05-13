@@ -4,7 +4,7 @@ This file separates release-blocking evidence from confidence-building inventory
 Phase 10/11/12 evidence records passing focused browser, API/unit, privacy, typecheck,
 and release-gate commands. Broader non-gate suites remain useful, but they are not
 treated as Phase 13 blockers unless product/release owners explicitly promote them.
-See `runtime-verification.md`, `evidence-register.md` C034-C058, and `manifest.json`
+See `runtime-verification.md`, `evidence-register.md` C034-C063, and `manifest.json`
 test groups.
 
 ## Release-Blocking Tests
@@ -21,6 +21,7 @@ test groups.
 | Mobile map/list primary flow | `tests/e2e/search/search-map-mobile.spec.ts` | `pnpm exec playwright test tests/e2e/search/search-map-mobile.spec.ts --project=mobile-anonymous --reporter=list` | Passed | Broader mobile tools/screenshots remain confidence-building. |
 | Map error/a11y behavior and `/api/map-listings` 500/429 retry | `tests/e2e/map-errors-a11y.anon.spec.ts`; H4/H5 in `tests/e2e/search/search-map-desktop.spec.ts` | `pnpm exec playwright test tests/e2e/map-errors-a11y.anon.spec.ts --project=chromium-anon --reporter=list`; `ENABLE_SEARCH_SNAPSHOT_CONTRACT=false pnpm exec playwright test tests/e2e/search/search-map-desktop.spec.ts --project=failure-mocked --grep '@failure-mocked' --reporter=list` | Passed | Legacy skipped placeholders remain fallback-only harness notes; current release proof is covered by C058. |
 | Public search/map API contract and helpers | Focused Jest command covering favorites, map listings, search facets, search V2, map payload sanitization, and search params | `pnpm test -- src/__tests__/api/favorites-get.test.ts src/__tests__/api/favorites.test.ts src/__tests__/api/map-listings-route.test.ts src/__tests__/api/map-listings.test.ts src/__tests__/api/search/facets/route.test.ts src/__tests__/api/search/v2/route.test.ts src/__tests__/lib/maps/sanitize-map-listings.test.ts src/__tests__/lib/search-params.test.ts` | Passed | Generated OpenAPI schemas remain out of scope for this docs gate. |
+| V2 route and load-more fallback control states | `src/__tests__/api/search/v2/route.test.ts`; `src/__tests__/app/search/actions.test.ts`; source contract in C063 | `pnpm test -- src/__tests__/api/search/v2/route.test.ts src/__tests__/app/search/actions.test.ts --runInBand` | Passed | `/api/search/listings` fallback still needs dedicated route-handler coverage; broader `search-v2-service.test.ts` currently has 2 semantic-search expectation failures. |
 | Public payload PII/privacy | Focused P0 privacy suite, fixture scanner checks, real captured payload scan, GitHub Actions Public Payload PII Scan | Captured `/api/search/v2`, `/api/search/listings`, `/api/map-listings`, and `/api/listings` payload scan plus PR #119 checks | Passed after P0 fix | No-arg deterministic capture wrapper remains P1/P2 operational follow-up, not a Phase 13 blocker. |
 | Full search release gate | `tests/e2e/search-release-gate/*` | `pnpm run test:e2e:search-release-gate` | Passed | SSR report: 27 expected/25 skipped/0 unexpected; client report: 36 expected/16 skipped/0 unexpected. |
 | CI/release readiness checks for merged fix | PR #119 final GitHub Actions checks | Public Payload PII Scan, both search release gates, all 10 E2E shards, Stability E2E, Unit/API/Component/Type/Lint/Build, Search Smoke, Lighthouse, Vercel, and related search/filter checks | Passed | Evidence is external CI status already recorded in Phase 12 notes; this docs pass does not rerun CI. |
@@ -42,7 +43,7 @@ confidence-building unless a release owner explicitly promotes one to a blocker.
 | Legacy V1-only map/a11y placeholders | Skipped branches inside `map-errors-a11y.anon.spec.ts` when V2 mode is active | Superseded by C058 for `/api/map-listings` 500/429 browser proof | The current release proof uses the existing `failure-mocked` desktop Search Map tests; keep these placeholders only if a dedicated forced-V1 a11y project is added later. | P2 |
 | Broader pagination suites beyond C062 | Remaining `tests/e2e/pagination/*.spec.ts` beyond the focused C062 root reset coverage | Partially covered by C062 for root pagination/sort reset and map-bounds round-trip; broader pagination families not fully run | C062 covers the highest-risk reset/bounds paths; remaining pagination variants are confidence coverage unless promoted. | P2 |
 | Broader filter, URL, semantic, dedupe suites | `tests/e2e/search-filters/*.anon.spec.ts`; `tests/e2e/search-url-*.spec.ts`; `tests/e2e/semantic-search/*.anon.spec.ts`; `tests/e2e/dedupe/search-list-*.dedupe.spec.ts` | Not fully run | Focused gate commands cover primary flows; these are wider regression nets. | P1 |
-| Search service internals | `src/__tests__/lib/search/*.test.ts`; cursor/query/projection/dedupe/semantic/cache tests | Mostly not run, except focused search-params and selected API/unit files | Final docs cite focused API/unit evidence and mark deeper implementation parity as a gap. | P1 |
+| Search service internals | `src/__tests__/lib/search/*.test.ts`; cursor/query/projection/dedupe/semantic/cache tests | Partially run; C063 attempted `search-v2-service.test.ts` and found 2 semantic-search expectation failures | Final docs cite focused API/unit evidence and mark deeper implementation parity as a gap. | P1 |
 | Component/context/hook inventory | Search form/header/filter/result/map/save/favorite component tests and search/map contexts/hooks | Mostly not run | User-visible Playwright gate passed for critical flows; component inventory remains useful for narrowing regressions. | P2 |
 | Fixtures/helpers/page objects | `tests/e2e/pages/*`, `tests/e2e/fixtures/*`, `tests/e2e/helpers/*`, `tests/e2e/utils/*` | Not run directly | These are support files, not standalone behavior claims. | P2 |
 | Machine-readable exact test index | Generated file index from test discovery | Not generated | Manifest intentionally uses grouped test-family entries; exact per-file inventory can be generated later. | P2 |
@@ -57,7 +58,7 @@ confidence-building unless a release owner explicitly promotes one to a blocker.
 | Saved listing | Anonymous/authenticated Playwright and favorites API tests passed | FavoriteButton component CSRF/header checks |
 | Saved search | Not release-blocking under current docs because branches are marked partial | Saved-search E2E/action/component/paywall tests |
 | Public payload/privacy | Fixed real payload scan, focused privacy suite, and PR #119 CI passed | No-arg deterministic payload-capture wrapper |
-| API contracts | Focused API/unit tests passed; compact docs tables added | Formal generated schemas and broader API suites |
+| API contracts | Focused API/unit tests passed; compact docs tables and C063 fallback contract added | Formal generated schemas, dedicated `/api/search/listings` fallback test, and broader API suites |
 
 See `phase-4/05-test-traceability.md` and `manifest.json` for the broader
 discovered inventory.

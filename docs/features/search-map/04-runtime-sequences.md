@@ -31,6 +31,31 @@ sequenceDiagram
 
 Evidence: `evidence-register.md` C001-C007, C034, C045, C047.
 
+## V2 / Legacy Fallback Selection
+
+```mermaid
+sequenceDiagram
+  participant Caller as "SSR/API/action caller"
+  participant V2 as "executeSearchV2"
+  participant Legacy as "getListingsPaginated"
+  participant Client as "SearchResultsClient"
+
+  Caller->>V2: Search with normalized URL params
+  alt V2 success
+    V2-->>Caller: SearchV2Response + paginated result
+    Caller-->>Client: backendSource v2, ok/zero-results state
+  else unbounded/admission/snapshot
+    V2-->>Caller: Structured control state
+    Caller-->>Client: location-required or error envelope
+  else V2 failure or circuit open where fallback is allowed
+    Caller->>Legacy: Fetch legacy paginated listings
+    Legacy-->>Caller: Legacy list result
+    Caller-->>Client: backendSource v1-fallback, degraded when V2 was intended
+  end
+```
+
+Evidence: C063; `src/app/search/page.tsx`:L416-L421, L445-L462, L475-L515, L559-L582; `src/app/api/search/listings/route.ts`:L138-L227, L230-L311, L314-L387; `src/app/api/search/v2/route.ts`:L90-L181; `src/app/search/actions.ts`:L151-L185, L247-L297; `src/components/search/SearchResultsClient.tsx`:L487-L540, L780-L784, L1225-L1303.
+
 ## Filter Or Sort Change
 
 ```mermaid
@@ -71,7 +96,7 @@ sequenceDiagram
   end
 ```
 
-Evidence: `src/components/search/SearchResultsClient.tsx`:L710-L872; `src/app/search/actions.ts`:L48-L300; `runtime-verification.md`; `evidence-register.md` C036.
+Evidence: `src/components/search/SearchResultsClient.tsx`:L710-L872; `src/app/search/actions.ts`:L48-L300; `runtime-verification.md`; `evidence-register.md` C036, C063. Load-more V1 fallback intentionally returns a degraded non-appendable result because cursor pagination is not supported by the legacy path.
 
 ## Map Bounds / Marker Fetch
 

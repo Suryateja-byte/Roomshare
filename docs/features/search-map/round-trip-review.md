@@ -19,7 +19,7 @@ follow-up documentation improvements.
 | Public API contracts | Partially clear | Endpoint list, high-level inputs, auth, errors, and verification status are clear. Exact response schemas, cache semantics, and per-field public/private payload contracts are still incomplete. |
 | State machine | Partially clear | URL-first search, SSR search, client result state, V2 map data, load-more, and map pan/fetch loops are reconstructable. Error, empty, auth, save, mobile sheet, and privacy states are not integrated into the state-machine diagram. |
 | URL/search param model | Clear after P0 follow-up | The docs make the URL the canonical committed search state, and `13-url-search-param-reference.md` now provides the exact param list, legacy aliases, allowed values, defaults, invalid-input handling, serialization, and reset rules. |
-| Key invariants | Clear from docs | The invariants table is useful and grounded: URL-first state, bounded geography, auth-protected saved mutations, public payload privacy, V2/legacy fallback caution, automatic map-pan search separated from the removed manual Search-this-area control, and no active booking UX claim. |
+| Key invariants | Clear from docs | The invariants table is useful and grounded: URL-first state, bounded geography, auth-protected saved mutations, public payload privacy, source-extracted V2/search-doc versus legacy fallback states, automatic map-pan search separated from the removed manual Search-this-area control, and no active booking UX claim. |
 | Error/empty/loading states | Partially clear | Important scenarios and test coverage are listed. Exact user-visible UI copy, route/API status behavior, retry behavior, and ownership by component/API are not always reconstructable without source. |
 | Minimum test plan | Clear from docs | The test traceability matrix and runtime verification file give a practical P0/P1 test plan and clearly separate passed, not-run, skipped, and remaining coverage gaps. |
 
@@ -159,7 +159,8 @@ A fresh reader can reconstruct these invariants:
 - URL params are canonical committed search input.
 - Text searches without usable bounds must not trigger unsafe unbounded scans.
 - Map APIs need bounded or derived geography.
-- V2/search-doc is primary, with legacy fallback still present.
+- V2/search-doc is primary, with source-extracted legacy fallback/control-state
+  behavior in C063.
 - Cursor/query hash state is intended to prevent stale pagination, though some
   reset behavior remains a gap.
 - Saved listing mutation requires authentication.
@@ -257,4 +258,6 @@ P1/P2 confidence-building gaps already listed in `12-gaps-unknowns-and-questions
 and `unknowns.md`: broader non-gate map/list/filter/pagination/mobile coverage,
 saved-search auth/paywall runtime coverage, optional direct search-card Contact
 Host product work or full contact-host handoff browser proof, optional stale
-Mapbox comment/fixture cleanup, and optional generated API/test-index artifacts.
+Mapbox comment/fixture cleanup, C063 residual `/api/search/listings`
+route-handler/service semantic-suite coverage, and optional generated
+API/test-index artifacts.

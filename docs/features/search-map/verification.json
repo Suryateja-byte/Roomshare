@@ -34,8 +34,8 @@
     },
     {
       "claimId": "V005",
-      "claim": "Exact V2/search-doc versus legacy fallback branching and field parity remain incomplete.",
-      "citation": "06-data-model-and-invariants.md; 12-gaps-unknowns-and-questions.md G007; phase-4/02-api-data-flow.md",
+      "claim": "The V2/search-doc versus legacy fallback contract is source-extracted for SSR search, `/api/search/listings`, direct `/api/search/v2`, load-more, and client degraded states, with remaining P2 gaps for dedicated `/api/search/listings` route tests and broader service semantic-suite repair.",
+      "citation": "05-api-contracts.md; 06-data-model-and-invariants.md; 12-gaps-unknowns-and-questions.md G007; evidence-register.md C063; runtime-verification.md",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -441,7 +441,7 @@
     },
     {
       "manifestItem": "test inventory",
-      "gap": "Tests are discovered and grouped in the manifest; focused search/map harness commands, focused API/unit Jest, the P0 privacy suite, typecheck, the full search release gate, scanner fixture checks, and the real fixed payload scan have passed. Non-gate broader E2E commands have not passed in this session.",
+      "gap": "Tests are discovered and grouped in the manifest; focused search/map harness commands, focused API/unit Jest, the C063 V2 route/load-more action command, the P0 privacy suite, typecheck, the full search release gate, scanner fixture checks, and the real fixed payload scan have passed. Non-gate broader E2E commands have not passed in this session, and the attempted broader V2 service semantic suite currently has 2 expectation failures.",
       "severity": "P1"
     },
     {
@@ -456,7 +456,7 @@
     },
     {
       "manifestItem": "API response contracts",
-      "gap": "The docs now include compact field/cache/error tables for the main contracts, but they are not generated OpenAPI schemas and do not enumerate every optional debug-only field combination.",
+      "gap": "The docs now include compact field/cache/error tables for the main contracts and the C063 V2/search-doc versus legacy fallback contract, but they are not generated OpenAPI schemas, do not enumerate every optional debug-only field combination, and still need dedicated `/api/search/listings` route-handler fallback coverage plus service semantic-suite repair/reclassification.",
       "severity": "P2"
     },
     {

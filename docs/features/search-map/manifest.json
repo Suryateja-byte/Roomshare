@@ -502,7 +502,7 @@
         "pnpm scan:public-payload-pii"
       ],
       "evidence": "package.json scripts discovered in Phase 4",
-      "status": "Partially run: focused `pnpm test -- ...` Jest command passed for selected API/unit files; `pnpm scan:public-payload-pii` still requires explicit payload JSON when run bare; direct scanner fixture commands behaved as expected; original real search/map payload scan failed; after the P0 privacy fix, real captured `/api/search/v2`, `/api/search/listings`, `/api/map-listings`, and `/api/listings` payloads scanned cleanly; `pnpm run typecheck` and `pnpm run test:e2e:search-release-gate` passed locally; PR #119 is merged to `main` and final GitHub Actions checks passed for public payload PII scan, search release gates, all E2E shards, Stability E2E, Unit/API/Component/Type/Lint/Build, Search Smoke, Lighthouse, Vercel, and related search/filter checks; other package scripts not run locally"
+      "status": "Partially run: focused `pnpm test -- ...` Jest commands passed for selected API/unit files; C063 focused V2 route/load-more action command passed; attempted broader V2 service command failed 2 semantic-search expectation tests; `pnpm scan:public-payload-pii` still requires explicit payload JSON when run bare; direct scanner fixture commands behaved as expected; original real search/map payload scan failed; after the P0 privacy fix, real captured `/api/search/v2`, `/api/search/listings`, `/api/map-listings`, and `/api/listings` payloads scanned cleanly; `pnpm run typecheck` and `pnpm run test:e2e:search-release-gate` passed locally; PR #119 is merged to `main` and final GitHub Actions checks passed for public payload PII scan, search release gates, all E2E shards, Stability E2E, Unit/API/Component/Type/Lint/Build, Search Smoke, Lighthouse, Vercel, and related search/filter checks; other package scripts not run locally"
     },
     {
       "area": "Search route and server action tests",
@@ -511,7 +511,7 @@
         "src/__tests__/app/search/layout.test.tsx"
       ],
       "evidence": "Phase 4 test discovery; focused Jest command in runtime-verification.md",
-      "status": "Partially passed: search V2 route, facets route, map-listings route/helper, and favorites GET/POST tests passed; search-count and search-telemetry not run"
+      "status": "Partially passed: search V2 route, load-more action, facets route, map-listings route/helper, and favorites GET/POST tests passed; search-count, search-telemetry, and dedicated `/api/search/listings` fallback route coverage not run"
     },
     {
       "area": "Search API route tests",
@@ -748,7 +748,7 @@
     {
       "manifestArea": "apiRoutes/dataAccessFunctions/searchParamParsers",
       "coverageDoc": "05-api-contracts.md; 06-data-model-and-invariants.md; 13-url-search-param-reference.md; phase-4/02-api-data-flow.md",
-      "status": "Main public route contracts now have compact response/cache/error tables; generated schemas and every internal helper permutation remain explicit P2 follow-up coverage rather than final-gate blockers."
+      "status": "Main public route contracts now have compact response/cache/error tables, and C063 extracts the V2/search-doc versus legacy fallback contract. Generated schemas, dedicated `/api/search/listings` fallback route-handler coverage, service semantic-suite repair, and every internal helper permutation remain explicit P2 follow-up coverage rather than final-gate blockers."
     },
     {
       "manifestArea": "databaseModels/migrations",
@@ -758,7 +758,7 @@
     {
       "manifestArea": "tests",
       "coverageDoc": "11-test-traceability-matrix.md; runtime-verification.md; phase-4/05-test-traceability.md; 12-gaps-unknowns-and-questions.md G001, G002, G011, G012, G013",
-      "status": "Grouped into release-blocking tests and confidence-building inventory. Release-blocking commands have Phase 10/11/12 evidence; broader non-gate families are explicitly listed as confidence-building gaps."
+      "status": "Grouped into release-blocking tests and confidence-building inventory. Release-blocking commands have Phase 10/11/12 evidence, C063 adds focused V2 route/load-more action proof, and broader non-gate/service families are explicitly listed as confidence-building gaps."
     },
     {
       "manifestArea": "externalServices/environmentVariables",
@@ -872,7 +872,7 @@
   ],
   "unknowns": [
     "Runtime/browser behavior is now verified for the Phase 10/11/12 release-blocking search/map commands, including failure-mocked /api/map-listings 500/429 browser checks and C062 focused root pagination/sort reset plus map-bounds round-trip checks; broader non-gate E2E families remain confidence-building gaps.",
-    "Discovered tests are grouped in this manifest; the release-blocking subset and focused API/unit/privacy checks have passing evidence, while broader grouped families are listed as not run.",
+    "Discovered tests are grouped in this manifest; the release-blocking subset, C063 V2 route/load-more action command, and focused API/unit/privacy checks have passing evidence, while broader grouped families are listed as not run and the broader V2 service semantic suite currently has 2 expectation failures.",
     "Current source evidence shows an indirect contact-host handoff: search cards link to listing detail pages, and listing detail owns the Contact Host CTA; a direct search-card Contact Host CTA remains a P2 product question.",
     "The old manual/deferred Search-this-area control is removed, while current source evidence shows automatic map-pan search-as-move with canonical bounds updates and a `Searching this area...` status overlay; fresh browser proof remains optional P2 coverage.",
     "Map provider terminology is reduced to a P2 maintenance cleanup: current docs identify MapLibre runtime with OpenFreeMap light style, local dark style, and OpenStreetMap fallback. Stadia config exists but is not proven active for Search Map, while stale Mapbox wording remains in comments, optional scripts, compatibility language, or fixture names.",

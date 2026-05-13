@@ -21,8 +21,10 @@ remaining dirty or untracked files are local-only discovery inputs unless a
 specific evidence row cites them.
 The existing failure-mocked desktop map tests now verify `/api/map-listings`
 500/429 browser retry behavior as C058. C062 verifies focused root
-pagination/sort reset and map-bounds round-trip browser behavior. Non-gate
-broader E2E coverage is still not runtime-verified. See `runtime-verification.md` and
+pagination/sort reset and map-bounds round-trip browser behavior. C063 extracts
+the V2/search-doc versus legacy fallback contract and verifies the focused V2
+route/load-more action checks, with a remaining service-suite semantic-test
+residual. Non-gate broader E2E coverage is still not runtime-verified. See `runtime-verification.md` and
 `public-payload-pii-triage.md`.
 
 ## Purpose
@@ -31,7 +33,7 @@ This feature lets users discover listings from `/search`, using URL-backed searc
 
 ## Current implementation summary
 
-`/search` is the main SSR entry point. It parses URL params, applies a server-side rate limit, runs the V2 search path first, and falls back to legacy listing data when needed. Evidence: `src/app/search/page.tsx`:L242-L623; `evidence-register.md` C001, C005, C006.
+`/search` is the main SSR entry point. It parses URL params, applies a server-side rate limit, runs the V2 search path first when enabled, and falls back to legacy listing data when needed. C063 now documents which fallback/control state each search surface returns: SSR and `/api/search/listings` can serve `v1-fallback`/`degraded`, direct `/api/search/v2` returns V2 control or error envelopes without V1 fallback, and load-more returns a degraded non-appendable result when legacy fallback is reached. Evidence: `src/app/search/page.tsx`:L242-L623; `evidence-register.md` C001, C005, C006, C063.
 
 The map is hosted by the `/search` layout and persistent map wrapper. The wrapper can use V2 map data or independently fetch `/api/map-listings`; the map component renders clusters, markers, selected listing previews, empty state, and error handling. Evidence: `src/app/search/layout.tsx`:L46-L93; `src/components/PersistentMapWrapper.tsx`:L4-L17, L365-L430; `src/components/Map.tsx`:L3876-L4573; `evidence-register.md` C013-C015.
 
@@ -60,7 +62,7 @@ Committed search state is URL-first: raw URL params are parsed by `parseSearchPa
 |---|---|---|
 | URL params are the canonical committed search input. | `evidence-register.md` C003 | Verified by code |
 | Text searches without usable bounds can enter a bounds-required state instead of scanning everything. | `evidence-register.md` C004, C011 | Verified by code |
-| V2/search-doc is primary, with legacy fallback paths still present. | `evidence-register.md` C006, C009 | Verified by code |
+| V2/search-doc is primary, with explicit legacy fallback/control-state branches. | `evidence-register.md` C006, C009, C063 | Verified by code and focused route/action tests; full service parity remains P2 |
 | Public search/map APIs are rate-limited. | `phase-4/04-auth-security-permissions.md` | Verified by code |
 | Saved listing mutation requires auth on POST. | `evidence-register.md` C018-C019 | Verified by code |
 | Runtime behavior and test status must be scoped to checks that actually ran. | `unknowns.md` G001-G002; `runtime-verification.md`; `evidence-register.md` C056, C062 | Smoke/filter/pagination/root pagination-sort reset/map-bounds round-trip/desktop map-list parity/results-state/URL-state/saved-listing/mobile-map/error-resilience/map-error-a11y, focused API/unit Jest, release gate, and real captured public-payload PII scan passed; non-gate broader E2E remains unverified |
