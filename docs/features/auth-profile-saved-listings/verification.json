@@ -2,7 +2,7 @@
   "featureSlug": "auth-profile-saved-listings",
   "status": "partial",
   "verifiedAt": "2026-05-13",
-  "method": "source audit plus test discovery, focused route/action Jest commands recorded in APS-E018 and APS-E019, focused Chromium browser gate recorded in APS-E020, and local/mocked provider-adjacent Jest command recorded in APS-E021 through APS-E024",
+  "method": "source audit plus test discovery, focused route/action Jest commands recorded in APS-E018, APS-E019, and APS-E025, focused Chromium browser gate recorded in APS-E020, local/mocked provider-adjacent Jest command recorded in APS-E021 through APS-E024, and partial live HTTP transport probes recorded in APS-E025",
   "claims": [
     {
       "claimId": "V-APS-001",
@@ -31,10 +31,10 @@
     {
       "claimId": "V-APS-004",
       "claim": "Browser/runtime behavior and focused tests have been verified.",
-      "citation": "runtime-verification.md; APS-E018, APS-E019, APS-E020, APS-E021, APS-E022, APS-E023, APS-E024, APS-G001, APS-G002, APS-G003, APS-G005",
+      "citation": "runtime-verification.md; APS-E018, APS-E019, APS-E020, APS-E021, APS-E022, APS-E023, APS-E024, APS-E025, APS-G001, APS-G002, APS-G003, APS-G005",
       "verdict": "partial",
-      "discrepancy": "Focused route/action Jest coverage passed in APS-E018 and APS-E019, the focused Chromium browser gate passed in APS-E020, and local/mocked provider-adjacent checks passed in APS-E021 through APS-E024. Real Google IdP OAuth, Cloudflare Turnstile siteverify, Resend delivery/inbox receipt, Stripe hosted checkout/webhook/provider fulfillment, and optional live HTTP transport parity remain unverified.",
-      "recommendedFix": "Run real-provider checks for Google, Cloudflare Turnstile, Resend, and Stripe in a non-production-safe environment with test credentials, and optionally add live HTTP transport parity coverage."
+      "discrepancy": "Focused route/action Jest coverage passed in APS-E018, APS-E019, and APS-E025; the focused Chromium browser gate passed in APS-E020; local/mocked provider-adjacent checks passed in APS-E021 through APS-E024; and APS-E025 live HTTP probes verified status/CSRF/JSON behavior for the listed auth/favorites routes. Real Google IdP OAuth, Cloudflare Turnstile siteverify, Resend delivery/inbox receipt, and Stripe hosted checkout/webhook/provider fulfillment remain unverified. Live cache-header parity remains residual because APS-E025 observed `Cache-Control: private, no-cache`, not the route-handler/direct-test `private, no-store` expectation.",
+      "recommendedFix": "Run real-provider checks for Google, Cloudflare Turnstile, Resend, and Stripe in a non-production-safe environment with test credentials. Resolve or explicitly accept the APS-E025 live cache-header mismatch between `private, no-cache` and the route-handler/direct-test `private, no-store` expectation."
     },
     {
       "claimId": "V-APS-005",
@@ -48,7 +48,7 @@
   "coverageGaps": [
     {
       "manifestItem": "Direct API verification",
-      "gap": "Focused route/action status, CSRF, and auth/favorites private no-store checks passed in APS-E019. Optional live HTTP transport parity remains unrun.",
+      "gap": "Focused route/action status, CSRF, and auth/favorites private no-store checks passed in APS-E019. APS-E025 live HTTP probes verified status/CSRF/JSON behavior for the listed auth/favorites routes and unauthenticated favorites GET behavior, but live cache-header parity remains residual because observed live responses returned `Cache-Control: private, no-cache`.",
       "severity": "P2"
     },
     {

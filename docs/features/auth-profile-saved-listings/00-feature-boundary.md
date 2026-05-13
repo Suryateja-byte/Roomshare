@@ -25,5 +25,5 @@
 | Unknown | Severity | Evidence |
 | --- | --- | --- |
 | Focused Chromium auth/profile/settings/saved-listings/saved-searches browser gate passed. | Closed | APS-E020, APS-G001 |
-| Direct route/action checks for auth recovery, favorites, saved-search actions, settings actions, CSRF variants, and private no-store headers are verified by APS-E018 and APS-E019. Optional live HTTP transport parity remains unrun. | P2 | APS-G002 |
+| Direct route/action checks for auth recovery, favorites, saved-search actions, settings actions, CSRF variants, and private no-store headers are verified by APS-E018 and APS-E019. APS-E025 partially verifies live HTTP status/CSRF/JSON behavior, but live cache-header parity remains residual because observed live responses returned `private, no-cache` rather than route-handler/direct-test `private, no-store`. | P2 | APS-G002, APS-E025 |
 | Local/mocked provider-adjacent behavior is verified by APS-E021 through APS-E024, but real Google IdP OAuth, Cloudflare Turnstile `siteverify`, Resend delivery/inbox receipt, and Stripe hosted checkout/webhook/provider fulfillment remain unverified. | P2 | APS-G003 |
