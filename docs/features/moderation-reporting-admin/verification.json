@@ -2,7 +2,7 @@
   "featureSlug": "moderation-reporting-admin",
   "status": "partial",
   "verifiedAt": "2026-05-13",
-  "method": "source audit plus test discovery plus route-handler/direct API Jest command MRA-E019; authoritative WSL rerun MRA-E020 passed focused local mocked telemetry/notification invocation coverage; MRA-E021 passed controlled Chromium admin-boundary and verification-admin journey coverage; MRA-E022 passed route-handler baseline plus live-server negative/status/header parity for selected report and verification document routes; MRA-E023 passed local audit helper fail-open/error visibility coverage while admin-auth .admin.spec.ts suites, ignored admin-host race, admin report/listing moderation browser coverage, authenticated admin signed-URL success, real storage/provider behavior, real provider delivery/observability, migration SQL audit, live browser/admin-operation audit failure injection, production observability delivery, provider telemetry, and database outage runtime proof remain unverified",
+  "method": "source audit plus test discovery plus route-handler/direct API Jest command MRA-E019; authoritative WSL rerun MRA-E020 passed focused local mocked telemetry/notification invocation coverage; MRA-E021 passed controlled Chromium admin-boundary and verification-admin journey coverage; MRA-E022 passed route-handler baseline plus live-server negative/status/header parity for selected report and verification document routes; MRA-E023 passed local audit helper fail-open/error visibility coverage; MRA-E024 completed tracked migration SQL line audit and passed related 8-suite / 74-test Jest coverage while admin-auth .admin.spec.ts suites, ignored admin-host race, admin report/listing moderation browser coverage, authenticated admin signed-URL success, real storage/provider behavior, real provider delivery/observability, production/staging database migration-state proof, live browser/admin-operation audit failure injection, production observability delivery, provider telemetry, and database outage runtime proof remain unverified",
   "claims": [
     {
       "claimId": "V-MRA-001",
@@ -38,11 +38,11 @@
     },
     {
       "claimId": "V-MRA-005",
-      "claim": "Migration-backed moderation/reporting/verification invariants are fully line-audited.",
-      "citation": "MRA-E017; MRA-G004",
-      "verdict": "partial",
-      "discrepancy": "Relevant migration paths were discovered, but migration SQL was not line-audited in this pass.",
-      "recommendedFix": "Line-audit relevant migration SQL and update 06-data-model-and-invariants.md."
+      "claim": "Migration-backed moderation/reporting/verification source invariants are line-audited.",
+      "citation": "MRA-E017; MRA-E024; MRA-G004",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
     }
   ],
   "coverageGaps": [
@@ -63,7 +63,7 @@
     },
     {
       "manifestItem": "Migration SQL audit",
-      "gap": "Migration paths were discovered, but SQL line ranges were not audited for every invariant.",
+      "gap": "Tracked migration SQL line ranges were audited in MRA-E024 and related Jest coverage passed. Production/staging database migration-state proof remains unverified.",
       "severity": "P2"
     },
     {

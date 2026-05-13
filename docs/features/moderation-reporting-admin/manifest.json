@@ -2,7 +2,7 @@
   "featureSlug": "moderation-reporting-admin",
   "status": "complete_with_gaps",
   "statusDate": "2026-05-13",
-  "sourceOfTruth": "Current dirty worktree source audit on 2026-05-10 plus 2026-05-13 route-handler/direct API Jest evidence; MRA-E020 records the authoritative WSL focused local mocked telemetry/notification invocation pass; MRA-E021 records controlled Chromium admin-boundary and verification-admin journey passes; MRA-E022 records route-handler baseline plus live-server negative/status/header parity; MRA-E023 records local audit helper fail-open/error visibility proof while admin-auth .admin.spec.ts suites, ignored admin-host race, admin report/listing moderation browser coverage, authenticated admin signed-URL success, real storage/provider behavior, live browser/admin-operation audit failure injection, production observability delivery, provider telemetry, and database outage runtime proof remain unverified.",
+  "sourceOfTruth": "Current dirty worktree source audit on 2026-05-10 plus 2026-05-13 route-handler/direct API Jest evidence; MRA-E020 records the authoritative WSL focused local mocked telemetry/notification invocation pass; MRA-E021 records controlled Chromium admin-boundary and verification-admin journey passes; MRA-E022 records route-handler baseline plus live-server negative/status/header parity; MRA-E023 records local audit helper fail-open/error visibility proof; MRA-E024 records tracked migration SQL line audit and a related 8-suite / 74-test Jest pass while admin-auth .admin.spec.ts suites, ignored admin-host race, admin report/listing moderation browser coverage, authenticated admin signed-URL success, real storage/provider behavior, production/staging database migration-state proof, live browser/admin-operation audit failure injection, production observability delivery, provider telemetry, and database outage runtime proof remain unverified.",
   "primaryArtifacts": [
     "README.md",
     "00-feature-boundary.md",
@@ -70,9 +70,9 @@
     },
     {
       "id": "MRA-M007",
-      "name": "Migration inventory",
-      "status": "partial",
-      "evidence": ["MRA-E017", "MRA-G004"]
+      "name": "Migration inventory and SQL source audit",
+      "status": "documented_with_residual",
+      "evidence": ["MRA-E017", "MRA-E024", "MRA-G004"]
     }
   ],
   "claims": [
