@@ -459,7 +459,7 @@
     {
       "model": "HostContactChannels",
       "path": "prisma/schema.prisma",
-      "responsibility": "Adjacent contact-host support model; direct search-card contact entry point was not verified in Phase 1/2.",
+      "responsibility": "Adjacent contact-host support model; Search Map hands off to Contact Host through listing detail rather than a direct search-card CTA.",
       "evidence": "L908-L909",
       "confidence": "Partially verified"
     }
@@ -873,7 +873,7 @@
   "unknowns": [
     "Runtime/browser behavior is now verified for the Phase 10/11/12 release-blocking search/map commands, including failure-mocked /api/map-listings 500/429 browser checks; broader non-gate E2E families remain confidence-building gaps.",
     "Discovered tests are grouped in this manifest; the release-blocking subset and focused API/unit/privacy checks have passing evidence, while broader grouped families are listed as not run.",
-    "Direct contact-host entry point from search cards was not verified; listing cards link to listing detail pages.",
+    "Current source evidence shows an indirect contact-host handoff: search cards link to listing detail pages, and listing detail owns the Contact Host CTA; a direct search-card Contact Host CTA remains a P2 product question.",
     "\"Search this area\" appears only in a comment describing a removed deferred flow.",
     "Map provider terminology is reduced to a P2 maintenance cleanup: current docs identify MapLibre runtime with OpenFreeMap light style, local dark style, and OpenStreetMap fallback. Stadia config exists but is not proven active for Search Map, while stale Mapbox wording remains in comments, optional scripts, compatibility language, or fixture names.",
     "Some search-related files remain dirty or untracked; C057 records them as local-only discovery caveats, not standalone passing evidence.",

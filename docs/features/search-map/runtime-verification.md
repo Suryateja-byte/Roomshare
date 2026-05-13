@@ -11,8 +11,10 @@ search/list/map public payload PII scan also pass. PR #119 was merged to
 PR checks were green after the P0 privacy fix and the follow-up E2E
 stabilization. Commit `7e80c899` adds the focused desktop list/map parity
 evidence recorded as C056. C058 adds focused `/api/map-listings` 500/429
-browser proof from the existing desktop `failure-mocked` project. Non-gate
-broader E2E coverage is still not run.
+browser proof from the existing desktop `failure-mocked` project. The Search
+Map contact-host handoff is source-verified as search card -> listing detail ->
+Contact Host CTA in C060, but a full browser journey from search to messages was
+not run. Non-gate broader E2E coverage is still not run.
 
 Date: 2026-05-07, with post-merge check update on 2026-05-08 and desktop list/map parity plus map API error updates on 2026-05-13.
 
@@ -86,6 +88,12 @@ run with `ENABLE_SEARCH_SNAPSHOT_CONTRACT=false` to exercise the independent
 retry and 429 rate-limit retry behavior. The legacy skipped
 `map-errors-a11y.anon.spec.ts` placeholders remain skipped, but the P1 map API
 500/429 browser proof is now satisfied by C058.
+
+Also on 2026-05-13, source/static evidence reduced the contact-host entry-point
+ambiguity: Search Map result cards and split-stay cards link to listing detail,
+and listing detail renders `MessagingCta`/`ContactHostButton` for Contact Host
+or unlock-required states. This pass did not run a full browser journey from
+`/search` to `/listings/{id}` to `/messages/{conversationId}`.
 
 ## Post-Merge Fixed-Code Verification
 
@@ -187,7 +195,7 @@ tests/e2e/search/search-smoke.spec.ts --project=desktop-anonymous
 | API failure/resilience | Search/list requests should degrade to visible error, retry, loading, or recovery states instead of crashing. | Verified in focused chromium-anon resilience suite: client-side API errors, recovery, slow/intermittent responses, rate-limit UI, error-boundary retry, offline/network recovery, load-more errors, and console monitoring passed. Map error/a11y passed for V2-compatible paths, and C058 covers `/api/map-listings` 500/429 retryable browser behavior. | Match | Passing `search-error-resilience.anon.spec.ts`, `map-errors-a11y.anon.spec.ts`, and `failure-mocked` desktop map commands | Keep broader non-gate resilience journeys as confidence gaps. |
 | Anonymous save listing | Favorite POST 401 should navigate to `/login`. | Verified in focused desktop-anonymous saved-listing spec using a mocked unauthorized `/api/favorites` response. The focused Jest command also passed favorites API GET/POST suites. | Match | Passing `search-saved-listing.spec.ts --project=desktop-anonymous`, `.last-run.json`, and focused Jest command | Keep FavoriteButton component and client CSRF-header tests as gaps. |
 | Authenticated save listing | Logged-in users should be able to save, reload with saved state, and unsave a search result card. | Verified in focused desktop-authenticated saved-listing spec. The focused Jest command also passed favorites API GET/POST suites. | Match | Passing `search-saved-listing.spec.ts --project=desktop-authenticated`, `.last-run.json`, and focused Jest command | Keep FavoriteButton component and client CSRF-header tests as gaps. |
-| Contact host entry point | Direct contact-host action from search cards was not verified by code evidence. | Search result cards rendered with listing detail links, favorite buttons, and show-on-map buttons in the snapshot; contact-host was not observed. | Partial | `error-context.md` page snapshot and passing smoke rerun | Keep contact-host as not verified from search cards. |
+| Contact host entry point | Source evidence now verifies an indirect search card -> listing detail -> Contact Host CTA handoff, with no direct search-card Contact Host CTA claimed. | Search result cards rendered with listing detail links, favorite buttons, and show-on-map buttons in the snapshot; C060 traces listing-detail `MessagingCta`/`ContactHostButton` source. A full search -> detail -> messages browser journey was not run. | Partial | `error-context.md` page snapshot, passing smoke rerun, and `evidence-register.md` C060 | Keep direct search-card Contact Host as a P2 product question unless promoted. |
 | Mobile map/list behavior | Mobile map/list state exists by code evidence. | Verified in focused mobile-anonymous map/list spec: bottom sheet moved through map/peek/list snap states, collapsed overlay applied budget/filter state, and recent searches rendered/removal worked. | Match | Passing `search-map-mobile.spec.ts` command and `.last-run.json` | Keep mobile URL-state cross-checks and broader mobile-map specs as gaps. |
 
 ## Required Next Step

@@ -126,10 +126,14 @@ sequenceDiagram
   participant User
   participant Card as "Search listing card"
   participant Detail as "Listing detail page"
+  participant Button as "ContactHostButton"
+  participant Messages as "Messages thread"
 
   User->>Card: Click listing card
-  Card-->>Detail: Navigate to /listings/{id}
-  Note over Card,Detail: Direct contact-host button was not verified in search card files.
+  Card-->>Detail: Navigate to /listings/{id} with valid date params when present
+  Detail->>Button: Render Contact Host or Unlock to Contact CTA when viewer state allows it
+  Button-->>Messages: On successful startConversation, navigate to /messages/{conversationId}
+  Note over Card,Messages: Static source evidence only; full browser journey was not run in this Search Map slice.
 ```
 
-Evidence: `src/components/listings/ListingCard.tsx`:L349-L352, L492-L499; `evidence-register.md` C029.
+Evidence: `src/components/search/SearchResultsClient.tsx`:L1179-L1184, L1213-L1218; `src/lib/search/listing-detail-link.ts`:L78-L95; `src/components/listings/ListingCard.tsx`:L349-L352, L471-L499; `src/components/search/SplitStayCard.tsx`:L64-L74, L155-L176; `src/app/listings/[id]/ListingPageClient.tsx`:L505-L518, L529-L590, L1401-L1417; `src/components/ContactHostButton.tsx`:L98-L145, L156-L173; `evidence-register.md` C060.

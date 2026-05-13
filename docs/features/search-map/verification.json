@@ -138,8 +138,8 @@
     },
     {
       "claimId": "V018",
-      "claim": "A direct contact-host action from search cards was not verified.",
-      "citation": "README.md; 02-user-flows.md; 08-auth-security-permissions.md; 12-gaps-unknowns-and-questions.md G003; evidence-register.md C029",
+      "claim": "The current Search Map contact-host handoff is source-verified as search card to listing detail to Contact Host CTA, without claiming a direct search-card Contact Host action or full browser journey.",
+      "citation": "README.md; 02-user-flows.md; 04-runtime-sequences.md; 08-auth-security-permissions.md; 12-gaps-unknowns-and-questions.md G003; evidence-register.md C060",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null

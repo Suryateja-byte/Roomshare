@@ -15,7 +15,7 @@ follow-up documentation improvements.
 
 | Area | Result | Summary |
 |---|---|---|
-| Main user flows | Clear from docs | The primary `/search`, filter/sort, pagination, map, listing-card, saved-listing, and saved-search paths can be reconstructed. Direct contact-host from search cards and Search-this-area are correctly marked unverified or absent. |
+| Main user flows | Clear from docs | The primary `/search`, filter/sort, pagination, map, listing-card, saved-listing, saved-search, and indirect listing-detail Contact Host handoff paths can be reconstructed. Direct Contact Host from search cards and Search-this-area are correctly excluded from current behavior. |
 | Public API contracts | Partially clear | Endpoint list, high-level inputs, auth, errors, and verification status are clear. Exact response schemas, cache semantics, and per-field public/private payload contracts are still incomplete. |
 | State machine | Partially clear | URL-first search, SSR search, client result state, V2 map data, load-more, and map pan/fetch loops are reconstructable. Error, empty, auth, save, mobile sheet, and privacy states are not integrated into the state-machine diagram. |
 | URL/search param model | Clear after P0 follow-up | The docs make the URL the canonical committed search state, and `13-url-search-param-reference.md` now provides the exact param list, legacy aliases, allowed values, defaults, invalid-input handling, serialization, and reset rules. |
@@ -164,8 +164,9 @@ A fresh reader can reconstruct these invariants:
   or private listing/location data.
 - Public payloads should not expose exact coordinates, owner IDs, addresses,
   zips, raw group keys, or raw context keys.
-- Search-this-area and direct search-card contact-host must not be documented as
-  current behavior without more evidence.
+- Search-this-area and direct search-card Contact Host must not be documented as
+  current behavior without more evidence; current source-backed contact-host
+  handoff is through listing detail.
 - Booking references must remain labeled as current code/data history, not
   active booking UX.
 
@@ -251,6 +252,6 @@ verification status, compact API/cache/payload reconstruction, state-machine
 coverage, and release-blocking test traceability. Remaining work is limited to
 P1/P2 confidence-building gaps already listed in `12-gaps-unknowns-and-questions.md`
 and `unknowns.md`: broader non-gate map/list/filter/pagination/mobile coverage,
-direct contact-host handoff verification, saved-search auth/paywall runtime
-coverage, optional stale Mapbox comment/fixture cleanup, and optional generated
-API/test-index artifacts.
+saved-search auth/paywall runtime coverage, optional direct search-card Contact
+Host product work or full contact-host handoff browser proof, optional stale
+Mapbox comment/fixture cleanup, and optional generated API/test-index artifacts.

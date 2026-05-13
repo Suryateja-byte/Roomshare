@@ -33,7 +33,7 @@ This feature lets users discover listings from `/search`, using URL-backed searc
 
 The map is hosted by the `/search` layout and persistent map wrapper. The wrapper can use V2 map data or independently fetch `/api/map-listings`; the map component renders clusters, markers, selected listing previews, empty state, and error handling. Evidence: `src/app/search/layout.tsx`:L46-L93; `src/components/PersistentMapWrapper.tsx`:L4-L17, L365-L430; `src/components/Map.tsx`:L3876-L4573; `evidence-register.md` C013-C015.
 
-Search cards link to listing detail pages and include favorite and show-on-map actions. A direct contact-host action was not verified on search cards in this pass. Evidence: `src/components/listings/ListingCard.tsx`:L349-L352, L471-L499; `evidence-register.md` C017, C029.
+Search cards link to listing detail pages and include favorite and show-on-map actions. The current contact-host handoff is source-verified as search card -> listing detail -> Contact Host CTA; this pass does not claim a direct search-card Contact Host CTA or a full browser journey to messages. Evidence: `src/components/listings/ListingCard.tsx`:L349-L352, L471-L499; `src/app/listings/[id]/ListingPageClient.tsx`:L505-L518, L529-L590, L1401-L1417; `src/components/ContactHostButton.tsx`:L98-L145, L156-L173; `evidence-register.md` C017, C060.
 
 ## Main entry points
 
