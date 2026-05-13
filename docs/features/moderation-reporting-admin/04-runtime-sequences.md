@@ -29,4 +29,4 @@
 | 3 | Route checks request exists, not deleted, not expired, and has requested storage path. | MRA-E013 |
 | 4 | Route creates signed URL, logs `VERIFICATION_DOCUMENT_VIEWED`, sets `Cache-Control: no-store`, and redirects. | MRA-E013 |
 
-Runtime/browser observation gap: no browser session was run in this pass; see MRA-G001 and `runtime-verification.md`.
+Runtime/browser observation gap: controlled Chromium admin-boundary and verification-admin journey coverage passed in MRA-E021, but admin-auth `.admin.spec.ts` suites, ignored admin-host race coverage, and admin report/listing moderation browser coverage remain unverified; see MRA-G001 and `runtime-verification.md`.

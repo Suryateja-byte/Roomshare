@@ -2,7 +2,7 @@
   "featureSlug": "moderation-reporting-admin",
   "status": "complete_with_gaps",
   "statusDate": "2026-05-13",
-  "sourceOfTruth": "Current dirty worktree source audit on 2026-05-10 plus 2026-05-13 route-handler/direct API Jest evidence; MRA-E020 records the authoritative WSL focused local mocked telemetry/notification invocation pass.",
+  "sourceOfTruth": "Current dirty worktree source audit on 2026-05-10 plus 2026-05-13 route-handler/direct API Jest evidence; MRA-E020 records the authoritative WSL focused local mocked telemetry/notification invocation pass; MRA-E021 records controlled Chromium admin-boundary and verification-admin journey passes while admin-auth .admin.spec.ts suites, ignored admin-host race, and admin report/listing moderation browser coverage remain unverified.",
   "primaryArtifacts": [
     "README.md",
     "00-feature-boundary.md",
@@ -66,7 +66,7 @@
       "id": "MRA-M006",
       "name": "Tests and runtime verification",
       "status": "partial",
-      "evidence": ["MRA-E016", "MRA-E019", "MRA-E020", "MRA-G001", "MRA-G002", "MRA-G003"]
+      "evidence": ["MRA-E016", "MRA-E019", "MRA-E020", "MRA-E021", "MRA-G001", "MRA-G002", "MRA-G003"]
     },
     {
       "id": "MRA-M007",

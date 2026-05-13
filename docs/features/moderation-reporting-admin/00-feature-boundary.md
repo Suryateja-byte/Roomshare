@@ -25,6 +25,6 @@
 
 | Unknown | Severity | Evidence |
 | --- | --- | --- |
-| Full browser admin/report/verification/moderation suites were not run in this documentation pass. | P1 | MRA-G001 |
+| Controlled Chromium admin-boundary and verification-admin journey coverage passed, but admin-auth `.admin.spec.ts` suites, ignored admin-host race coverage, and admin report/listing moderation browser coverage remain unverified. | P1 residual | MRA-E021, MRA-G001 |
 | Route-handler/direct API Jest checks passed for reports, verification documents, private-feedback no-public-bleed, abuse hardening, and injection prevention; optional live-server HTTP transport parity was not run. | P2 | MRA-E019, MRA-G002 |
 | Local mocked private-feedback telemetry invocation and verification approval/rejection notification email invocation are verified; real email provider delivery, inbox/bounce/webhook proof, provider observability/telemetry runtime, and other provider/runtime proof remain unverified. | P2 residual | MRA-E020, MRA-G003 |

@@ -2,7 +2,7 @@
 
 | ID | Severity | Status | Gap or unknown | Evidence |
 | --- | --- | --- | --- | --- |
-| MRA-G001 | P1 | NOT VERIFIED | Full browser admin/report/listing moderation/verification suites were not executed in this pass. | MRA-E016 |
+| MRA-G001 | P1 | PARTIAL | Controlled Chromium admin-boundary and verification-admin journey coverage passed in MRA-E021, reducing the prior fully unrun browser gap. Admin-auth `.admin.spec.ts` suites, ignored admin-host race coverage, and admin report/listing moderation browser coverage remain unverified residual blockers. | MRA-E016, MRA-E021 |
 | MRA-G002 | P2 | PARTIAL | Route-handler/direct API Jest checks for reports, verification documents, abuse hardening, and injection prevention passed; optional live-server HTTP transport parity for report/admin document route status/cache/header/CSRF/signed URL behavior was not executed. | MRA-E001, MRA-E013, MRA-E019 |
 | MRA-G003 | P2 | RESIDUAL | Local mocked private-feedback telemetry invocation and verification approval/rejection notification email invocation are verified by MRA-E020. Real email provider delivery, inbox/bounce/webhook proof, provider observability/telemetry runtime, and other provider/runtime proof remain unverified residual gaps. | MRA-E002, MRA-E012, MRA-E019, MRA-E020 |
 | MRA-G004 | P2 | PARTIAL | Relevant migrations were discovered by path, but migration SQL was not line-audited for every report/moderation/verification invariant. | MRA-E017 |
