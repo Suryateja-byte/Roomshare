@@ -2,12 +2,12 @@
   "featureSlug": "moderation-reporting-admin",
   "status": "partial",
   "verifiedAt": "2026-05-13",
-  "method": "source audit plus test discovery plus route-handler/direct API Jest command MRA-E019; authoritative WSL rerun MRA-E020 passed focused local mocked telemetry/notification invocation coverage; MRA-E021 passed controlled Chromium admin-boundary and verification-admin journey coverage while admin-auth .admin.spec.ts suites, ignored admin-host race, admin report/listing moderation browser coverage, live-server HTTP parity, real provider delivery/observability, and migration SQL audit commands remain unverified",
+  "method": "source audit plus test discovery plus route-handler/direct API Jest command MRA-E019; authoritative WSL rerun MRA-E020 passed focused local mocked telemetry/notification invocation coverage; MRA-E021 passed controlled Chromium admin-boundary and verification-admin journey coverage; MRA-E022 passed route-handler baseline plus live-server negative/status/header parity for selected report and verification document routes while admin-auth .admin.spec.ts suites, ignored admin-host race, admin report/listing moderation browser coverage, authenticated admin signed-URL success, real storage/provider behavior, real provider delivery/observability, and migration SQL audit commands remain unverified",
   "claims": [
     {
       "claimId": "V-MRA-001",
       "claim": "Report and private-feedback submission behavior is documented from source evidence.",
-      "citation": "MRA-E001, MRA-E002, MRA-E015, MRA-E019",
+      "citation": "MRA-E001, MRA-E002, MRA-E015, MRA-E019, MRA-E022",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -23,7 +23,7 @@
     {
       "claimId": "V-MRA-003",
       "claim": "Verification review and document access behavior is documented from source evidence.",
-      "citation": "MRA-E011, MRA-E012, MRA-E013, MRA-E015, MRA-E019",
+      "citation": "MRA-E011, MRA-E012, MRA-E013, MRA-E015, MRA-E019, MRA-E022",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -31,10 +31,10 @@
     {
       "claimId": "V-MRA-004",
       "claim": "Browser/runtime behavior and focused tests have been verified.",
-      "citation": "runtime-verification.md; MRA-E019, MRA-E020, MRA-E021, MRA-G001, MRA-G002, MRA-G003",
+      "citation": "runtime-verification.md; MRA-E019, MRA-E020, MRA-E021, MRA-E022, MRA-G001, MRA-G002, MRA-G003",
       "verdict": "partial",
-      "discrepancy": "Source evidence, test inventory, route-handler/direct API Jest evidence, focused local mocked telemetry/notification invocation evidence, and partial browser runtime evidence exist. Controlled Chromium admin-boundary and verification-admin journey commands passed under one worker. Admin-auth .admin.spec.ts browser suites, ignored admin-host race coverage, admin report/listing moderation browser coverage, optional live-server HTTP transport parity, real storage/provider signed URL behavior, real email provider delivery, inbox/bounce/webhook behavior, provider telemetry/observability runtime, and other provider/runtime proof were not run.",
-      "recommendedFix": "Run the remaining admin-auth .admin.spec.ts browser suites, admin-host race coverage, admin report/listing moderation browser coverage, live-server HTTP parity, and real provider delivery/observability commands in 11-test-traceability-matrix.md and update runtime-verification.md."
+      "discrepancy": "Source evidence, test inventory, route-handler/direct API Jest evidence, focused local mocked telemetry/notification invocation evidence, partial browser runtime evidence, and partial live-server negative-path HTTP transport evidence exist. Controlled Chromium admin-boundary and verification-admin journey commands passed under one worker. Live-server probes verified missing Origin/CSRF, OPTIONS, invalid document kind, and unauthenticated valid-kind statuses/cache headers. Admin-auth .admin.spec.ts browser suites, ignored admin-host race coverage, admin report/listing moderation browser coverage, authenticated admin signed-URL success, real storage/provider signed URL behavior, real email provider delivery, inbox/bounce/webhook behavior, provider telemetry/observability runtime, and other provider/runtime proof were not run.",
+      "recommendedFix": "Run the remaining admin-auth .admin.spec.ts browser suites, admin-host race coverage, admin report/listing moderation browser coverage, authenticated admin document-route success/signed-URL probes, real storage/provider behavior, and real provider delivery/observability commands in 11-test-traceability-matrix.md and update runtime-verification.md."
     },
     {
       "claimId": "V-MRA-005",
@@ -53,7 +53,7 @@
     },
     {
       "manifestItem": "Direct API verification",
-      "gap": "Route-handler/direct API Jest checks passed in MRA-E019; optional live-server HTTP transport parity for report/admin document route statuses, cache headers, CSRF variants, and signed URL behavior was not run.",
+      "gap": "Route-handler/direct API Jest checks passed in MRA-E019; MRA-E022 verified the narrower route-handler baseline plus live-server negative/status/header parity for missing Origin/CSRF, OPTIONS, invalid document kind, and unauthenticated valid-kind document access. Authenticated admin signed-URL success, real storage/provider behavior, and any admin-session success path remain unverified.",
       "severity": "P2"
     },
     {
