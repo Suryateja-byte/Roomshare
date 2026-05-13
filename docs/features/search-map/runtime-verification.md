@@ -1,7 +1,7 @@
 # Runtime Verification
 
 Status: partially verified with post-merge fixed-code confirmation. The narrow `/search` smoke, filter/URL,
-sort/load-more pagination, desktop map, results-state, URL-state, anonymous
+sort/load-more pagination, desktop map/list parity, results-state, URL-state, anonymous
 saved-listing redirect, mobile map/list, and search error-resilience specs now
 pass after Docker/Postgres became available. The map error/a11y suite,
 authenticated saved-listing persistence path, focused API/unit Jest command,
@@ -9,16 +9,18 @@ P0 privacy-focused tests, full search release gate, and real captured
 search/list/map public payload PII scan also pass. PR #119 was merged to
 `main` as `89ad33ea58391452b03a2ff5c3a219503769edaa` on 2026-05-08, and all
 PR checks were green after the P0 privacy fix and the follow-up E2E
-stabilization. V1-only map API mock cases and non-gate broader E2E coverage are
+stabilization. Commit `7e80c899` adds the focused desktop list/map parity
+evidence recorded as C056. V1-only map API mock cases and non-gate broader E2E coverage are
 still not run.
 
-Date: 2026-05-07, with post-merge check update on 2026-05-08.
+Date: 2026-05-07, with post-merge check update on 2026-05-08 and desktop list/map parity update on 2026-05-13.
 
 Source of truth: current dirty documentation worktree plus post-merge
 `origin/main` at `89ad33ea58391452b03a2ff5c3a219503769edaa`. The local branch
 `codex/search-ux-fixes` is dirty and overlaps updated `main`, so the fixed-code
 confirmation below uses `origin/main` and GitHub Actions evidence rather than a
-local merge into this worktree.
+local merge into this worktree. The desktop list/map parity code and test slice
+itself is committed locally as `7e80c899`.
 
 ## Summary
 
@@ -65,6 +67,15 @@ shards including Shard 2/10, component/API/unit/type/lint/build checks, and
 Vercel. V1-only map API mock cases and non-gate broader E2E coverage are still
 not verified.
 
+On 2026-05-13, the committed desktop parity slice `7e80c899` added
+`SearchListResultsContext` and re-ran the focused desktop map spec. The rerun
+passed with list-backed map filtering, marker/list focus, and pan/zoom URL state
+covered by `tests/e2e/search/search-map-desktop.spec.ts`. The related
+`SearchResultsClient` focused Jest command also passed 40 tests. The console
+error fixture used by the new E2E support has broad benign filters for `404`,
+`net::err`, and `failed to fetch`; that is acceptable evidence for this slice,
+but should be tightened as a later harness-hardening task.
+
 ## Post-Merge Fixed-Code Verification
 
 | Item | Result | Evidence |
@@ -102,7 +113,8 @@ not verified.
 | `pnpm exec playwright test tests/e2e/search/search-smoke.spec.ts --project=desktop-anonymous --reporter=list` rerun after diagnostic | Passed | `/api/health/ready` returned `200`; E2E seed completed; `/search?...` returned `200`; result count was `57`; Playwright reported `1 passed (27.0s)`. |
 | `pnpm exec playwright test tests/e2e/search/search-filters.spec.ts --project=desktop-anonymous --reporter=list` | Passed | Ran 2 desktop-anonymous filter tests covering primary filter families, canonical URL state, applied filter chips, and clear-all behavior. |
 | `pnpm exec playwright test tests/e2e/search/search-pagination.spec.ts --project=desktop-anonymous --reporter=list` | Passed | Ran 4 desktop-anonymous sort/load-more tests covering sort reset, unique appended cards, retryable load-more failure, and retryable rate-limit messaging. |
-| `pnpm exec playwright test tests/e2e/search/search-map-desktop.spec.ts --project=desktop-anonymous --reporter=list` | Passed | Playwright `.last-run.json` reported `status: passed` with no failed tests; desktop map preference, marker/list focus, and pan/zoom URL state paths are covered by this spec for the desktop-anonymous project. |
+| `pnpm exec playwright test tests/e2e/search/search-map-desktop.spec.ts --project=desktop-anonymous --reporter=list` | Passed | Playwright `.last-run.json` reported `status: passed` with no failed tests; desktop map preference, list-backed marker parity, marker/list focus, and pan/zoom URL state paths are covered by this spec for the desktop-anonymous project. Latest C056 rerun is tied to commit `7e80c899`. |
+| `pnpm test -- src/__tests__/components/search/SearchResultsClient.test.tsx` | Passed | Focused Jest command passed 1 suite / 40 tests for the result-list client behavior adjacent to the list-result ID handoff. Latest C056 rerun is tied to commit `7e80c899`. |
 | `pnpm exec playwright test tests/e2e/search/search-results-states.spec.ts --project=desktop-anonymous --reporter=list` | Passed | Ran 4 desktop-anonymous result-state tests covering zero results, sparse results, result-cap guidance, and expanded near-match messaging. |
 | `pnpm exec playwright test tests/e2e/search/search-url-state.spec.ts --project=desktop-anonymous --reporter=list` | Passed | Ran the desktop URL-state paths covering deep links, refresh/back/forward state, legacy params, invalid dates, and tampered cursors. The mobile-owned URL-state case is not covered by this project run. |
 | `pnpm exec playwright test tests/e2e/search/search-saved-listing.spec.ts --project=desktop-anonymous --reporter=list` | Passed | Ran the desktop-anonymous saved-listing path; authenticated save persistence was skipped by project ownership, and anonymous favorite POST 401 redirected to `/login`. |
@@ -156,7 +168,7 @@ tests/e2e/search/search-smoke.spec.ts --project=desktop-anonymous
 | `/search` initial render | `/search` should render a results or browse/location-required state. | Verified on latest narrow smoke rerun: `/search?...` returned `200`, found `57` listings, rendered listing cards, reloaded, and had no unhandled page errors. | Match | Passing smoke command | Keep the earlier failed run as historical evidence only. |
 | Filter change updates URL/results | Filter changes should affect URL/search state. | Verified in focused desktop filter spec: primary filter families update canonical URL state, applied filters render, and clear actions remove params. | Match | Passing `search-filters.spec.ts` command | Keep broader cross-project coverage as a test gap. |
 | Sort change resets pagination | Sort query changes should reset stale pagination/cursor state. | Verified in focused desktop pagination spec: load-more appends items, sort resets list count and cursor/page state, and no duplicate card ids appear. | Match | Passing `search-pagination.spec.ts` command | Keep non-desktop/bounds-reset coverage as a gap. |
-| Map movement behavior | Map movement updates viewport/state and may fetch map listings. | Verified in focused desktop map spec: desktop split preference persisted, marker/list focus path ran, and pan/zoom updated canonical bounds while results and map shell stayed sane. Map error/a11y suite also passed, with V1-only 500/429 API mock tests skipped in V2 mode. | Match | Passing `search-map-desktop.spec.ts`, `search-map-mobile.spec.ts`, and `map-errors-a11y.anon.spec.ts` commands | Keep V1-only map API mock cases and broader map specs as gaps. |
+| Map movement behavior | Map movement updates viewport/state and may fetch map listings. | Verified in focused desktop map spec: desktop split preference persisted, list-backed marker parity held, marker/list focus path ran, and pan/zoom updated canonical bounds while results and map shell stayed sane. Map error/a11y suite also passed, with V1-only 500/429 API mock tests skipped in V2 mode. | Match | Passing `search-map-desktop.spec.ts`, `search-map-mobile.spec.ts`, and `map-errors-a11y.anon.spec.ts` commands; `evidence-register.md` C056 | Keep V1-only map API mock cases and broader non-gate map specs as gaps. |
 | Search this area | Not documented as current behavior. | Not run. | Not verified | Not run | No correction. |
 | Empty results state | Empty/location-required states exist by code evidence. | Verified for desktop zero-results, sparse-results, result-cap, near-match, and broader zero-results guidance paths in focused result/error specs. Location-required route-by-route UX remains a narrower gap. | Partial match | Passing `search-results-states.spec.ts` and `search-error-resilience.anon.spec.ts` commands | Narrow the remaining gap to location-required variants and map-specific failures. |
 | Invalid URL params handling | Parser normalizes/drops/rejects invalid values depending path. | Verified for desktop URL-state behavior covering deep links, refresh/back/forward, legacy params, invalid dates, tampered cursors, SQL-injection-like queries, extreme price values, and invalid bounds. The focused Jest command also passed `src/__tests__/lib/search-params.test.ts`. Mobile URL-state path was not run in this project. | Partial match | Passing `search-url-state.spec.ts`, `search-error-resilience.anon.spec.ts`, and focused Jest commands | Keep mobile and broader adversarial URL E2E specs as gaps. |

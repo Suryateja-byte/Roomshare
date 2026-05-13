@@ -47,4 +47,4 @@ Important rules:
 
 ## Known Gaps
 
-The URL parser and helper behavior above is code/test verified. Runtime coverage is focused, not exhaustive: V1-only map API mock cases, broader non-gate E2E coverage, broader map/list synchronization coverage, and stale map/list data prevention remain documented gaps. Evidence: `runtime-verification.md`; `unknowns.md` G001, G006, G011.
+The URL parser and helper behavior above is code/test verified. Runtime coverage is focused, not exhaustive: C056 verifies focused desktop list/map parity, while V1-only map API mock cases, broader non-gate E2E coverage, broader map/list synchronization coverage beyond that focused path, and stale map/list data prevention remain documented gaps. Evidence: `runtime-verification.md`; `unknowns.md` G001, G006, G011.

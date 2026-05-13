@@ -106,8 +106,8 @@
     },
     {
       "claimId": "V014",
-      "claim": "Desktop map preference, marker/list focus, pan/zoom URL state, mobile map/list behavior, and map error/a11y behavior have passing browser coverage; V1-only map API mock cases and provider terminology remain incomplete.",
-      "citation": "README.md; 02-user-flows.md; 12-gaps-unknowns-and-questions.md G001, G005, G011; evidence-register.md C031",
+      "claim": "Desktop map preference, focused list-backed map parity, marker/list focus, pan/zoom URL state, mobile map/list behavior, and map error/a11y behavior have passing browser coverage; V1-only map API mock cases and provider terminology remain incomplete.",
+      "citation": "README.md; 02-user-flows.md; 12-gaps-unknowns-and-questions.md G001, G005, G011; evidence-register.md C031, C056",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -314,8 +314,8 @@
     },
     {
       "claimId": "V040",
-      "claim": "The focused desktop-anonymous desktop map Playwright spec passed after Docker/Postgres readiness.",
-      "citation": "runtime-verification.md; evidence-register.md C037; test-results/.last-run.json; command output from `pnpm exec playwright test tests/e2e/search/search-map-desktop.spec.ts --project=desktop-anonymous --reporter=list`",
+      "claim": "The focused desktop-anonymous desktop map Playwright spec passed after Docker/Postgres readiness and was rerun for committed desktop list/map parity evidence.",
+      "citation": "runtime-verification.md; evidence-register.md C037, C056; test-results/.last-run.json; command output from `pnpm exec playwright test tests/e2e/search/search-map-desktop.spec.ts --project=desktop-anonymous --reporter=list`; commit 7e80c899",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null

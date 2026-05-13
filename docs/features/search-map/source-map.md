@@ -1,6 +1,6 @@
 # Search / Map Source Map
 
-Source of truth: current dirty worktree. This is a Phase 1/2 source map, not final feature documentation.
+Source of truth: current dirty worktree plus committed desktop parity slice `7e80c899`. This is a Phase 1/2 source map, not final feature documentation.
 
 | Area | File | Symbols / components | Responsibility | Evidence | Confidence |
 |---|---|---|---|---|---|
@@ -39,7 +39,7 @@ Source of truth: current dirty worktree. This is a Phase 1/2 source map, not fin
 | Listing focus | `src/contexts/ListingFocusContext.tsx` | `ListingFocusProvider`, focus hooks | List/map hover, active listing, and scroll request state. | L11-L16, L34-L48, L142-L211, L271-L315 | Verified |
 | Search map UI | `src/contexts/SearchMapUIContext.tsx` | `SearchMapUIProvider`, `useSearchMapUI` | Map visibility and focus-on-map action shared by result cards and map/list layout. | L33-L36, L62-L98, L123-L156, L165 | Verified |
 | V2 map data state | `src/contexts/SearchV2DataContext.tsx` | `SearchV2DataProvider`, `useV2MapData`, `useV2MapDataSetter` | Client-side V2 listing/map/GeoJSON data state. | L57-L83, L132-L175, L219-L296 | Verified |
-| List result IDs | `src/contexts/SearchListResultsContext.tsx` | `SearchListResultsProvider`, list-result hooks | Dirty-worktree context for list result IDs. | `src/components/search/SearchResultsClient.tsx`:L984; file discovery | Partially verified |
+| List result IDs | `src/contexts/SearchListResultsContext.tsx` | `SearchListResultsProvider`, list-result hooks | Committed context for list result IDs used to keep the desktop map aligned with the visible result list. | `src/components/search/SearchResultsClient.tsx`:L984; `evidence-register.md` C056; commit `7e80c899` | Verified |
 | Listing card | `src/components/listings/ListingCard.tsx` | `ListingCard` | Listing card link, favorite button, hover/focus state, and show-on-map button. | L280-L352, L431-L499 | Verified |
 | Split-stay card | `src/components/search/SplitStayCard.tsx` | `SplitStayCard` | Split-stay result card variant with detail links and show-on-map interaction. | L64-L71, L133-L176 | Verified |
 | Favorite button | `src/components/FavoriteButton.tsx` | `FavoriteButton` | Optimistic favorite toggle and unauthorized login redirect. | L16-L24, L43-L87, L97-L100 | Verified |

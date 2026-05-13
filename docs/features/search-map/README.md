@@ -4,7 +4,7 @@ Status: evidence-backed draft from the current dirty documentation worktree,
 with post-merge fixed-code verification against `origin/main` at
 `89ad33ea58391452b03a2ff5c3a219503769edaa`. Runtime browser behavior was
 attempted in Phase 10; local Postgres is now available and the narrow smoke,
-filter/URL, sort/load-more pagination, desktop map, results-state, URL-state,
+filter/URL, sort/load-more pagination, desktop map/list parity, results-state, URL-state,
 anonymous/authenticated saved-listing, mobile map/list, search
 error-resilience, and map error/a11y specs now pass. A focused API/unit Jest
 command for favorites, map listings, search facets, search V2, map payload
@@ -13,6 +13,8 @@ command also passes. The original real search/map public-payload PII scan
 failed, but the P0 public payload fix now passes a real captured payload scan
 for `/api/search/v2`, `/api/search/listings`, `/api/map-listings`, and
 `/api/listings`; PR #119 is merged to `main` and all final PR checks pass.
+The committed C056 slice (`7e80c899`) also verifies desktop list-backed map
+parity with focused browser and `SearchResultsClient` Jest evidence.
 V1-only map API mock cases and non-gate broader E2E coverage are still not
 runtime-verified. See `runtime-verification.md` and
 `public-payload-pii-triage.md`.
@@ -55,7 +57,7 @@ Committed search state is URL-first: raw URL params are parsed by `parseSearchPa
 | V2/search-doc is primary, with legacy fallback paths still present. | `evidence-register.md` C006, C009 | Verified by code |
 | Public search/map APIs are rate-limited. | `phase-4/04-auth-security-permissions.md` | Verified by code |
 | Saved listing mutation requires auth on POST. | `evidence-register.md` C018-C019 | Verified by code |
-| Runtime behavior and test status must be scoped to checks that actually ran. | `unknowns.md` G001-G002; `runtime-verification.md` | Smoke/filter/pagination/desktop map/results-state/URL-state/saved-listing/mobile-map/error-resilience/map-error-a11y, focused API/unit Jest, release gate, and real captured public-payload PII scan passed; non-gate broader E2E remains unverified |
+| Runtime behavior and test status must be scoped to checks that actually ran. | `unknowns.md` G001-G002; `runtime-verification.md`; `evidence-register.md` C056 | Smoke/filter/pagination/desktop map-list parity/results-state/URL-state/saved-listing/mobile-map/error-resilience/map-error-a11y, focused API/unit Jest, release gate, and real captured public-payload PII scan passed; non-gate broader E2E remains unverified |
 
 ## Quick links
 

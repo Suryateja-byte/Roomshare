@@ -242,9 +242,9 @@
     {
       "path": "src/contexts/SearchListResultsContext.tsx",
       "symbols": ["SearchListResultsProvider", "useSearchListResultIds"],
-      "responsibility": "Untracked dirty-worktree context for list result IDs.",
-      "evidence": "file discovery, src/components/search/SearchResultsClient.tsx:L984",
-      "confidence": "Partially verified"
+      "responsibility": "Committed context for list result IDs used to keep the desktop map aligned with the visible result list.",
+      "evidence": "src/components/search/SearchResultsClient.tsx:L984; evidence-register.md C056; commit 7e80c899",
+      "confidence": "Verified"
     }
   ],
   "apiRoutes": [
@@ -645,7 +645,7 @@
         "tests/e2e/search/search-url-state.spec.ts"
       ],
       "evidence": "Phase 4 test traceability table; Phase 10 runtime-verification.md",
-      "status": "Partially passed: search-smoke, search-filters, search-map-desktop, search-map-mobile, search-pagination, search-results-states, search-saved-listing anonymous/authenticated project paths, and search-url-state passed; budget-validation, listing-card, location, saved-search, and security not run"
+      "status": "Partially passed: search-smoke, search-filters, search-map-desktop including C056 desktop list/map parity, search-map-mobile, search-pagination, search-results-states, search-saved-listing anonymous/authenticated project paths, and search-url-state passed; budget-validation, listing-card, location, saved-search, and security not run"
     },
     {
       "area": "Additional search, map, URL, accessibility, resilience, and visual E2E specs",

@@ -92,7 +92,7 @@ sequenceDiagram
   Wrapper-->>Map: Render listings/markers
 ```
 
-Evidence: `src/components/Map.tsx`:L3614-L3650; `src/contexts/ActivePanBoundsContext.tsx`:L52-L68; `src/components/PersistentMapWrapper.tsx`:L382-L430; `src/app/api/map-listings/route.ts`:L230-L397; `runtime-verification.md`; `evidence-register.md` C037, C041, C043. V1-only map API mock cases and broader map/list synchronization coverage remain gaps.
+Evidence: `src/components/Map.tsx`:L3614-L3650; `src/contexts/ActivePanBoundsContext.tsx`:L52-L68; `src/components/PersistentMapWrapper.tsx`:L382-L430; `src/app/api/map-listings/route.ts`:L230-L397; `runtime-verification.md`; `evidence-register.md` C037, C041, C043, C056. C056 verifies the focused desktop list-backed map parity path. V1-only map API mock cases and broader non-gate map/list synchronization coverage remain gaps.
 
 ## Save Listing
 
