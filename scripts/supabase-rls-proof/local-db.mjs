@@ -1,10 +1,20 @@
 import { spawnSync } from "node:child_process";
 import process from "node:process";
 
-export const CONTACT_HOST_TABLES = [
+export const CONTACT_HOST_RLS_TABLES = [
   "Conversation",
   "_ConversationParticipants",
   "Message",
+  "ConversationDeletion",
+  "TypingStatus",
+];
+
+export const CONTACT_HOST_REALTIME_TABLES = ["Message"];
+
+export const CONTACT_HOST_REALTIME_FORBIDDEN_TABLES = [
+  "BlockedUser",
+  "Conversation",
+  "_ConversationParticipants",
   "ConversationDeletion",
   "TypingStatus",
 ];
@@ -181,6 +191,133 @@ export function runCommand(command, args, options = {}) {
 
 export function commandOutput(result) {
   return redactSecrets(`${result.stdout || ""}\n${result.stderr || ""}`.trim());
+}
+
+export function splitSqlStatements(sql) {
+  const statements = [];
+  let statementStart = 0;
+  let index = 0;
+  let state = "base";
+  let dollarTag = null;
+
+  while (index < sql.length) {
+    const char = sql[index];
+    const nextChar = sql[index + 1];
+
+    if (state === "base") {
+      if (char === "'") {
+        state = "single-quote";
+        index += 1;
+        continue;
+      }
+
+      if (char === '"') {
+        state = "double-quote";
+        index += 1;
+        continue;
+      }
+
+      if (char === "-" && nextChar === "-") {
+        state = "line-comment";
+        index += 2;
+        continue;
+      }
+
+      if (char === "/" && nextChar === "*") {
+        state = "block-comment";
+        index += 2;
+        continue;
+      }
+
+      if (char === "$") {
+        const dollarMatch = sql.slice(index).match(/^\$[A-Za-z_0-9]*\$/);
+        if (dollarMatch) {
+          dollarTag = dollarMatch[0];
+          state = "dollar-quote";
+          index += dollarTag.length;
+          continue;
+        }
+      }
+
+      if (char === ";") {
+        const statement = sql.slice(statementStart, index).trim();
+        if (statement) {
+          statements.push(statement);
+        }
+        statementStart = index + 1;
+      }
+
+      index += 1;
+      continue;
+    }
+
+    if (state === "single-quote") {
+      if (char === "'" && nextChar === "'") {
+        index += 2;
+        continue;
+      }
+
+      if (char === "'") {
+        state = "base";
+      }
+
+      index += 1;
+      continue;
+    }
+
+    if (state === "double-quote") {
+      if (char === '"' && nextChar === '"') {
+        index += 2;
+        continue;
+      }
+
+      if (char === '"') {
+        state = "base";
+      }
+
+      index += 1;
+      continue;
+    }
+
+    if (state === "line-comment") {
+      if (char === "\n") {
+        state = "base";
+      }
+
+      index += 1;
+      continue;
+    }
+
+    if (state === "block-comment") {
+      if (char === "*" && nextChar === "/") {
+        state = "base";
+        index += 2;
+        continue;
+      }
+
+      index += 1;
+      continue;
+    }
+
+    if (state === "dollar-quote") {
+      if (sql.startsWith(dollarTag, index)) {
+        index += dollarTag.length;
+        state = "base";
+        dollarTag = null;
+        continue;
+      }
+
+      index += 1;
+      continue;
+    }
+  }
+
+  const finalStatement = sql.slice(statementStart).trim();
+  if (finalStatement) {
+    statements.push(finalStatement);
+  }
+
+  return statements;
 }
 
 function relevantUrlEnvEntries(env) {

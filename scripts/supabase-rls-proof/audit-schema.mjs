@@ -2,7 +2,9 @@
 
 import process from "node:process";
 import {
-  CONTACT_HOST_TABLES,
+  CONTACT_HOST_REALTIME_FORBIDDEN_TABLES,
+  CONTACT_HOST_REALTIME_TABLES,
+  CONTACT_HOST_RLS_TABLES,
   discoverLocalDatabaseUrl,
   fail,
   info,
@@ -45,7 +47,7 @@ try {
     JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname = 'public'
       AND c.relkind IN ('r', 'p')
-      AND c.relname IN (${Prisma.join(CONTACT_HOST_TABLES)})
+      AND c.relname IN (${Prisma.join(CONTACT_HOST_RLS_TABLES)})
     ORDER BY c.relname
   `;
 
@@ -58,7 +60,7 @@ try {
       roles
     FROM pg_policies
     WHERE schemaname = 'public'
-      AND tablename IN (${Prisma.join(CONTACT_HOST_TABLES)})
+      AND tablename IN (${Prisma.join(CONTACT_HOST_RLS_TABLES)})
     ORDER BY tablename, policyname
   `;
 
@@ -69,7 +71,10 @@ try {
     FROM pg_publication_tables
     WHERE schemaname = 'public'
       AND pubname = 'supabase_realtime'
-      AND tablename IN (${Prisma.join(CONTACT_HOST_TABLES)})
+      AND tablename IN (${Prisma.join([
+        ...CONTACT_HOST_REALTIME_TABLES,
+        ...CONTACT_HOST_REALTIME_FORBIDDEN_TABLES,
+      ])})
     ORDER BY tablename
   `;
 
@@ -79,26 +84,35 @@ try {
     publicationRows.map((row) => row.table_name)
   );
 
-  const missingTables = CONTACT_HOST_TABLES.filter(
+  const missingTables = CONTACT_HOST_RLS_TABLES.filter(
     (tableName) => !rlsByTable.has(tableName)
   );
-  const rlsDisabled = CONTACT_HOST_TABLES.filter((tableName) => {
+  const rlsDisabled = CONTACT_HOST_RLS_TABLES.filter((tableName) => {
     const row = rlsByTable.get(tableName);
     return row && !row.rls_enabled;
   });
-  const policiesMissing = CONTACT_HOST_TABLES.filter(
+  const policiesMissing = CONTACT_HOST_RLS_TABLES.filter(
     (tableName) => !policiesByTable.has(tableName)
   );
-  const publicationMissing = CONTACT_HOST_TABLES.filter(
+  const publicationMissing = CONTACT_HOST_REALTIME_TABLES.filter(
     (tableName) => !publicationTables.has(tableName)
+  );
+  const publicationForbidden = CONTACT_HOST_REALTIME_FORBIDDEN_TABLES.filter(
+    (tableName) => publicationTables.has(tableName)
   );
 
   console.log("supabase-rls-proof audit summary:");
-  console.log(`- tables checked: ${CONTACT_HOST_TABLES.join(", ")}`);
+  console.log(`- RLS tables checked: ${CONTACT_HOST_RLS_TABLES.join(", ")}`);
   console.log(`- missing tables: ${tableList(missingTables)}`);
   console.log(`- RLS disabled: ${tableList(rlsDisabled)}`);
   console.log(`- policies missing: ${tableList(policiesMissing)}`);
+  console.log(
+    `- supabase_realtime required: ${CONTACT_HOST_REALTIME_TABLES.join(", ")}`
+  );
   console.log(`- supabase_realtime missing: ${tableList(publicationMissing)}`);
+  console.log(
+    `- supabase_realtime forbidden present: ${tableList(publicationForbidden)}`
+  );
 
   if (policyRows.length > 0) {
     console.log("- policies found:");
@@ -128,6 +142,10 @@ try {
     ...publicationMissing.map((tableName) => ({
       code: "REALTIME_PUBLICATION_MISSING",
       detail: `${tableName} is absent from supabase_realtime`,
+    })),
+    ...publicationForbidden.map((tableName) => ({
+      code: "REALTIME_PUBLICATION_FORBIDDEN",
+      detail: `${tableName} must not be present in supabase_realtime`,
     })),
   ];
 
