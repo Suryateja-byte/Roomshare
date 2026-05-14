@@ -235,8 +235,9 @@ Remaining ambiguity:
 - Some rows still list broader commands as not run; that is honest, but the
   docs should distinguish “required before release” from “useful future
   confidence.”
-- The no-arg public-payload scanner wrapper remains missing, so the local
-  scanner gate is not fully self-service.
+- The no-arg public-payload scanner wrapper now passes checked-in public payload
+  fixtures in C064. Live-server payload capture remains optional confidence
+  coverage if release owners need runtime parity beyond fixtures.
 
 ## Required Documentation Fixes
 

@@ -1,0 +1,25 @@
+{
+  "kind": "ok",
+  "source": "v2",
+  "meta": {
+    "queryHash": "q_public_fixture_map",
+    "backendSource": "v2",
+    "responseVersion": "search-public-map"
+  },
+  "data": {
+    "listings": [
+      {
+        "id": "listing_public_1",
+        "title": "Private room near transit",
+        "images": ["https://images.example.test/listing-a.jpg"],
+        "location": {
+          "lat": 37.78,
+          "lng": -122.42
+        },
+        "groupContext": {
+          "contextKey": "pg1_search_a"
+        }
+      }
+    ]
+  }
+}

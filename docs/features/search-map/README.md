@@ -13,7 +13,8 @@ sanitization, and search params also passes. The full search release-gate
 command also passes. The original real search/map public-payload PII scan
 failed, but the P0 public payload fix now passes a real captured payload scan
 for `/api/search/v2`, `/api/search/listings`, `/api/map-listings`, and
-`/api/listings`; PR #119 is merged to `main` and all final PR checks pass.
+`/api/listings`; C064 adds a deterministic no-arg checked-in public payload
+fixture gate; PR #119 is merged to `main` and all final PR checks pass.
 The committed C056 slice (`7e80c899`) also verifies desktop list-backed map
 parity with focused browser and `SearchResultsClient` Jest evidence. C057
 narrows the old dirty-worktree source warning to a P2 branch-hygiene caveat:
@@ -65,7 +66,7 @@ Committed search state is URL-first: raw URL params are parsed by `parseSearchPa
 | V2/search-doc is primary, with explicit legacy fallback/control-state branches. | `evidence-register.md` C006, C009, C063 | Verified by code and focused route/action tests; full service parity remains P2 |
 | Public search/map APIs are rate-limited. | `phase-4/04-auth-security-permissions.md` | Verified by code |
 | Saved listing mutation requires auth on POST. | `evidence-register.md` C018-C019 | Verified by code |
-| Runtime behavior and test status must be scoped to checks that actually ran. | `unknowns.md` G001-G002; `runtime-verification.md`; `evidence-register.md` C056, C062 | Smoke/filter/pagination/root pagination-sort reset/map-bounds round-trip/desktop map-list parity/results-state/URL-state/saved-listing/mobile-map/error-resilience/map-error-a11y, focused API/unit Jest, release gate, and real captured public-payload PII scan passed; non-gate broader E2E remains unverified |
+| Runtime behavior and test status must be scoped to checks that actually ran. | `unknowns.md` G001-G002; `runtime-verification.md`; `evidence-register.md` C056, C062, C064 | Smoke/filter/pagination/root pagination-sort reset/map-bounds round-trip/desktop map-list parity/results-state/URL-state/saved-listing/mobile-map/error-resilience/map-error-a11y, focused API/unit Jest, release gate, real captured public-payload PII scan, and no-arg checked-in public payload fixture gate passed; non-gate broader E2E remains unverified |
 
 ## Quick links
 

@@ -386,10 +386,10 @@
     },
     {
       "claimId": "V049",
-      "claim": "The public-payload PII scanner works against clean/leak fixtures, and the bare package script requires explicit payload JSON input.",
+      "claim": "Historical: before C064, the public-payload PII scanner worked against clean/leak fixtures, but the bare package script required explicit payload JSON input.",
       "citation": "runtime-verification.md; evidence-register.md C046; command outputs from `pnpm scan:public-payload-pii`, `node scripts/scan-public-payload-pii.js scripts/fixtures/public-payload-clean.json`, and `node scripts/scan-public-payload-pii.js scripts/fixtures/public-payload-leak.json`",
       "verdict": "pass",
-      "discrepancy": null,
+      "discrepancy": "Superseded by C064, which adds and verifies a deterministic no-arg package gate.",
       "recommendedFix": null
     },
     {
@@ -431,6 +431,14 @@
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
+    },
+    {
+      "claimId": "V055",
+      "claim": "The public-payload PII scanner now has a deterministic no-arg package gate over checked-in generic and Search Map public payload fixtures, while explicit payload-file scans still detect the leak fixture.",
+      "citation": "runtime-verification.md; evidence-register.md C064; scripts/run-public-payload-pii-gate.js; scripts/fixtures/public-payload-clean.json; scripts/fixtures/public-payload-search-v2.json; scripts/fixtures/public-payload-search-listings.json; scripts/fixtures/public-payload-map-listings.json; scripts/fixtures/public-payload-listings.json; command outputs from `pnpm run scan:public-payload-pii` and `pnpm run scan:public-payload-pii -- scripts/fixtures/public-payload-leak.json`",
+      "verdict": "pass",
+      "discrepancy": null,
+      "recommendedFix": null
     }
   ],
   "coverageGaps": [
@@ -441,7 +449,7 @@
     },
     {
       "manifestItem": "test inventory",
-      "gap": "Tests are discovered and grouped in the manifest; focused search/map harness commands, focused API/unit Jest, the C063 V2 route/load-more action command, the P0 privacy suite, typecheck, the full search release gate, scanner fixture checks, and the real fixed payload scan have passed. Non-gate broader E2E commands have not passed in this session, and the attempted broader V2 service semantic suite currently has 2 expectation failures.",
+      "gap": "Tests are discovered and grouped in the manifest; focused search/map harness commands, focused API/unit Jest, the C063 V2 route/load-more action command, the P0 privacy suite, typecheck, the full search release gate, the C064 no-arg public payload fixture gate, and the real fixed payload scan have passed. Non-gate broader E2E commands have not passed in this session, and the attempted broader V2 service semantic suite currently has 2 expectation failures.",
       "severity": "P1"
     },
     {
@@ -451,8 +459,8 @@
     },
     {
       "manifestItem": "public payload privacy",
-      "gap": "The concrete search/list/map public payload leak is fixed and verified by real captured payload scanning. A deterministic no-arg payload-capture wrapper is still missing for the package scanner gate.",
-      "severity": "P1"
+      "gap": "The concrete search/list/map public payload leak is fixed and verified by real captured payload scanning, and the package scanner now has a deterministic no-arg checked-in fixture gate. Optional live-server payload capture inside the no-arg gate remains confidence coverage if release owners require runtime parity beyond fixtures.",
+      "severity": "P2"
     },
     {
       "manifestItem": "API response contracts",

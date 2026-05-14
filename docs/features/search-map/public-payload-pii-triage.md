@@ -9,6 +9,8 @@ capture, and post-merge `origin/main` evidence for PR #119 at
 | Command | Result | Evidence |
 |---|---|---|
 | `pnpm scan:public-payload-pii` | Failed before scanning because no payload JSON was supplied. | `runtime-verification.md`; `evidence-register.md` C046 |
+| `pnpm run scan:public-payload-pii` after C064 | Passed with checked-in public payload fixtures. | `runtime-verification.md`; `evidence-register.md` C064 |
+| `pnpm run scan:public-payload-pii -- scripts/fixtures/public-payload-leak.json` after C064 | Failed as expected. | `runtime-verification.md`; `evidence-register.md` C064 |
 | `node scripts/scan-public-payload-pii.js scripts/fixtures/public-payload-clean.json` | Passed. | `runtime-verification.md`; `evidence-register.md` C046 |
 | `node scripts/scan-public-payload-pii.js scripts/fixtures/public-payload-leak.json` | Failed as expected. | `runtime-verification.md`; `evidence-register.md` C046 |
 | Temporary dev server capture of `/api/search/v2`, `/api/map-listings`, and `/api/search/facets`, then `node scripts/scan-public-payload-pii.js /tmp/roomshare-search-v2.json /tmp/roomshare-map-listings.json /tmp/roomshare-facets.json` | Failed. | `runtime-verification.md`; `evidence-register.md` C048 |
@@ -23,6 +25,7 @@ capture, and post-merge `origin/main` evidence for PR #119 at
 | `/api/map-listings` | Failed | 80 total scanner violations: 26 `raw_phone_value`, 54 `forbidden_public_key`. |
 | `/api/search/facets` | Passed | 0 scanner violations. |
 | `/api/search/v2`, `/api/search/listings`, `/api/map-listings`, `/api/listings` after fix | Passed | Real captured local payloads scanned cleanly with `{"ok":true,"scannedFiles":4}`. |
+| Checked-in generic and Search Map public payload fixtures after C064 | Passed | Deterministic no-arg gate scanned five fixture files with `{"ok":true,"scannedFiles":5}`. |
 | PR #119 fixed code on `main` | Passed | GitHub Actions reported green Public Payload PII Scan, both Search Release Gate jobs, Shards 1/10 through 10/10, Unit/API/Component/Type/Lint/Build checks, Stability E2E, Search Smoke, Lighthouse, Vercel, and related filter/search checks. |
 
 ## Triage
@@ -70,7 +73,7 @@ passed for `/api/search/v2`, `/api/search/listings`, `/api/map-listings`, and
 
 ## Recommended Next Step
 
-Keep the fixed scanner evidence attached to the P0 privacy fix, and add a later
-wrapper that captures deterministic payload JSON before invoking
-`scan:public-payload-pii` so the privacy gate can run without manual `/tmp`
-payload setup.
+Keep the fixed scanner evidence attached to the P0 privacy fix. C064 adds the
+standard no-arg fixture gate for local and CI use. Add live-server payload
+capture later only if release owners require runtime parity beyond checked-in
+fixture coverage.

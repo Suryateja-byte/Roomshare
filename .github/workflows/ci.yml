@@ -224,7 +224,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run scan:public-payload-pii -- scripts/fixtures/public-payload-clean.json
+      - run: pnpm run scan:public-payload-pii
 
   # E2E tests handled by separate Playwright workflows (playwright.yml, playwright-smoke.yml)
 

@@ -57,7 +57,7 @@ confidence-building unless a release owner explicitly promotes one to a blocker.
 | Empty/error/loading/invalid URL | Results-state, error-resilience, URL-state passed | Mobile URL-state cross-checks and wider journey specs |
 | Saved listing | Anonymous/authenticated Playwright and favorites API tests passed | FavoriteButton component CSRF/header checks |
 | Saved search | Not release-blocking under current docs because branches are marked partial | Saved-search E2E/action/component/paywall tests |
-| Public payload/privacy | Fixed real payload scan, focused privacy suite, and PR #119 CI passed | No-arg deterministic payload-capture wrapper |
+| Public payload/privacy | Fixed real payload scan, focused privacy suite, PR #119 CI, and C064 no-arg checked-in fixture gate passed | Optional live-server payload capture in the no-arg gate |
 | API contracts | Focused API/unit tests passed; compact docs tables and C063 fallback contract added | Formal generated schemas, dedicated `/api/search/listings` fallback test, and broader API suites |
 
 See `phase-4/05-test-traceability.md` and `manifest.json` for the broader

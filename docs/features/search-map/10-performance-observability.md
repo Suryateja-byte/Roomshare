@@ -19,7 +19,9 @@ Recommended verification before accepting performance claims:
 
 | Check | Command | Status |
 |---|---|---|
-| Public payload PII scan | `pnpm scan:public-payload-pii` | Failed with usage because no payload JSON was supplied |
+| Historical public payload PII scan before C064 | `pnpm scan:public-payload-pii` | Failed with usage because no payload JSON was supplied |
+| Deterministic public payload PII fixture gate | `pnpm run scan:public-payload-pii` | Passed with `{"ok":true,"scannedFiles":5}` for the generic clean fixture plus checked-in `/api/search/v2`, `/api/search/listings`, `/api/map-listings`, and `/api/listings` public payload fixtures |
+| PII scanner leak fixture through wrapper | `pnpm run scan:public-payload-pii -- scripts/fixtures/public-payload-leak.json` | Failed as expected with exact address, unit, phone, and exact coordinate violations |
 | PII scanner clean fixture | `node scripts/scan-public-payload-pii.js scripts/fixtures/public-payload-clean.json` | Passed |
 | PII scanner leak fixture | `node scripts/scan-public-payload-pii.js scripts/fixtures/public-payload-leak.json` | Failed as expected with exact address, unit, phone, and exact coordinate violations |
 | Original real search/map payload PII scan | Temporary dev server capture of `/api/search/v2`, `/api/map-listings`, `/api/search/facets`, then `node scripts/scan-public-payload-pii.js /tmp/roomshare-search-v2.json /tmp/roomshare-map-listings.json /tmp/roomshare-facets.json` | Failed; search V2 reported 228 violations, map-listings 80, facets 0 |

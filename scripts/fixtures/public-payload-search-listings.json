@@ -1,0 +1,28 @@
+{
+  "kind": "ok",
+  "source": "v2",
+  "meta": {
+    "queryHash": "q_public_fixture_listings",
+    "backendSource": "v2",
+    "responseVersion": "search-public-list"
+  },
+  "data": {
+    "items": [
+      {
+        "id": "listing_public_1",
+        "title": "Private room near transit",
+        "publicAreaName": "North Loop",
+        "price": 1250,
+        "availableFrom": "2026-06-01",
+        "image": "https://images.example.test/listing-a.jpg",
+        "location": {
+          "lat": 37.78,
+          "lng": -122.42
+        },
+        "groupKey": "pg1_search_a"
+      }
+    ],
+    "nextCursor": null,
+    "hasNextPage": false
+  }
+}

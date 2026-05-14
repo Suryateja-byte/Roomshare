@@ -43,7 +43,7 @@
     "test:e2e:search-release-gate:ssr": "node scripts/run-search-release-gate.js ssr",
     "test:e2e:search-release-gate:client": "node scripts/run-search-release-gate.js client",
     "test:e2e:search-release-gate": "pnpm run test:e2e:search-release-gate:ssr && pnpm run test:e2e:search-release-gate:client",
-    "scan:public-payload-pii": "node scripts/scan-public-payload-pii.js",
+    "scan:public-payload-pii": "node scripts/run-public-payload-pii-gate.js",
     "supabase:init": "test -f supabase/config.toml || supabase init",
     "supabase:start": "supabase start",
     "supabase:status": "supabase status",
