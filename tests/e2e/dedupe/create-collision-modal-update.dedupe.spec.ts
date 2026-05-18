@@ -6,6 +6,10 @@ import {
   seedCollisionListings,
 } from "./create-collision-helpers";
 
+const OWNER_EMAIL = "e2e-other@roomshare.dev";
+
+test.use({ storageState: "playwright/.auth/user2.json" });
+
 test("T-16: duplicate create opens the collision modal and update routes to edit", async ({
   page,
 }) => {
@@ -17,12 +21,14 @@ test("T-16: duplicate create opens the collision modal and update routes to edit
 
   const seededListingIds = await seedCollisionListings(page, {
     title: "E2E Collision Update Existing",
+    ownerEmail: OWNER_EMAIL,
   });
 
   try {
     const createPage = await openPreparedCreateListingPage(
       page,
-      buildCollisionFormData("Collision Update Candidate")
+      buildCollisionFormData("Collision Update Candidate"),
+      OWNER_EMAIL
     );
 
     const firstResponse = await createPage.submitAndWaitForResponse();

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
 import { Search, X, MapPin, SlidersHorizontal, Navigation } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import {
   buildCanonicalSearchUrl,
   normalizeSearchQuery,
 } from "@/lib/search/search-query";
+import { markPendingSearchNavigation } from "@/lib/search/pending-search-navigation";
 import { clearAllFilters } from "@/components/filters/filter-chip-utils";
 
 /**
@@ -37,6 +39,7 @@ export default function ZeroResultsSuggestions({
 }: ZeroResultsSuggestionsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [isClearing, setIsClearing] = useState(false);
 
   const handleRemoveFilter = (filter: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -190,9 +193,16 @@ export default function ZeroResultsSuggestions({
     router.push(buildCanonicalSearchUrl(normalizeSearchQuery(params)));
   };
 
+  const clearedSearchParams = clearAllFilters(
+    new URLSearchParams(searchParams.toString())
+  );
+  const clearAllHref = `/search${
+    clearedSearchParams ? `?${clearedSearchParams}` : ""
+  }`;
   const handleClearAll = () => {
-    const cleared = clearAllFilters(new URLSearchParams(searchParams.toString()));
-    router.push(`/search${cleared ? `?${cleared}` : ""}`);
+    setIsClearing(true);
+    markPendingSearchNavigation(clearAllHref);
+    router.push(clearAllHref, { scroll: false });
   };
 
   if (suggestions.length === 0) {
@@ -217,11 +227,21 @@ export default function ZeroResultsSuggestions({
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3">
-          <Button variant="outline" onClick={handleClearAll} className="gap-2">
+          <Button
+            variant="outline"
+            onClick={handleClearAll}
+            disabled={isClearing}
+            className="gap-2"
+          >
             <X className="w-4 h-4" />
             Clear filters
           </Button>
-          <Button variant="primary" onClick={handleClearAll} className="gap-2">
+          <Button
+            variant="primary"
+            onClick={handleClearAll}
+            disabled={isClearing}
+            className="gap-2"
+          >
             <MapPin className="w-4 h-4" />
             Browse all
           </Button>
@@ -328,8 +348,10 @@ export default function ZeroResultsSuggestions({
       {/* Clear all button */}
       <div className="flex justify-center mt-6">
         <Button
+          type="button"
           variant="ghost"
           onClick={handleClearAll}
+          disabled={isClearing}
           className="text-on-surface-variant hover:text-on-surface"
         >
           Clear all filters

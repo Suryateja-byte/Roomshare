@@ -11,6 +11,9 @@ const mockSetPending = jest.fn();
 const mockReset = jest.fn();
 const mockCommit = jest.fn();
 const mockUseMediaQuery = jest.fn();
+const mockFilterModalProps = {
+  current: null as null | Record<string, unknown>,
+};
 
 const mockPending = { ...emptyFilterValues };
 const mockCommitted = { ...emptyFilterValues };
@@ -75,8 +78,12 @@ jest.mock("@/hooks/useDebouncedFilterCount", () => ({
 
 jest.mock("@/components/search/FilterModal", () => ({
   __esModule: true,
-  default: ({ isOpen }: { isOpen: boolean }) =>
-    isOpen ? <div data-testid="filter-modal">Filters modal</div> : null,
+  default: (props: Record<string, unknown> & { isOpen: boolean }) => {
+    mockFilterModalProps.current = props;
+    return props.isOpen ? (
+      <div data-testid="filter-modal">Filters modal</div>
+    ) : null;
+  },
 }));
 
 jest.mock("@/components/search/PriceRangeFilter", () => ({
@@ -91,7 +98,9 @@ jest.mock("@radix-ui/react-popover", () => {
     open: boolean;
     onOpenChange: (open: boolean) => void;
   };
-  const PopoverContext = React.createContext(null as PopoverContextValue | null);
+  const PopoverContext = React.createContext(
+    null as PopoverContextValue | null
+  );
 
   return {
     Root: ({
@@ -165,6 +174,7 @@ describe("InlineFilterStrip", () => {
     mockMobileResultsView = "list";
     Object.assign(mockPending, emptyFilterValues);
     Object.assign(mockCommitted, emptyFilterValues);
+    mockFilterModalProps.current = null;
     mockUseMediaQuery.mockImplementation((query: string) =>
       query === "(min-width: 768px)" ? true : undefined
     );
@@ -175,7 +185,9 @@ describe("InlineFilterStrip", () => {
 
     fireEvent.click(screen.getByTestId("quick-filter-price"));
 
-    expect(screen.getByTestId("quick-filter-price-popover")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("quick-filter-price-popover")
+    ).toBeInTheDocument();
     expect(screen.queryByTestId("filter-modal")).not.toBeInTheDocument();
   });
 
@@ -187,6 +199,48 @@ describe("InlineFilterStrip", () => {
     expect(screen.getByTestId("filter-modal")).toBeInTheDocument();
   });
 
+  it("wires end-date props through to the advanced filter drawer", () => {
+    mockPending.moveInDate = "2026-05-20";
+    mockPending.endDate = "2026-06-20";
+    render(<InlineFilterStrip />);
+
+    fireEvent.click(screen.getByTestId("quick-filter-more-filters"));
+
+    expect(mockFilterModalProps.current).toMatchObject({
+      endDate: "2026-06-20",
+      minEndDate: "2026-05-20",
+    });
+
+    const onEndDateChange = mockFilterModalProps.current!.onEndDateChange as (
+      value: string
+    ) => void;
+    onEndDateChange("2026-06-25");
+
+    expect(mockSetPending).toHaveBeenCalledWith({ endDate: "2026-06-25" });
+  });
+
+  it("clears stale end date when drawer move-in date moves past it", () => {
+    render(<InlineFilterStrip />);
+
+    fireEvent.click(screen.getByTestId("quick-filter-more-filters"));
+    const onMoveInDateChange = mockFilterModalProps.current!
+      .onMoveInDateChange as (value: string) => void;
+    onMoveInDateChange("2026-07-01");
+
+    const updater = mockSetPending.mock.calls[0][0] as (
+      values: typeof emptyFilterValues
+    ) => Partial<typeof emptyFilterValues>;
+    expect(
+      updater({
+        ...emptyFilterValues,
+        endDate: "2026-06-20",
+      })
+    ).toEqual({
+      moveInDate: "2026-07-01",
+      endDate: "",
+    });
+  });
+
   it("commits room type immediately from the desktop quick filter", () => {
     render(<InlineFilterStrip />);
 
@@ -194,7 +248,9 @@ describe("InlineFilterStrip", () => {
     fireEvent.click(screen.getByRole("button", { name: "Private Room" }));
 
     expect(mockCommit).toHaveBeenCalledWith({ roomType: "Private Room" });
-    expect(screen.queryByTestId("quick-filter-room-type-popover")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("quick-filter-room-type-popover")
+    ).not.toBeInTheDocument();
     expect(screen.queryByTestId("filter-modal")).not.toBeInTheDocument();
   });
 
@@ -214,7 +270,9 @@ describe("InlineFilterStrip", () => {
     expect(
       screen.getByTestId("desktop-results-heading-section")
     ).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "24 places in Dallas" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "24 places in Dallas" })
+    ).toBeInTheDocument();
     expect(screen.getByText(/showing top listings/i)).toBeInTheDocument();
     expect(screen.getByText(/1–12/)).toBeInTheDocument();
     expect(screen.getByTestId("toolbar-slot")).toBeInTheDocument();
@@ -238,9 +296,15 @@ describe("InlineFilterStrip", () => {
     render(<InlineFilterStrip />);
 
     expect(screen.queryByTestId("mobile-filter-price")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("mobile-filter-move-in")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("mobile-filter-room-type")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("mobile-filter-button")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("mobile-filter-move-in")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("mobile-filter-room-type")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("mobile-filter-button")
+    ).not.toBeInTheDocument();
   });
 
   it('hides the mobile quick filters in "peek" view', () => {
@@ -250,9 +314,15 @@ describe("InlineFilterStrip", () => {
     render(<InlineFilterStrip />);
 
     expect(screen.queryByTestId("mobile-filter-price")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("mobile-filter-move-in")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("mobile-filter-room-type")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("mobile-filter-button")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("mobile-filter-move-in")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("mobile-filter-room-type")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("mobile-filter-button")
+    ).not.toBeInTheDocument();
   });
 
   it("shows selected values in mobile quick filters", () => {
@@ -261,11 +331,11 @@ describe("InlineFilterStrip", () => {
     Object.assign(mockCommitted, {
       minPrice: "1200",
       maxPrice: "1800",
-      moveInDate: "2026-05-01",
+      moveInDate: "2026-06-01",
       roomType: "Private Room",
     });
     mockSearchParams = new URLSearchParams(
-      "minPrice=1200&maxPrice=1800&moveInDate=2026-05-01&roomType=Private+Room"
+      "minPrice=1200&maxPrice=1800&moveInDate=2026-06-01&roomType=Private+Room"
     );
 
     render(<InlineFilterStrip />);
@@ -274,7 +344,7 @@ describe("InlineFilterStrip", () => {
       "$1,200-$1,800"
     );
     expect(screen.getByTestId("mobile-filter-move-in")).toHaveTextContent(
-      "May 1"
+      "Jun 1"
     );
     expect(screen.getByTestId("mobile-filter-room-type")).toHaveTextContent(
       "Private Room"
@@ -285,7 +355,7 @@ describe("InlineFilterStrip", () => {
     mockUseMediaQuery.mockReturnValue(false);
     mockMobileResultsView = "list";
     mockSearchParams = new URLSearchParams(
-      "minPrice=1200&maxPrice=1800&moveInDate=2026-05-01&roomType=Private+Room"
+      "minPrice=1200&maxPrice=1800&moveInDate=2026-06-01&roomType=Private+Room"
     );
 
     render(<InlineFilterStrip />);
@@ -294,7 +364,7 @@ describe("InlineFilterStrip", () => {
       name: "Applied filters",
     });
     expect(appliedRegion).toHaveTextContent("$1,200 - $1,800");
-    expect(appliedRegion).toHaveTextContent("Move-in: May 1, 2026");
+    expect(appliedRegion).toHaveTextContent("Move-in: Jun 1, 2026");
     expect(appliedRegion).toHaveTextContent("+1 more");
   });
 });

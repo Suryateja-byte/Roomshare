@@ -107,6 +107,14 @@ describe("Input", () => {
   });
 
   describe("states", () => {
+    it("uses design-system focus treatment", () => {
+      render(<Input />);
+      const input = screen.getByRole("textbox");
+      expect(input).toHaveClass("focus-visible:border-primary");
+      expect(input).toHaveClass("focus-visible:ring-2");
+      expect(input).toHaveClass("focus-visible:ring-primary/10");
+    });
+
     it("handles disabled state", () => {
       render(<Input disabled />);
       expect(screen.getByRole("textbox")).toBeDisabled();
@@ -208,10 +216,13 @@ describe("Input", () => {
 
     it("supports aria-invalid", () => {
       render(<Input aria-invalid="true" />);
-      expect(screen.getByRole("textbox")).toHaveAttribute(
+      const input = screen.getByRole("textbox");
+      expect(input).toHaveAttribute(
         "aria-invalid",
         "true"
       );
+      expect(input).toHaveClass("aria-invalid:border-destructive");
+      expect(input).toHaveClass("aria-invalid:focus-visible:ring-destructive/10");
     });
   });
 

@@ -1,16 +1,17 @@
 /**
  * Room Type Filter E2E Tests (P0)
  *
- * Validates room type filtering behavior via both the inline room type tabs
- * in the search form and the Select dropdown in the filter modal.
+ * Validates room type filtering behavior via the current desktop quick-filter
+ * popover and the Select dropdown in the filter modal.
  *
  * Key implementation details:
- * - Inline tabs: button[aria-pressed] with values "any", "Private Room", "Shared Room", "Entire Place"
+ * - Quick filter trigger: data-testid="quick-filter-room-type"
+ * - Quick filter popover: data-testid="quick-filter-room-type-popover"
  * - Modal select: #filter-room-type using Radix Select with same values
  * - URL param: roomType (e.g., roomType=Private+Room)
  * - Valid values: "any" (excluded from URL), "Private Room", "Shared Room", "Entire Place"
  * - Aliases: "private" -> "Private Room", "shared" -> "Shared Room", etc.
- * - Inline tab click triggers immediate form submit (handleRoomTypeSelect)
+ * - Quick filter option click triggers immediate URL commit
  * - Modal select only updates pending state; committed on Apply
  */
 
@@ -26,6 +27,55 @@ import {
   filtersButton,
   applyFilters,
 } from "../helpers";
+
+const ROOM_TYPE_OPTIONS = ["Private Room", "Shared Room", "Entire Place"];
+
+function optionName(label: string): RegExp {
+  return new RegExp(`^${label}(?: \\(\\d+\\))?$`, "i");
+}
+
+function roomTypeQuickFilter(page: import("@playwright/test").Page) {
+  return searchResultsContainer(page).getByTestId("quick-filter-room-type");
+}
+
+function roomTypeOption(
+  popover: import("@playwright/test").Locator,
+  label: string
+) {
+  if (label === "Any") {
+    return popover.getByRole("button", { name: /^Any(?: \(\d+\))?$/ }).first();
+  }
+
+  return popover.getByRole("button", { name: optionName(label) });
+}
+
+async function openRoomTypeQuickFilter(page: import("@playwright/test").Page) {
+  const trigger = roomTypeQuickFilter(page);
+  await expect(trigger).toBeVisible({ timeout: 30_000 });
+  await trigger.click();
+
+  const popover = page.getByTestId("quick-filter-room-type-popover");
+  await expect(popover).toBeVisible({ timeout: 10_000 });
+  return popover;
+}
+
+async function selectRoomTypeQuickFilter(
+  page: import("@playwright/test").Page,
+  label: string
+) {
+  const popover = await openRoomTypeQuickFilter(page);
+  const option = roomTypeOption(popover, label);
+  await expect(option).toBeVisible({ timeout: 10_000 });
+
+  if (await option.isDisabled()) {
+    await expect(option).toBeDisabled();
+    return false;
+  }
+
+  await option.click();
+  await expect(popover).not.toBeVisible({ timeout: 10_000 });
+  return true;
+}
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -46,62 +96,38 @@ test.describe("Room Type Filter", () => {
 
     expect(getUrlParam(page, "roomType")).toBe("Private Room");
 
-    // The inline "Private" tab should be pressed
-    const privateTab = page
-      .locator('button[aria-pressed="true"]')
-      .filter({ hasText: /private/i });
-    const tabVisible = await privateTab.isVisible().catch(() => false);
-    if (tabVisible) {
-      await expect(privateTab).toHaveAttribute("aria-pressed", "true");
-    }
+    await expect(roomTypeQuickFilter(page)).toContainText("Private Room", {
+      timeout: 30_000,
+    });
   });
 
-  // 2. Click inline room type tab -> URL updates
-  test(`${tags.core} - clicking inline room type tab updates URL`, async ({
+  // 2. Click quick-filter room type option -> URL updates
+  test(`${tags.core} - clicking quick-filter room type option updates URL`, async ({
     page,
   }) => {
     await waitForSearchReady(page);
 
-    // Find the "Private" room type tab (CategoryTabs renders button with text "Private" and aria-pressed)
-    const privateTab = page
-      .locator("button[aria-pressed]")
-      .filter({ hasText: /Private/i });
-    const tabVisible = await privateTab.isVisible().catch(() => false);
+    const selected = await selectRoomTypeQuickFilter(page, "Private Room");
+    expect(selected).toBe(true);
 
-    if (tabVisible) {
-      // Wrap in retry: tab click may not trigger URL update immediately due to hydration
-      await expect(async () => {
-        await privateTab.click();
-        await expect
-          .poll(() =>
-            new URL(page.url(), "http://localhost").searchParams.get("roomType")
-          )
-          .not.toBeNull();
-      }).toPass({ timeout: 15_000 });
+    await expect
+      .poll(
+        () =>
+          new URL(page.url(), "http://localhost").searchParams.get("roomType"),
+        {
+          timeout: 30_000,
+          message: 'URL param "roomType" to be "Private Room"',
+        }
+      )
+      .toBe("Private Room");
 
-      // Wait for URL to settle to correct value
-      await expect
-        .poll(
-          () =>
-            new URL(page.url(), "http://localhost").searchParams.get(
-              "roomType"
-            ),
-          {
-            timeout: 30_000,
-            message: 'URL param "roomType" to be "Private Room"',
-          }
-        )
-        .toBe("Private Room");
-
-      expect(getUrlParam(page, "roomType")).toBe("Private Room");
-    } else {
-      // On smaller viewports, inline tabs may not be visible
-      test.skip(true, "Room type tabs not visible (likely mobile viewport)");
-    }
+    await expect(roomTypeQuickFilter(page)).toContainText("Private Room", {
+      timeout: 30_000,
+    });
   });
 
-  // 3. Select "All" tab -> roomType param removed from URL
-  test(`${tags.core} - selecting All room type removes roomType from URL`, async ({
+  // 3. Select "Any" in quick filter -> roomType param removed from URL
+  test(`${tags.core} - selecting Any room type removes roomType from URL`, async ({
     page,
   }) => {
     // Start with a room type filter
@@ -109,40 +135,20 @@ test.describe("Room Type Filter", () => {
 
     expect(getUrlParam(page, "roomType")).toBe("Private Room");
 
-    // Click the "All" tab (CategoryTabs renders button with text "All" and aria-pressed)
-    // Wait for hydration — tabs may not be interactive immediately
-    const allTab = page
-      .locator("button[aria-pressed]")
-      .filter({ hasText: /^All$/i });
-    const tabVisible = await allTab
-      .isVisible({ timeout: 10_000 })
-      .catch(() => false);
+    const selected = await selectRoomTypeQuickFilter(page, "Any");
+    expect(selected).toBe(true);
 
-    if (tabVisible) {
-      // Wrap in retry: tab click may not trigger URL update immediately due to hydration
-      await expect(async () => {
-        await allTab.click();
-        await expect
-          .poll(() =>
-            new URL(page.url(), "http://localhost").searchParams.get("roomType")
-          )
-          .toBeNull();
-      }).toPass({ timeout: 20_000 });
+    await expect
+      .poll(
+        () =>
+          new URL(page.url(), "http://localhost").searchParams.get("roomType"),
+        { timeout: 30_000, message: 'URL param "roomType" to be absent' }
+      )
+      .toBeNull();
 
-      await expect
-        .poll(
-          () =>
-            new URL(page.url(), "http://localhost").searchParams.get(
-              "roomType"
-            ),
-          { timeout: 30_000, message: 'URL param "roomType" to be absent' }
-        )
-        .toBeNull();
-
-      expect(getUrlParam(page, "roomType")).toBeNull();
-    } else {
-      test.skip(true, "Room type tabs not visible");
-    }
+    await expect(roomTypeQuickFilter(page)).toContainText("Room Type", {
+      timeout: 30_000,
+    });
   });
 
   // 4. Room type filter narrows results
@@ -185,7 +191,6 @@ test.describe("Room Type Filter", () => {
         .first();
       await expect(roomTypeChip).toBeVisible({ timeout: 10_000 });
     }
-
   });
 
   // 6. Clear room type filter restores all results
@@ -273,52 +278,45 @@ test.describe("Room Type Filter", () => {
 
     // Page should load without errors
 
-    // The inline tab should reflect the resolved value
-    const privateTab = page
-      .locator('button[aria-pressed="true"]')
-      .filter({ hasText: /private/i });
-    const tabVisible = await privateTab.isVisible().catch(() => false);
-    if (tabVisible) {
-      await expect(privateTab).toHaveAttribute("aria-pressed", "true");
-    }
+    await expect(roomTypeQuickFilter(page)).toContainText(/private/i, {
+      timeout: 30_000,
+    });
   });
 
-  // 9. Each room type option can be selected
-  test(`${tags.core} - all room type options are selectable via tabs`, async ({
+  // 9. Each room type option can be selected or is explicitly disabled by facet counts
+  test(`${tags.core} - all room type options are represented in quick-filter popover`, async ({
     page,
   }) => {
     await waitForSearchReady(page);
 
-    const roomTypes = [
-      { text: /^Private$/i, param: "Private Room" },
-      { text: /^Shared$/i, param: "Shared Room" },
-      { text: /^Entire$/i, param: "Entire Place" },
-    ];
+    for (const roomType of ROOM_TYPE_OPTIONS) {
+      const popover = await openRoomTypeQuickFilter(page);
+      const option = roomTypeOption(popover, roomType);
+      await expect(option).toBeVisible({ timeout: 10_000 });
 
-    for (const { text, param } of roomTypes) {
-      const tab = page
-        .locator("button[aria-pressed]")
-        .filter({ hasText: text });
-      const tabVisible = await tab.isVisible().catch(() => false);
-
-      if (!tabVisible) {
-        test.skip(true, "Room type tabs not visible");
-        return;
+      if (await option.isDisabled()) {
+        await expect(option).toBeDisabled();
+        await page.keyboard.press("Escape");
+        await expect(popover).not.toBeVisible({ timeout: 10_000 });
+        continue;
       }
 
-      await tab.click();
-
+      await option.click();
       await expect
         .poll(
           () =>
             new URL(page.url(), "http://localhost").searchParams.get(
               "roomType"
             ),
-          { timeout: 30_000, message: `URL param "roomType" to be "${param}"` }
+          {
+            timeout: 30_000,
+            message: `URL param "roomType" to be "${roomType}"`,
+          }
         )
-        .toBe(param);
-
-      expect(getUrlParam(page, "roomType")).toBe(param);
+        .toBe(roomType);
+      await expect(roomTypeQuickFilter(page)).toContainText(roomType, {
+        timeout: 30_000,
+      });
     }
   });
 });

@@ -2,7 +2,9 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 import type { GeocodingResult } from "@/lib/geocoding-cache";
+import type { LocationAutocompleteBias } from "@/lib/geocoding/autocomplete";
 import { prisma } from "@/lib/prisma";
+import { searchPhoton } from "@/lib/geocoding/photon";
 import {
   isListingEligibleForPublicSearch,
   resolvePublicAvailability,
@@ -15,6 +17,7 @@ import {
 } from "@/lib/geocoding/public-autocomplete-telemetry";
 
 const PUBLIC_AUTOCOMPLETE_MAX_CANDIDATES = 250;
+const PUBLIC_EXTERNAL_PLACE_LIMIT = 10;
 const PUBLIC_CELL_HALF_SIZE = 0.005;
 const ADDRESS_SUFFIX_PATTERN =
   /\b(?:st|street|ave|avenue|rd|road|dr|drive|ln|lane|blvd|boulevard|ct|court|cir|circle|trl|trail|way|pl|place|hwy|highway|pkwy|parkway)\b/i;
@@ -46,6 +49,7 @@ interface PublicAutocompleteLabel {
 export interface PublicAutocompleteSearchOptions {
   limit: number;
   now?: Date;
+  bias?: LocationAutocompleteBias;
 }
 
 export const PUBLIC_AUTOCOMPLETE_SELECT_SQL = `
@@ -163,7 +167,7 @@ function isSafePublicAutocompleteLabel(placeName: string): boolean {
     return false;
   }
 
-  if (/^\d/.test(normalized)) {
+  if (/^\d{1,6}\b/.test(normalized)) {
     return false;
   }
 
@@ -251,6 +255,137 @@ function createSuggestionId(label: string, publicCellId: string): string {
     .slice(0, 16)}`;
 }
 
+function createSuggestionKey(result: GeocodingResult): string {
+  return normalizeAutocompleteText(result.place_name);
+}
+
+function isPointInBounds(
+  center: [number, number],
+  bounds?: LocationAutocompleteBias["bounds"]
+): boolean {
+  if (!bounds) {
+    return false;
+  }
+
+  const [lng, lat] = center;
+  const [minLng, minLat, maxLng, maxLat] = bounds;
+  return lng >= minLng && lng <= maxLng && lat >= minLat && lat <= maxLat;
+}
+
+function distanceSquaredFromBias(
+  center: [number, number],
+  bias?: LocationAutocompleteBias
+): number | null {
+  if (!bias?.near) {
+    return null;
+  }
+
+  const [lng, lat] = center;
+  const latDelta = lat - bias.near.lat;
+  const lngDelta = lng - bias.near.lng;
+  return latDelta * latDelta + lngDelta * lngDelta;
+}
+
+function scoreExternalSuggestion(
+  result: GeocodingResult,
+  bias?: LocationAutocompleteBias
+): number {
+  let score = 100;
+
+  if (isPointInBounds(result.center, bias?.bounds)) {
+    score += 50;
+  }
+
+  const distanceSquared = distanceSquaredFromBias(result.center, bias);
+  if (distanceSquared !== null) {
+    score += Math.max(0, 40 - distanceSquared * 1_000);
+  }
+
+  return score;
+}
+
+function normalizeExternalPlaceType(
+  placeName: string,
+  placeType: string[]
+): string[] | null {
+  if (placeType.includes("country")) {
+    return null;
+  }
+
+  if (placeType.includes("address")) {
+    if (!ADDRESS_SUFFIX_PATTERN.test(placeName)) {
+      return null;
+    }
+
+    return ["street"];
+  }
+
+  if (placeType.includes("neighborhood")) {
+    return ["neighborhood"];
+  }
+
+  if (placeType.includes("locality")) {
+    return ["locality"];
+  }
+
+  if (placeType.includes("region")) {
+    return ["region"];
+  }
+
+  return ["place"];
+}
+
+function toSafeExternalSuggestion(
+  result: GeocodingResult,
+  query: string
+): GeocodingResult | null {
+  if (
+    !matchesAutocompleteQuery(result.place_name, query) ||
+    !isSafePublicAutocompleteLabel(result.place_name)
+  ) {
+    return null;
+  }
+
+  const placeType = normalizeExternalPlaceType(
+    result.place_name,
+    result.place_type
+  );
+  if (!placeType) {
+    return null;
+  }
+
+  return {
+    ...result,
+    id: `place:${result.id}`,
+    place_type: placeType,
+  };
+}
+
+async function searchSafeExternalPlaces(
+  query: string,
+  options: PublicAutocompleteSearchOptions
+): Promise<GeocodingResult[]> {
+  const externalLimit = Math.min(options.limit * 2, PUBLIC_EXTERNAL_PLACE_LIMIT);
+  try {
+    const results = await searchPhoton(query, {
+      limit: externalLimit,
+      near: options.bias?.near,
+    });
+
+    return results
+      .map((result) => toSafeExternalSuggestion(result, query))
+      .filter((result): result is GeocodingResult => Boolean(result))
+      .sort(
+        (a, b) =>
+          scoreExternalSuggestion(b, options.bias) -
+          scoreExternalSuggestion(a, options.bias)
+      );
+  } catch {
+    recordPublicAutocompleteFallbackUsed("external_place_search_unavailable");
+    return [];
+  }
+}
+
 export async function searchPublicAutocomplete(
   query: string,
   options: PublicAutocompleteSearchOptions
@@ -278,7 +413,11 @@ export async function searchPublicAutocomplete(
     candidateLimit
   );
 
-  const suggestions = new Map<string, GeocodingResult>();
+  const suggestions = new Map<
+    string,
+    { result: GeocodingResult; score: number; index: number }
+  >();
+  let suggestionIndex = 0;
 
   for (const row of rows) {
     const label = buildPublicAutocompleteLabel(row);
@@ -332,23 +471,48 @@ export async function searchPublicAutocomplete(
       continue;
     }
 
-    const suggestionKey = `${label.placeName.toLowerCase()}|${row.publicCellId}`;
+    const suggestionKey = createSuggestionKey({
+      id: "",
+      place_name: label.placeName,
+      center: [center.lng, center.lat],
+      place_type: label.placeType,
+    });
     if (suggestions.has(suggestionKey)) {
       continue;
     }
 
     suggestions.set(suggestionKey, {
-      id: createSuggestionId(label.placeName, row.publicCellId ?? ""),
-      place_name: label.placeName,
-      center: [center.lng, center.lat],
-      place_type: label.placeType,
-      bbox: buildCoarseBbox(center),
+      result: {
+        id: createSuggestionId(label.placeName, row.publicCellId ?? ""),
+        place_name: label.placeName,
+        center: [center.lng, center.lat],
+        place_type: label.placeType,
+        bbox: buildCoarseBbox(center),
+      },
+      score: 1_000,
+      index: suggestionIndex++,
     });
+  }
 
-    if (suggestions.size >= options.limit) {
-      break;
+  if (suggestions.size < options.limit) {
+    const externalSuggestions = await searchSafeExternalPlaces(query, options);
+
+    for (const result of externalSuggestions) {
+      const suggestionKey = createSuggestionKey(result);
+      if (suggestions.has(suggestionKey)) {
+        continue;
+      }
+
+      suggestions.set(suggestionKey, {
+        result,
+        score: scoreExternalSuggestion(result, options.bias),
+        index: suggestionIndex++,
+      });
     }
   }
 
-  return Array.from(suggestions.values()).slice(0, options.limit);
+  return Array.from(suggestions.values())
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .map((suggestion) => suggestion.result)
+    .slice(0, options.limit);
 }

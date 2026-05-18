@@ -105,6 +105,7 @@ export async function handleGeocodeNeeded(
 
   // success
   const { lat, lng } = result;
+  const publicAreaName = result.publicAreaName?.trim() || null;
 
   // Coarsen public_point: round to ~1km grid (±0.01 deg ≈ 1km)
   const publicLat = Math.round(lat * 100) / 100;
@@ -121,6 +122,7 @@ export async function handleGeocodeNeeded(
         exact_point     = ${exactPointWkt},
         public_point    = ${publicPointWkt},
         public_cell_id  = ${publicCellId},
+        public_area_name = COALESCE(${publicAreaName}, public_area_name),
         source_version  = source_version + 1,
         updated_at      = NOW()
     WHERE id = ${unitId}

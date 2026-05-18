@@ -35,6 +35,27 @@ import type { Page, Route } from "@playwright/test";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 const SEARCH_URL = `/search?${boundsQS}`;
+const USA_BOUNDS = {
+  minLat: 24.6,
+  maxLat: 49.2,
+  minLng: -125,
+  maxLng: -66.8,
+} as const;
+const usaBoundsQS = `minLat=${USA_BOUNDS.minLat}&maxLat=${USA_BOUNDS.maxLat}&minLng=${USA_BOUNDS.minLng}&maxLng=${USA_BOUNDS.maxLng}`;
+const USA_SEARCH_URL = `/search?${usaBoundsQS}`;
+
+const SF_SOURCE_SEED_PREFIXES = [
+  "e2e-sf-",
+  "usa-seed-003-",
+  "usa-seed-035-",
+] as const;
+const NON_CALIFORNIA_REGIONAL_SEED_IDS = [
+  "usa-seed-001-seattle-pike-place",
+  "usa-seed-012-dallas-main-street-district",
+  "usa-seed-018-chicago-wicker-park",
+  "usa-seed-029-new-york-east-village",
+  "usa-seed-044-dallas-main-street-district",
+] as const;
 
 // Debounce for map auto-search (600ms in Map.tsx handleMoveEnd)
 const MAP_SEARCH_DEBOUNCE_MS = 600;
@@ -191,6 +212,92 @@ function getUrlBounds(url: string) {
   };
 }
 
+function isNavigationEvaluateError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes("Execution context was destroyed") ||
+    message.includes("Cannot find context with specified id") ||
+    message.includes("Target closed")
+  );
+}
+
+async function getMapSourceListingIds(page: Page): Promise<string[]> {
+  try {
+    return await page.evaluate(() => {
+      const map = (window as any).__e2eMapRef;
+      const source = map?.getSource?.("listings") as
+        | {
+            _data?: unknown;
+            _options?: { data?: unknown };
+            serialize?: () => { data?: unknown };
+          }
+        | undefined;
+      const serializedData = source?.serialize?.().data;
+      const candidates = [
+        source?._data,
+        (source?._data as { geojson?: unknown } | undefined)?.geojson,
+        source?._options?.data,
+        serializedData,
+        (serializedData as { geojson?: unknown } | undefined)?.geojson,
+      ];
+
+      const sourceData = candidates.find(
+        (candidate): candidate is { features: unknown[] } =>
+          !!candidate &&
+          typeof candidate !== "string" &&
+          Array.isArray((candidate as { features?: unknown }).features)
+      );
+
+      if (!sourceData) return [];
+
+      return Array.from(
+        new Set(
+          sourceData.features
+            .map((feature) => {
+              const properties = (feature as { properties?: { id?: unknown } })
+                .properties;
+              return typeof properties?.id === "string" ? properties.id : null;
+            })
+            .filter((id): id is string => id !== null)
+        )
+      ).sort();
+    });
+  } catch (error) {
+    if (isNavigationEvaluateError(error)) return [];
+    throw error;
+  }
+}
+
+function isSfSourceSeedId(id: string): boolean {
+  return SF_SOURCE_SEED_PREFIXES.some((prefix) => id.startsWith(prefix));
+}
+
+function sameStringSet(left: readonly string[], right: readonly string[]) {
+  if (left.length !== right.length) return false;
+  const rightSet = new Set(right);
+  return left.every((value) => rightSet.has(value));
+}
+
+async function waitForMapSourceIds(
+  page: Page,
+  predicate: (ids: string[]) => boolean
+): Promise<string[]> {
+  let latestIds: string[] = [];
+  await expect
+    .poll(
+      async () => {
+        latestIds = await getMapSourceListingIds(page);
+        return predicate(latestIds);
+      },
+      {
+        timeout: 30_000,
+        intervals: [250, 500, 1000, 2000],
+      }
+    )
+    .toBe(true);
+  return latestIds;
+}
+
 // Map tests need extra time for WebGL rendering and tile loading in CI
 test.beforeEach(async () => {
   test.slow();
@@ -205,7 +312,10 @@ test.describe("Map search: always-on behavior", () => {
     await waitForSearchPage(page);
 
     const mapInteractive = await isMapInteractive(page);
-    test.skip(!mapInteractive, "Map controls not available (WebGL unavailable)");
+    test.skip(
+      !mapInteractive,
+      "Map controls not available (WebGL unavailable)"
+    );
 
     await expect(
       page.getByRole("switch", { name: /search as i move/i })
@@ -241,7 +351,10 @@ test.describe("Map search: always-on behavior", () => {
       .then(() => true)
       .catch(() => false);
 
-    test.skip(!urlChanged, "URL did not update within timeout (slow WSL2 server)");
+    test.skip(
+      !urlChanged,
+      "URL did not update within timeout (slow WSL2 server)"
+    );
 
     // URL bounds should have changed
     const newBounds = getUrlBounds(page.url());
@@ -306,7 +419,10 @@ test.describe("Map search: always-on behavior", () => {
       .then(() => true)
       .catch(() => false);
 
-    test.skip(!urlChanged, "URL did not update within timeout (slow WSL2 server)");
+    test.skip(
+      !urlChanged,
+      "URL did not update within timeout (slow WSL2 server)"
+    );
 
     const newBounds = getUrlBounds(page.url());
     const boundsChanged =
@@ -318,6 +434,49 @@ test.describe("Map search: always-on behavior", () => {
     expect(boundsChanged).toBe(true);
   });
 
+  test("4 - Nationwide bounds replace city-only map source data", async ({
+    page,
+  }) => {
+    await waitForSearchPage(page);
+
+    const mapInteractive = await isMapInteractive(page);
+    test.skip(!mapInteractive, "Map controls not available");
+    const mapFullyLoaded = await isMapFullyLoaded(page);
+    test.skip(!mapFullyLoaded, "Map not fully loaded");
+
+    const initialSourceIds = await waitForMapSourceIds(page, (ids) =>
+      ids.some(isSfSourceSeedId)
+    );
+    expect(initialSourceIds.some(isSfSourceSeedId)).toBe(true);
+
+    await page.goto(USA_SEARCH_URL, { waitUntil: "domcontentloaded" });
+    await waitForMapReady(page);
+
+    const nationwideSourceIds = await waitForMapSourceIds(page, (ids) => {
+      const usaSeedCount = ids.filter((id) =>
+        id.startsWith("usa-seed-")
+      ).length;
+      const regionalSeedCount = NON_CALIFORNIA_REGIONAL_SEED_IDS.filter((id) =>
+        ids.includes(id)
+      ).length;
+
+      return (
+        usaSeedCount >= 5 &&
+        regionalSeedCount >= 2 &&
+        !sameStringSet(ids, initialSourceIds)
+      );
+    });
+    expect(
+      nationwideSourceIds.filter((id) => id.startsWith("usa-seed-")).length
+    ).toBeGreaterThanOrEqual(5);
+    expect(
+      NON_CALIFORNIA_REGIONAL_SEED_IDS.filter((id) =>
+        nationwideSourceIds.includes(id)
+      ).length
+    ).toBeGreaterThanOrEqual(2);
+    expect(sameStringSet(nationwideSourceIds, initialSourceIds)).toBe(false);
+    await expect(page.getByText(/Map data request timed out/i)).toBeHidden();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -345,7 +504,11 @@ test.describe("Map search: Result synchronization", () => {
     test.skip(!panned, "Map pan failed");
 
     // Wait for debounce to fire and network activity to settle
-    await page.waitForResponse(resp => resp.url().includes("/search") && resp.status() === 200).catch(() => {});
+    await page
+      .waitForResponse(
+        (resp) => resp.url().includes("/search") && resp.status() === 200
+      )
+      .catch(() => {});
     await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Page should still be functional (not crashed)
@@ -374,7 +537,11 @@ test.describe("Map search: Result synchronization", () => {
     // Pan the map
     await simulateMapPan(page, 100, 50);
     // Wait for debounce to fire and network activity to settle
-    await page.waitForResponse(resp => resp.url().includes("/search") && resp.status() === 200).catch(() => {});
+    await page
+      .waitForResponse(
+        (resp) => resp.url().includes("/search") && resp.status() === 200
+      )
+      .catch(() => {});
     await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Get E2E marker count
@@ -424,7 +591,11 @@ test.describe("Map search: Result synchronization", () => {
     await simulateMapPan(page, 50, 25);
 
     // Wait for debounce to fire and network activity to settle
-    await page.waitForResponse(resp => resp.url().includes("/search") && resp.status() === 200).catch(() => {});
+    await page
+      .waitForResponse(
+        (resp) => resp.url().includes("/search") && resp.status() === 200
+      )
+      .catch(() => {});
     await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Page should be functional (no stale response issues)
@@ -459,7 +630,11 @@ test.describe("Map search: Result synchronization", () => {
     }
 
     // Wait for debounce to fire and network activity to settle
-    await page.waitForResponse(resp => resp.url().includes("map-listings") && resp.status() === 200).catch(() => {});
+    await page
+      .waitForResponse(
+        (resp) => resp.url().includes("map-listings") && resp.status() === 200
+      )
+      .catch(() => {});
     await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Should have at most 2 API calls despite 4 pans
@@ -506,7 +681,10 @@ test.describe("Map search: Debounce and performance", () => {
       .then(() => true)
       .catch(() => false);
 
-    test.skip(!urlChanged, "URL did not update within timeout (slow WSL2 server)");
+    test.skip(
+      !urlChanged,
+      "URL did not update within timeout (slow WSL2 server)"
+    );
 
     // URL should have changed now
     const urlAfterDebounce = page.url();
@@ -564,5 +742,4 @@ test.describe("Map search: Debounce and performance", () => {
     // The debounce coalesces rapid moves
     expect(urlChanges.length).toBeLessThanOrEqual(3);
   });
-
 });

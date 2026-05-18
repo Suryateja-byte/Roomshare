@@ -53,14 +53,18 @@ import {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** UTC ISO date string for N days from today (matches schema's UTC midnight comparison) */
+function formatLocalDateOnly(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/** Local date string for N days from today. */
 function daysFromNow(n: number): string {
   const d = new Date();
-  d.setUTCDate(d.getUTCDate() + n);
-  const yyyy = d.getUTCFullYear();
-  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
+  d.setDate(d.getDate() + n);
+  return formatLocalDateOnly(d);
 }
 
 /** ISO date string for N years from today */
@@ -71,16 +75,12 @@ function _yearsFromNow(n: number): string {
 }
 void _yearsFromNow; // prevent unused warning
 
-/** Compute the exact 2-year boundary date string the schema uses (UTC calendar-year + 2) */
+/** Compute the exact 2-year local boundary date string the schema uses. */
 function twoYearBoundaryDate(offsetDays = 0): string {
   const d = new Date();
-  d.setUTCFullYear(d.getUTCFullYear() + 2);
-  d.setUTCHours(0, 0, 0, 0);
-  d.setUTCDate(d.getUTCDate() + offsetDays);
-  const yyyy = d.getUTCFullYear();
-  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
+  d.setFullYear(d.getFullYear() + 2);
+  d.setDate(d.getDate() + offsetDays);
+  return formatLocalDateOnly(d);
 }
 
 // ---------------------------------------------------------------------------
@@ -769,11 +769,10 @@ describe("listingImagesSchema", () => {
 // ===================================================================
 
 describe("moveInDateSchema", () => {
-  // Note: "today" as a date string is timezone-sensitive because the schema
-  // parses the string as UTC midnight but compares against local midnight.
-  // In negative-UTC-offset timezones, UTC midnight < local midnight, so
-  // "today" may be rejected. We test with tomorrow (daysFromNow(1)) as the
-  // safe near-future boundary.
+  it("accepts today using local date-only semantics", () => {
+    const r = moveInDateSchema.safeParse(daysFromNow(0));
+    expect(r.success).toBe(true);
+  });
 
   it("accepts tomorrow (near-future boundary)", () => {
     const r = moveInDateSchema.safeParse(daysFromNow(1));

@@ -9,7 +9,9 @@ import {
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SlidersHorizontal, X } from "lucide-react";
-import FilterModal from "@/components/search/FilterModal";
+import FilterModal, {
+  type FilterModalApplySnapshot,
+} from "@/components/search/FilterModal";
 import DesktopQuickFilters, {
   type QuickFilterKey,
 } from "@/components/search/DesktopQuickFilters";
@@ -25,6 +27,7 @@ import {
 } from "@/components/filters/filter-chip-utils";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
 import { useMobileSearch } from "@/contexts/MobileSearchContext";
+import { useFilterStateSafe } from "@/contexts/FilterStateContext";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import {
   emptyFilterValues,
@@ -174,6 +177,8 @@ export function InlineFilterStrip({
   const searchParams = useSearchParams();
   const router = useRouter();
   const transitionCtx = useSearchTransitionSafe();
+  const filterState = useFilterStateSafe();
+  const setGlobalDrawerOpen = filterState?.setDrawerOpen;
   const { mobileResultsView, registerOpenFilters } = useMobileSearch();
   const isPending = transitionCtx?.isPending ?? false;
   const isDesktopQuickFilters = useMediaQuery("(min-width: 768px)") === true;
@@ -197,6 +202,7 @@ export function InlineFilterStrip({
     minPrice,
     maxPrice,
     moveInDate,
+    endDate,
     leaseDuration,
     roomType,
     amenities,
@@ -237,6 +243,11 @@ export function InlineFilterStrip({
       setLanguageSearch("");
     }
   }, [showFilterDrawer]);
+
+  useEffect(() => {
+    setGlobalDrawerOpen?.(showFilterDrawer);
+    return () => setGlobalDrawerOpen?.(false);
+  }, [setGlobalDrawerOpen, showFilterDrawer]);
 
   const activeCount = useMemo(
     () => countActiveFilters(searchParams),
@@ -284,6 +295,7 @@ export function InlineFilterStrip({
     ? parseFloat(committed.maxPrice)
     : undefined;
   const minMoveInDate = new Date().toLocaleDateString("en-CA");
+  const minEndDate = moveInDate || minMoveInDate;
   const visibleAppliedChips = showMobileInlineFilters
     ? chips.slice(0, 2)
     : chips;
@@ -420,14 +432,20 @@ export function InlineFilterStrip({
     (value: string) => {
       const normalized = validateMoveInDate(value);
       if (!normalized) return;
-      commit({ moveInDate: normalized });
+      commit({
+        moveInDate: normalized,
+        endDate:
+          committed.endDate && committed.endDate > normalized
+            ? committed.endDate
+            : "",
+      });
       setOpenQuickFilter(null);
     },
-    [commit]
+    [commit, committed.endDate]
   );
 
   const handleMoveInClear = useCallback(() => {
-    commit({ moveInDate: "" });
+    commit({ moveInDate: "", endDate: "" });
     setOpenQuickFilter(null);
   }, [commit]);
 
@@ -674,8 +692,26 @@ export function InlineFilterStrip({
       <FilterModal
         isOpen={showFilterDrawer}
         onClose={closeAdvancedDrawer}
-        onApply={() => {
-          commit();
+        onApply={(snapshot: FilterModalApplySnapshot) => {
+          // Apply the rendered drawer snapshot so the committed URL matches
+          // the visible modal state during concurrent map/search-param syncs.
+          commit({
+            minPrice:
+              snapshot.minPrice !== undefined ? String(snapshot.minPrice) : "",
+            maxPrice:
+              snapshot.maxPrice !== undefined ? String(snapshot.maxPrice) : "",
+            moveInDate: snapshot.moveInDate,
+            endDate: snapshot.endDate,
+            leaseDuration: snapshot.leaseDuration,
+            roomType: snapshot.roomType,
+            amenities: [...snapshot.amenities],
+            houseRules: [...snapshot.houseRules],
+            languages: [...snapshot.languages],
+            genderPreference: snapshot.genderPreference,
+            householdGender: snapshot.householdGender,
+            minSlots:
+              snapshot.minSlots !== undefined ? String(snapshot.minSlots) : "",
+          });
           setShowFilterDrawer(false);
         }}
         onClearAll={handleClearAll}
@@ -684,6 +720,7 @@ export function InlineFilterStrip({
         }
         activeFilterCount={showFilterDrawer ? pendingActiveCount : activeCount}
         moveInDate={moveInDate}
+        endDate={endDate}
         leaseDuration={leaseDuration}
         roomType={roomType}
         amenities={amenities}
@@ -696,8 +733,13 @@ export function InlineFilterStrip({
           setPending({ minSlots: value !== undefined ? String(value) : "" })
         }
         onMoveInDateChange={(value: string) =>
-          setPending({ moveInDate: value })
+          setPending((prev) => ({
+            moveInDate: value,
+            endDate:
+              prev.endDate && value && prev.endDate > value ? prev.endDate : "",
+          }))
         }
+        onEndDateChange={(value: string) => setPending({ endDate: value })}
         onLeaseDurationChange={(value: string) =>
           setPending({ leaseDuration: value === "any" ? "" : value })
         }
@@ -717,6 +759,7 @@ export function InlineFilterStrip({
         onLanguageSearchChange={setLanguageSearch}
         filteredLanguages={filteredLanguages}
         minMoveInDate={minMoveInDate}
+        minEndDate={minEndDate}
         amenityOptions={VALID_AMENITIES}
         houseRuleOptions={VALID_HOUSE_RULES}
         minPrice={numericMinPrice}

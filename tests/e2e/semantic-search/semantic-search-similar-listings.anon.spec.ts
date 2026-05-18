@@ -2,12 +2,13 @@
  * Semantic Search Similar Listings E2E Tests
  *
  * Validates the "Similar listings" section on the listing detail page.
- * Tests gracefully skip when the section is not visible (requires embeddings).
+ * Seeds deterministic E2E embeddings so similar-listing assertions run.
  *
  * Scenarios: SS-20 through SS-27, SS-56, SS-57, SS-61
  * Run: pnpm playwright test tests/e2e/semantic-search/semantic-search-similar-listings.anon.spec.ts
  */
 
+import { PrismaClient } from "@prisma/client";
 import {
   test,
   expect,
@@ -22,6 +23,51 @@ import {
 
 const SEMANTIC_ENABLED = process.env.ENABLE_SEMANTIC_SEARCH === "true";
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
+const SEMANTIC_SIMILAR_TARGET_URL = "/listings/e2e-dedupe-clone-mar20";
+const E2E_EMBEDDING_MODEL =
+  "gemini-embedding-2.search-result.nosensitive-v1.d768";
+const E2E_SEMANTIC_SIMILAR_LISTING_IDS = [
+  "e2e-dedupe-clone-mar20",
+  "e2e-sf-1-sunny-mission-room",
+  "e2e-sf-4-hayes-valley-private-suite",
+  "e2e-sf-7-noe-valley-garden-room",
+  "e2e-sf-11-pacific-heights-room",
+  "e2e-sf-18-russian-hill-room",
+];
+
+const prisma = new PrismaClient();
+
+function buildDeterministicEmbeddingVectorLiteral() {
+  return `[${Array.from({ length: 768 }, (_, index) =>
+    index % 2 === 0 ? "0.03125" : "0.015625"
+  ).join(",")}]`;
+}
+
+async function seedSemanticSimilarListingEmbeddings() {
+  if (!SEMANTIC_ENABLED) return;
+
+  const semanticEmbeddingVector = buildDeterministicEmbeddingVectorLiteral();
+  const semanticEmbeddingUpdateCount = await prisma.$executeRawUnsafe(
+    `
+      UPDATE listing_search_docs
+      SET embedding = $1::vector,
+          embedding_text = COALESCE(embedding_text, title || ' ' || description),
+          embedding_status = 'COMPLETED',
+          embedding_model = $2,
+          embedding_image_count = 0,
+          embedding_updated_at = NOW(),
+          doc_updated_at = NOW()
+      WHERE id = ANY($3::text[])
+    `,
+    semanticEmbeddingVector,
+    E2E_EMBEDDING_MODEL,
+    E2E_SEMANTIC_SIMILAR_LISTING_IDS
+  );
+
+  expect(Number(semanticEmbeddingUpdateCount)).toBe(
+    E2E_SEMANTIC_SIMILAR_LISTING_IDS.length
+  );
+}
 
 /**
  * Find a listing URL from search results to use as the detail page target.
@@ -77,24 +123,19 @@ function similarCards(page: import("@playwright/test").Page) {
   return similarSection(page).locator('[data-testid="listing-card"]');
 }
 
-/**
- * Check if the "Similar listings" section is visible on the page.
- * Uses the correct pattern: expect().toBeVisible() instead of isVisible({ timeout }).
- */
-async function isSimilarSectionVisible(
-  page: import("@playwright/test").Page
-): Promise<boolean> {
-  return expect(similarListingsHeading(page))
-    .toBeVisible({ timeout: 15_000 })
-    .then(() => true)
-    .catch(() => false);
-}
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
 test.describe("Semantic Search - Similar Listings", () => {
+  test.beforeAll(async () => {
+    await seedSemanticSimilarListingEmbeddings();
+  });
+
+  test.afterAll(async () => {
+    await prisma.$disconnect();
+  });
+
   test.beforeEach(async () => {
     test.slow();
   });
@@ -104,17 +145,7 @@ test.describe("Semantic Search - Similar Listings", () => {
   }) => {
     test.skip(!SEMANTIC_ENABLED, "Requires ENABLE_SEMANTIC_SEARCH=true");
 
-    const listingUrl = await findListingUrl(page);
-    test.skip(!listingUrl, "No listings found in search");
-
-    await navigateToListingDetail(page, listingUrl!);
-
-    const hasSection = await isSimilarSectionVisible(page);
-    test.skip(
-      !hasSection,
-      "Similar listings section not visible (embeddings may not be backfilled)"
-    );
-
+    await navigateToListingDetail(page, SEMANTIC_SIMILAR_TARGET_URL);
     await expect(similarListingsHeading(page)).toHaveText("Similar listings");
 
     const cards = similarCards(page);
@@ -198,16 +229,8 @@ test.describe("Semantic Search - Similar Listings", () => {
   }) => {
     test.skip(!SEMANTIC_ENABLED, "Requires ENABLE_SEMANTIC_SEARCH=true");
 
-    const listingUrl = await findListingUrl(page);
-    test.skip(!listingUrl, "No listings found in search");
-
-    await navigateToListingDetail(page, listingUrl!);
-
-    const hasSection = await isSimilarSectionVisible(page);
-    test.skip(
-      !hasSection,
-      "Similar listings section not visible (embeddings may not be backfilled)"
-    );
+    await navigateToListingDetail(page, SEMANTIC_SIMILAR_TARGET_URL);
+    await expect(similarListingsHeading(page)).toBeVisible();
 
     // Extract current listing ID from URL
     const currentUrl = page.url();
@@ -229,13 +252,8 @@ test.describe("Semantic Search - Similar Listings", () => {
   }) => {
     test.skip(!SEMANTIC_ENABLED, "Requires ENABLE_SEMANTIC_SEARCH=true");
 
-    const listingUrl = await findListingUrl(page);
-    test.skip(!listingUrl, "No listings found in search");
-
-    await navigateToListingDetail(page, listingUrl!);
-
-    const hasSection = await isSimilarSectionVisible(page);
-    test.skip(!hasSection, "Similar listings section not visible");
+    await navigateToListingDetail(page, SEMANTIC_SIMILAR_TARGET_URL);
+    await expect(similarListingsHeading(page)).toBeVisible();
 
     const cards = similarCards(page);
     const count = await cards.count();
@@ -255,13 +273,8 @@ test.describe("Semantic Search - Similar Listings", () => {
   test(`SS-27: at most 4 similar listing cards displayed`, async ({ page }) => {
     test.skip(!SEMANTIC_ENABLED, "Requires ENABLE_SEMANTIC_SEARCH=true");
 
-    const listingUrl = await findListingUrl(page);
-    test.skip(!listingUrl, "No listings found in search");
-
-    await navigateToListingDetail(page, listingUrl!);
-
-    const hasSection = await isSimilarSectionVisible(page);
-    test.skip(!hasSection, "Similar listings section not visible");
+    await navigateToListingDetail(page, SEMANTIC_SIMILAR_TARGET_URL);
+    await expect(similarListingsHeading(page)).toBeVisible();
 
     const cards = similarCards(page);
     const count = await cards.count();
@@ -274,13 +287,8 @@ test.describe("Semantic Search - Similar Listings", () => {
   }) => {
     test.skip(!SEMANTIC_ENABLED, "Requires ENABLE_SEMANTIC_SEARCH=true");
 
-    const listingUrl = await findListingUrl(page);
-    test.skip(!listingUrl, "No listings found in search");
-
-    await navigateToListingDetail(page, listingUrl!);
-
-    const hasSection = await isSimilarSectionVisible(page);
-    test.skip(!hasSection, "Similar listings section not visible");
+    await navigateToListingDetail(page, SEMANTIC_SIMILAR_TARGET_URL);
+    await expect(similarListingsHeading(page)).toBeVisible();
 
     const cards = similarCards(page);
     const firstCard = cards.first();
@@ -296,13 +304,8 @@ test.describe("Semantic Search - Similar Listings", () => {
   }) => {
     test.skip(!SEMANTIC_ENABLED, "Requires ENABLE_SEMANTIC_SEARCH=true");
 
-    const listingUrl = await findListingUrl(page);
-    test.skip(!listingUrl, "No listings found in search");
-
-    await navigateToListingDetail(page, listingUrl!);
-
-    const hasSection = await isSimilarSectionVisible(page);
-    test.skip(!hasSection, "Similar listings section not visible");
+    await navigateToListingDetail(page, SEMANTIC_SIMILAR_TARGET_URL);
+    await expect(similarListingsHeading(page)).toBeVisible();
 
     const cards = similarCards(page);
     const firstCard = cards.first();
@@ -321,15 +324,10 @@ test.describe("Semantic Search - Similar Listings", () => {
   test(`SS-61: similar listings responsive layout`, async ({ page }) => {
     test.skip(!SEMANTIC_ENABLED, "Requires ENABLE_SEMANTIC_SEARCH=true");
 
-    const listingUrl = await findListingUrl(page);
-    test.skip(!listingUrl, "No listings found in search");
-
     // Desktop viewport first
     await page.setViewportSize({ width: 1280, height: 800 });
-    await navigateToListingDetail(page, listingUrl!);
-
-    const hasSection = await isSimilarSectionVisible(page);
-    test.skip(!hasSection, "Similar listings section not visible");
+    await navigateToListingDetail(page, SEMANTIC_SIMILAR_TARGET_URL);
+    await expect(similarListingsHeading(page)).toBeVisible();
 
     // Desktop: verify grid classes exist on the similar listings grid
     const grids = page.locator(".pt-8 > .space-y-6 > .grid");
@@ -343,7 +341,12 @@ test.describe("Semantic Search - Similar Listings", () => {
     // Mobile viewport
     await page.setViewportSize({ width: 375, height: 667 });
     // Allow layout reflow after viewport resize
-    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+    await page.evaluate(
+      () =>
+        new Promise((r) =>
+          requestAnimationFrame(() => requestAnimationFrame(r))
+        )
+    );
 
     // Heading should still be visible
     await expect(similarListingsHeading(page)).toBeVisible();

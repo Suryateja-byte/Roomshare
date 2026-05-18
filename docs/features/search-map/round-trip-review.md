@@ -256,9 +256,13 @@ The docs now pass the round-trip test for high-level feature understanding, P0
 verification status, compact API/cache/payload reconstruction, state-machine
 coverage, and release-blocking test traceability. Remaining work is limited to
 P1/P2 confidence-building gaps already listed in `12-gaps-unknowns-and-questions.md`
-and `unknowns.md`: broader non-gate map/list/filter/pagination/mobile coverage,
-saved-search auth/paywall runtime coverage, optional direct search-card Contact
-Host product work or full contact-host handoff browser proof, optional stale
-Mapbox comment/fixture cleanup, C063 residual `/api/search/listings`
-route-handler/service semantic-suite coverage, and optional generated
-API/test-index artifacts.
+and `unknowns.md`: remaining non-map broader filter/pagination/mobile coverage,
+skipped map cases, and non-Chromium/provider breadth after C065. Lower-priority
+follow-up items include live-network visual breadth, saved-search direct
+action/component/saved-searches page and broader
+journey confidence coverage after C066, location component/provider/geolocation
+confidence coverage after C068, optional direct search-card Contact Host product
+work or full contact-host handoff browser proof, optional stale Mapbox
+comment/fixture cleanup, C063 residual `/api/search/listings`
+route-handler fallback coverage after C069, and optional generated API/test
+index artifacts.

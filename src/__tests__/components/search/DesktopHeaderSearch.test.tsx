@@ -53,6 +53,7 @@ jest.mock("@/components/LocationSearchInput", () => ({
     onLocationSelect,
     placeholder,
     fallbackItems = [],
+    autocompleteBias,
   }: {
     id?: string;
     value: string;
@@ -69,11 +70,13 @@ jest.mock("@/components/LocationSearchInput", () => ({
       primaryText: string;
       onSelect: () => void;
     }>;
+    autocompleteBias?: unknown;
   }) => (
     <div>
       <input
         id={id}
         data-testid="desktop-location-input"
+        data-autocomplete-bias={JSON.stringify(autocompleteBias ?? null)}
         value={value}
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
@@ -139,6 +142,24 @@ describe("DesktopHeaderSearch", () => {
       "Select a location from the dropdown suggestions."
     );
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("passes current URL location as autocomplete bias while editing", () => {
+    mockSearchParams =
+      "locationLabel=San+Francisco&lat=37.7749&lng=-122.4194&minLng=-122.6&minLat=37.6&maxLng=-122.2&maxLat=37.9";
+
+    render(<DesktopHeaderSearch collapsed={false} />);
+
+    expect(
+      JSON.parse(
+        screen
+          .getByTestId("desktop-location-input")
+          .getAttribute("data-autocomplete-bias") || "null"
+      )
+    ).toEqual({
+      near: { lat: 37.7749, lng: -122.4194 },
+      bounds: [-122.6, 37.6, -122.2, 37.9],
+    });
   });
 
   it("submits selected location and vibe while preserving existing filters", () => {

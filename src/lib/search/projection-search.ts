@@ -46,7 +46,7 @@ import {
   buildPublicAvailability,
   type PublicAvailability,
 } from "./public-availability";
-import { searchV2MapToListings } from "./v2-map-data";
+import { resolvePublicListingVisibilityState } from "@/lib/listings/public-contact-contract";
 import {
   isPhase04ForceClustersOnlyActive,
   isPhase04ForceListOnlyActive,
@@ -121,6 +121,20 @@ interface ParsedUnitKey {
   key: string;
 }
 
+interface LiveListingProjectionRow {
+  id: string;
+  status: string | null;
+  statusReason: string | null;
+  openSlots: number | null;
+  totalSlots: number | null;
+  moveInDate: Date | null;
+  availableUntil: Date | null;
+  minStayMonths: number | null;
+  lastConfirmedAt: Date | null;
+  price: string | number | { toString(): string };
+  roomType: string | null;
+}
+
 function getFirstValue(
   value: string | string[] | undefined
 ): string | undefined {
@@ -179,6 +193,122 @@ function normalizeProjectionRow(row: RawProjectionUnitRow): ProjectionUnitRow {
   };
 }
 
+function isPresent<T>(value: T | null | undefined): value is T {
+  return value != null;
+}
+
+function toFiniteNumber(
+  value: string | number | { toString(): string } | null | undefined
+): number | null {
+  const numberValue = Number(
+    typeof value === "object" && value !== null ? value.toString() : value
+  );
+  return Number.isFinite(numberValue) ? numberValue : null;
+}
+
+function dateTime(value: Date | null): number {
+  return value instanceof Date && !Number.isNaN(value.getTime())
+    ? value.getTime()
+    : Number.POSITIVE_INFINITY;
+}
+
+function roomTypeToProjectionCategory(roomType: string | null): string | null {
+  if (roomType === "Entire Place") return "ENTIRE_PLACE";
+  if (roomType === "Shared Room") return "SHARED_ROOM";
+  if (roomType === "Private Room") return "PRIVATE_ROOM";
+  return roomType?.trim() ? roomType : null;
+}
+
+function sortLiveListingsForProjection(
+  left: LiveListingProjectionRow,
+  right: LiveListingProjectionRow
+): number {
+  const leftPrice = toFiniteNumber(left.price) ?? Number.POSITIVE_INFINITY;
+  const rightPrice = toFiniteNumber(right.price) ?? Number.POSITIVE_INFINITY;
+  if (leftPrice !== rightPrice) return leftPrice - rightPrice;
+
+  const leftMoveIn = dateTime(left.moveInDate);
+  const rightMoveIn = dateTime(right.moveInDate);
+  if (leftMoveIn !== rightMoveIn) return leftMoveIn - rightMoveIn;
+
+  return left.id.localeCompare(right.id);
+}
+
+async function filterProjectionRowsByLiveListingVisibility(
+  rows: ProjectionUnitRow[]
+): Promise<ProjectionUnitRow[]> {
+  const listingIds = Array.from(
+    new Set(rows.flatMap((row) => row.inventoryIds))
+  );
+  if (listingIds.length === 0) return [];
+
+  const listings = await prisma.listing.findMany({
+    where: { id: { in: listingIds } },
+    select: {
+      id: true,
+      status: true,
+      statusReason: true,
+      openSlots: true,
+      totalSlots: true,
+      moveInDate: true,
+      availableUntil: true,
+      minStayMonths: true,
+      lastConfirmedAt: true,
+      price: true,
+      roomType: true,
+    },
+  });
+
+  const visibleListingsById = new Map<string, LiveListingProjectionRow>();
+  for (const listing of listings) {
+    const visibility = resolvePublicListingVisibilityState(listing);
+    if (visibility.isPubliclyVisible) {
+      visibleListingsById.set(listing.id, listing);
+    }
+  }
+
+  return rows
+    .map((row) => {
+      const visibleListings = row.inventoryIds
+        .map((inventoryId) => visibleListingsById.get(inventoryId))
+        .filter(isPresent)
+        .sort(sortLiveListingsForProjection);
+
+      if (visibleListings.length === 0) {
+        return null;
+      }
+
+      const prices = visibleListings
+        .map((listing) => toFiniteNumber(listing.price))
+        .filter(isPresent);
+      const earliestAvailableFrom =
+        visibleListings
+          .map((listing) => listing.moveInDate)
+          .filter(isPresent)
+          .sort((left, right) => left.getTime() - right.getTime())[0] ??
+        row.earliestAvailableFrom;
+      const roomCategories = Array.from(
+        new Set(
+          visibleListings
+            .map((listing) => roomTypeToProjectionCategory(listing.roomType))
+            .filter(isPresent)
+        )
+      ).sort();
+
+      return {
+        ...row,
+        representativeInventoryId: visibleListings[0].id,
+        inventoryIds: visibleListings.map((listing) => listing.id),
+        fromPrice: prices.length > 0 ? Math.min(...prices) : row.fromPrice,
+        roomCategories:
+          roomCategories.length > 0 ? roomCategories : row.roomCategories,
+        earliestAvailableFrom,
+        matchingInventoryCount: visibleListings.length,
+      };
+    })
+    .filter(isPresent);
+}
+
 function parsePublicPoint(
   publicPoint: string | null,
   publicCellId: string | null
@@ -235,13 +365,18 @@ function parseUnitKeys(unitKeys: string[]): ParsedUnitKey[] {
 function buildPublicAvailabilityForRow(
   row: ProjectionUnitRow
 ): PublicAvailability {
+  const visibleInventoryCount = projectionRowInventoryTotal(row);
   return buildPublicAvailability({
-    openSlots: row.matchingInventoryCount,
-    availableSlots: row.matchingInventoryCount,
-    totalSlots: row.matchingInventoryCount,
+    openSlots: visibleInventoryCount,
+    availableSlots: visibleInventoryCount,
+    totalSlots: visibleInventoryCount,
     moveInDate: row.earliestAvailableFrom ?? undefined,
     minStayMonths: 1,
   });
+}
+
+function projectionRowInventoryTotal(row: ProjectionUnitRow): number {
+  return Math.max(1, row.inventoryIds.length);
 }
 
 function buildGroupSummary(
@@ -251,19 +386,22 @@ function buildGroupSummary(
   const siblingIds = row.inventoryIds.filter(
     (id) => id !== row.representativeInventoryId
   );
+  const visibleInventoryCount = projectionRowInventoryTotal(row);
+  const perInventoryOpenSlots = 1;
+  const perInventoryTotalSlots = 1;
   return {
     groupKey: row.unitKey,
     siblingIds,
     availableFromDates: firstDate ? [firstDate] : [],
-    combinedOpenSlots: row.matchingInventoryCount,
-    combinedTotalSlots: row.matchingInventoryCount,
+    combinedOpenSlots: visibleInventoryCount * perInventoryOpenSlots,
+    combinedTotalSlots: visibleInventoryCount * perInventoryTotalSlots,
     groupOverflow: false,
-    members: row.inventoryIds.map((inventoryId, index) => ({
+    members: row.inventoryIds.map((inventoryId) => ({
       listingId: inventoryId,
       availableFrom: firstDate ?? "",
       availableUntil: null,
-      openSlots: index === 0 ? row.matchingInventoryCount : 0,
-      totalSlots: row.matchingInventoryCount,
+      openSlots: perInventoryOpenSlots,
+      totalSlots: perInventoryTotalSlots,
       isCanonical: inventoryId === row.representativeInventoryId,
       roomType: row.roomCategories[0] ?? null,
     })),
@@ -272,7 +410,7 @@ function buildGroupSummary(
           {
             availableFrom: firstDate,
             availableUntil: null,
-            openSlots: row.matchingInventoryCount,
+            openSlots: visibleInventoryCount,
           },
         ]
       : [],
@@ -540,9 +678,11 @@ async function queryProjectionUnitRows(
     sql,
     ...params
   );
-  return rows
+  const projectionRows = rows
     .map(normalizeProjectionRow)
     .filter((row) => isInsideBounds(row, spec));
+
+  return filterProjectionRowsByLiveListingVisibility(projectionRows);
 }
 
 async function fetchProjectionRowsByUnitKeys(
@@ -608,9 +748,11 @@ async function fetchProjectionRowsByUnitKeys(
   const byKey = new Map(
     rows.map((row) => [row.unit_key, normalizeProjectionRow(row)])
   );
-  return parsed
+  const orderedRows = parsed
     .map((entry) => byKey.get(entry.key))
     .filter(Boolean) as ProjectionUnitRow[];
+
+  return filterProjectionRowsByLiveListingVisibility(orderedRows);
 }
 
 function emptyMap(): SearchV2Map {
@@ -969,22 +1111,6 @@ export async function hydratePhase04MapSnapshot(input: {
         queryHash: requestedQueryHash || snapshot.queryHash,
         reason: "search_contract_changed",
       },
-    };
-  }
-  if (snapshot.mapPayload) {
-    const storedMap = snapshot.mapPayload as unknown as SearchV2Map;
-    return {
-      kind: "ok",
-      data: {
-        listings: searchV2MapToListings(storedMap),
-        ...(storedMap.truncated !== undefined
-          ? { truncated: storedMap.truncated }
-          : {}),
-        ...(storedMap.totalCandidates !== undefined
-          ? { totalCandidates: storedMap.totalCandidates }
-          : {}),
-      },
-      meta: toSnapshotResponseMeta(snapshot),
     };
   }
   const rows = await fetchProjectionRowsByUnitKeys(

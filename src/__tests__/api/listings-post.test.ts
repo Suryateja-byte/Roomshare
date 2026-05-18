@@ -156,6 +156,7 @@ import { upsertSearchDocSync } from "@/lib/search/search-doc-sync";
 import { triggerInstantAlerts } from "@/lib/search-alerts";
 import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 import { syncCanonicalListingInventory } from "@/lib/listings/canonical-inventory";
+import { calculateProfileCompletion } from "@/lib/profile-completion";
 
 // ---------------------------------------------------------------------------
 // Shared fixtures
@@ -164,6 +165,10 @@ import { syncCanonicalListingInventory } from "@/lib/listings/canonical-inventor
 const mockSession = {
   user: { id: "user-123", name: "Test User", email: "test@example.com" },
 };
+
+const futureMoveInDate = new Date();
+futureMoveInDate.setDate(futureMoveInDate.getDate() + 30);
+const futureMoveInISO = futureMoveInDate.toISOString().split("T")[0];
 
 const validBody = {
   title: "Cozy Room in Downtown",
@@ -177,7 +182,7 @@ const validBody = {
   zip: "94102",
   roomType: "Private Room",
   totalSlots: "1",
-  moveInDate: "2026-05-01",
+  moveInDate: futureMoveInISO,
   images: [
     "https://test-project.supabase.co/storage/v1/object/public/images/listings/user-123/test.jpg",
   ],
@@ -247,7 +252,32 @@ describe("POST /api/listings — extended edge cases", () => {
   });
 
   // =========================================================================
-  // 1. Idempotency
+  // 1. Profile gate
+  // =========================================================================
+
+  describe("profile gate", () => {
+    it("returns 403 when profile completion is below the create-listing threshold", async () => {
+      (calculateProfileCompletion as jest.Mock).mockReturnValueOnce({
+        percentage: 59,
+        missing: ["bio"],
+        canCreateListing: false,
+        canSendMessages: true,
+        canBookRooms: false,
+      });
+
+      const response = await POST(makeRequest(validBody));
+
+      expect(response.status).toBe(403);
+      const data = await response.json();
+      expect(data.error).toContain("Profile must be at least 60% complete");
+      expect(data.error).toContain("Current: 59%");
+      expect(geocodeAddress).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  // =========================================================================
+  // 2. Idempotency
   // =========================================================================
 
   describe("idempotency", () => {
@@ -466,6 +496,22 @@ describe("POST /api/listings — extended edge cases", () => {
         })
       );
       expect(response.status).toBe(400);
+    });
+
+    it("rejects Supabase image URL owned by another user", async () => {
+      const response = await POST(
+        makeRequest({
+          ...validBody,
+          images: [
+            "https://test-project.supabase.co/storage/v1/object/public/images/listings/other-user-456/photo.jpg",
+          ],
+        })
+      );
+
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.error).toBe("One or more image URLs are invalid");
+      expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 
     it("accepts valid Supabase image URL", async () => {

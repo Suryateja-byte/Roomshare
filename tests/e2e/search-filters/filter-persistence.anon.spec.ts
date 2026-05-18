@@ -236,8 +236,7 @@ test.describe("Filter State Persistence", () => {
     expect(getUrlParam(page, "sort")).toBe("price_asc");
 
     const region = appliedFiltersRegion(page);
-    const regionVisible = await region.isVisible().catch(() => false);
-    test.skip(!regionVisible, "Applied filters region not visible");
+    await expect(region).toBeVisible({ timeout: 10_000 });
 
     // Remove the price filter chip
     const removePrice = region

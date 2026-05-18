@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { ArrowRight, Check, Home, SlidersHorizontal } from "lucide-react";
+import Link from "next/link";
 import FavoriteButton from "@/components/FavoriteButton";
 import { Button } from "@/components/ui/button";
 import { formatPrice } from "@/lib/format";

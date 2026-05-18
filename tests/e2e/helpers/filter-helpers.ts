@@ -98,8 +98,12 @@ export function urlHasParam(page: Page, key: string): boolean {
 /** Build a search URL from params (merges with SF bounds) */
 export function buildSearchUrl(params?: Record<string, string>): string {
   if (!params || Object.keys(params).length === 0) return SEARCH_URL;
-  const extra = new URLSearchParams(params).toString();
-  return `${SEARCH_URL}&${extra}`;
+  const url = new URL(SEARCH_URL, "http://localhost");
+  for (const [key, value] of Object.entries(params)) {
+    url.searchParams.delete(key);
+    url.searchParams.set(key, value);
+  }
+  return `${url.pathname}?${url.searchParams.toString()}`;
 }
 
 /**
@@ -164,7 +168,12 @@ export async function waitForFilterCommit(
   if (expectedValue === null) {
     await waitForNoUrlParam(page, paramKey, Math.floor(timeout * 0.6));
   } else if (expectedValue !== undefined) {
-    await waitForUrlParam(page, paramKey, expectedValue, Math.floor(timeout * 0.6));
+    await waitForUrlParam(
+      page,
+      paramKey,
+      expectedValue,
+      Math.floor(timeout * 0.6)
+    );
   } else {
     await waitForUrlParam(page, paramKey, undefined, Math.floor(timeout * 0.6));
   }
@@ -263,9 +272,7 @@ export function filtersButton(page: Page): Locator {
 
   if (viewport && viewport.width >= 768) {
     return page
-      .locator(
-        'button[data-testid="quick-filter-more-filters"], button[data-hydrated][aria-label^="Filters"]:not([data-testid="mobile-filter-button"]), button[aria-label^="Filters"]:not([data-testid="mobile-filter-button"]), button:not([data-testid="mobile-filter-button"]):has-text("Filters")'
-      )
+      .locator('button[data-testid="quick-filter-more-filters"]')
       .filter({ visible: true })
       .first();
   }
@@ -291,7 +298,8 @@ async function ensureMobileFilterButton(page: Page): Promise<void> {
   const btn = filtersButton(page);
 
   // Wait for useMediaQuery hydration to show the collapsed bar
-  const visible = await btn.waitFor({ state: "visible", timeout: 10_000 })
+  const visible = await btn
+    .waitFor({ state: "visible", timeout: 10_000 })
     .then(() => true)
     .catch(() => false);
   if (visible) return;
@@ -514,9 +522,9 @@ export async function applyFilter(
 // Chips Region
 // ---------------------------------------------------------------------------
 
-/** Locate the applied filters region (scoped to visible container) */
+/** Locate the visible applied filters region in the current filter strip. */
 export function appliedFiltersRegion(page: Page): Locator {
-  return searchResultsContainer(page).locator('[aria-label="Applied filters"]');
+  return page.getByRole("region", { name: "Applied filters" }).first();
 }
 
 /** Locate the "Clear all filters" button in the chips bar */
@@ -602,15 +610,22 @@ export async function selectDropdownOption(
  */
 export async function waitForUrlStable(
   page: Page,
-  _settleMs = 500,
+  settleMs = 500,
   timeout = 10_000
 ): Promise<string> {
   let lastUrl = page.url();
+  let stableSince = Date.now();
   await expect
     .poll(
       () => {
         const currentUrl = page.url();
-        const stable = currentUrl === lastUrl;
+        if (currentUrl !== lastUrl) {
+          lastUrl = currentUrl;
+          stableSince = Date.now();
+          return false;
+        }
+
+        const stable = Date.now() - stableSince >= settleMs;
         lastUrl = currentUrl;
         return stable;
       },

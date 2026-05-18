@@ -10,7 +10,6 @@ import { ErrorBoundary } from "@/components/error/ErrorBoundary";
 interface ProvidersProps {
   children: ReactNode;
   session?: Session | null;
-  nonce?: string;
 }
 
 export default function Providers({ children, session }: ProvidersProps) {

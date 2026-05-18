@@ -133,6 +133,10 @@ const RATE_LIMITS = {
     burst: { limit: 60, windowMs: 60 * 1000 }, // 60/min
     sustained: { limit: 300, windowMs: 60 * 60 * 1000 }, // 300/hour
   },
+  searchSsr: {
+    burst: { limit: 120, windowMs: 60 * 1000 }, // 120/min
+    sustained: { limit: 600, windowMs: 60 * 60 * 1000 }, // 600/hour
+  },
   listingsRead: {
     burst: { limit: 30, windowMs: 60 * 1000 }, // 30/min
     sustained: { limit: 100, windowMs: 60 * 60 * 1000 }, // 100/hour
@@ -152,6 +156,7 @@ const DB_FALLBACK_CONFIGS: Record<
   metrics: { limit: 100, windowMs: 60 * 1000 },
   map: { limit: 60, windowMs: 60 * 1000 },
   searchV2: { limit: 60, windowMs: 60 * 1000 },
+  searchSsr: { limit: 120, windowMs: 60 * 1000 },
   listingsRead: { limit: 30, windowMs: 60 * 1000 },
   searchCount: { limit: 30, windowMs: 60 * 1000 },
 };
@@ -321,6 +326,24 @@ export const searchListSustainedLimiter = new Ratelimit({
   redis,
   limiter: Ratelimit.slidingWindow(300, "1 h"),
   prefix: "search-list-sustained",
+  analytics: true,
+});
+
+// ============ SEARCH SSR LIMITERS ============
+// Dedicated bucket for /search server renders so public page transitions do not
+// pay the database-backed limiter during normal development navigation.
+
+export const searchSsrBurstLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(120, "1 m"),
+  prefix: "search-ssr-burst",
+  analytics: true,
+});
+
+export const searchSsrSustainedLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(600, "1 h"),
+  prefix: "search-ssr-sustained",
   analytics: true,
 });
 
@@ -700,6 +723,71 @@ export async function checkSearchListRateLimit(
       console.error("[RateLimit] Redis error:", error);
     }
     return checkDbFallbackRateLimit("searchV2", ip);
+  }
+}
+
+/**
+ * Check SSR search page rate limits (both burst and sustained).
+ * Development without Redis uses in-memory fallback to keep public navigation
+ * out of the blocking database rate-limit path.
+ *
+ * @param ip - Client IP address
+ * @returns Rate limit result with optional retry-after seconds
+ */
+export async function checkSearchSsrRateLimit(
+  ip: string
+): Promise<RateLimitResult> {
+  if (
+    !process.env.UPSTASH_REDIS_REST_URL ||
+    !process.env.UPSTASH_REDIS_REST_TOKEN
+  ) {
+    if (process.env.NODE_ENV === "development") {
+      return checkInMemoryRateLimits("searchSsr", ip);
+    }
+
+    return checkDbFallbackRateLimit("searchSsr", ip);
+  }
+
+  try {
+    const burstResult = await protectedRateLimitCheck(
+      searchSsrBurstLimiter,
+      ip,
+      "search-ssr-burst-limit"
+    );
+    if (!burstResult.success) {
+      return {
+        success: false,
+        retryAfter: Math.ceil((burstResult.reset - Date.now()) / 1000),
+      };
+    }
+
+    const sustainedResult = await protectedRateLimitCheck(
+      searchSsrSustainedLimiter,
+      ip,
+      "search-ssr-sustained-limit"
+    );
+    if (!sustainedResult.success) {
+      return {
+        success: false,
+        retryAfter: Math.ceil((sustainedResult.reset - Date.now()) / 1000),
+      };
+    }
+
+    return { success: true };
+  } catch (error) {
+    if (isTimeoutError(error)) {
+      console.error("[RateLimit] Redis timeout:", error);
+    } else if (isCircuitOpenError(error)) {
+      console.error("[RateLimit] Circuit breaker open:", error);
+    } else {
+      console.error("[RateLimit] Redis error:", error);
+    }
+
+    if (process.env.NODE_ENV === "development") {
+      return checkInMemoryRateLimits("searchSsr", ip);
+    }
+
+    return checkDbFallbackRateLimit("searchSsr", ip);
   }
 }
 

@@ -65,8 +65,7 @@ test.describe("Active Filter Chips", () => {
     await page.waitForLoadState("domcontentloaded");
 
     const region = appliedFiltersRegion(page);
-    const regionVisible = await region.isVisible().catch(() => false);
-    test.skip(!regionVisible, "Applied filters region not visible");
+    await expect(region).toBeVisible({ timeout: 10_000 });
 
     // Find and click the remove button for the roomType chip
     const removeRoomType = region.getByRole("button", {
@@ -104,8 +103,7 @@ test.describe("Active Filter Chips", () => {
     await page.waitForLoadState("domcontentloaded");
 
     const region = appliedFiltersRegion(page);
-    const regionVisible = await region.isVisible().catch(() => false);
-    test.skip(!regionVisible, "Applied filters region not visible");
+    await expect(region).toBeVisible({ timeout: 10_000 });
 
     // Click "Clear all"
     const clearAllBtn = region.getByRole("button", { name: /clear all/i });
@@ -148,8 +146,7 @@ test.describe("Active Filter Chips", () => {
     await page.waitForLoadState("domcontentloaded");
 
     const region = appliedFiltersRegion(page);
-    const regionVisible = await region.isVisible().catch(() => false);
-    test.skip(!regionVisible, "Applied filters region not visible");
+    await expect(region).toBeVisible({ timeout: 10_000 });
 
     // Verify Private Room chip
     await expect(region.getByText(/Private Room/i).first()).toBeVisible({
@@ -179,8 +176,7 @@ test.describe("Active Filter Chips", () => {
     await page.waitForLoadState("domcontentloaded");
 
     const region = appliedFiltersRegion(page);
-    const regionVisible = await region.isVisible().catch(() => false);
-    test.skip(!regionVisible, "Applied filters region not visible");
+    await expect(region).toBeVisible({ timeout: 10_000 });
 
     // Room type should display "Private Room" (not raw URL value)
     await expect(region.getByText(/Private Room/i).first()).toBeVisible({
@@ -211,8 +207,7 @@ test.describe("Active Filter Chips", () => {
     await page.waitForLoadState("domcontentloaded");
 
     const region = appliedFiltersRegion(page);
-    const regionVisible = await region.isVisible().catch(() => false);
-    test.skip(!regionVisible, "Applied filters region not visible");
+    await expect(region).toBeVisible({ timeout: 10_000 });
 
     // Remove Wifi chip
     const removeWifi = region.getByRole("button", {
@@ -284,8 +279,7 @@ test.describe("Active Filter Chips", () => {
     await page.waitForLoadState("domcontentloaded");
 
     const region = appliedFiltersRegion(page);
-    const regionVisible = await region.isVisible().catch(() => false);
-    test.skip(!regionVisible, "Applied filters region not visible");
+    await expect(region).toBeVisible({ timeout: 10_000 });
 
     // Should show a single combined price chip like "$500 - $2,000"
     const priceChip = region.getByText(/\$500.*\$2,000/i).first();
@@ -311,8 +305,7 @@ test.describe("Active Filter Chips", () => {
     await page.waitForLoadState("domcontentloaded");
 
     const region = appliedFiltersRegion(page);
-    const regionVisible = await region.isVisible().catch(() => false);
-    test.skip(!regionVisible, "Applied filters region not visible");
+    await expect(region).toBeVisible({ timeout: 10_000 });
 
     // Find the price chip's remove button
     const removePrice = region
@@ -353,8 +346,7 @@ test.describe("Active Filter Chips", () => {
     await page.waitForLoadState("domcontentloaded");
 
     const region = appliedFiltersRegion(page);
-    const regionVisible = await region.isVisible().catch(() => false);
-    test.skip(!regionVisible, "Applied filters region not visible");
+    await expect(region).toBeVisible({ timeout: 10_000 });
 
     const clearAllBtn = region.getByRole("button", { name: /clear all/i });
     await expect(clearAllBtn).toBeVisible({ timeout: 10_000 });

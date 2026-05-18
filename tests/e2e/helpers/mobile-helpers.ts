@@ -12,7 +12,7 @@
  * - data-snap-current attribute on the content area reflects current snap
  */
 
-import { Page } from "@playwright/test";
+import { expect, Page } from "@playwright/test";
 
 // ---------------------------------------------------------------------------
 // Selectors (matching MobileBottomSheet.tsx DOM structure)
@@ -54,7 +54,10 @@ export const mobileSelectors = {
 } as const;
 
 function bottomSheetLocator(page: Page) {
-  return page.locator(mobileSelectors.bottomSheet).filter({ visible: true }).first();
+  return page
+    .locator(mobileSelectors.bottomSheet)
+    .filter({ visible: true })
+    .first();
 }
 
 // ---------------------------------------------------------------------------
@@ -87,19 +90,24 @@ export async function getSheetSnapIndex(page: Page): Promise<number> {
 export async function getSheetHeightFraction(page: Page): Promise<number> {
   // Wait for framer-motion to constrain height to within viewport bounds
   await page
-    .waitForFunction(() => {
-      const candidates = Array.from(
-        document.querySelectorAll('[role="region"][aria-label="Search results"]')
-      ) as HTMLElement[];
-      const el =
-        candidates.find((candidate) => {
-          const rect = candidate.getBoundingClientRect();
-          return rect.width > 0 && rect.height > 0;
-        }) ?? null;
-      if (!el) return false;
-      const h = parseFloat(window.getComputedStyle(el).height);
-      return h > 0 && h <= window.innerHeight * 1.05;
-    }, { timeout: 5000 })
+    .waitForFunction(
+      () => {
+        const candidates = Array.from(
+          document.querySelectorAll(
+            '[role="region"][aria-label="Search results"]'
+          )
+        ) as HTMLElement[];
+        const el =
+          candidates.find((candidate) => {
+            const rect = candidate.getBoundingClientRect();
+            return rect.width > 0 && rect.height > 0;
+          }) ?? null;
+        if (!el) return false;
+        const h = parseFloat(window.getComputedStyle(el).height);
+        return h > 0 && h <= window.innerHeight * 1.05;
+      },
+      { timeout: 5000 }
+    )
     .catch(() => {
       /* assertion will catch bad values */
     });
@@ -111,9 +119,8 @@ export async function getSheetHeightFraction(page: Page): Promise<number> {
 }
 
 /**
- * Set the bottom sheet to a specific snap index using the keyboard-accessible
- * slider handle. Calculates the number of ArrowUp/ArrowDown presses needed
- * to reach the target snap from the current position.
+ * Set the bottom sheet to a specific snap index using visible controls first,
+ * then the keyboard-accessible slider handle.
  */
 export async function setSheetSnap(
   page: Page,
@@ -122,35 +129,37 @@ export async function setSheetSnap(
   const currentSnap = await getSheetSnapIndex(page);
   if (currentSnap === targetSnap) return;
 
-  const handle = page.locator(mobileSelectors.sheetHandle);
-  await handle.focus();
+  const handle = page
+    .locator(mobileSelectors.sheetHandle)
+    .filter({ visible: true })
+    .first();
+  await expect(handle).toBeVisible({ timeout: 10_000 });
 
-  const diff = targetSnap - currentSnap;
-  const key = diff > 0 ? "ArrowUp" : "ArrowDown";
-  const presses = Math.abs(diff);
+  const key =
+    targetSnap === 0
+      ? "Home"
+      : targetSnap === 2
+        ? "End"
+        : currentSnap < targetSnap
+          ? "ArrowUp"
+          : "ArrowDown";
 
-  for (let i = 0; i < presses; i++) {
-    const prevSnap = await getSheetSnapIndex(page);
-    await handle.press(key);
-    if (i < presses - 1) {
-      // Wait for data-snap-current to update before next press
-      await page
-        .waitForFunction(
-          ({ sel, prev }: { sel: string; prev: number }) => {
-            const el = document.querySelector(sel);
-            if (!el) return true;
-            const curr = parseInt(
-              el.getAttribute("data-snap-current") ?? "-1",
-              10
-            );
-            return curr !== prev;
-          },
-          { sel: mobileSelectors.snapContent, prev: prevSnap },
-          { timeout: 3000 }
-        )
-        .catch(() => {});
+  await expect(async () => {
+    const minimize = page
+      .locator(mobileSelectors.minimizeButton)
+      .filter({ visible: true })
+      .first();
+
+    if (targetSnap === 0 && (await minimize.isVisible().catch(() => false))) {
+      await minimize.click();
+    } else {
+      await handle.press(key);
     }
-  }
+
+    await expect
+      .poll(() => getSheetSnapIndex(page), { timeout: 1_500 })
+      .toBe(targetSnap);
+  }).toPass({ timeout: 10_000 });
 
   await waitForSheetAnimation(page);
 }
@@ -168,7 +177,9 @@ export async function ensureMobileResultsVisible(
   const results = page.locator(mobileSelectors.mobileResults).first();
   const currentSnap = await getSheetSnapIndex(page);
   if (currentSnap >= targetSnap) {
-    await results.waitFor({ state: "visible", timeout: 10_000 }).catch(() => {});
+    await results
+      .waitFor({ state: "visible", timeout: 10_000 })
+      .catch(() => {});
     return;
   }
 
@@ -196,7 +207,9 @@ export async function waitForSheetAnimation(page: Page): Promise<void> {
     await page.waitForFunction(
       () => {
         const candidates = Array.from(
-          document.querySelectorAll('[role="region"][aria-label="Search results"]')
+          document.querySelectorAll(
+            '[role="region"][aria-label="Search results"]'
+          )
         ) as HTMLElement[];
         const el =
           candidates.find((candidate) => {

@@ -18,6 +18,7 @@ import {
   clearAllFilters,
   type FilterChipData,
 } from "./filter-chip-utils";
+import { markPendingSearchNavigation } from "@/lib/search/pending-search-navigation";
 
 export interface AppliedFilterChipsProps {
   /** Current result count (for calculating impact delta on hover) */
@@ -45,15 +46,19 @@ export function AppliedFilterChips({
 
   const handleRemove = (chip: FilterChipData) => {
     const newQuery = removeFilterFromUrl(searchParams, chip);
+    const url = `${pathname}${newQuery ? `?${newQuery}` : ""}`;
+    markPendingSearchNavigation(url);
     startTransition(() => {
-      router.push(`${pathname}${newQuery ? `?${newQuery}` : ""}`);
+      router.push(url);
     });
   };
 
   const handleClearAll = () => {
     const newQuery = clearAllFilters(searchParams);
+    const url = `${pathname}${newQuery ? `?${newQuery}` : ""}`;
+    markPendingSearchNavigation(url);
     startTransition(() => {
-      router.push(`${pathname}${newQuery ? `?${newQuery}` : ""}`);
+      router.push(url);
     });
   };
 

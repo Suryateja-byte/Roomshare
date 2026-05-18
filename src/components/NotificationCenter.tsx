@@ -5,13 +5,13 @@ import Link from "next/link";
 import {
   Bell,
   Calendar,
+  ChevronRight,
   MessageSquare,
   Star,
   Heart,
   Check,
   X,
   Clock,
-  CheckCheck,
   Search,
   AlertTriangle,
 } from "lucide-react";
@@ -21,7 +21,6 @@ import {
   markAllNotificationsAsRead,
 } from "@/app/actions/notifications";
 import type { NotificationType } from "@/lib/notifications";
-import { Button } from "@/components/ui/button";
 
 interface Notification {
   id: string;
@@ -40,7 +39,7 @@ const notificationIcons: Record<NotificationType, typeof Bell> = {
   BOOKING_CANCELLED: X,
   BOOKING_HOLD_REQUEST: Clock,
   BOOKING_EXPIRED: X,
-  BOOKING_HOLD_EXPIRED: Clock,
+  BOOKING_HOLD_EXPIRED: X,
   NEW_MESSAGE: MessageSquare,
   NEW_REVIEW: Star,
   LISTING_SAVED: Heart,
@@ -51,34 +50,37 @@ const notificationIcons: Record<NotificationType, typeof Bell> = {
 };
 
 const notificationColors: Record<NotificationType, string> = {
-  BOOKING_REQUEST: "bg-blue-100 text-blue-600",
-  BOOKING_ACCEPTED: "bg-green-100 text-green-600",
-  BOOKING_REJECTED: "bg-red-100 text-red-600",
-  BOOKING_CANCELLED: "bg-surface-container-high text-on-surface-variant",
-  BOOKING_HOLD_REQUEST: "bg-amber-100 text-amber-600",
-  BOOKING_EXPIRED: "bg-surface-container-high text-on-surface-variant",
-  BOOKING_HOLD_EXPIRED: "bg-amber-100 text-amber-600",
-  NEW_MESSAGE: "bg-purple-100 text-purple-600",
-  NEW_REVIEW: "bg-yellow-100 text-yellow-600",
-  LISTING_SAVED: "bg-pink-100 text-pink-600",
-  SEARCH_ALERT: "bg-orange-100 text-orange-600",
-  LISTING_FRESHNESS_REMINDER: "bg-sky-100 text-sky-700",
-  LISTING_STALE_WARNING: "bg-amber-100 text-amber-700",
-  LISTING_AUTO_PAUSED: "bg-amber-100 text-amber-700",
+  BOOKING_REQUEST: "bg-primary/10 text-primary",
+  BOOKING_ACCEPTED: "bg-success/10 text-success",
+  BOOKING_REJECTED: "bg-surface-container-high/70 text-on-surface-variant",
+  BOOKING_CANCELLED: "bg-surface-container-high/70 text-on-surface-variant",
+  BOOKING_HOLD_REQUEST: "bg-warning/10 text-tertiary",
+  BOOKING_EXPIRED: "bg-surface-container-high/70 text-on-surface-variant",
+  BOOKING_HOLD_EXPIRED: "bg-surface-container-high/70 text-on-surface-variant",
+  NEW_MESSAGE: "bg-primary/10 text-primary",
+  NEW_REVIEW: "bg-warning/10 text-tertiary",
+  LISTING_SAVED: "bg-primary/10 text-primary",
+  SEARCH_ALERT: "bg-warning/10 text-tertiary",
+  LISTING_FRESHNESS_REMINDER: "bg-warning/10 text-tertiary",
+  LISTING_STALE_WARNING: "bg-warning/10 text-tertiary",
+  LISTING_AUTO_PAUSED: "bg-surface-container-high/70 text-on-surface-variant",
 };
 
-function formatTimeAgo(date: Date) {
-  const now = new Date();
-  const diff = now.getTime() - new Date(date).getTime();
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
+const POPOVER_NOTIFICATION_LIMIT = 5;
 
-  if (minutes < 1) return "Just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  if (hours < 24) return `${hours}h ago`;
-  if (days < 7) return `${days}d ago`;
-  return new Date(date).toLocaleDateString();
+function formatNotificationTimestamp(date: Date) {
+  const notificationDate = new Date(date);
+  const dateText = notificationDate.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  const timeText = notificationDate.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
+  return `${dateText} • ${timeText}`;
 }
 
 export default function NotificationCenter() {
@@ -91,7 +93,7 @@ export default function NotificationCenter() {
   const fetchNotifications = useCallback(async () => {
     setIsLoading(true);
     try {
-      const result = await getNotifications(20);
+      const result = await getNotifications(POPOVER_NOTIFICATION_LIMIT);
       setNotifications(result.notifications);
       setUnreadCount(result.unreadCount);
     } catch {
@@ -141,9 +143,11 @@ export default function NotificationCenter() {
   return (
     <div className="relative" ref={menuRef}>
       <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-full transition-all"
+        className="relative flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full p-2 text-on-surface-variant transition-all hover:bg-surface-container-high hover:text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
         aria-label="Notifications"
+        aria-expanded={isOpen}
       >
         <Bell className="w-5 h-5" />
         {unreadCount > 0 && (
@@ -154,36 +158,39 @@ export default function NotificationCenter() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-surface-container-lowest/95 backdrop-blur-[20px] rounded-lg shadow-ambient overflow-hidden z-sticky animate-in fade-in zoom-in-95 duration-200">
+        <div className="absolute right-0 z-sticky mt-4 w-[min(calc(100vw-1.5rem),42rem)] overflow-hidden rounded-[1.25rem] border border-outline-variant/20 bg-surface-container-lowest/95 shadow-ambient-lg backdrop-blur-[20px] animate-in fade-in zoom-in-95 duration-200 max-sm:fixed max-sm:left-3 max-sm:right-3 max-sm:top-20 max-sm:mt-0 max-sm:w-auto">
           {/* Header */}
-          <div className="px-4 py-3 bg-surface-container-high/30 flex items-center justify-between">
-            <h3 className="font-semibold text-on-surface">Notifications</h3>
+          <div className="flex items-center justify-between gap-4 px-5 py-4 sm:px-6 sm:py-5">
+            <h3 className="text-2xl font-extrabold leading-tight text-on-surface sm:text-3xl">
+              Notifications
+            </h3>
             {unreadCount > 0 && (
               <button
+                type="button"
                 onClick={handleMarkAllAsRead}
-                className="text-xs text-on-surface-variant hover:text-on-surface flex items-center gap-1 transition-colors"
+                className="flex min-h-[40px] shrink-0 items-center gap-2 rounded-full px-2 text-sm font-medium text-on-surface-variant transition-colors hover:text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 sm:text-base"
               >
-                <CheckCheck className="w-3 h-3" />
+                <Check className="h-4 w-4 sm:h-5 sm:w-5" />
                 Mark all read
               </button>
             )}
           </div>
 
           {/* Notifications List */}
-          <div className="max-h-96 overflow-y-auto">
+          <div className="max-h-[min(calc(100vh-14rem),30rem)] space-y-3 overflow-y-auto px-4 pb-4 sm:px-5 sm:pb-5">
             {isLoading && notifications.length === 0 ? (
-              <div className="p-8 text-center text-on-surface-variant">
+              <div className="rounded-[1rem] bg-surface-canvas px-5 py-8 text-center text-sm text-on-surface-variant">
                 Loading...
               </div>
             ) : notifications.length === 0 ? (
-              <div className="p-8 text-center">
-                <div className="w-16 h-16 bg-surface-container-high rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Bell className="w-8 h-8 text-on-surface-variant" />
+              <div className="rounded-[1rem] bg-surface-canvas px-5 py-8 text-center">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-[1rem] bg-surface-container-high text-on-surface-variant">
+                  <Bell className="h-7 w-7" />
                 </div>
-                <h4 className="font-medium text-on-surface mb-1">
+                <h4 className="mb-2 text-base font-bold text-on-surface">
                   You&apos;re all caught up!
                 </h4>
-                <p className="text-on-surface-variant text-sm">
+                <p className="text-sm text-on-surface-variant">
                   No new notifications at the moment.
                 </p>
               </div>
@@ -195,34 +202,40 @@ export default function NotificationCenter() {
                   "bg-surface-container-high text-on-surface-variant";
 
                 const content = (
-                  <div
-                    className={`px-4 py-3 hover:bg-surface-container-high transition-colors ${!notification.read ? "bg-primary/5" : ""}`}
-                    onClick={() =>
-                      !notification.read && handleMarkAsRead(notification.id)
-                    }
-                  >
-                    <div className="flex gap-3">
-                      <div className={`p-2 rounded-lg ${colorClass} shrink-0`}>
-                        <Icon className="w-4 h-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p
-                          className={`text-sm ${!notification.read ? "font-semibold" : "font-medium"} text-on-surface truncate`}
-                        >
-                          {notification.title}
-                        </p>
-                        <p className="text-xs text-on-surface-variant line-clamp-2 mt-0.5">
-                          {notification.message}
-                        </p>
-                        <p className="text-xs text-on-surface-variant mt-1">
-                          {formatTimeAgo(notification.createdAt)}
-                        </p>
-                      </div>
-                      {!notification.read && (
-                        <div className="w-2 h-2 rounded-full bg-primary shrink-0 mt-2" />
-                      )}
+                  <>
+                    <div
+                      className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-[1rem] sm:h-16 sm:w-16 ${colorClass}`}
+                    >
+                      <Icon className="h-6 w-6 sm:h-7 sm:w-7" />
                     </div>
-                  </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p
+                            className={`truncate text-base leading-snug sm:text-lg ${
+                              !notification.read
+                                ? "font-extrabold"
+                                : "font-bold"
+                            } text-on-surface`}
+                          >
+                            {notification.title}
+                          </p>
+                          <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-on-surface-variant">
+                            {notification.message}
+                          </p>
+                        </div>
+                        {!notification.read && (
+                          <span className="mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-primary" />
+                        )}
+                      </div>
+                      <p className="mt-2.5 flex items-center gap-2 text-xs font-medium text-on-surface-variant sm:text-sm">
+                        <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                        <span>
+                          {formatNotificationTimestamp(notification.createdAt)}
+                        </span>
+                      </p>
+                    </div>
+                  </>
                 );
 
                 if (notification.link) {
@@ -230,28 +243,51 @@ export default function NotificationCenter() {
                     <Link
                       key={notification.id}
                       href={notification.link}
-                      onClick={() => setIsOpen(false)}
+                      onClick={() => {
+                        if (!notification.read) {
+                          void handleMarkAsRead(notification.id);
+                        }
+                        setIsOpen(false);
+                      }}
+                      className="flex w-full items-center gap-4 rounded-[1rem] border border-outline-variant/20 bg-surface-container-lowest px-4 py-4 text-left shadow-[inset_0_1px_0_rgb(255_255_255/0.65)] transition-colors hover:bg-surface-canvas focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 sm:px-5"
                     >
                       {content}
+                      <ChevronRight className="h-5 w-5 shrink-0 text-on-surface-variant" />
                     </Link>
                   );
                 }
 
-                return <div key={notification.id}>{content}</div>;
+                return (
+                  <button
+                    key={notification.id}
+                    type="button"
+                    className="flex w-full items-center gap-4 rounded-[1rem] border border-outline-variant/20 bg-surface-container-lowest px-4 py-4 text-left shadow-[inset_0_1px_0_rgb(255_255_255/0.65)] transition-colors hover:bg-surface-canvas focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 sm:px-5"
+                    onClick={() =>
+                      !notification.read && handleMarkAsRead(notification.id)
+                    }
+                  >
+                    {content}
+                  </button>
+                );
               })
             )}
           </div>
 
           {/* Footer */}
-          {notifications.length > 0 && (
-            <div className="px-4 py-3 bg-surface-container-high/30">
-              <Link href="/notifications" onClick={() => setIsOpen(false)}>
-                <Button variant="ghost" className="w-full text-sm">
-                  View all notifications
-                </Button>
-              </Link>
-            </div>
-          )}
+          <div className="bg-surface-container-lowest px-4 pb-4 sm:px-5 sm:pb-5">
+            <div className="h-px bg-outline-variant/20" />
+            <Link
+              href="/notifications"
+              onClick={() => setIsOpen(false)}
+              className="mt-3 flex min-h-14 items-center justify-center gap-3 rounded-full px-4 text-base font-bold text-tertiary transition-colors hover:bg-surface-canvas focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
+            >
+              <Bell className="h-5 w-5 text-tertiary" />
+              <span className="flex-1 text-center sm:flex-none">
+                View all notifications
+              </span>
+              <ChevronRight className="h-5 w-5 text-on-surface-variant" />
+            </Link>
+          </div>
         </div>
       )}
     </div>

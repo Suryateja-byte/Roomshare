@@ -26,7 +26,8 @@ import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
 import { DEFAULT_PAGE_SIZE } from "@/lib/constants";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { circuitBreakers, isCircuitOpenError } from "@/lib/circuit-breaker";
-import { checkServerComponentRateLimit } from "@/lib/with-rate-limit";
+import { getClientIPFromHeaders } from "@/lib/rate-limit";
+import { checkSearchSsrRateLimit } from "@/lib/rate-limit-redis";
 import { headers } from "next/headers";
 import * as Sentry from "@sentry/nextjs";
 import type { Metadata } from "next";
@@ -381,19 +382,12 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     );
   }
 
-  // P0-2 FIX: Rate limit SSR search to prevent bot-driven DB connection pool exhaustion.
-  // This is the only search path that previously lacked rate limiting:
-  // - API routes have withRateLimitRedis
-  // - Server actions have checkServerComponentRateLimit
-  // - SSR page had nothing — bots could hammer /search with varying params
-  // Uses dedicated "search-ssr" bucket (120/min) separate from "search" (60/min for server actions)
-  // to prevent map panning (which generates SSR at 800ms intervals) from exhausting Load More budget.
-  const ssrRateLimit = await checkServerComponentRateLimit(
-    headersList,
-    "search-ssr",
-    "/search"
+  // Dedicated SSR search limiter. In development without Redis, this stays in
+  // memory so public navigation does not pay a database write before rendering.
+  const ssrRateLimit = await checkSearchSsrRateLimit(
+    getClientIPFromHeaders(headersList)
   );
-  if (!ssrRateLimit.allowed) {
+  if (!ssrRateLimit.success) {
     recordSearchRequestLatency({
       route: "search-page-ssr",
       durationMs: performance.now() - requestStartTime,

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { StatusNotice } from "@/components/ui/status-notice";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
   SUPPORTED_LANGUAGES,
@@ -288,7 +289,7 @@ function HostManagedEditListingForm({
   const FieldError = ({ field }: { field: string }) => {
     if (!fieldErrors[field]) return null;
     return (
-      <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+      <p className="text-destructive text-xs mt-1 flex items-center gap-1">
         <AlertCircle className="w-3 h-3" />
         {fieldErrors[field]}
       </p>
@@ -396,50 +397,40 @@ function HostManagedEditListingForm({
       </div>
 
       {isWriteLocked && (
-        <div className="bg-amber-50 border border-amber-100 px-4 py-4 rounded-xl mb-8">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-amber-900">
-                  Listing locked
-                </p>
-                <p className="text-sm text-amber-700 mt-1">
-                  {LISTING_LOCKED_ERROR_MESSAGE}
-                </p>
-                <p className="text-xs text-amber-700 mt-2">
-                  Your unsaved edits are still on the page. Reload when you want
-                  to check for an updated listing state.
-                </p>
-              </div>
-            </div>
+        <StatusNotice
+          variant="warning"
+          icon={<AlertCircle className="w-5 h-5" />}
+          title="Listing locked"
+          className="mb-8"
+          actions={
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={() => router.refresh()}
               disabled={loading}
-              className="flex-shrink-0 text-amber-700 border-outline-variant/20 hover:bg-amber-100"
+              className="flex-shrink-0"
             >
               <RefreshCcw className="w-4 h-4 mr-1" />
               Reload page
             </Button>
-          </div>
-        </div>
+          }
+        >
+          <p>{LISTING_LOCKED_ERROR_MESSAGE}</p>
+          <p className="text-xs mt-2">
+            Your unsaved edits are still on the page. Reload when you want to
+            check for an updated listing state.
+          </p>
+        </StatusNotice>
       )}
 
       {!isWriteLocked && error && (
-        <div className="bg-red-50 border border-red-100 px-4 py-4 rounded-xl mb-8">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-red-900">
-                  Failed to save changes
-                </p>
-                <p className="text-sm text-red-600 mt-1">{error}</p>
-              </div>
-            </div>
+        <StatusNotice
+          variant="error"
+          icon={<AlertCircle className="w-5 h-5" />}
+          title="Failed to save changes"
+          className="mb-8"
+          actions={
             <Button
               type="button"
               variant="outline"
@@ -450,7 +441,7 @@ function HostManagedEditListingForm({
                   : formRef.current?.requestSubmit()
               }
               disabled={isFormDisabled}
-              className="flex-shrink-0 text-red-700 border-outline-variant/20 hover:bg-red-100"
+              className="flex-shrink-0"
             >
               <RefreshCcw className="w-4 h-4 mr-1" />
               {pendingReload
@@ -459,38 +450,35 @@ function HostManagedEditListingForm({
                   ? "Reload latest"
                   : "Retry"}
             </Button>
-          </div>
-        </div>
+          }
+        >
+          {error}
+        </StatusNotice>
       )}
 
       {!isWriteLocked && !error && reloadSuggested && (
-        <div className="bg-amber-50 border border-amber-100 px-4 py-4 rounded-xl mb-8">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-amber-900">
-                  A newer version is available
-                </p>
-                <p className="text-sm text-amber-700 mt-1">
-                  Reload the latest listing snapshot to discard unsaved changes
-                  and continue editing with the current version.
-                </p>
-              </div>
-            </div>
+        <StatusNotice
+          variant="warning"
+          icon={<AlertCircle className="w-5 h-5" />}
+          title="A newer version is available"
+          className="mb-8"
+          actions={
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={handleReloadLatest}
               disabled={isFormDisabled}
-              className="flex-shrink-0 text-amber-700 border-outline-variant/20 hover:bg-amber-100"
+              className="flex-shrink-0"
             >
               <RefreshCcw className="w-4 h-4 mr-1" />
               {pendingReload ? "Reloading..." : "Reload latest"}
             </Button>
-          </div>
-        </div>
+          }
+        >
+          Reload the latest listing snapshot to discard unsaved changes and
+          continue editing with the current version.
+        </StatusNotice>
       )}
 
       <form
@@ -784,7 +772,7 @@ function LegacyEditListingForm({
   const FieldError = ({ field }: { field: string }) => {
     if (!fieldErrors[field]) return null;
     return (
-      <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+      <p className="text-destructive text-xs mt-1 flex items-center gap-1">
         <AlertCircle className="w-3 h-3" />
         {fieldErrors[field]}
       </p>
@@ -1125,120 +1113,114 @@ function LegacyEditListingForm({
       </Link>
 
       {isWriteLocked && (
-        <div className="bg-amber-50 border border-amber-100 px-4 py-4 rounded-xl mb-8">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-amber-900">
-                  Listing locked
-                </p>
-                <p className="text-sm text-amber-700 mt-1">
-                  {LISTING_LOCKED_ERROR_MESSAGE}
-                </p>
-                <p className="text-xs text-amber-700 mt-2">
-                  Your unsaved edits remain available locally. Reload when you
-                  want to check for an updated listing state.
-                </p>
-              </div>
-            </div>
+        <StatusNotice
+          variant="warning"
+          icon={<AlertCircle className="w-5 h-5" />}
+          title="Listing locked"
+          className="mb-8"
+          actions={
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={() => router.refresh()}
               disabled={loading}
-              className="flex-shrink-0 text-amber-700 border-outline-variant/20 hover:bg-amber-100"
+              className="flex-shrink-0"
             >
               <RefreshCcw className="w-4 h-4 mr-1" />
               Reload page
             </Button>
-          </div>
-        </div>
+          }
+        >
+          <p>{LISTING_LOCKED_ERROR_MESSAGE}</p>
+          <p className="text-xs mt-2">
+            Your unsaved edits remain available locally. Reload when you want to
+            check for an updated listing state.
+          </p>
+        </StatusNotice>
       )}
 
       {!isWriteLocked && error && (
-        <div className="bg-red-50 border border-red-100 px-4 py-4 rounded-xl mb-8">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-red-900">
-                  Failed to save changes
-                </p>
-                <p className="text-sm text-red-600 mt-1">{error}</p>
-                <p className="text-xs text-red-500 mt-2">
-                  Your changes have been saved locally and won&apos;t be lost.
-                </p>
-              </div>
-            </div>
+        <StatusNotice
+          variant="error"
+          icon={<AlertCircle className="w-5 h-5" />}
+          title="Failed to save changes"
+          className="mb-8"
+          actions={
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={handleRetry}
               disabled={loading}
-              className="flex-shrink-0 text-red-700 border-outline-variant/20 hover:bg-red-100"
+              className="flex-shrink-0"
             >
               <RefreshCcw className="w-4 h-4 mr-1" />
               Retry
             </Button>
-          </div>
-        </div>
+          }
+        >
+          <p>{error}</p>
+          <p className="text-xs mt-2">
+            Your changes have been saved locally and won&apos;t be lost.
+          </p>
+        </StatusNotice>
       )}
 
       {/* Draft Resume Banner */}
       {showDraftBanner && savedAt && (
-        <div className="bg-blue-50 border border-outline-variant/20 px-4 py-4 rounded-xl mb-8 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <FileText className="w-5 h-5 text-blue-600 flex-shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-blue-900">
-                You have unsaved edits
-              </p>
-              <p className="text-xs text-blue-600">
-                Last saved {formatTimeSince(savedAt)}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={discardDraft}
-              className="text-blue-700 border-blue-200 hover:bg-blue-100"
-            >
-              Discard
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={restoreDraft}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              Resume Edits
-            </Button>
-          </div>
-        </div>
+        <StatusNotice
+          role="status"
+          variant="info"
+          icon={<FileText className="w-5 h-5" />}
+          title="You have unsaved edits"
+          className="mb-8"
+          actions={
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={discardDraft}
+              >
+                Discard
+              </Button>
+              <Button type="button" size="sm" onClick={restoreDraft}>
+                Resume Edits
+              </Button>
+            </>
+          }
+        >
+          <p className="text-xs">Last saved {formatTimeSince(savedAt)}</p>
+        </StatusNotice>
       )}
 
       {crossTabConflict && (
-        <div className="bg-yellow-50 border border-outline-variant/20 rounded-lg p-3 text-sm text-yellow-800 mb-4">
+        <StatusNotice
+          variant="warning"
+          className="mb-4"
+          actions={
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={dismissCrossTabConflict}
+            >
+              Dismiss
+            </Button>
+          }
+        >
           <p>
             This draft was modified in another tab. Reload to see the latest
             version.
           </p>
-          <button onClick={dismissCrossTabConflict} className="underline mt-1">
-            Dismiss
-          </button>
-        </div>
+        </StatusNotice>
       )}
 
       {/* Auto-save status indicator */}
       {!showDraftBanner && savedAt && formModified && !loading && (
         <div className="flex items-center justify-end gap-2 mb-4 text-xs text-on-surface-variant animate-in fade-in duration-300">
-          <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+          <CheckCircle className="w-3.5 h-3.5 text-success" />
           <span>Draft saved {formatTimeSince(savedAt)}</span>
         </div>
       )}
@@ -1347,13 +1329,13 @@ function LegacyEditListingForm({
             <FieldError field="images" />
 
             {images.length === 0 && (
-              <p className="text-sm text-yellow-600 mt-2">
+              <p className="text-sm text-tertiary mt-2">
                 At least one photo is required for your listing
               </p>
             )}
 
             {isAnyImageUploading && (
-              <p className="text-sm text-blue-600 mt-2">
+              <p className="text-sm text-primary mt-2">
                 Please wait for image uploads to complete before saving...
               </p>
             )}

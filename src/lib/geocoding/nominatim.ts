@@ -59,6 +59,54 @@ interface NominatimReverseResult {
   address?: Record<string, string>;
 }
 
+export interface ForwardGeocodeResult {
+  lat: number;
+  lng: number;
+  publicAreaName?: string;
+}
+
+const PUBLIC_AREA_ADDRESS_KEYS = [
+  "neighbourhood",
+  "neighborhood",
+  "suburb",
+  "city_district",
+  "district",
+  "borough",
+  "quarter",
+  "locality",
+  "city",
+  "town",
+  "village",
+  "municipality",
+  "county",
+];
+
+function isSafePublicAreaName(value: string): boolean {
+  const trimmed = value.trim();
+  if (trimmed.length < 2) {
+    return false;
+  }
+
+  return !/^\d{1,6}\b/.test(trimmed);
+}
+
+function derivePublicAreaName(
+  address?: Record<string, string>
+): string | undefined {
+  if (!address) {
+    return undefined;
+  }
+
+  for (const key of PUBLIC_AREA_ADDRESS_KEYS) {
+    const value = address[key]?.trim();
+    if (value && isSafePublicAreaName(value)) {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
 /**
  * Forward geocode an address to coordinates.
  * Used server-side for listing creation. Includes rate limiting.
@@ -66,7 +114,7 @@ interface NominatimReverseResult {
 export async function forwardGeocode(
   query: string,
   options?: { signal?: AbortSignal }
-): Promise<{ lat: number; lng: number } | null> {
+): Promise<ForwardGeocodeResult | null> {
   await rateLimitWait();
 
   const encoded = encodeURIComponent(query);
@@ -90,9 +138,13 @@ export async function forwardGeocode(
     return null;
   }
 
+  const result = data[0];
+  const publicAreaName = derivePublicAreaName(result.address);
+
   return {
-    lat: parseFloat(data[0].lat),
-    lng: parseFloat(data[0].lon),
+    lat: parseFloat(result.lat),
+    lng: parseFloat(result.lon),
+    ...(publicAreaName ? { publicAreaName } : {}),
   };
 }
 

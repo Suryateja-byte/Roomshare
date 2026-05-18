@@ -213,6 +213,7 @@ function makeProps(
     hasActiveFilters: false,
     activeFilterCount: 0,
     moveInDate: "",
+    endDate: "",
     leaseDuration: "any",
     roomType: "any",
     amenities: [] as string[],
@@ -221,6 +222,7 @@ function makeProps(
     genderPreference: "any",
     householdGender: "any",
     onMoveInDateChange: jest.fn(),
+    onEndDateChange: jest.fn(),
     onLeaseDurationChange: jest.fn(),
     onRoomTypeChange: jest.fn(),
     onToggleAmenity: jest.fn(),
@@ -233,6 +235,7 @@ function makeProps(
     onLanguageSearchChange: jest.fn(),
     filteredLanguages: ["en", "es", "fr"],
     minMoveInDate: "2025-01-01",
+    minEndDate: "2025-01-01",
     amenityOptions: ["WiFi", "Parking", "Laundry"] as const,
     houseRuleOptions: ["No Smoking", "No Pets"] as const,
     ...overrides,
@@ -282,6 +285,23 @@ describe("FilterModal", () => {
       expect(scrollableContent).toHaveClass("hide-scrollbar-mobile");
       expect(scrollableContent).not.toHaveClass("scrollbar-hide");
       expect(scrollableContent).not.toHaveClass("scrollbar-none");
+    });
+
+    it("renders the end-date filter", () => {
+      render(<FilterModal {...makeProps()} />);
+
+      expect(screen.getByLabelText("End Date")).toBeInTheDocument();
+    });
+
+    it("calls onEndDateChange when the end date changes", () => {
+      const onEndDateChange = jest.fn();
+      render(<FilterModal {...makeProps({ onEndDateChange })} />);
+
+      fireEvent.change(screen.getByLabelText("End Date"), {
+        target: { value: "2026-06-01" },
+      });
+
+      expect(onEndDateChange).toHaveBeenCalledWith("2026-06-01");
     });
   });
 

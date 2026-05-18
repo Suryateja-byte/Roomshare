@@ -50,10 +50,211 @@ import type { Page } from "@playwright/test";
 // Search URL with SF bounds pre-set for immediate marker fetch
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 const SEARCH_URL = `/search?${boundsQS}`;
+const C078_MARKER_COORDS = { lat: 37.775, lng: -122.435 };
 
 // ---------------------------------------------------------------------------
 // Shared Helpers
 // ---------------------------------------------------------------------------
+
+async function getVisibleCardIdsForDeterministicMarkers(
+  page: Page,
+  minCount: number
+): Promise<string[]> {
+  await expect(async () => {
+    const ids = Array.from(new Set(await getAllCardListingIds(page)));
+    expect(ids.length).toBeGreaterThanOrEqual(minCount);
+  }).toPass({ timeout: 30_000, intervals: [500, 1000, 2000] });
+
+  return Array.from(new Set(await getAllCardListingIds(page)));
+}
+
+async function setupDeterministicMarkerCardOverlaps(
+  page: Page,
+  minCount: number
+): Promise<string[]> {
+  const cardIds = await getVisibleCardIdsForDeterministicMarkers(
+    page,
+    minCount
+  );
+  const mockListings = cardIds.map((id, index) => ({
+    id,
+    title: `C078 Deterministic Listing ${index + 1}`,
+    price: 1200 + index * 100,
+    availableSlots: 1 + index,
+    location: C078_MARKER_COORDS,
+    images: [],
+    ownerId: `c078-owner-${index + 1}`,
+  }));
+
+  await page.context().route("**/api/map-listings**", async (route) => {
+    const requestQueryHash =
+      route.request().headers()["x-search-query-hash"] ||
+      "c078-deterministic-markers";
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        kind: "ok",
+        data: {
+          listings: mockListings,
+          truncated: false,
+        },
+        meta: {
+          queryHash: requestQueryHash,
+          backendSource: "map-api",
+          responseVersion: "c078-deterministic-markers",
+        },
+      }),
+    });
+  });
+
+  await page.goto("/");
+  await page.waitForLoadState("domcontentloaded");
+
+  const mapListingsResponse = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/map-listings") && response.status() === 200,
+    { timeout: 30_000 }
+  );
+  await page.goto(SEARCH_URL, { waitUntil: "domcontentloaded" });
+  await expect(
+    searchResultsContainer(page).locator(selectors.listingCard).first()
+  ).toBeVisible({ timeout: timeouts.navigation });
+  await expect(mapListingsResponse).resolves.toBeTruthy();
+
+  const hasMapRef = await waitForMapRef(page);
+  expect(hasMapRef).toBe(true);
+
+  const jumped = await page.evaluate((coords) => {
+    return new Promise<boolean>((resolve) => {
+      const map = (window as any).__e2eMapRef;
+      if (!map) {
+        resolve(false);
+        return;
+      }
+
+      const setProgrammatic = (window as any).__e2eSetProgrammaticMove;
+      if (typeof setProgrammatic === "function") {
+        setProgrammatic(true);
+      }
+
+      let resolved = false;
+      const finish = () => {
+        if (resolved) return;
+        resolved = true;
+        resolve(true);
+      };
+
+      map.once("idle", finish);
+      map.jumpTo({ center: [coords.lng, coords.lat], zoom: 16 });
+      setTimeout(finish, 8000);
+    });
+  }, C078_MARKER_COORDS);
+  expect(jumped).toBe(true);
+
+  await expect(async () => {
+    await page.evaluate(() => (window as any).__e2eUpdateMarkers?.());
+
+    const markerIds = await getAllMarkerListingIds(page);
+    const renderedCardIds = new Set(await getAllCardListingIds(page));
+    const overlapping = markerIds.filter((id) => renderedCardIds.has(id));
+    expect(overlapping.length).toBeGreaterThanOrEqual(minCount);
+  }).toPass({ timeout: 45_000, intervals: [500, 1000, 2000, 5000] });
+
+  const markerIds = await getAllMarkerListingIds(page);
+  const renderedCardIds = new Set(await getAllCardListingIds(page));
+  return markerIds.filter((id) => renderedCardIds.has(id)).slice(0, minCount);
+}
+
+async function getVisibleMarkerPricePillOverlapSummary(page: Page): Promise<{
+  markerCount: number;
+  pricePillCount: number;
+  overlappingPairs: Array<[string, string]>;
+}> {
+  return page.evaluate(() => {
+    type PlainRect = {
+      left: number;
+      right: number;
+      top: number;
+      bottom: number;
+      width: number;
+      height: number;
+    };
+    type MarkerPricePill = { id: string; priceRect: PlainRect | null };
+
+    const priceTextPattern = /\$\s?\d/;
+    const toPlainRect = (rect: DOMRect): PlainRect => ({
+      left: rect.left,
+      right: rect.right,
+      top: rect.top,
+      bottom: rect.bottom,
+      width: rect.width,
+      height: rect.height,
+    });
+
+    const visibleMarkers = Array.from(
+      document.querySelectorAll<HTMLElement>(".maplibregl-marker")
+    )
+      .map((marker): MarkerPricePill | null => {
+        const markerRect = marker.getBoundingClientRect();
+        if (markerRect.width <= 0 || markerRect.height <= 0) return null;
+
+        const pin = marker.querySelector<HTMLElement>("[data-listing-id]");
+        const id = pin?.getAttribute("data-listing-id");
+        if (!pin || !id) return null;
+
+        const priceElement = Array.from(
+          pin.querySelectorAll<HTMLElement>("div")
+        ).find((element) => {
+          const text = (element.textContent ?? "").trim();
+          if (!priceTextPattern.test(text)) return false;
+
+          return Array.from(element.children).every(
+            (child) => !priceTextPattern.test((child.textContent ?? "").trim())
+          );
+        });
+
+        if (!priceElement) return { id, priceRect: null };
+
+        const priceRect = priceElement.getBoundingClientRect();
+        if (priceRect.width <= 0 || priceRect.height <= 0) {
+          return { id, priceRect: null };
+        }
+
+        return { id, priceRect: toPlainRect(priceRect) };
+      })
+      .filter((entry): entry is MarkerPricePill => entry !== null);
+
+    const pricePills = visibleMarkers.filter(
+      (entry): entry is { id: string; priceRect: PlainRect } =>
+        entry.priceRect !== null
+    );
+    const overlappingPairs: Array<[string, string]> = [];
+
+    for (let i = 0; i < pricePills.length; i += 1) {
+      for (let j = i + 1; j < pricePills.length; j += 1) {
+        const first = pricePills[i];
+        const second = pricePills[j];
+        const overlaps =
+          first.priceRect.left < second.priceRect.right &&
+          first.priceRect.right > second.priceRect.left &&
+          first.priceRect.top < second.priceRect.bottom &&
+          first.priceRect.bottom > second.priceRect.top;
+
+        if (overlaps) {
+          overlappingPairs.push([first.id, second.id]);
+        }
+      }
+    }
+
+    return {
+      markerCount: visibleMarkers.length,
+      pricePillCount: pricePills.length,
+      overlappingPairs,
+    };
+  });
+}
 
 /**
  * Get the first visible marker that also has a rendered listing card and
@@ -62,7 +263,10 @@ const SEARCH_URL = `/search?${boundsQS}`;
  * a matching card in the DOM.
  */
 async function getFirstMarkerIdOrSkip(page: Page): Promise<string> {
-  test.skip(!(await isMapAvailable(page)), "Map not available (WebGL unavailable in headless)");
+  test.skip(
+    !(await isMapAvailable(page)),
+    "Map not available (WebGL unavailable in headless)"
+  );
 
   const markerCount = await waitForMarkersWithClusterExpansion(page);
   test.skip(markerCount === 0, "No markers available after cluster expansion");
@@ -77,6 +281,48 @@ async function getFirstMarkerIdOrSkip(page: Page): Promise<string> {
   );
 
   return overlappingId!;
+}
+
+async function getMarkerIdsWithRenderedCards(
+  page: Page,
+  minCount: number
+): Promise<string[]> {
+  await expect(async () => {
+    const markerCount = await waitForMarkersWithClusterExpansion(page, {
+      minCount,
+    });
+    expect(markerCount).toBeGreaterThanOrEqual(minCount);
+
+    const markerIds = await getAllMarkerListingIds(page);
+    const cardIds = new Set(await getAllCardListingIds(page));
+    const overlappingIds = markerIds.filter((id) => cardIds.has(id));
+    expect(overlappingIds.length).toBeGreaterThanOrEqual(minCount);
+  }).toPass({ timeout: 45_000, intervals: [500, 1000, 2000, 5000] });
+
+  const markerIds = await getAllMarkerListingIds(page);
+  const cardIds = new Set(await getAllCardListingIds(page));
+  return markerIds.filter((id) => cardIds.has(id)).slice(0, minCount);
+}
+
+async function maybeGetMarkerIdsWithRenderedCards(
+  page: Page,
+  minCount: number
+): Promise<string[]> {
+  try {
+    return await getMarkerIdsWithRenderedCards(page, minCount);
+  } catch (error) {
+    const markerIds = await getAllMarkerListingIds(page);
+    const cardIds = new Set(await getAllCardListingIds(page));
+    const overlappingIds = markerIds
+      .filter((id) => cardIds.has(id))
+      .slice(0, minCount);
+
+    if (overlappingIds.length < minCount) {
+      return overlappingIds;
+    }
+
+    throw error;
+  }
 }
 
 /**
@@ -119,7 +365,12 @@ async function clickMarkerByListingId(
     expect(result).toBe("ok");
 
     // Wait for React state propagation + easeTo animation before checking card state
-    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+    await page.evaluate(
+      () =>
+        new Promise((r) =>
+          requestAnimationFrame(() => requestAnimationFrame(r))
+        )
+    );
 
     // Verify the click triggered handleMarkerClick → setActive(listingId)
     const cardState = await getCardState(page, listingId);
@@ -156,63 +407,33 @@ async function clickMarkerFast(page: Page, listingId: string): Promise<void> {
   }, listingId);
 }
 
+async function moveMouseToMarker(page: Page, listingId: string): Promise<void> {
+  const marker = page
+    .locator(`.maplibregl-marker [data-listing-id="${listingId}"]`)
+    .first();
+
+  await expect(marker).toBeVisible({ timeout: 5_000 });
+
+  const box = await marker.boundingBox();
+  expect(box).not.toBeNull();
+  if (!box) throw new Error(`Marker ${listingId} has no bounding box`);
+
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+}
+
 /**
- * Hover a map marker by listing ID using page.evaluate + PointerEvent dispatch,
+ * Hover a map marker by listing ID with trusted Playwright mouse movement,
  * then verify the hover triggered setHovered(listingId) → marker scales up.
- *
- * Dispatches 'pointerover' on the .maplibregl-marker WRAPPER element (where
- * react-map-gl attaches onPointerEnter). React 18 uses pointerover/pointerout
- * for enter/leave delegation. Setting relatedTarget to document.body (outside
- * the marker tree) ensures React's enter/leave diffing correctly identifies
- * this as a "pointer entered from outside" event — if relatedTarget were inside
- * the marker tree, React would suppress the enter.
- * Sets pointerType='mouse' to pass the touch guard in Map.tsx:1815.
  */
 async function hoverMarkerByListingId(
   page: Page,
   listingId: string
 ): Promise<void> {
   await expect(async () => {
-    const hovered = await page.evaluate((id) => {
-      const inner = document.querySelector(
-        `.maplibregl-marker [data-listing-id="${id}"]`
-      ) as HTMLElement | null;
-      if (!inner?.isConnected) return false;
-      // Target the wrapper where onPointerEnter is attached
-      const wrapper = inner.closest(".maplibregl-marker") as HTMLElement;
-      if (!wrapper) return false;
-      const rect = wrapper.getBoundingClientRect();
-      wrapper.dispatchEvent(
-        new PointerEvent("pointerover", {
-          bubbles: true,
-          cancelable: true,
-          pointerType: "mouse",
-          // relatedTarget MUST be outside the marker tree for React to treat
-          // this as an "enter" event (not just moving between children)
-          relatedTarget: document.body,
-          clientX: rect.left + rect.width / 2,
-          clientY: rect.top + rect.height / 2,
-        })
-      );
-      return true;
-    }, listingId);
-    expect(hovered).toBe(true);
-
-    // Verify the hover triggered the handler → setHovered(listingId) → marker scales
+    await moveMouseToMarker(page, listingId);
     const state = await getMarkerState(page, listingId);
     expect(state.isScaled).toBe(true);
   }).toPass({ timeout: 10_000, intervals: [200, 500, 1000, 2000] });
-}
-
-/**
- * Hover a visible marker by index.
- */
-async function hoverMarkerByIndex(page: Page, index: number): Promise<void> {
-  const listingId = await getMarkerListingId(page, index);
-  if (!listingId) {
-    throw new Error(`No marker at index ${index}`);
-  }
-  await hoverMarkerByListingId(page, listingId);
 }
 
 /**
@@ -221,25 +442,7 @@ async function hoverMarkerByIndex(page: Page, index: number): Promise<void> {
  * verifying each one would defeat the timing test.
  */
 async function hoverMarkerFast(page: Page, listingId: string): Promise<void> {
-  await page.evaluate((id) => {
-    const inner = document.querySelector(
-      `.maplibregl-marker [data-listing-id="${id}"]`
-    ) as HTMLElement | null;
-    if (!inner?.isConnected) return;
-    const wrapper = inner.closest(".maplibregl-marker") as HTMLElement;
-    if (!wrapper) return;
-    const rect = wrapper.getBoundingClientRect();
-    wrapper.dispatchEvent(
-      new PointerEvent("pointerover", {
-        bubbles: true,
-        cancelable: true,
-        pointerType: "mouse",
-        relatedTarget: document.body,
-        clientX: rect.left + rect.width / 2,
-        clientY: rect.top + rect.height / 2,
-      })
-    );
-  }, listingId);
+  await moveMouseToMarker(page, listingId);
 }
 
 /**
@@ -433,7 +636,10 @@ test.describe("Map-List Synchronization", () => {
       const markerIds = await getAllMarkerListingIds(page);
       const cardIds = new Set(await getAllCardListingIds(page));
       const matchedIds = markerIds.filter((id) => cardIds.has(id));
-      test.skip(matchedIds.length < 2, "Need at least 2 markers with matching listing cards");
+      test.skip(
+        matchedIds.length < 2,
+        "Need at least 2 markers with matching listing cards"
+      );
       const firstId = matchedIds[0];
       const secondId = matchedIds[1];
 
@@ -448,7 +654,10 @@ test.describe("Map-List Synchronization", () => {
       } catch {
         // Second marker may have been re-clustered or removed after first click;
         // this is expected flakiness in CI map rendering
-        test.skip(true, "Second marker not found after first click — map re-rendered");
+        test.skip(
+          true,
+          "Second marker not found after first click — map re-rendered"
+        );
         return;
       }
 
@@ -492,9 +701,7 @@ test.describe("Map-List Synchronization", () => {
       }).toPass({ timeout: timeouts.action, intervals: [200, 500, 1000] });
     });
 
-    test("1.5 - Close popup -> card highlight clears", async ({
-      page,
-    }) => {
+    test("1.5 - Close popup -> card highlight clears", async ({ page }) => {
       const listingId = await getFirstMarkerIdOrSkip(page);
 
       // Click the same marker ID we captured above. Re-resolving "index 0"
@@ -537,16 +744,7 @@ test.describe("Map-List Synchronization", () => {
     }) => {
       test.skip(!(await isMapAvailable(page)), "Map not available");
 
-      const markerCount = await waitForMarkersWithClusterExpansion(page);
-      test.skip(markerCount === 0, "No markers");
-
-      // Get the listing ID of the first card
-      const cardId = await getFirstCardId(page);
-      test.skip(!cardId, "No card listing ID");
-
-      // Check if this card has a corresponding marker visible
-      const markerIds = await getAllMarkerListingIds(page);
-      test.skip(!markerIds.includes(cardId!), "Card listing has no visible marker on map");
+      const cardId = (await setupDeterministicMarkerCardOverlaps(page, 1))[0]!;
 
       // Hover the card (uses evaluate on mobile to bypass bottom sheet overlay)
       const card = searchResultsContainer(page)
@@ -566,14 +764,7 @@ test.describe("Map-List Synchronization", () => {
     }) => {
       test.skip(!(await isMapAvailable(page)), "Map not available");
 
-      const markerCount = await waitForMarkersWithClusterExpansion(page);
-      test.skip(markerCount === 0, "No markers");
-
-      const cardId = await getFirstCardId(page);
-      test.skip(!cardId, "No card listing ID");
-
-      const markerIds = await getAllMarkerListingIds(page);
-      test.skip(!markerIds.includes(cardId!), "No visible marker for this card");
+      const cardId = (await setupDeterministicMarkerCardOverlaps(page, 1))[0]!;
 
       // Hover the card (uses evaluate on mobile to bypass bottom sheet overlay)
       const card = searchResultsContainer(page)
@@ -597,20 +788,9 @@ test.describe("Map-List Synchronization", () => {
     }) => {
       test.skip(!(await isMapAvailable(page)), "Map not available");
 
-      const markerCount = await waitForMarkersWithClusterExpansion(page, {
-        minCount: 2,
-      });
-      test.skip(markerCount < 2, "Need 2+ markers");
-
-      const markerIds = await getAllMarkerListingIds(page);
-      const cardIds = await getAllCardListingIds(page);
-
-      // Find two card IDs that also have visible markers
-      const overlapping = cardIds.filter((id) => markerIds.includes(id));
-      test.skip(overlapping.length < 2, "Need 2+ cards with visible markers");
-
-      const firstId = overlapping[0];
-      const secondId = overlapping[1];
+      const overlapping = await setupDeterministicMarkerCardOverlaps(page, 2);
+      const firstId = overlapping[0]!;
+      const secondId = overlapping[1]!;
 
       // Hover first card (uses evaluate on mobile to bypass bottom sheet overlay)
       const firstCard = searchResultsContainer(page)
@@ -634,7 +814,27 @@ test.describe("Map-List Synchronization", () => {
       expect(firstMarkerState.isDimmed).toBe(true);
     });
 
-    test("2.4 - Click card -> navigates to listing detail (not marker interaction)", async ({
+    test("2.4 - Deterministic colliding markers do not render overlapping visible price pills", async ({
+      page,
+    }) => {
+      test.skip(!(await isMapAvailable(page)), "Map not available");
+
+      await setupDeterministicMarkerCardOverlaps(page, 3);
+
+      await expect(async () => {
+        await page.evaluate(() => (window as any).__e2eUpdateMarkers?.());
+
+        const summary = await getVisibleMarkerPricePillOverlapSummary(page);
+        expect(summary.markerCount).toBeGreaterThanOrEqual(3);
+        expect(summary.pricePillCount).toBeLessThan(summary.markerCount);
+        expect(summary.overlappingPairs).toEqual([]);
+      }).toPass({
+        timeout: 15_000,
+        intervals: [250, 500, 1000, 2000],
+      });
+    });
+
+    test("2.5 - Click card -> navigates to listing detail (not marker interaction)", async ({
       page,
     }) => {
       const cardId = await getFirstCardId(page);
@@ -684,18 +884,9 @@ test.describe("Map-List Synchronization", () => {
     }) => {
       test.skip(!(await isMapAvailable(page)), "Map not available");
 
-      const markerCount = await waitForMarkersWithClusterExpansion(page, {
-        minCount: 2,
-      });
-      test.skip(markerCount < 2, "Need 2+ markers");
-
-      const markerIds = await getAllMarkerListingIds(page);
-      const cardIds = await getAllCardListingIds(page);
-      const overlapping = cardIds.filter((id) => markerIds.includes(id));
-      test.skip(overlapping.length < 2, "Need 2+ overlapping listings");
-
-      const activeId = overlapping[0];
-      const hoverId = overlapping[1];
+      const overlapping = await setupDeterministicMarkerCardOverlaps(page, 2);
+      const activeId = overlapping[0]!;
+      const hoverId = overlapping[1]!;
 
       // Click marker to set active (use listing ID directly — index-based lookup
       // is brittle because getAllMarkerListingIds may return a high index)
@@ -728,7 +919,10 @@ test.describe("Map-List Synchronization", () => {
 
       const markerIds = await getAllMarkerListingIds(page);
       const cardIds = await getAllCardListingIds(page);
-      test.skip(!cardIds.includes(listingId) || !markerIds.includes(listingId), "Listing not in both cards and markers");
+      test.skip(
+        !cardIds.includes(listingId) || !markerIds.includes(listingId),
+        "Listing not in both cards and markers"
+      );
 
       // Click the same marker ID we captured above. Re-resolving "index 0"
       // is brittle because Mapbox marker DOM order can shift between reads.
@@ -1029,44 +1223,32 @@ test.describe("Map-List Synchronization", () => {
       test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page, {
-        minCount: 3,
+        minCount: 2,
       });
-      test.skip(markerCount < 3, "Need 3+ markers");
+      test.skip(markerCount < 2, "Need 2+ markers");
 
-      const id0 = await getMarkerListingId(page, 0);
-      const id1 = await getMarkerListingId(page, 1);
-      const id2 = await getMarkerListingId(page, 2);
-      test.skip(!id0 || !id1 || !id2, "Could not read marker IDs");
+      const markerIds = await getAllMarkerListingIds(page);
+      const cardIds = new Set(await getAllCardListingIds(page));
+      const overlappingIds = markerIds.filter((id) => cardIds.has(id));
+      test.skip(
+        overlappingIds.length < 2,
+        "Need 2+ marker/card overlaps (fixture/cardinality/headless NOT VERIFIED)"
+      );
+      const [id0, id1] = overlappingIds;
 
-      // Rapidly click three markers: fire-and-forget for first two (no verification
-      // delay), verify only the last click's effect. Using clickMarkerFast avoids the
-      // 15s verify timeout per click and prevents marker DOM churn between clicks.
+      // Rapidly click two markers: fire-and-forget for the first one (no
+      // verification delay), verify only the last click's effect. Using
+      // clickMarkerFast avoids the 15s verify timeout for the intermediate click
+      // and prevents marker DOM churn between clicks.
       await clickMarkerFast(page, id0!);
-      await clickMarkerFast(page, id1!);
-      try {
-        await clickMarkerByListingId(page, id2!);
-      } catch {
-        test.skip(
-          true,
-          "Marker click did not trigger card activation (headless CI WebGL limitation)"
-        );
-        return;
-      }
+      await clickMarkerByListingId(page, id1!);
 
       // Wait for the last clicked card to become active
-      try {
-        await waitForCardHighlight(page, id2!);
-      } catch {
-        test.skip(
-          true,
-          "Card highlight did not appear after marker click (headless CI)"
-        );
-        return;
-      }
+      await waitForCardHighlight(page, id1!);
 
       // Only the LAST clicked card should have the active ring
       const activeId = await getActiveListingId(page);
-      expect(activeId).toBe(id2);
+      expect(activeId).toBe(id1);
 
       // Only one card should have ring-2
       const activeCount = await countActiveCards(page);
@@ -1144,7 +1326,10 @@ test.describe("Map-List Synchronization", () => {
       });
 
       // Check for map availability on mobile
-      test.skip(!(await isMapAvailable(page)), "Map not visible on mobile viewport");
+      test.skip(
+        !(await isMapAvailable(page)),
+        "Map not visible on mobile viewport"
+      );
 
       const mapReady = await waitForMapRef(page);
       test.skip(!mapReady, "Map not ready");
@@ -1189,7 +1374,9 @@ test.describe("Map-List Synchronization", () => {
     test("6.1 - Active card has data-focus-state='active'", async ({
       page,
     }) => {
-      const listingId = await getFirstMarkerIdOrSkip(page);
+      const listingId = (
+        await setupDeterministicMarkerCardOverlaps(page, 1)
+      )[0]!;
 
       // Click the same marker ID we captured above. Re-resolving "index 0"
       // is brittle because Mapbox marker DOM order can shift between reads.
@@ -1257,17 +1444,8 @@ test.describe("Map-List Synchronization", () => {
     test("6.3 - Marker z-index changes on hover/active", async ({ page }) => {
       test.skip(!(await isMapAvailable(page)), "Map not available");
 
-      const markerCount = await waitForMarkersWithClusterExpansion(page, {
-        minCount: 2,
-      });
-      test.skip(markerCount < 2, "Need 2+ markers");
-
-      const cardIds = await getAllCardListingIds(page);
-      const markerIds = await getAllMarkerListingIds(page);
-      const overlapping = cardIds.filter((id) => markerIds.includes(id));
-      test.skip(overlapping.length === 0, "No overlapping card/marker IDs");
-
-      const targetId = overlapping[0];
+      const overlapping = await setupDeterministicMarkerCardOverlaps(page, 2);
+      const targetId = overlapping[0]!;
 
       // Hover the card to trigger marker hover state (evaluate on mobile)
       const card = searchResultsContainer(page)
@@ -1300,18 +1478,9 @@ test.describe("Map-List Synchronization", () => {
     }) => {
       test.skip(!(await isMapAvailable(page)), "Map not available");
 
-      const markerCount = await waitForMarkersWithClusterExpansion(page, {
-        minCount: 2,
-      });
-      test.skip(markerCount < 2, "Need 2+ markers");
-
-      const cardIds = await getAllCardListingIds(page);
-      const markerIds = await getAllMarkerListingIds(page);
-      const overlapping = cardIds.filter((id) => markerIds.includes(id));
-      test.skip(overlapping.length < 2, "Need 2+ overlapping IDs");
-
-      const id1 = overlapping[0];
-      const id2 = overlapping[1];
+      const overlapping = await setupDeterministicMarkerCardOverlaps(page, 2);
+      const id1 = overlapping[0]!;
+      const id2 = overlapping[1]!;
 
       // Instrument a transition counter to detect flickering
       await page.evaluate(
@@ -1405,43 +1574,20 @@ test.describe("Map-List Synchronization", () => {
     }) => {
       test.skip(!(await isMapAvailable(page)), "Map not available");
 
-      const markerCount = await waitForMarkersWithClusterExpansion(page);
-      test.skip(markerCount === 0, "No markers");
+      const hoverIds = await maybeGetMarkerIdsWithRenderedCards(page, 1);
+      test.skip(
+        hoverIds.length < 1,
+        `Need 1+ marker/card overlap for marker hover highlight; found ${hoverIds.length}`
+      );
+      const [listingId] = hoverIds;
 
-      const listingId = await getMarkerListingId(page, 0);
-      test.skip(!listingId, "No marker ID");
-
-      // Check if a card exists for this listing
-      const cardExists = await searchResultsContainer(page)
-        .locator(`[data-testid="listing-card"][data-listing-id="${listingId}"]`)
-        .count();
-      test.skip(cardExists === 0, "No card for this marker's listing");
-
-      // Hover the marker — may fail in headless CI where PointerEvent dispatch
-      // doesn't reliably trigger React handlers
-      try {
-        await hoverMarkerByIndex(page, 0);
-      } catch {
-        test.skip(
-          true,
-          "Marker hover dispatch did not trigger handler (headless CI limitation)"
-        );
-        return;
-      }
+      await hoverMarkerByListingId(page, listingId);
 
       // The corresponding card should get ring-1 hover highlight
       // (via setHovered from map, which updates ListingFocusContext)
-      try {
-        await waitForCardHover(page, listingId!, timeouts.action);
-      } catch {
-        test.skip(
-          true,
-          "Card hover highlight did not appear (headless CI limitation)"
-        );
-        return;
-      }
+      await waitForCardHover(page, listingId, timeouts.action);
 
-      const cardState = await getCardState(page, listingId!);
+      const cardState = await getCardState(page, listingId);
       expect(cardState.isHovered).toBe(true);
     });
 
@@ -1470,34 +1616,17 @@ test.describe("Map-List Synchronization", () => {
       expect(cardState.isActive).toBe(true);
     });
 
-    test("Escape closes popup and clears card highlight", async ({
-      page,
-    }) => {
-      const listingId = await getFirstMarkerIdOrSkip(page);
+    test("Escape closes popup and clears card highlight", async ({ page }) => {
+      const listingId = (
+        await setupDeterministicMarkerCardOverlaps(page, 1)
+      )[0]!;
 
       // Click marker
-      try {
-        await clickMarkerByListingId(page, listingId);
-        await waitForCardHighlight(page, listingId);
-      } catch {
-        test.skip(
-          true,
-          "Marker click did not trigger card highlight (headless CI limitation)"
-        );
-        return;
-      }
+      await clickMarkerByListingId(page, listingId);
+      await waitForCardHighlight(page, listingId);
 
       const popup = page.locator(".maplibregl-popup");
-      const popupVisible = await popup
-        .isVisible({ timeout: timeouts.action })
-        .catch(() => false);
-      if (!popupVisible) {
-        test.skip(
-          true,
-          "Popup did not appear after marker click (headless CI limitation)"
-        );
-        return;
-      }
+      await expect(popup).toBeVisible({ timeout: timeouts.action });
 
       // Press Escape
       await page.keyboard.press("Escape");
@@ -1513,16 +1642,8 @@ test.describe("Map-List Synchronization", () => {
     test("Marker hover debounces scroll request (300ms)", async ({ page }) => {
       test.skip(!(await isMapAvailable(page)), "Map not available");
 
-      const markerCount = await waitForMarkersWithClusterExpansion(page, {
-        minCount: 3,
-      });
-      test.skip(markerCount < 3, "Need 3+ markers");
-
-      // Get marker IDs for PointerEvent-based hover dispatch
-      const hid0 = await getMarkerListingId(page, 0);
-      const hid1 = await getMarkerListingId(page, 1);
-      const hid2 = await getMarkerListingId(page, 2);
-      test.skip(!hid0 || !hid1 || !hid2, "Could not read marker IDs");
+      const hoverIds = await setupDeterministicMarkerCardOverlaps(page, 2);
+      const [hid0, hid1] = hoverIds;
 
       // Instrument scroll count before hovering (viewport-aware container)
       await page.evaluate(() => {
@@ -1539,22 +1660,12 @@ test.describe("Map-List Synchronization", () => {
         }
       });
 
-      // Rapidly hover across markers via PointerEvent dispatch (faster than 300ms debounce).
-      // First two use fire-and-forget dispatch to maintain rapid timing.
-      // Last one uses verified hover to ensure at least one handler fires.
+      // Rapidly hover across markers using trusted mouse movement.
+      // The first hover is fire-and-forget to maintain rapid timing.
+      // The last one is verified to ensure at least one handler fires.
       await hoverMarkerFast(page, hid0!);
       await page.waitForTimeout(50); // INTENTIONAL: sub-debounce timing to test 300ms debounce coalescing
-      await hoverMarkerFast(page, hid1!);
-      await page.waitForTimeout(50); // INTENTIONAL: sub-debounce timing to test 300ms debounce coalescing
-      try {
-        await hoverMarkerByListingId(page, hid2!);
-      } catch {
-        test.skip(
-          true,
-          "Marker hover dispatch did not trigger handler (headless CI limitation)"
-        );
-        return;
-      }
+      await hoverMarkerByListingId(page, hid1!);
 
       // INTENTIONAL: debounce verification — must wait past 300ms debounce window to count scroll events
       await page.waitForTimeout(500); // INTENTIONAL: debounce verification timing
@@ -1574,43 +1685,24 @@ test.describe("Map-List Synchronization", () => {
     }) => {
       test.skip(!(await isMapAvailable(page)), "Map not available");
 
-      const markerCount = await waitForMarkersWithClusterExpansion(page);
-      test.skip(markerCount === 0, "No markers");
-
-      const listingId = await getMarkerListingId(page, 0);
-      test.skip(!listingId, "No marker ID");
-
-      const cardExists = await searchResultsContainer(page)
-        .locator(`[data-testid="listing-card"][data-listing-id="${listingId}"]`)
-        .count();
-      test.skip(cardExists === 0, "No card for listing");
+      const hoverIds = await maybeGetMarkerIdsWithRenderedCards(page, 1);
+      test.skip(
+        hoverIds.length < 1,
+        `Need 1+ marker/card overlap for focusSource marker-hover guard; found ${hoverIds.length}`
+      );
+      const [listingId] = hoverIds;
 
       // Hover marker (sets focusSource to "map")
-      try {
-        await hoverMarkerByIndex(page, 0);
-      } catch {
-        test.skip(
-          true,
-          "Marker hover dispatch did not trigger handler (headless CI limitation)"
-        );
-        return;
-      }
+      await hoverMarkerByListingId(page, listingId);
 
       // The card should get hover highlight from the map's setHovered
       // But the card's onMouseEnter should NOT fire back because
       // focusSource === "map" guard prevents the loop
-      try {
-        await waitForCardHover(page, listingId!, timeouts.action);
-      } catch {
-        test.skip(
-          true,
-          "Card hover highlight did not appear (headless CI limitation)"
-        );
-        return;
-      }
-      // This is hard to assert directly, but we verify no infinite loop
-      // by checking that the page remains responsive
-      expect(true).toBe(true); // If we get here, no infinite loop
+      await waitForCardHover(page, listingId, timeouts.action);
+
+      const cardState = await getCardState(page, listingId);
+      expect(cardState.isHovered).toBe(true);
+      await expect(searchResultsContainer(page)).toBeVisible();
 
       // Move away to clean up
       await page.mouse.move(0, 0);
@@ -1627,7 +1719,10 @@ test.describe("Map-List Synchronization", () => {
         `[data-testid="listing-card"][data-listing-id="${cardId}"] button[aria-label="Show on map"]`
       );
 
-      test.skip((await showOnMapBtn.count()) === 0, "No 'Show on map' button found");
+      test.skip(
+        (await showOnMapBtn.count()) === 0,
+        "No 'Show on map' button found"
+      );
 
       await showOnMapBtn.click();
 

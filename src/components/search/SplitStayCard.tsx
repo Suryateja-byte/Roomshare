@@ -8,6 +8,7 @@ import {
   useListingFocusState,
   useListingFocusActions,
 } from "@/contexts/ListingFocusContext";
+import { useSearchMapUI } from "@/contexts/SearchMapUIContext";
 import type { SplitStayPair } from "@/lib/search/split-stay";
 import {
   buildListingDetailHref,
@@ -129,6 +130,7 @@ function SplitStayHalf({
   // This prevents SplitStayHalf from re-rendering on unrelated context changes (scrollRequest, etc.).
   const { hoveredId, activeId } = useListingFocusState();
   const { setHovered, setActive, focusSourceRef } = useListingFocusActions();
+  const { focusListingOnMap } = useSearchMapUI();
   const isHovered = hoveredId === listing.id;
   const isActive = activeId === listing.id;
 
@@ -165,6 +167,7 @@ function SplitStayHalf({
               e.preventDefault();
               e.stopPropagation();
               setActive(listing.id);
+              focusListingOnMap(listing.id);
             }}
             data-show-on-map-id={listing.id}
             className="p-1 rounded-md text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors"

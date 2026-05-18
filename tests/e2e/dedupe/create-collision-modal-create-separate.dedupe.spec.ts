@@ -8,17 +8,23 @@ import {
   seedCollisionListings,
 } from "./create-collision-helpers";
 
+const OWNER_EMAIL = "e2e-other@roomshare.dev";
+
+test.use({ storageState: "playwright/.auth/user2.json" });
+
 test("T-18: create-separate requires a reason and creates a non-moderated listing", async ({
   page,
 }) => {
   const cleanupIds = await seedCollisionListings(page, {
     title: "E2E Collision Create Separate",
+    ownerEmail: OWNER_EMAIL,
   });
 
   try {
     const createPage = await openPreparedCreateListingPage(
       page,
-      buildCollisionFormData("Collision Create Separate Candidate")
+      buildCollisionFormData("Collision Create Separate Candidate"),
+      OWNER_EMAIL
     );
 
     const firstResponse = await createPage.submitAndWaitForResponse();
@@ -40,7 +46,9 @@ test("T-18: create-separate requires a reason and creates a non-moderated listin
         response.request().headers()["x-collision-ack"] === "1"
     );
 
-    await reasonTextarea.fill("Separate lease and entrance justify its own listing.");
+    await reasonTextarea.fill(
+      "Separate lease and entrance justify its own listing."
+    );
     await expect(page.getByTestId("collision-continue")).toBeEnabled();
     await page.getByTestId("collision-continue").click();
 

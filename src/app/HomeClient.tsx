@@ -2,7 +2,6 @@
 
 import React, { Suspense, lazy } from "react";
 import { useSession } from "next-auth/react";
-import Link from "next/link";
 import {
   ArrowRight,
   Check,
@@ -12,6 +11,7 @@ import {
   Sparkles,
   UserCheck,
 } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 const SearchForm = lazy(() => import("@/components/SearchForm"));

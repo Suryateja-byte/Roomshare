@@ -42,6 +42,7 @@ function areCarouselPropsEqual(
 }
 
 const CLICK_DRAG_THRESHOLD_PX = 8;
+const FALLBACK_IMAGE = "/images/home/hero-living-room.png";
 
 function ImageCarouselInner({
   images,
@@ -59,8 +60,6 @@ function ImageCarouselInner({
   const [showControls, setShowControls] = useState(false);
   const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
   const suppressNextClickRef = useRef(false);
-  const fallbackImage =
-    "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80";
 
   const scrollPrev = useCallback(
     (e: React.MouseEvent) => {
@@ -194,7 +193,7 @@ function ImageCarouselInner({
     return (
       <div className={`relative overflow-hidden ${className}`}>
         <Image
-          src={images[0] || fallbackImage}
+          src={images[0] || FALLBACK_IMAGE}
           alt={alt}
           fill
           className="object-cover"

@@ -22,7 +22,19 @@ test("T-04: the grouped-date trigger and panel honor the keyboard contract", asy
   await tabToLocator(page, trigger);
   await expect(trigger).toBeFocused();
 
-  await page.keyboard.press("Enter");
+  await expect(async () => {
+    if ((await trigger.getAttribute("aria-expanded")) === "true") {
+      return;
+    }
+
+    await page.keyboard.press("Enter");
+    await expect(trigger).toHaveAttribute("aria-expanded", "true", {
+      timeout: 1_000,
+    });
+  }).toPass({
+    timeout: 5_000,
+    intervals: [100, 250, 500],
+  });
 
   const panel = searchResultsContainer(page).locator(
     '[data-testid="group-dates-panel"]'

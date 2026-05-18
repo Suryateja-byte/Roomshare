@@ -7,6 +7,27 @@
 
 import { render, screen, waitFor, act } from "@testing-library/react";
 
+type TestV2Feature = {
+  type: "Feature";
+  geometry: { type: "Point"; coordinates: [number, number] };
+  properties: {
+    id: string;
+    title: string;
+    price: number;
+    image: string | null;
+    availableSlots: number;
+    publicAvailability: {
+      availabilitySource: "HOST_MANAGED";
+      openSlots: number;
+      totalSlots: number;
+      availableFrom: string | null;
+      availableUntil: string | null;
+      minStayMonths: number;
+      lastConfirmedAt: string | null;
+    };
+  };
+};
+
 // Mock next/navigation
 const mockSearchParams = new URLSearchParams();
 jest.mock("next/navigation", () => ({
@@ -17,7 +38,13 @@ jest.mock("next/navigation", () => ({
 jest.mock("@/components/DynamicMap", () => ({
   __esModule: true,
   default: ({ listings }: { listings: unknown[] }) => (
-    <div data-testid="dynamic-map" data-listings-count={listings.length}>
+    <div
+      data-testid="dynamic-map"
+      data-listings-count={listings.length}
+      data-listing-ids={listings
+        .map((listing) => (listing as { id?: string }).id)
+        .join(",")}
+    >
       Map with {listings.length} listings
     </div>
   ),
@@ -27,7 +54,7 @@ jest.mock("@/components/DynamicMap", () => ({
 const mockV2MapData = {
   geojson: {
     type: "FeatureCollection" as const,
-    features: [],
+    features: [] as TestV2Feature[],
   },
   mode: "geojson" as const,
   queryHash: "",
@@ -39,6 +66,7 @@ let mockPendingV2QueryHash: string | null = null;
 let mockTransitionPending = false;
 let mockPendingReason: "search-submit" | "filter" | "sort" | "map-pan" | null =
   null;
+let mockListResultIds: string[] | null = null;
 
 function getRequestQueryHash(options?: {
   headers?: RequestInit["headers"];
@@ -85,6 +113,41 @@ function createOkMapResponse(
   };
 }
 
+function makeMapListing(index: number) {
+  return {
+    id: `listing-${index}`,
+    title: `Listing ${index}`,
+    price: 1000 + index,
+    location: { lat: 37 + index * 0.1, lng: -122 + index * 0.1 },
+  };
+}
+
+function makeV2MapFeature(index: number): TestV2Feature {
+  return {
+    type: "Feature",
+    geometry: {
+      type: "Point",
+      coordinates: [-124 + index, 32 + index],
+    },
+    properties: {
+      id: `v2-listing-${index}`,
+      title: `V2 Listing ${index}`,
+      price: 1200 + index,
+      image: null,
+      availableSlots: 1,
+      publicAvailability: {
+        availabilitySource: "HOST_MANAGED",
+        openSlots: 1,
+        totalSlots: 1,
+        availableFrom: null,
+        availableUntil: null,
+        minStayMonths: 1,
+        lastConfirmedAt: null,
+      },
+    },
+  };
+}
+
 jest.mock("@/contexts/SearchV2DataContext", () => ({
   useSearchV2Data: () => ({
     v2MapData: mockHasV2Data ? mockV2MapData : null,
@@ -99,6 +162,10 @@ jest.mock("@/contexts/SearchV2DataContext", () => ({
     setIsV2Enabled: jest.fn(),
   }),
   usePendingV2QueryHash: () => mockPendingV2QueryHash,
+}));
+
+jest.mock("@/contexts/SearchListResultsContext", () => ({
+  useSearchListResultIds: () => mockListResultIds,
 }));
 
 // Mock SearchTransitionContext
@@ -136,6 +203,7 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
     mockPendingV2QueryHash = null;
     mockTransitionPending = false;
     mockPendingReason = null;
+    mockListResultIds = null;
 
     // Reset search params with valid bounds
     mockSearchParams.delete("minLng");
@@ -147,6 +215,7 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
     mockSearchParams.set("minLat", "37.5");
     mockSearchParams.set("maxLat", "38.0");
     mockV2MapData.queryHash = getCurrentQueryHash();
+    mockV2MapData.geojson.features = [];
 
     // Default successful response
     mockFetch.mockImplementation(
@@ -386,6 +455,151 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
     });
   });
 
+  describe("Map payload correctness", () => {
+    it("renders all valid v1 map listings even when list context only has first-page IDs", async () => {
+      mockListResultIds = ["listing-1", "listing-2"];
+      mockFetch.mockImplementation(
+        async (_url: string, options?: { headers?: Record<string, string> }) =>
+          createOkMapResponse(
+            [1, 2, 3, 4, 5].map((index) => makeMapListing(index)),
+            options
+          )
+      );
+
+      const { getByTestId } = render(
+        <PersistentMapWrapper shouldRenderMap={true} />
+      );
+
+      await act(async () => {
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
+      });
+
+      await waitFor(() => {
+        expect(getByTestId("dynamic-map")).toHaveAttribute(
+          "data-listings-count",
+          "5"
+        );
+      });
+      expect(getByTestId("dynamic-map")).toHaveAttribute(
+        "data-listing-ids",
+        "listing-1,listing-2,listing-3,listing-4,listing-5"
+      );
+    });
+
+    it("renders all valid v2 GeoJSON features even when list context only has first-page IDs", async () => {
+      mockIsV2Enabled = true;
+      mockHasV2Data = true;
+      mockListResultIds = ["v2-listing-1", "v2-listing-2"];
+      mockV2MapData.queryHash = getCurrentQueryHash();
+      mockV2MapData.geojson.features = [1, 2, 3, 4, 5].map((index) =>
+        makeV2MapFeature(index)
+      );
+
+      const { getByTestId } = render(
+        <PersistentMapWrapper shouldRenderMap={true} />
+      );
+
+      await waitFor(() => {
+        expect(getByTestId("dynamic-map")).toHaveAttribute(
+          "data-listings-count",
+          "5"
+        );
+      });
+      expect(getByTestId("dynamic-map")).toHaveAttribute(
+        "data-listing-ids",
+        "v2-listing-1,v2-listing-2,v2-listing-3,v2-listing-4,v2-listing-5"
+      );
+    });
+
+    it("ignores request A when it resolves after request B updates markers", async () => {
+      let resolveA!: () => void;
+      let resolveB!: () => void;
+
+      mockFetch
+        .mockImplementationOnce(
+          (_url: string, options?: { headers?: Record<string, string> }) =>
+            new Promise((resolve) => {
+              resolveA = () =>
+                resolve(
+                  createOkMapResponse(
+                    [
+                      {
+                        id: "request-a",
+                        title: "Request A",
+                        price: 1000,
+                        location: { lat: 37.7, lng: -122.4 },
+                      },
+                    ],
+                    options
+                  )
+                );
+            })
+        )
+        .mockImplementationOnce(
+          (_url: string, options?: { headers?: Record<string, string> }) =>
+            new Promise((resolve) => {
+              resolveB = () =>
+                resolve(
+                  createOkMapResponse(
+                    [
+                      {
+                        id: "request-b",
+                        title: "Request B",
+                        price: 1100,
+                        location: { lat: 40.7, lng: -73.9 },
+                      },
+                    ],
+                    options
+                  )
+                );
+            })
+        );
+
+      const { getByTestId, rerender } = render(
+        <PersistentMapWrapper shouldRenderMap={true} />
+      );
+
+      await act(async () => {
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
+      });
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      mockSearchParams.set("minLng", "-74.2");
+      mockSearchParams.set("maxLng", "-73.7");
+      mockSearchParams.set("minLat", "40.4");
+      mockSearchParams.set("maxLat", "40.9");
+
+      rerender(<PersistentMapWrapper shouldRenderMap={true} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
+      });
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+
+      await act(async () => {
+        resolveB();
+      });
+
+      await waitFor(() => {
+        expect(getByTestId("dynamic-map")).toHaveAttribute(
+          "data-listing-ids",
+          "request-b"
+        );
+      });
+
+      await act(async () => {
+        resolveA();
+      });
+
+      await waitFor(() => {
+        expect(getByTestId("dynamic-map")).toHaveAttribute(
+          "data-listing-ids",
+          "request-b"
+        );
+      });
+    });
+  });
+
   describe("V2 Race Guard (100ms timeout)", () => {
     it("shows loading placeholder when v2 enabled but data not yet arrived", () => {
       mockIsV2Enabled = true;
@@ -513,6 +727,21 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
   });
 
   describe("Error Handling", () => {
+    function mockHangingFetch() {
+      mockFetch.mockImplementation(
+        (_url: string, options?: { signal?: AbortSignal }) =>
+          new Promise((_resolve, reject) => {
+            options?.signal?.addEventListener(
+              "abort",
+              () => {
+                reject(new DOMException("Aborted", "AbortError"));
+              },
+              { once: true }
+            );
+          })
+      );
+    }
+
     it("handles fetch error gracefully", async () => {
       const consoleSpy = jest
         .spyOn(console, "error")
@@ -533,6 +762,128 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
       expect(errorAlert).toBeInTheDocument();
 
       consoleSpy.mockRestore();
+    });
+
+    it("waits for the 30s client timeout before showing retryable map timeout state", async () => {
+      mockHangingFetch();
+
+      const { queryByRole, findByRole } = render(
+        <PersistentMapWrapper shouldRenderMap={true} />
+      );
+
+      await act(async () => {
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
+      });
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        jest.advanceTimersByTime(29_999);
+      });
+      expect(queryByRole("alert")).not.toBeInTheDocument();
+
+      await act(async () => {
+        jest.advanceTimersByTime(1);
+      });
+
+      const errorAlert = await findByRole("alert");
+      expect(errorAlert).toHaveTextContent(
+        "Map data request timed out. Please try again."
+      );
+      expect(errorAlert).toHaveTextContent("Retry");
+    });
+
+    it("preserves existing map markers when the active refetch times out", async () => {
+      mockFetch
+        .mockImplementationOnce(
+          async (
+            _url: string,
+            options?: { headers?: Record<string, string> }
+          ) =>
+            createOkMapResponse(
+              [
+                {
+                  id: "initial-listing",
+                  title: "Initial Listing",
+                  price: 1000,
+                  location: { lat: 37.7, lng: -122.4 },
+                },
+              ],
+              options
+            )
+        )
+        .mockImplementationOnce(
+          (_url: string, options?: { signal?: AbortSignal }) =>
+            new Promise((_resolve, reject) => {
+              options?.signal?.addEventListener(
+                "abort",
+                () => {
+                  reject(new DOMException("Aborted", "AbortError"));
+                },
+                { once: true }
+              );
+            })
+        );
+
+      const { getByTestId, findByRole, rerender } = render(
+        <PersistentMapWrapper shouldRenderMap={true} />
+      );
+
+      await act(async () => {
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
+      });
+
+      await waitFor(() => {
+        expect(getByTestId("dynamic-map")).toHaveAttribute(
+          "data-listings-count",
+          "1"
+        );
+      });
+
+      mockSearchParams.set("minLng", "-121.0");
+      mockSearchParams.set("maxLng", "-120.5");
+      mockSearchParams.set("minLat", "38.5");
+      mockSearchParams.set("maxLat", "39.0");
+
+      rerender(<PersistentMapWrapper shouldRenderMap={true} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS + 30_000);
+      });
+
+      const errorAlert = await findByRole("alert");
+      expect(errorAlert).toHaveTextContent(
+        "Map data request timed out. Please try again."
+      );
+      expect(getByTestId("dynamic-map")).toHaveAttribute(
+        "data-listings-count",
+        "1"
+      );
+    });
+
+    it("does not show a timeout alert for a superseded request abort", async () => {
+      mockHangingFetch();
+
+      const { queryByRole, rerender } = render(
+        <PersistentMapWrapper shouldRenderMap={true} />
+      );
+
+      await act(async () => {
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
+      });
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      mockSearchParams.set("minLng", "-121.0");
+      mockSearchParams.set("maxLng", "-120.5");
+      mockSearchParams.set("minLat", "38.5");
+      mockSearchParams.set("maxLat", "39.0");
+      rerender(<PersistentMapWrapper shouldRenderMap={true} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
+      });
+
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(queryByRole("alert")).not.toBeInTheDocument();
     });
 
     it("handles 429 rate limit response", async () => {
@@ -575,8 +926,10 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
           json: async () => ({ error: "Too many requests", retryAfter: 2 }),
         })
         .mockImplementationOnce(
-          async (_url: string, options?: { headers?: Record<string, string> }) =>
-            createOkMapResponse([], options)
+          async (
+            _url: string,
+            options?: { headers?: Record<string, string> }
+          ) => createOkMapResponse([], options)
         );
 
       const { container } = render(
@@ -622,7 +975,10 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
           json: async () => ({ error: "Too many requests" }),
         })
         .mockImplementationOnce(
-          async (_url: string, options?: { headers?: Record<string, string> }) =>
+          async (
+            _url: string,
+            options?: { headers?: Record<string, string> }
+          ) =>
             createOkMapResponse(
               [
                 {
@@ -718,8 +1074,10 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
       mockFetch
         .mockRejectedValueOnce(new Error("Network error"))
         .mockImplementationOnce(
-          async (_url: string, options?: { headers?: Record<string, string> }) =>
-            createOkMapResponse([], options)
+          async (
+            _url: string,
+            options?: { headers?: Record<string, string> }
+          ) => createOkMapResponse([], options)
         );
 
       const consoleSpy = jest
@@ -775,7 +1133,9 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
       // P2-FIX (#151): Changed from alert to status role since this is informational, not an error
       const infoBanner = queryByRole("status");
       expect(infoBanner).toBeInTheDocument();
-      expect(infoBanner?.textContent).toContain("Zoom in further to update results");
+      expect(infoBanner?.textContent).toContain(
+        "Zoom in further to update results"
+      );
 
       // Should NOT fetch when viewport exceeds max span — early return preserves existing map data
       await act(async () => {

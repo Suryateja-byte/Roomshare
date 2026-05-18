@@ -82,7 +82,6 @@ test.describe("Filter Combinations", () => {
     const amenities = getUrlParam(page, "amenities") ?? "";
     expect(amenities).toContain("Wifi");
     expect(amenities).toContain("Parking");
-
   });
 
   // 3. All filters together
@@ -158,8 +157,7 @@ test.describe("Filter Combinations", () => {
     await page.waitForLoadState("domcontentloaded");
 
     const region = appliedFiltersRegion(page);
-    const regionVisible = await region.isVisible().catch(() => false);
-    test.skip(!regionVisible, "Applied filters region not visible");
+    await expect(region).toBeVisible({ timeout: 10_000 });
 
     // Remove the roomType chip
     const removeRoomType = region.getByRole("button", {
@@ -209,7 +207,6 @@ test.describe("Filter Combinations", () => {
 
     expect(getUrlParam(page, "q")).toBe("downtown");
     expect(getUrlParam(page, "roomType")).toBe("Private Room");
-
   });
 
   // 8. Pagination resets when any filter changes
@@ -298,7 +295,6 @@ test.describe("Filter Combinations", () => {
         timeout: 10_000,
       });
     }
-
   });
 
   // 11. All sort options work with active filters

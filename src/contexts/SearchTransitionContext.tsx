@@ -27,6 +27,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { SLOW_TRANSITION_THRESHOLD_MS } from "@/lib/constants";
+import { markPendingSearchNavigation } from "@/lib/search/pending-search-navigation";
 
 export type SearchTransitionReason =
   | "search-submit"
@@ -105,6 +106,9 @@ export function SearchTransitionProvider({
       const scroll = options?.scroll ?? false;
       const reason = options?.reason ?? "filter";
       lastNavRef.current = { url, method: "push", scroll, reason };
+      if (reason !== "map-pan") {
+        markPendingSearchNavigation(url);
+      }
       setPendingReason(reason);
       startTransition(() => {
         router.push(url, { scroll });

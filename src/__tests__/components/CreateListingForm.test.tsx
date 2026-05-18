@@ -363,6 +363,31 @@ describe("CreateListingForm", () => {
 
       expect(screen.getByText(/draft saved/i)).toBeInTheDocument();
     });
+
+    it("shows and dismisses cross-tab draft conflicts", () => {
+      const dismissCrossTabConflict = jest.fn();
+      (useFormPersistence as jest.Mock).mockReturnValue({
+        persistedData: null,
+        hasDraft: false,
+        savedAt: null,
+        saveData: jest.fn(),
+        cancelSave: jest.fn(),
+        clearPersistedData: jest.fn(),
+        isHydrated: true,
+        crossTabConflict: true,
+        dismissCrossTabConflict,
+      });
+
+      render(<CreateListingForm />);
+
+      expect(
+        screen.getByText(/this draft was modified in another tab/i)
+      ).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: /dismiss/i }));
+
+      expect(dismissCrossTabConflict).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("image upload", () => {

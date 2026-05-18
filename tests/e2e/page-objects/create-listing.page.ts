@@ -2,6 +2,12 @@ import { Page, Locator, expect } from "@playwright/test";
 import { timeouts } from "../helpers/test-utils";
 import path from "path";
 
+export interface UploadFilePayload {
+  name: string;
+  mimeType: string;
+  buffer: Buffer;
+}
+
 /**
  * Test data interface for create listing form
  */
@@ -45,6 +51,7 @@ export class CreateListingPage {
 
   // ── Section 3: Photos ──
   readonly imageFileInput: Locator;
+  readonly uploadDropZone: Locator;
 
   // ── Section 4: Finer Details ──
   readonly amenitiesInput: Locator;
@@ -54,6 +61,7 @@ export class CreateListingPage {
   readonly genderPrefTrigger: Locator;
   readonly householdGenderTrigger: Locator;
   readonly houseRulesInput: Locator;
+  readonly languageSearchInput: Locator;
 
   // ── Form Actions ──
   readonly submitButton: Locator;
@@ -88,6 +96,9 @@ export class CreateListingPage {
 
     // Section 3: Photos (hidden file input)
     this.imageFileInput = page.locator('input[type="file"]').first();
+    this.uploadDropZone = page.getByRole("button", {
+      name: /upload photos/i,
+    });
 
     // Section 4: Finer Details
     this.amenitiesInput = page.getByLabel("Amenities");
@@ -97,12 +108,13 @@ export class CreateListingPage {
     this.genderPrefTrigger = page.locator("#genderPreference");
     this.householdGenderTrigger = page.locator("#householdGender");
     this.houseRulesInput = page.getByLabel("House Rules");
+    this.languageSearchInput = page.getByLabel("Search languages");
 
     // Actions
     this.submitButton = page.getByRole("button", {
       name: /create|submit|publish/i,
     });
-    this.form = page.locator("form[novalidate]").first();
+    this.form = page.getByTestId("create-listing-form");
 
     // State — error banner uses role="alert" and data-testid
     this.errorBanner = page.locator('[data-testid="form-error-banner"]');
@@ -124,7 +136,27 @@ export class CreateListingPage {
   async goto() {
     await this.page.goto("/listings/create");
     await this.page.waitForLoadState("domcontentloaded");
+    await this.waitForFormReady();
+  }
+
+  private async waitForFormReady() {
     await this.form.waitFor({ state: "visible", timeout: timeouts.navigation });
+    const hydrated = await expect(this.form)
+      .toHaveAttribute("data-hydrated", "true", {
+        timeout: 15_000,
+      })
+      .then(() => true)
+      .catch(() => false);
+
+    if (hydrated) {
+      return;
+    }
+
+    await this.page.reload({ waitUntil: "domcontentloaded" });
+    await this.form.waitFor({ state: "visible", timeout: timeouts.navigation });
+    await expect(this.form).toHaveAttribute("data-hydrated", "true", {
+      timeout: timeouts.navigation,
+    });
   }
 
   // ── Form Fill Actions ──
@@ -189,14 +221,47 @@ export class CreateListingPage {
   }
 
   private async selectMoveInDate() {
-    // DatePicker is a Radix Popover button trigger; select "Today" as a valid
-    // required date without relying on a text input.
+    // DatePicker is a Radix Popover button trigger; select the browser's local
+    // "Today" value without relying on a text input.
+    await expect(this.form).toHaveAttribute("data-hydrated", "true", {
+      timeout: timeouts.navigation,
+    });
     await this.moveInDateInput.waitFor({ state: "visible", timeout: 5000 });
     await this.moveInDateInput.scrollIntoViewIfNeeded();
-    await this.moveInDateInput.click();
     const todayButton = this.page.getByRole("button", { name: "Today" });
-    await todayButton.waitFor({ state: "visible", timeout: 5000 });
+    const expectedTodayLabel = await this.page.evaluate(() =>
+      new Date().toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    );
+
+    await expect(async () => {
+      if (await todayButton.isVisible().catch(() => false)) {
+        return;
+      }
+
+      await this.moveInDateInput.click();
+      if (await todayButton.isVisible().catch(() => false)) {
+        return;
+      }
+
+      await this.moveInDateInput.press("Enter");
+      if (await todayButton.isVisible().catch(() => false)) {
+        return;
+      }
+
+      await this.moveInDateInput.press(" ");
+      await expect(todayButton).toBeVisible({ timeout: 500 });
+    }).toPass({
+      timeout: 8_000,
+      intervals: [100, 250, 500, 1_000],
+    });
+
+    await expect(todayButton).toBeVisible();
     await todayButton.click();
+    await expect(this.moveInDateInput).toContainText(expectedTodayLabel);
   }
 
   async fillAllFields(data: CreateListingData) {
@@ -215,14 +280,15 @@ export class CreateListingPage {
     await listbox.waitFor({ state: "visible", timeout: 5000 });
     // Click the matching option
     const option = this.page.getByRole("option", {
-      name: new RegExp(`^${value}$`, "i"),
+      name: value,
+      exact: true,
     });
     await option.click();
   }
 
   // ── Image Upload ──
 
-  private async resolveMockUploadUserId(): Promise<string> {
+  private async resolveMockUploadUserId(email?: string): Promise<string> {
     const fallbackUserId = process.env.E2E_TEST_USER_ID || "e2e-test-user";
     const secret = process.env.E2E_TEST_SECRET;
 
@@ -235,7 +301,8 @@ export class CreateListingPage {
         data: {
           action: "findUserByEmail",
           params: {
-            email: process.env.E2E_TEST_EMAIL || "e2e-test@roomshare.dev",
+            email:
+              email || process.env.E2E_TEST_EMAIL || "e2e-test@roomshare.dev",
           },
         },
         headers: {
@@ -259,11 +326,11 @@ export class CreateListingPage {
    * Mock /api/upload to return instant fake Supabase URLs.
    * Call before uploading images.
    */
-  async mockImageUpload() {
+  async mockImageUpload(email?: string) {
     let uploadCount = 0;
     const supabaseBaseUrl =
       process.env.NEXT_PUBLIC_SUPABASE_URL || "https://fake.supabase.co";
-    const userId = await this.resolveMockUploadUserId();
+    const userId = await this.resolveMockUploadUserId(email);
     await this.page.route("**/api/upload", async (route) => {
       uploadCount++;
       const id = `mock-${Date.now()}-${uploadCount}`;
@@ -287,6 +354,37 @@ export class CreateListingPage {
       fileName
     );
     await this.imageFileInput.setInputFiles(filePath);
+  }
+
+  async uploadFilePayload(file: UploadFilePayload | UploadFilePayload[]) {
+    await this.imageFileInput.setInputFiles(file);
+  }
+
+  async dropFilePayload(file: UploadFilePayload | UploadFilePayload[]) {
+    const payloads: Array<{
+      name: string;
+      mimeType: string;
+      bytes: number[];
+    }> = (Array.isArray(file) ? file : [file]).map((payload) => ({
+      name: payload.name,
+      mimeType: payload.mimeType,
+      bytes: Array.from(payload.buffer),
+    }));
+
+    const dataTransfer = await this.page.evaluateHandle((files) => {
+      const transfer = new DataTransfer();
+      for (const item of files) {
+        transfer.items.add(
+          new File([new Uint8Array(item.bytes)], item.name, {
+            type: item.mimeType,
+          })
+        );
+      }
+      return transfer;
+    }, payloads);
+
+    await this.uploadDropZone.dispatchEvent("drop", { dataTransfer });
+    await dataTransfer.dispose();
   }
 
   /**
@@ -316,6 +414,68 @@ export class CreateListingPage {
         this.page.locator(`img[alt="Preview ${i + 1}"]`)
       ).toBeVisible({ timeout: 10_000 });
     }
+  }
+
+  async expectImagePreviewCount(count: number) {
+    await expect(this.page.locator('img[alt^="Preview"]')).toHaveCount(count, {
+      timeout: 10_000,
+    });
+  }
+
+  async waitForUploadFailures(count: number) {
+    await expect(
+      this.page.getByText(
+        new RegExp(`${count} image${count === 1 ? "" : "s"} failed to upload`)
+      )
+    ).toBeVisible({ timeout: 10_000 });
+  }
+
+  async retryAllFailedUploads() {
+    await this.page.getByRole("button", { name: /retry all failed/i }).click();
+  }
+
+  async cancelUploads() {
+    await this.page.getByRole("button", { name: /cancel uploads/i }).click();
+  }
+
+  async removeImageAt(index: number = 0) {
+    const preview = this.page.locator('img[alt^="Preview"]').nth(index);
+    await preview.locator("..").hover();
+    await this.page
+      .getByRole("button", { name: "Remove image" })
+      .nth(index)
+      .click({ force: true });
+  }
+
+  async setImageAsMainAt(index: number) {
+    const preview = this.page.locator('img[alt^="Preview"]').nth(index);
+    await preview.locator("..").hover();
+    await this.page
+      .getByRole("button", { name: "Set as main photo" })
+      .nth(index - 1)
+      .click({ force: true });
+  }
+
+  async expectPartialUploadDialog() {
+    await expect(this.partialUploadDialog).toBeVisible({ timeout: 5_000 });
+    await expect(this.partialUploadDialog).toContainText(
+      /some images failed to upload/i
+    );
+  }
+
+  async goBackFromPartialUploadDialog() {
+    await this.partialUploadDialog
+      .getByRole("button", { name: /go back to fix/i })
+      .click();
+    await expect(this.partialUploadDialog).not.toBeVisible();
+  }
+
+  async publishWithSuccessfulPhotos(count: number) {
+    await this.partialUploadDialog
+      .getByRole("button", {
+        name: new RegExp(`publish with ${count} photo`, "i"),
+      })
+      .click();
   }
 
   /**
@@ -417,6 +577,40 @@ export class CreateListingPage {
 
   async expectProgressText(text: string | RegExp) {
     await expect(this.progressText).toContainText(text);
+  }
+
+  // ── Household Languages ──
+
+  async searchLanguage(query: string) {
+    await this.languageSearchInput.fill(query);
+  }
+
+  async selectLanguage(name: string) {
+    await this.page
+      .getByRole("button", { name: new RegExp(`^${name}$`, "i") })
+      .click();
+  }
+
+  async removeSelectedLanguage(name: string) {
+    await this.page
+      .getByRole("button", { name: new RegExp(`^${name}, selected$`, "i") })
+      .click();
+  }
+
+  async expectSelectedLanguage(name: string) {
+    await expect(
+      this.page.getByRole("button", {
+        name: new RegExp(`^${name}, selected$`, "i"),
+      })
+    ).toBeVisible();
+  }
+
+  async expectLanguageNotSelected(name: string) {
+    await expect(
+      this.page.getByRole("button", {
+        name: new RegExp(`^${name}, selected$`, "i"),
+      })
+    ).not.toBeVisible();
   }
 
   // ── Draft Persistence ──
@@ -527,6 +721,29 @@ export class CreateListingPage {
         await route.continue();
       }
     });
+  }
+
+  async mockListingApiSuccessWithCapture(id?: string) {
+    const bodies: Record<string, unknown>[] = [];
+    const mockId = id || `mock-${Date.now()}`;
+
+    await this.page.route("**/api/listings", async (route) => {
+      if (route.request().method() === "POST") {
+        const postData = route.request().postData();
+        if (postData) {
+          bodies.push(JSON.parse(postData) as Record<string, unknown>);
+        }
+        await route.fulfill({
+          status: 201,
+          contentType: "application/json",
+          body: JSON.stringify({ id: mockId }),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
+    return () => bodies;
   }
 
   /**

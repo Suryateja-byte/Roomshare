@@ -9,7 +9,10 @@
 
 import type { GeocodingResult } from "../geocoding-cache";
 import { fetchWithTimeout } from "../fetch-with-timeout";
-import { LOCATION_AUTOCOMPLETE_QUERY_MAX_LENGTH } from "./autocomplete";
+import {
+  LOCATION_AUTOCOMPLETE_QUERY_MAX_LENGTH,
+  type LocationAutocompletePointBias,
+} from "./autocomplete";
 
 const PHOTON_BASE_URL = "https://photon.komoot.io/api";
 const GEOCODING_TIMEOUT_MS = 8000;
@@ -128,14 +131,21 @@ function toGeocodingResult(feature: PhotonFeature): GeocodingResult {
  */
 export async function searchPhoton(
   query: string,
-  options?: { signal?: AbortSignal; limit?: number }
+  options?: {
+    signal?: AbortSignal;
+    limit?: number;
+    near?: LocationAutocompletePointBias;
+  }
 ): Promise<GeocodingResult[]> {
   const limit = options?.limit ?? 5;
   const encoded = encodeURIComponent(query);
   // Over-request to compensate for post-filtering non-US results.
-  // Bias toward US geographic center so US results rank higher.
+  // Bias toward the caller's current map/search context when available,
+  // otherwise use the US geographic center so US results rank higher.
   const requestLimit = limit * 3;
-  const url = `${PHOTON_BASE_URL}?q=${encoded}&limit=${requestLimit}&lang=en&lat=39.8283&lon=-98.5795`;
+  const lat = options?.near?.lat ?? 39.8283;
+  const lng = options?.near?.lng ?? -98.5795;
+  const url = `${PHOTON_BASE_URL}?q=${encoded}&limit=${requestLimit}&lang=en&lat=${lat}&lon=${lng}`;
 
   const response = await fetchWithTimeout(url, {
     signal: options?.signal,

@@ -20,6 +20,7 @@ function makeSearchResult(
     display_name: string;
     boundingbox: [string, string, string, string];
     geojson: GeoJSON.Geometry;
+    address: Record<string, string>;
   }> = {}
 ) {
   return {
@@ -34,6 +35,7 @@ function makeSearchResult(
       overrides.boundingbox ??
       (["30.1", "30.5", "-97.9", "-97.5"] as [string, string, string, string]),
     geojson: overrides.geojson,
+    address: overrides.address,
   };
 }
 
@@ -98,6 +100,50 @@ describe("forwardGeocode", () => {
     // Verify they are numbers, not strings
     expect(typeof result!.lat).toBe("number");
     expect(typeof result!.lng).toBe("number");
+  });
+
+  it("derives safe public area names from neighborhood-like address details", async () => {
+    mockFetchWithTimeout.mockResolvedValue(
+      makeSearchResponse([
+        makeSearchResult({
+          lat: "37.764",
+          lon: "-122.466",
+          address: {
+            house_number: "1800",
+            road: "Irving Street",
+            neighbourhood: "Inner Sunset",
+            city: "San Francisco",
+            state: "California",
+          },
+        }),
+      ])
+    );
+
+    const result = await forwardGeocode("1800 Irving St, San Francisco, CA");
+
+    expect(result).toEqual({
+      lat: 37.764,
+      lng: -122.466,
+      publicAreaName: "Inner Sunset",
+    });
+  });
+
+  it("falls back to city as the public area name when no narrower area exists", async () => {
+    mockFetchWithTimeout.mockResolvedValue(
+      makeSearchResponse([
+        makeSearchResult({
+          address: {
+            road: "Market Street",
+            city: "San Francisco",
+            state: "California",
+          },
+        }),
+      ])
+    );
+
+    const result = await forwardGeocode("Market St, San Francisco, CA");
+
+    expect(result!.publicAreaName).toBe("San Francisco");
   });
 
   it("returns null when results array is empty", async () => {

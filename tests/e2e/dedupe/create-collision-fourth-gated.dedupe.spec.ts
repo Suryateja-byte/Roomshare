@@ -6,11 +6,14 @@ import {
   seedCollisionListings,
 } from "./create-collision-helpers";
 
-test("T-19: the fourth acknowledged collision is blocked", async ({
-  page,
-}) => {
+const OWNER_EMAIL = "e2e-other@roomshare.dev";
+
+test.use({ storageState: "playwright/.auth/user2.json" });
+
+test("T-19: the fourth acknowledged collision is blocked", async ({ page }) => {
   const cleanupIds = await seedCollisionListings(page, {
     title: "E2E Collision Moderation Gate",
+    ownerEmail: OWNER_EMAIL,
     count: 3,
     createdAtOffsetsHours: [1, 2, 3],
     moveInDateOffsetsDays: [-1, -2, -3],
@@ -19,7 +22,8 @@ test("T-19: the fourth acknowledged collision is blocked", async ({
   try {
     const createPage = await openPreparedCreateListingPage(
       page,
-      buildCollisionFormData("Collision Moderation Candidate")
+      buildCollisionFormData("Collision Moderation Candidate"),
+      OWNER_EMAIL
     );
 
     const firstResponse = await createPage.submitAndWaitForResponse();

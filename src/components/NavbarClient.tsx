@@ -4,11 +4,11 @@ import { useState, useEffect, useRef, useCallback, useId } from "react";
 import { signOut, useSession } from "next-auth/react";
 import type { Session } from "next-auth";
 import Image from "next/image";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import {
   Plus,
+  Bell,
   MessageSquare,
   Menu,
   X,
@@ -19,6 +19,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import UserAvatar from "@/components/UserAvatar";
 import NotificationCenter from "@/components/NotificationCenter";
 
@@ -153,6 +154,8 @@ interface NavbarClientProps {
 const BASE_POLL_INTERVAL = 30000; // 30 seconds
 const MAX_BACKOFF_INTERVAL = 300000; // 5 minutes max
 const BACKOFF_MULTIPLIER = 2;
+const loginCallbackHref = (path: string) =>
+  `/login?callbackUrl=${encodeURIComponent(path)}`;
 
 export default function NavbarClient({
   user: initialUser,
@@ -167,6 +170,8 @@ export default function NavbarClient({
       : status === "unauthenticated"
         ? null
         : (session?.user ?? initialUser);
+  const messagesHref =
+    status === "unauthenticated" ? loginCallbackHref("/messages") : "/messages";
 
   const pathname = usePathname();
   const menuButtonId = useId();
@@ -518,6 +523,7 @@ export default function NavbarClient({
   return (
     <>
       <header
+        data-auth-state={status}
         className={`fixed top-0 left-0 right-0 z-dropdown transition-[transform,opacity,background-color,border-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] data-[anim-hidden=true]:-translate-y-full data-[anim-hidden=true]:opacity-0 data-[anim-hidden=true]:pointer-events-none data-[anim-hidden=true]:border-transparent ${
           isScrolled
             ? isMobileMenuOpen
@@ -579,7 +585,7 @@ export default function NavbarClient({
                   <IconButton
                     icon={<MessageSquare size={18} strokeWidth={2} />}
                     count={currentUnreadCount}
-                    href="/messages"
+                    href={messagesHref}
                     ariaLabel={
                       currentUnreadCount > 0
                         ? `Messages, ${currentUnreadCount} unread`
@@ -587,6 +593,16 @@ export default function NavbarClient({
                     }
                   />
                 </div>
+
+                {user && (
+                  <Link
+                    href="/notifications"
+                    className="relative flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 md:hidden"
+                    aria-label="Notifications"
+                  >
+                    <Bell size={20} strokeWidth={2} />
+                  </Link>
+                )}
 
                 {/* Profile Dropdown / Auth Buttons */}
                 {user ? (
@@ -778,7 +794,7 @@ export default function NavbarClient({
             {user && (
               <>
                 <Link
-                  href="/messages"
+                  href={messagesHref}
                   className="font-display text-3xl font-medium text-on-surface hover:text-primary tracking-tight transition-colors duration-300"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >

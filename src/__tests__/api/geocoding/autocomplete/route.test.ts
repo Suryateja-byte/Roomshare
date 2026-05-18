@@ -170,17 +170,52 @@ describe("/api/geocoding/autocomplete", () => {
     expect(payload).toEqual({ results });
     expect(mockGetPublicCacheStatePayload).toHaveBeenCalled();
     expect(mockGetCachedResults).toHaveBeenCalledWith("Austin", {
-      cacheVersion: "public:v1:test",
+      cacheVersion: "public:v1:test:safe-place-v2",
       ttlSeconds: 15 * 60,
     });
     expect(mockSearchPublicAutocomplete).toHaveBeenCalledWith("Austin", {
       limit: 5,
     });
     expect(mockSetCachedResults).toHaveBeenCalledWith("Austin", results, {
-      cacheVersion: "public:v1:test",
+      cacheVersion: "public:v1:test:safe-place-v2",
       ttlSeconds: 15 * 60,
     });
     expect(mockSearchPhoton).not.toHaveBeenCalled();
+  });
+
+  it("passes optional map bias to public autocomplete and isolates its cache key", async () => {
+    mockedFeatures.publicAutocompleteContract = true;
+    const results = [
+      {
+        id: "place:sf-irving",
+        place_name: "Irving Street, San Francisco, CA",
+        center: [-122.466, 37.764],
+        place_type: ["street"],
+      },
+    ];
+    mockSearchPublicAutocomplete.mockResolvedValueOnce(results);
+
+    const response = await GET(
+      requestFor(
+        "q=Irving&nearLat=37.7749&nearLng=-122.4194&minLng=-122.6&minLat=37.6&maxLng=-122.2&maxLat=37.9"
+      )
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload).toEqual({ results });
+    expect(mockGetCachedResults).toHaveBeenCalledWith("Irving", {
+      cacheVersion:
+        "public:v1:test:safe-place-v2:bias:n37.7749,-122.4194:b-122.6,37.6,-122.2,37.9",
+      ttlSeconds: 15 * 60,
+    });
+    expect(mockSearchPublicAutocomplete).toHaveBeenCalledWith("Irving", {
+      limit: 5,
+      bias: {
+        near: { lat: 37.7749, lng: -122.4194 },
+        bounds: [-122.6, 37.6, -122.2, 37.9],
+      },
+    });
   });
 
   it("maps upstream timeouts to 504 without exposing raw details on the legacy path", async () => {

@@ -122,3 +122,27 @@ describe("applySecurityHeaders", () => {
     });
   });
 });
+
+describe("Root layout nonce handling", () => {
+  let layoutSource: string;
+
+  beforeAll(async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    layoutSource = fs.readFileSync(
+      path.join(process.cwd(), "src", "app", "layout.tsx"),
+      "utf-8"
+    );
+  });
+
+  it("does not pass an unused nonce prop through Providers", () => {
+    expect(layoutSource).not.toContain("<Providers nonce=");
+    expect(layoutSource).toContain("<Providers>");
+  });
+
+  it("keeps request-time nonce rendering scoped to production", () => {
+    expect(layoutSource).toContain("preserveProductionNonceRendering");
+    expect(layoutSource).toContain('process.env.NODE_ENV === "production"');
+    expect(layoutSource).toContain("await headers()");
+  });
+});

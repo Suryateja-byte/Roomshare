@@ -41,6 +41,7 @@ import { useSession, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import UserAvatar from "@/components/UserAvatar";
 import { countActiveFilters } from "@/components/filters/filter-chip-utils";
+import { HeaderFilterDrawer } from "@/components/search/HeaderFilterDrawer";
 
 const MenuItem = ({
   icon,
@@ -105,7 +106,7 @@ const MenuItem = ({
 
 export default function SearchHeaderWrapper() {
   const { isCollapsed } = useScrollHeader({ threshold: 80 });
-  const { openFilters } = useMobileSearch();
+  const { registerOpenFilters } = useMobileSearch();
   const isMobileViewport = useMediaQuery("(max-width: 767px)");
   const { data: session } = useSession();
   const user = session?.user;
@@ -114,6 +115,12 @@ export default function SearchHeaderWrapper() {
 
   // Full-screen mobile search overlay (Option A — Airbnb pattern)
   const [isMobileOverlayOpen, setIsMobileOverlayOpen] = useState(false);
+  const [isHeaderFilterDrawerOpen, setIsHeaderFilterDrawerOpen] =
+    useState(false);
+  const handleOpenFilters = useCallback(
+    () => setIsHeaderFilterDrawerOpen(true),
+    []
+  );
   const handleOpenMobileSearch = useCallback(
     () => setIsMobileOverlayOpen(true),
     []
@@ -136,6 +143,10 @@ export default function SearchHeaderWrapper() {
 
   const searchParams = useSearchParams();
   const activeCount = countActiveFilters(searchParams);
+
+  useEffect(() => {
+    return registerOpenFilters(handleOpenFilters, 0);
+  }, [handleOpenFilters, registerOpenFilters]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -402,7 +413,7 @@ export default function SearchHeaderWrapper() {
               <div className="flex items-center">
                 <button
                   type="button"
-                  onClick={openFilters}
+                  onClick={handleOpenFilters}
                   aria-label={`Filters${activeCount > 0 ? `, ${activeCount} active` : ""}`}
                   aria-expanded="false"
                   aria-controls="search-filters"
@@ -554,7 +565,7 @@ export default function SearchHeaderWrapper() {
       <div className="transition-all duration-300 ease-out md:hidden block py-2">
         <CollapsedMobileSearch
           onExpand={handleOpenMobileSearch}
-          onOpenFilters={openFilters}
+          onOpenFilters={handleOpenFilters}
           expandButtonRef={mobileExpandButtonRef}
         />
       </div>
@@ -563,7 +574,12 @@ export default function SearchHeaderWrapper() {
       <MobileSearchOverlay
         isOpen={isMobileOverlayOpen}
         onClose={handleCloseMobileSearch}
-        onOpenFilters={openFilters}
+        onOpenFilters={handleOpenFilters}
+      />
+      <HeaderFilterDrawer
+        isOpen={isHeaderFilterDrawerOpen}
+        activeFilterCount={activeCount}
+        onClose={() => setIsHeaderFilterDrawerOpen(false)}
       />
     </>
   );

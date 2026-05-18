@@ -56,7 +56,9 @@ export function MapEmptyState({ onZoomOut, searchParams }: MapEmptyStateProps) {
     const hasDate = !!searchParams.get("moveInDate");
     return hasPrice || hasDate;
   }, [searchParams]);
-  const nearMatchesAlreadyOn = searchParams.get("nearMatches") === "1";
+  const nearMatchesValue = searchParams.get("nearMatches");
+  const nearMatchesAlreadyOn =
+    nearMatchesValue === "1" || nearMatchesValue === "true";
   const showNearMatches = hasPriceOrDateFilter && !nearMatchesAlreadyOn;
 
   // Smart filter suggestions
@@ -92,8 +94,12 @@ export function MapEmptyState({ onZoomOut, searchParams }: MapEmptyStateProps) {
       // CFM-604: canonical-on-write guarantee — must go through buildCanonicalSearchUrl.
       buildCanonicalSearchUrl(
         applySearchQueryChange(currentQuery, "filter", {
-          minPrice: keysToRemove.has("minPrice") ? undefined : currentQuery.minPrice,
-          maxPrice: keysToRemove.has("maxPrice") ? undefined : currentQuery.maxPrice,
+          minPrice: keysToRemove.has("minPrice")
+            ? undefined
+            : currentQuery.minPrice,
+          maxPrice: keysToRemove.has("maxPrice")
+            ? undefined
+            : currentQuery.maxPrice,
           moveInDate: keysToRemove.has("moveInDate")
             ? undefined
             : currentQuery.moveInDate,

@@ -124,6 +124,14 @@ describe("ListingCard", () => {
       expect(screen.getByText("Cozy Room in Downtown")).toBeInTheDocument();
     });
 
+    it("uses local placeholder images when listing images are missing", () => {
+      render(<ListingCard listing={{ ...mockListing, images: [] }} />);
+
+      const image = screen.getByTestId("listing-image");
+      expect(image.getAttribute("src")).toMatch(/^\/(?!\/)/);
+      expect(image.getAttribute("src")).not.toMatch(/^https?:\/\//);
+    });
+
     it("keeps the listing link clickable while the carousel handles its own drag suppression", () => {
       render(<ListingCard listing={mockListing} />);
       expect(screen.getByTestId("listing-card-link")).not.toHaveClass(
@@ -422,7 +430,11 @@ describe("ListingCard", () => {
 
       const article = screen.getByTestId("listing-card");
       expect(article).toHaveAttribute("data-focus-state", "hovered");
-      expect(article).toHaveClass("ring-2", "ring-primary/50", "shadow-ambient");
+      expect(article).toHaveClass(
+        "ring-2",
+        "ring-primary/50",
+        "shadow-ambient"
+      );
       expect(article).not.toHaveClass("ring-offset-2");
     });
 
@@ -644,9 +656,7 @@ describe("ListingCard", () => {
       render(<ListingCard listing={listing} />);
       // "Available Jun 15" derives from publicAvailability.availableFrom,
       // not from moveInDate=2025-01-01.
-      expect(
-        screen.getByText(/available jun 15/i)
-      ).toBeInTheDocument();
+      expect(screen.getByText(/available jun 15/i)).toBeInTheDocument();
     });
 
     it("aria-label slot count derives from publicAvailability when present", () => {

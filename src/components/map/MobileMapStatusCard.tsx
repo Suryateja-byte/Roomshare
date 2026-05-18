@@ -62,7 +62,9 @@ export function MobileMapStatusCard({
     return hasPrice || hasDate;
   }, [searchParams]);
 
-  const nearMatchesAlreadyOn = searchParams.get("nearMatches") === "1";
+  const nearMatchesValue = searchParams.get("nearMatches");
+  const nearMatchesAlreadyOn =
+    nearMatchesValue === "1" || nearMatchesValue === "true";
   const showNearMatches = hasPriceOrDateFilter && !nearMatchesAlreadyOn;
 
   const suggestions = useMemo(() => {
@@ -97,8 +99,12 @@ export function MobileMapStatusCard({
       // CFM-604: canonical-on-write guarantee — must go through buildCanonicalSearchUrl.
       buildCanonicalSearchUrl(
         applySearchQueryChange(currentQuery, "filter", {
-          minPrice: keysToRemove.has("minPrice") ? undefined : currentQuery.minPrice,
-          maxPrice: keysToRemove.has("maxPrice") ? undefined : currentQuery.maxPrice,
+          minPrice: keysToRemove.has("minPrice")
+            ? undefined
+            : currentQuery.minPrice,
+          maxPrice: keysToRemove.has("maxPrice")
+            ? undefined
+            : currentQuery.maxPrice,
           moveInDate: keysToRemove.has("moveInDate")
             ? undefined
             : currentQuery.moveInDate,

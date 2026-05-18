@@ -338,7 +338,25 @@ describe("middleware matcher config", () => {
     expect(proxySource).toContain("_next/image");
   });
 
+  it("matcher pattern excludes webpack HMR traffic", () => {
+    expect(proxySource).toContain("_next/webpack-hmr");
+  });
+
   it("matcher pattern excludes favicon.ico", () => {
     expect(proxySource).toContain("favicon.ico");
+  });
+
+  it("matcher pattern excludes service worker and manifest assets", () => {
+    expect(proxySource).toContain("sw.js");
+    expect(proxySource).toContain("sw-version.js");
+    expect(proxySource).toContain("manifest.json");
+    expect(proxySource).toContain("icons");
+  });
+
+  it("matcher skips Next router prefetch requests", () => {
+    expect(proxySource).toContain("missing:");
+    expect(proxySource).toContain("next-router-prefetch");
+    expect(proxySource).toContain('key: "purpose"');
+    expect(proxySource).toContain('value: "prefetch"');
   });
 });

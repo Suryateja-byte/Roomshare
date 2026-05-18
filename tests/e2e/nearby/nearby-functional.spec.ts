@@ -19,6 +19,7 @@ import {
   pharmacyPlaces,
   singlePlace,
   emptyPlacesResponse,
+  farAwayPlaces,
 } from "./nearby-mock-factory";
 
 test.describe("Nearby Places — Functional Core @nearby", () => {
@@ -303,6 +304,110 @@ test.describe("Nearby Places — Functional Core @nearby", () => {
       await expect(nearby.zoomOut).toBeVisible();
       await expect(nearby.resetView).toBeVisible();
     }
+  });
+
+  test("F-019: Map markers stay bound to coordinates during zoom", async ({
+    page,
+  }) => {
+    const consoleErrors: string[] = [];
+    const pageErrors: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error") {
+        consoleErrors.push(message.text());
+      }
+    });
+    page.on("pageerror", (error) => {
+      pageErrors.push(error.message);
+    });
+
+    await mockNearbyApi(page, { body: buildNearbyResponse(farAwayPlaces) });
+    await nearby.goto();
+    await nearby.scrollToSection();
+
+    const mapVisible = await nearby.isMapVisible();
+    if (!mapVisible) {
+      test.skip(true, "Map must be visible to verify marker projection");
+      return;
+    }
+
+    await nearby.selectCategory("Grocery");
+    await nearby.waitForResults();
+
+    const poiMarker = nearby.placeMarkers.first();
+    const homeMarker = page.getByTestId("nearby-home-marker");
+    await expect(poiMarker).toBeVisible({ timeout: 5_000 });
+    await expect(homeMarker).toBeVisible({ timeout: 5_000 });
+
+    const readMarkerMetrics = async () =>
+      page.evaluate(() => {
+        const poi = document.querySelector<HTMLElement>(".poi-marker");
+        const home = document.querySelector<HTMLElement>(
+          '[data-testid="nearby-home-marker"]'
+        );
+
+        if (!poi || !home) {
+          return null;
+        }
+
+        const poiRect = poi.getBoundingClientRect();
+        const homeRect = home.getBoundingClientRect();
+        const poiCenter = {
+          x: poiRect.left + poiRect.width / 2,
+          y: poiRect.top + poiRect.height / 2,
+        };
+        const homeCenter = {
+          x: homeRect.left + homeRect.width / 2,
+          y: homeRect.top + homeRect.height / 2,
+        };
+
+        return {
+          poiCenter,
+          homeCenter,
+          distance: Math.hypot(
+            poiCenter.x - homeCenter.x,
+            poiCenter.y - homeCenter.y
+          ),
+        };
+      });
+
+    const beforeZoom = await readMarkerMetrics();
+    expect(beforeZoom).not.toBeNull();
+    const initialMetrics = beforeZoom!;
+
+    await nearby.zoomIn.click();
+
+    await expect
+      .poll(
+        async () => {
+          const afterZoom = await readMarkerMetrics();
+
+          if (!afterZoom) {
+            return 0;
+          }
+
+          const poiDelta = Math.hypot(
+            afterZoom.poiCenter.x - initialMetrics.poiCenter.x,
+            afterZoom.poiCenter.y - initialMetrics.poiCenter.y
+          );
+          const homeDelta = Math.hypot(
+            afterZoom.homeCenter.x - initialMetrics.homeCenter.x,
+            afterZoom.homeCenter.y - initialMetrics.homeCenter.y
+          );
+          const distanceDelta = Math.abs(
+            afterZoom.distance - initialMetrics.distance
+          );
+
+          return Math.min(poiDelta, homeDelta, distanceDelta);
+        },
+        { timeout: 5_000, intervals: [100, 200, 500] }
+      )
+      .toBeGreaterThan(2);
+
+    await expect(
+      page.locator("[data-nextjs-dialog], [data-nextjs-dialog-overlay]")
+    ).toHaveCount(0);
+    expect(pageErrors).toEqual([]);
+    expect(consoleErrors).toEqual([]);
   });
 
   test("F-020: Fit all markers button appears after search", async ({

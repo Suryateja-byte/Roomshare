@@ -107,10 +107,21 @@ export const DesktopHeaderSearch = forwardRef<
   );
 
   const [isEditingCollapsedState, setIsEditingCollapsedState] = useState(false);
+  const [hasMounted, setHasMounted] = useState(false);
   const [location, setLocation] = useState(intentState.locationInput);
   const [vibe, setVibe] = useState(intentState.vibeInput);
   const [selectedLocation, setSelectedLocation] =
     useState<SearchLocationSelection | null>(intentState.selectedLocation);
+  const autocompleteBias = useMemo(() => {
+    const source = selectedLocation ?? intentState.selectedLocation;
+
+    return source
+      ? {
+          near: { lat: source.lat, lng: source.lng },
+          bounds: source.bounds,
+        }
+      : undefined;
+  }, [intentState.selectedLocation, selectedLocation]);
   const [minPrice, setMinPrice] = useState(() => {
     const parsed = getPriceParam(
       new URLSearchParams(searchParamsString),
@@ -159,6 +170,10 @@ export const DesktopHeaderSearch = forwardRef<
   );
 
   const isInlineEditorVisible = !collapsed || isEditingCollapsedState;
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   const syncFromSearchParams = useCallback(() => {
     const nextState = readSearchIntentState(
@@ -390,6 +405,7 @@ export const DesktopHeaderSearch = forwardRef<
         type="button"
         onClick={handleSummaryClick}
         data-testid="desktop-header-search-summary"
+        data-hydrated={hasMounted || undefined}
         className="mx-auto flex h-[58px] w-full max-w-[680px] items-center rounded-full border border-outline-variant/30 bg-surface-container-lowest/95 p-2 shadow-ambient-sm shadow-on-surface/5 backdrop-blur-xl transition-all duration-300 hover:border-outline-variant/60 hover:shadow-ambient focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
       >
         <div className="flex flex-1 items-center divide-x divide-outline-variant/25 px-4 text-left">
@@ -423,6 +439,7 @@ export const DesktopHeaderSearch = forwardRef<
       <form
         onSubmit={handleSubmit}
         data-testid="desktop-header-search-form"
+        data-hydrated={hasMounted || undefined}
         className={cn(
           "flex w-full items-center border border-outline-variant/30 bg-surface-container-lowest/95 shadow-ambient-sm shadow-on-surface/5 backdrop-blur-xl transition-all duration-300 hover:border-outline-variant/60 hover:shadow-ambient focus-within:border-primary/30 focus-within:shadow-ambient",
           collapsed ? "rounded-full p-2" : "rounded-[1.75rem] p-2"
@@ -444,6 +461,7 @@ export const DesktopHeaderSearch = forwardRef<
               onChange={handleLocationChange}
               onLocationSelect={handleLocationSelect}
               fallbackItems={locationFallbackItems}
+              autocompleteBias={autocompleteBias}
               placeholder={
                 selectedLocation && location.length === 0
                   ? "Selected area"

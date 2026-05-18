@@ -1,0 +1,76 @@
+{
+  "generatedAt": "2026-05-16",
+  "status": "partial_with_documented_gap",
+  "adversarialChecks": [
+    {
+      "check": "Current claims must cite current source, schema, migration, test output, or UNKNOWN/NOT VERIFIED.",
+      "result": "PASS"
+    },
+    {
+      "check": "Retired booking behavior must not be described as active product behavior.",
+      "result": "PASS"
+    },
+    {
+      "check": "Booking-era artifacts must be classified as historical unless current source uses them.",
+      "result": "PASS"
+    },
+    {
+      "check": "Test failures must not be hidden.",
+      "result": "PASS: listing-contactable failure is recorded in evidence, tests, and gaps."
+    },
+    {
+      "check": "Claims about rendered browser behavior require browser evidence.",
+      "result": "PASS: browser-rendered behavior is marked NOT VERIFIED."
+    }
+  ],
+  "commands": [
+    {
+      "command": "pnpm test -- src/__tests__/lib/search/public-availability.test.ts --runInBand",
+      "runtimeCommand": "wsl -d Ubuntu --cd /home/surya/roomshare -- pnpm test -- src/__tests__/lib/search/public-availability.test.ts --runInBand",
+      "result": "pass",
+      "testsPassed": 15,
+      "testsFailed": 0
+    },
+    {
+      "command": "pnpm test -- src/__tests__/components/listings/SlotBadge.test.tsx --runInBand",
+      "runtimeCommand": "wsl -d Ubuntu --cd /home/surya/roomshare -- pnpm test -- src/__tests__/components/listings/SlotBadge.test.tsx --runInBand",
+      "result": "pass",
+      "testsPassed": 13,
+      "testsFailed": 0
+    },
+    {
+      "command": "pnpm test -- src/__tests__/components/ListingCard.test.tsx --runInBand",
+      "runtimeCommand": "wsl -d Ubuntu --cd /home/surya/roomshare -- pnpm test -- src/__tests__/components/ListingCard.test.tsx --runInBand",
+      "result": "pass",
+      "testsPassed": 50,
+      "testsFailed": 0
+    },
+    {
+      "command": "pnpm test -- src/__tests__/api/listings-host-managed-patch.test.ts --runInBand",
+      "runtimeCommand": "wsl -d Ubuntu --cd /home/surya/roomshare -- pnpm test -- src/__tests__/api/listings-host-managed-patch.test.ts --runInBand",
+      "result": "pass",
+      "testsPassed": 11,
+      "testsFailed": 0
+    },
+    {
+      "command": "pnpm test -- src/__tests__/lib/messaging/listing-contactable.test.ts --runInBand",
+      "runtimeCommand": "wsl -d Ubuntu --cd /home/surya/roomshare -- pnpm test -- src/__tests__/lib/messaging/listing-contactable.test.ts --runInBand",
+      "result": "fail",
+      "testsPassed": 7,
+      "testsFailed": 2,
+      "failureSummary": "ACTIVE listing fixture expected ok:true but received LISTING_UNAVAILABLE."
+    },
+    {
+      "command": "pnpm test -- src/__tests__/api/listings-viewer-state-route.test.ts --runInBand",
+      "runtimeCommand": "wsl -d Ubuntu --cd /home/surya/roomshare -- pnpm test -- src/__tests__/api/listings-viewer-state-route.test.ts --runInBand",
+      "result": "pass",
+      "testsPassed": 11,
+      "testsFailed": 0
+    }
+  ],
+  "notVerified": [
+    "Rendered browser state for search, map, and listing detail surfaces.",
+    "Live production or staging database state.",
+    "Full E2E Contact Host conversation creation from a real browser click."
+  ]
+}

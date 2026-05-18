@@ -8,17 +8,23 @@ import {
   seedCollisionListings,
 } from "./create-collision-helpers";
 
+const OWNER_EMAIL = "e2e-other@roomshare.dev";
+
+test.use({ storageState: "playwright/.auth/user2.json" });
+
 test("T-17: add-date collision retry re-posts with ack and creates a listing", async ({
   page,
 }) => {
   const cleanupIds = await seedCollisionListings(page, {
     title: "E2E Collision Add Date",
+    ownerEmail: OWNER_EMAIL,
   });
 
   try {
     const createPage = await openPreparedCreateListingPage(
       page,
-      buildCollisionFormData("Collision Add Date Candidate")
+      buildCollisionFormData("Collision Add Date Candidate"),
+      OWNER_EMAIL
     );
 
     const firstResponse = await createPage.submitAndWaitForResponse();

@@ -111,9 +111,10 @@ export default function SaveSearchButton({
         }),
       });
 
-      const payload = (await response.json().catch(() => null)) as
-        | { error?: string; checkoutUrl?: string }
-        | null;
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string;
+        checkoutUrl?: string;
+      } | null;
 
       if (response.status === 401) {
         router.push("/login");
@@ -292,6 +293,7 @@ export default function SaveSearchButton({
                               type="button"
                               onClick={() => setAlertFrequency(freq)}
                               disabled={lockedSearchId !== null}
+                              aria-pressed={alertFrequency === freq}
                               className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                                 alertFrequency === freq
                                   ? "bg-primary text-on-primary"

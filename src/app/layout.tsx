@@ -54,17 +54,19 @@ export const viewport: Viewport = {
 };
 
 import MainLayout from "@/components/MainLayout";
-// CSP nonce is forwarded via x-nonce header from src/proxy.ts
-// Read it here with: const nonce = (await headers()).get('x-nonce') || undefined;
-// when adding inline <Script nonce={nonce}> tags
+
+async function preserveProductionNonceRendering() {
+  if (process.env.NODE_ENV === "production") {
+    await headers();
+  }
+}
 
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const requestHeaders = await headers();
-  const nonce = requestHeaders.get("x-nonce") || undefined;
+  await preserveProductionNonceRendering();
 
   return (
     <html lang="en">
@@ -106,7 +108,7 @@ export default async function RootLayout({
       <body
         className={`${newsreader.variable} ${manrope.variable} font-body bg-surface-canvas text-on-surface`}
       >
-        <Providers nonce={nonce}>
+        <Providers>
           <SkipLink />
           <CustomScrollContainer>
             <div className="flex flex-col min-h-screen">

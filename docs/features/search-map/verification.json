@@ -34,8 +34,8 @@
     },
     {
       "claimId": "V005",
-      "claim": "The V2/search-doc versus legacy fallback contract is source-extracted for SSR search, `/api/search/listings`, direct `/api/search/v2`, load-more, and client degraded states, with remaining P2 gaps for dedicated `/api/search/listings` route tests and broader service semantic-suite repair.",
-      "citation": "05-api-contracts.md; 06-data-model-and-invariants.md; 12-gaps-unknowns-and-questions.md G007; evidence-register.md C063; runtime-verification.md",
+      "claim": "The V2/search-doc versus legacy fallback contract is source-extracted for SSR search, `/api/search/listings`, direct `/api/search/v2`, load-more, and client degraded states; C069 verifies the repaired semantic-service suite, while dedicated `/api/search/listings` route-handler fallback tests remain P2.",
+      "citation": "05-api-contracts.md; 06-data-model-and-invariants.md; 12-gaps-unknowns-and-questions.md G007; evidence-register.md C063, C069; runtime-verification.md",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -58,8 +58,8 @@
     },
     {
       "claimId": "V008",
-      "claim": "Filter controls write search state through URL/query navigation and focused desktop filter/URL behavior has passing E2E coverage; broader cross-project filter coverage remains unrun.",
-      "citation": "02-user-flows.md; 03-interaction-census.md; 04-runtime-sequences.md; unknowns.md G006; phase-4/03-state-model.md",
+      "claim": "Filter controls write search state through URL/query navigation and focused desktop filter/URL behavior has passing E2E coverage; C070 adds focused chromium-anon lease-duration filter proof, C071 clears the amenities blocker, C072 clears the known chromium-anon filter race/reset blocker, C073 reduces skipped filter cases from 30 to 18, and C074 retires those residual active skips with final chromium-anon filter gates at 0 skipped.",
+      "citation": "02-user-flows.md; 03-interaction-census.md; 04-runtime-sequences.md; unknowns.md G001-G002; phase-4/03-state-model.md; evidence-register.md C070-C074",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -106,8 +106,8 @@
     },
     {
       "claimId": "V014",
-      "claim": "Desktop map preference, focused list-backed map parity, marker/list focus, pan/zoom URL state, mobile map/list behavior, map error/a11y behavior, and /api/map-listings 500/429 retry behavior have passing browser coverage; provider terminology is documented as MapLibre runtime with OpenFreeMap/OpenStreetMap map resources.",
-      "citation": "README.md; 02-user-flows.md; 12-gaps-unknowns-and-questions.md G001, G005, G011; evidence-register.md C031, C056, C058, C059",
+      "claim": "Desktop map preference, focused list-backed map parity, marker/list focus, pan/zoom URL state including zoom-only bounds updates, mobile map/list behavior, map error/a11y behavior, /api/map-listings 500/429 retry behavior, and broader chromium-anon map/list/map-tools behavior have passing browser coverage; C078 retires the residual focused chromium-anon marker/card overlap skips; provider terminology is documented as MapLibre runtime with OpenFreeMap/OpenStreetMap map resources.",
+      "citation": "README.md; 02-user-flows.md; 12-gaps-unknowns-and-questions.md G001, G005, G011; evidence-register.md C031, C056, C058, C059, C065, C077, C078",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -170,8 +170,8 @@
     },
     {
       "claimId": "V022",
-      "claim": "Saved search is documented as an entry point/server action, with checkout/paywall details only partially traced.",
-      "citation": "README.md; 02-user-flows.md; 05-api-contracts.md; phase-4/02-api-data-flow.md; phase-4/04-auth-security-permissions.md",
+      "claim": "Saved search is documented as an entry point/server action, with C066 browser evidence for the project-owned authenticated save/search-alert path and failure-mocked paywalled checkout handoff; action/component and saved-searches page variants remain only partially traced.",
+      "citation": "README.md; 02-user-flows.md; 05-api-contracts.md; phase-4/02-api-data-flow.md; phase-4/04-auth-security-permissions.md; runtime-verification.md; evidence-register.md C066",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -242,8 +242,8 @@
     },
     {
       "claimId": "V031",
-      "claim": "The test matrix lists existing search/map/unit/API/E2E tests, marks the narrow smoke, filter, pagination, desktop map, results-state, URL-state, anonymous saved-listing redirect, mobile map/list, search error-resilience, and map error/a11y specs as passed, and leaves broader tests as `Not run`.",
-      "citation": "11-test-traceability-matrix.md; manifest.json tests; phase-4/05-test-traceability.md",
+      "claim": "The test matrix lists existing search/map/unit/API/E2E tests, marks the focused passing commands, C070-C074 filter evidence, C078 map zero-skip evidence, C079 semantic/dedupe owner-baseline zero-skip evidence, C080 dedupe non-Chromium/mobile evidence, and C080 bounded release-gate provider evidence as passed or intentionally skipped by contract, while keeping semantic non-Chromium/mobile runtime behavior open where commands are unowned and broad non-gate provider candidates as lower-priority confidence coverage.",
+      "citation": "11-test-traceability-matrix.md; manifest.json tests; phase-4/05-test-traceability.md; evidence-register.md C079-C080",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -290,7 +290,7 @@
     },
     {
       "claimId": "V037",
-      "claim": "A later rerun of the narrow desktop-anonymous `/search` smoke test passed with `1 passed (27.0s)` after rendering 57 listings.",
+      "claim": "A later rerun of the narrow desktop-anonymous `/search` smoke test passed with `1 passed (27.Cs)` after rendering 57 listings.",
       "citation": "runtime-verification.md; evidence-register.md C034; command output from `pnpm exec playwright test tests/e2e/search/search-smoke.spec.ts --project=desktop-anonymous --reporter=list`",
       "verdict": "pass",
       "discrepancy": null,
@@ -363,7 +363,7 @@
     {
       "claimId": "V046",
       "claim": "The focused chromium-anon map error/a11y Playwright suite passed after Docker/Postgres readiness, and C058 separately covers /api/map-listings 500/429 browser behavior.",
-      "citation": "runtime-verification.md; evidence-register.md C043, C058; test-results/.last-run.json; command output from `pnpm exec playwright test tests/e2e/map-errors-a11y.anon.spec.ts --project=chromium-anon --reporter=list`; command output from `ENABLE_SEARCH_SNAPSHOT_CONTRACT=false pnpm exec playwright test tests/e2e/search/search-map-desktop.spec.ts --project=failure-mocked --grep '@failure-mocked' --reporter=list`",
+      "citation": "runtime-verification.md; evidence-register.md C043, C058; test-results/.last-run.json; command output from `pnpm exec playwright test tests/e2e/map-errors-a11y.anon.spec.ts --project=chromium-anon --reporter=list`; command output from `ENABLE_SEARCH_SNAPSHOT_0ONTRACT=false pnpm exec playwright test tests/e2e/search/search-map-desktop.spec.ts --project=failure-mocked --grep '@failure-mocked' --reporter=list`",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -439,18 +439,135 @@
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
+    },
+    {
+      "claimId": "V056",
+      "claim": "Broader chromium-anon anonymous map-mode/list-map browser commands passed for list/map synchronization, map controls/POI behavior, always-on map search/result synchronization including rapid panning debounce, mobile preview, mobile map tool viewport behavior, and visual state.",
+      "citation": "runtime-verification.md; evidence-register.md C065; command output from `pnpm exec playwright test tests/e2e/search-map-list-sync.anon.spec.ts --project=chromium-anon --reporter=list --workers=1`; command output from `pnpm exec playwright test tests/e2e/map-features.anon.spec.ts tests/e2e/map-search-results.anon.spec.ts tests/e2e/mobile-map-tools.anon.spec.ts --project=chromium-anon --reporter=list --workers=1`; test-results/.last-run.json",
+      "verdict": "pass",
+      "discrepancy": "The commands still had skipped tests and do not prove non-Chromium/browser-provider breadth, live provider-network visual breadth, or unrelated non-map broader E2E outside the C066/C067/C068 owner-project browser specs.",
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V057",
+      "claim": "The saved-search browser owner-project command passed for authenticated named save/search-alert behavior and failure-mocked paywalled search-alert checkout behavior.",
+      "citation": "runtime-verification.md; evidence-register.md C066; command output from `pnpm exec playwright test tests/e2e/search/search-saved-search.spec.ts --project=desktop-authenticated --project=failure-mocked --reporter=list --workers=1`; test-results/.last-run.json",
+      "verdict": "pass",
+      "discrepancy": "The 2 skipped tests were expected cross-project ownership skips. This command does not prove every saved-search action/component, saved-searches page, or broader journey variant.",
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V058",
+      "claim": "C067 records partial location/listing-card/security browser evidence: listing-card and security owner-project commands passed, while the location autocomplete command and focused B1 retry both failed with a `/api/geocoding/autocomplete` wait timeout.",
+      "citation": "runtime-verification.md; evidence-register.md C067; command output from `pnpm exec playwright test tests/e2e/search/search-location.spec.ts --project=desktop-anonymous --reporter=list --workers=1`; command output from `pnpm exec playwright test tests/e2e/search/search-location.spec.ts --project=desktop-anonymous --reporter=list --workers=1 -g 'B1'`; command output from `pnpm exec playwright test tests/e2e/search/search-listing-card.spec.ts --project=desktop-anonymous --project=mobile-anonymous --reporter=list --workers=1`; command output from `pnpm exec playwright test tests/e2e/search/search-security.spec.ts --project=desktop-anonymous --project=failure-mocked --reporter=list --workers=1`",
+      "verdict": "pass",
+      "discrepancy": "No product bug was proven by the pre-fix location timeout; B2-B4 did not run because the serial group stopped after B1. C068 supersedes the current location status; listing-card and security residual variants are P2 confidence coverage.",
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V059",
+      "claim": "C068 records the test-only SearchPage page-object wait-ordering fix and passing location owner-project browser evidence.",
+      "citation": "tests/e2e/pages/SearchPage.ts; runtime-verification.md; evidence-register.md C068; command output from `pnpm exec playwright test tests/e2e/search/search-location.spec.ts --project=desktop-anonymous --reporter=list --workers=1 -g 'B1'`; command output from `pnpm exec playwright test tests/e2e/search/search-location.spec.ts --project=desktop-anonymous --reporter=list --workers=1`; test-results/.last-run.json",
+      "verdict": "pass",
+      "discrepancy": "Focused B1 passed with `1 passed` in `1.Cm`, and the full desktop-anonymous location spec passed with `4 passed` in `55.7s`; `.last-run.json` reported `status: passed` and `failedTests: []`. This does not prove direct component/provider/geolocation variants or broader location journeys.",
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V060",
+      "claim": "C069 records the test-only stale fixture repair for Search V2 semantic-service coverage and passing focused plus broader Jest evidence.",
+      "citation": "src/__tests__/lib/search/search-v2-service.test.ts; runtime-verification.md; evidence-register.md C069; command output from `pnpm test -- src/__tests__/lib/search/search-v2-service.test.ts --runInBand`; command output from `pnpm test -- src/__tests__/api/search/v2/route.test.ts src/__tests__/app/search/actions.test.ts src/__tests__/lib/search/search-v2-service.test.ts --runInBand`; command output from `pnpm exec prettier --check src/__tests__/lib/search/search-v2-service.test.ts`",
+      "verdict": "pass",
+      "discrepancy": "The stale default lastConfirmedAt fixture was older than the 21-day public availability/contactability gate, so semantic candidates were filtered before assertions and the service correctly fell back. After C069, the focused service suite passed 1 suite / 41 tests and the broader route/action/service command passed 3 suites / 73 tests. This does not prove every /api/search/listings route-handler fallback branch. C074 later closes active chromium filter skipped cases, C079 later closes active chromium semantic/dedupe owner-baseline gaps, and C080 later closes/downgrades dedupe non-Chromium/mobile plus bounded release-gate provider breadth; semantic non-Chromium/mobile runtime behavior remains a P1 ownership residual, and broad non-gate map/provider candidates remain lower-priority confidence coverage.",
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V061",
+      "claim": "C070 records a broader filter-browser attempt where the owner project is chromium-anon, the focused lease-duration filter spec passed, and the first full filter-suite attempt stopped at the amenities modal-open blocker.",
+      "citation": "runtime-verification.md; evidence-register.md C070; command output from `find tests/e2e/search-filters -maxdepth 2 -type f | sort`; command output from `pnpm exec playwright test --list --project=desktop-anonymous tests/e2e/search-filters`; command output from `pnpm exec playwright test --list --project=chromium-anon tests/e2e/search-filters`; command output from `pnpm exec playwright test tests/e2e/search-filters/filter-lease-duration.anon.spec.ts --project=chromium-anon --reporter=list --workers=1`; command output from `PLAYWRIGHT_JSON_OUTPUT_NAME=/tmp/c070-search-filters.json pnpm exec playwright test tests/e2e/search-filters --project=chromium-anon --reporter=json --workers=1`; command output from `pnpm exec playwright test tests/e2e/search-filters/filter-amenities.anon.spec.ts --project=chromium-anon --reporter=line --workers=1 --no-deps -g \"selecting an amenity\"`",
+      "verdict": "pass",
+      "discrepancy": "C070 proves only focused lease-duration browser behavior: `3 passed`, runtime about `1.7m`. The first full `tests/e2e/search-filters` command started 144 chromium-anon tests and failed immediately in `filter-amenities.anon.spec.ts` when `openFilterModal()` timed out waiting for the filters dialog. The focused retry hung before useful app behavior evidence. C071 later supersedes the amenities blocker.",
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V062",
+      "claim": "C071 records the amenities-filter debug result: the desktop helper targets the inline quick-filter button, focused and full amenities specs pass, and the broader filter suite now fails later race/reset tests.",
+      "citation": "tests/e2e/helpers/filter-helpers.ts; runtime-verification.md; evidence-register.md C071; command output from `pnpm exec playwright test tests/e2e/search-filters/filter-amenities.anon.spec.ts:51 --project=chromium-anon --reporter=list --workers=1 --no-deps`; command output from `pnpm exec playwright test tests/e2e/search-filters/filter-amenities.anon.spec.ts --project=chromium-anon --reporter=list --workers=1`; command output from `pnpm exec playwright test tests/e2e/search-filters --project=chromium-anon --reporter=list --workers=1`; Playwright artifacts under `test-results/search-filters-filter-race-fbeb2-e-click-on-Apply-button-P0--chromium-anon`, `test-results/search-filters-filter-rese-ff8ab-s-URL-and-refreshes-results-chromium-anon`, and `test-results/search-filters-filter-rese-c893d-learing-restrictive-filters-chromium-anon`",
+      "verdict": "pass",
+      "discrepancy": "Focused amenities passed with `1 passed (12.7s)`, full amenities passed with `9 passed (43.2s)`, and the broader chromium-anon filter suite ran all 144 tests with `111 passed`, `30 skipped`, and `3 failed` in `10.7m`. The three remaining failures are `filter-race-conditions.anon.spec.ts:205` waiting for `amenities=Wifi` after double-click Apply, plus `filter-reset.anon.spec.ts:109` and `filter-reset.anon.spec.ts:235` waiting for zero-results clear-all to remove `minPrice`/`maxPrice`. Production code was not changed.",
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V063",
+      "claim": "C072 records the race/reset triage result: filter Apply uses the currently rendered snapshot and guards duplicate Apply, pending non-map filter navigations are protected from stale map-pan writes, reset controls navigate from active search params, and the chromium-anon search-filter folder passes with skipped cases still not verified.",
+      "citation": "runtime-verification.md; evidence-register.md C072; tests/e2e/search-filters/filter-race-conditions.anon.spec.ts; tests/e2e/search-filters/filter-reset.anon.spec.ts; tests/e2e/helpers/filter-helpers.ts; src/components/search/FilterModal.tsx; src/components/search/InlineFilterStrip.tsx; src/hooks/useBatchedFilters.ts; src/contexts/SearchTransitionContext.tsx; src/components/Map.tsx; src/components/search/SearchUrlCanonicalizer.tsx; src/lib/search/pending-search-navigation.ts; src/components/ZeroResultsSuggestions.tsx; src/components/filters/AppliedFilterChips.tsx; src/components/search/SearchResultsClient.tsx; command output from `pnpm exec playwright test tests/e2e/search-filters/filter-race-conditions.anon.spec.ts:212 tests/e2e/search-filters/filter-reset.anon.spec.ts:168 tests/e2e/search-filters/filter-reset.anon.spec.ts:275 --project=chromium-anon --reporter=list --workers=1 --no-deps`; command output from `pnpm exec playwright test tests/e2e/search-filters/filter-race-conditions.anon.spec.ts tests/e2e/search-filters/filter-reset.anon.spec.ts --project=chromium-anon --reporter=list --workers=1`; command output from `pnpm exec playwright test tests/e2e/search-filters --project=chromium-anon --reporter=list --workers=1`",
+      "verdict": "pass",
+      "discrepancy": "Focused C072 passed with `3 passed`; related race/reset specs passed with `11 passed`; the full chromium-anon search-filter folder passed with `114 passed` / `30 skipped`. C073/C074 later close active chromium skipped-filter residuals, C078 closes focused skipped-map residuals, and C079 closes active chromium semantic/dedupe owner-baseline gaps; C080 later closes/downgrades dedupe non-Chromium/mobile plus bounded release-gate provider breadth. Semantic non-Chromium/mobile runtime behavior remains a P1 ownership residual; broad non-gate map/provider candidates remain lower-priority confidence coverage.",
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V064",
+      "claim": "C073 records the skipped-case audit result: applied-filter skipped cases were test harness drift, the test-only helper/skip-guard fix converts those cases to executed passing tests, the chip-bar clear-all reset harness is hardened, and the remaining chromium-anon search-filter skips are classified residuals.",
+      "citation": "runtime-verification.md; evidence-register.md C073; tests/e2e/helpers/filter-helpers.ts; tests/e2e/search-filters/filter-chips.anon.spec.ts; tests/e2e/search-filters/filter-combinations.anon.spec.ts; tests/e2e/search-filters/filter-persistence.anon.spec.ts; tests/e2e/search-filters/filter-validation.anon.spec.ts; tests/e2e/search-filters/filter-reset.anon.spec.ts; tests/e2e/search-filters/filter-category-bar.anon.spec.ts; tests/e2e/search-filters/filter-recommended.anon.spec.ts; tests/e2e/search-filters/filter-near-matches.anon.spec.ts; tests/e2e/search-filters/filter-pagination-interaction.anon.spec.ts; tests/e2e/search-filters/filter-room-type.anon.spec.ts; tests/e2e/search-filters/filter-url-desync.anon.spec.ts; src/components/search/InlineFilterStrip.tsx; src/components/search/DesktopQuickFilters.tsx; command output from `PLAYWRIGHT_JSON_OUTPUT_NAME=/tmp/c073-search-filters.json pnpm exec playwright test tests/e2e/search-filters --project=chromium-anon --reporter=json --workers=1`; command output from `grep -RIn \"test\\\\.skip\\\\|describe\\\\.skip\\\\|\\\\.skip(\" tests/e2e/search-filters`; command output from `pnpm exec playwright test tests/e2e/search-filters/filter-chips.anon.spec.ts tests/e2e/search-filters/filter-combinations.anon.spec.ts tests/e2e/search-filters/filter-persistence.anon.spec.ts tests/e2e/search-filters/filter-validation.anon.spec.ts --project=chromium-anon --reporter=list --workers=1 --no-deps`; command output from `PLAYWRIGHT_JSON_OUTPUT_NAME=/tmp/c073-search-filters-after-fix.json pnpm exec playwright test tests/e2e/search-filters --project=chromium-anon --reporter=json --workers=1`; command output from `pnpm exec playwright test tests/e2e/search-filters/filter-reset.anon.spec.ts:218 --project=chromium-anon --reporter=list --workers=1 --no-deps`; command output from `pnpm exec playwright test tests/e2e/search-filters/filter-chips.anon.spec.ts tests/e2e/search-filters/filter-combinations.anon.spec.ts tests/e2e/search-filters/filter-persistence.anon.spec.ts tests/e2e/search-filters/filter-validation.anon.spec.ts tests/e2e/search-filters/filter-reset.anon.spec.ts --project=chromium-anon --reporter=list --workers=1 --no-deps`; command output from final `pnpm exec playwright test tests/e2e/search-filters --project=chromium-anon --reporter=list --workers=1`",
+      "verdict": "pass",
+      "discrepancy": "Baseline C073 full JSON passed with `114 passed` / `30 skipped`. The affected applied-filter specs first showed `22 passed` / `12 skipped` after only the helper locator change, then passed with `34 passed` and no skips after replacing immediate `isVisible()` skip guards with web-first visibility assertions. The post-fix full JSON run passed with `126 passed` / `18 skipped`, `0 unexpected`, and `0 flaky`. Two list-reporter full-folder attempts then failed once each after `125 passed` / `18 skipped`: one quick-filter readiness wait in `filter-house-rules.anon.spec.ts:50`, then one chip-bar clear-all visibility assertion in `filter-reset.anon.spec.ts:218`; focused reruns passed, and the reset case was hardened test-side. After hardening, the focused reset command passed with `1 passed`, touched applied-filter/reset specs passed with `38 passed`, and the final full list-reporter command passed with `126 passed` / `18 skipped`. The remaining skips are classified as 11 stale/obsolete removed UI cases, 4 fixture/data-dependent cases, and 3 old room-type tab UI target cases. Those 18 residuals remain not executed behavior.",
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V065",
+      "claim": "C074 retires the 18 C073 residual active chromium-anon search-filter skips and the full active filter folder runs with zero skipped tests.",
+      "citation": "runtime-verification.md; evidence-register.md C074; tests/e2e/search-filters/filter-room-type.anon.spec.ts; tests/e2e/search-filters/filter-url-desync.anon.spec.ts; tests/e2e/search-filters/filter-near-matches.anon.spec.ts; tests/e2e/search-filters/filter-pagination-interaction.anon.spec.ts; src/__tests__/components/LowResultsGuidance.test.tsx; src/__tests__/components/search/SearchResultsClient.test.tsx; command output from `PLAYWRIGHT_JSON_OUTPUT_NAME=/tmp/c074-search-filters-before.json pnpm exec playwright test tests/e2e/search-filters --project=chromium-anon --reporter=json --workers=1`; command output from `grep -RIn \"test\\\\.skip\\\\|describe\\\\.skip\\\\|\\\\.skip(\" tests/e2e/search-filters`; command output from `pnpm test -- src/__tests__/components/LowResultsGuidance.test.tsx src/__tests__/components/search/SearchResultsClient.test.tsx --runInBand`; command output from focused C074 Playwright touched-spec run; command output from `PLAYWRIGHT_JSON_OUTPUT_NAME=/tmp/c074-search-filters-after2.json pnpm exec playwright test tests/e2e/search-filters --project=chromium-anon --reporter=json --workers=1`; command output from final `pnpm exec playwright test tests/e2e/search-filters --project=chromium-anon --reporter=list --workers=1`",
+      "verdict": "pass",
+      "discrepancy": "Baseline C074 full JSON matched the C073 residual set with `126 passed` / `18 skipped`. C074 deletes obsolete active CategoryBar/RecommendedFilters skipped suites, rewrites room-type tab skips against the current quick-filter popover, replaces the stale category-bar URL-desync skip with current room-type quick-filter URL consistency coverage, and replaces fixture-dependent low-results/pagination-cap browser skips with deterministic component/unit coverage. Unit/component coverage passed 2 suites / 45 tests; focused touched Playwright specs passed with `22 passed`. The first full post-edit JSON gate had 0 skipped but failed one strict locator in the new URL-desync room-type trigger; scoping the trigger to the search results container fixed it and focused retry passed. Final C074 JSON passed with `130 expected`, `0 skipped`, `0 unexpected`, and final list passed with `130 passed (10.5m)`. Retired low-results guidance and pagination-cap exact browser flows remain not browser-executed.",
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V066",
+      "claim": "C077 fixes the zoom-only map URL-bounds regression exposed by C076 and reduces the focused chromium-anon skipped-map-case residual from 11 actual skips to 8 dynamic marker availability/card-overlap skips.",
+      "citation": "runtime-verification.md; evidence-register.md C077; 12-gaps-unknowns-and-questions.md G011; src/components/Map.tsx:L3039-L3118, L3336-L3368, L3407-L3437; /home/surya/roomshare/playwright/.cache/c076-map-skips-before.json; /home/surya/roomshare/playwright/.cache/c076-map-skips-after.json; /home/surya/roomshare/playwright/.cache/c076-narrow-after-fix.json; /home/surya/roomshare/playwright/.cache/c077-map-focused-after2.json",
+      "verdict": "pass",
+      "discrepancy": "C076 baseline focused map JSON reported `50 expected`, `11 skipped`, `0 unexpected`, `0 flaky`, runtime `417601.468ms`. The C076 test-only attempt stopped/replanned after `2 unexpected` failures: zoom URL bounds did not change within 30000ms, and rapid marker-click coverage found `0` marker/card overlaps. C077 changed `Map.tsx` so the `handleMoveEnd` early return occurs only when both center and bounds are unchanged using `0.C001` bounds tolerance while preserving the existing `executeMapSearch` URL write path. `pnpm run typecheck` passed exit 0. Final C077 focused map JSON exited 0 with `50 expected`, `8 skipped`, `0 unexpected`, `0 flaky`, runtime `654379.108ms`. Residual skips are dynamic marker availability/card-overlap only: `map-errors-a11y.anon.spec.ts` has `No markers available for focus management test` x1; `search-map-list-sync.anon.spec.ts` has `No markers` x2, `Need 2+ markers` x3, and `No markers available after cluster expansion` x2. Marker hover/click/card-overlap behaviors remained `NOT VERIFIED` in WSL/headless when overlap prerequisites were absent; C078 later closes that focused residual and C080 later closes/downgrades bounded release-gate provider breadth.",
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V067",
+      "claim": "C078 retires the 8 C077 residual focused chromium-anon marker availability/card-overlap skips through deterministic test-only marker/card setup, and the focused map subset runs with zero skipped tests.",
+      "citation": "runtime-verification.md; evidence-register.md C078; 12-gaps-unknowns-and-questions.md G011; tests/e2e/search-map-list-sync.anon.spec.ts:L71-L153, L653-L702, L778-L778, L1265-L1372, L1510-L1553; tests/e2e/map-errors-a11y.anon.spec.ts:L95-L183, L531-L559; /home/surya/roomshare/playwright/.cache/c077-map-focused-after2.json; /home/surya/roomshare/playwright/.cache/c078-map-focused-after.json; /home/surya/roomshare/playwright/.cache/c078-critic-fix-focused.json; /home/surya/roomshare/playwright/.cache/c078-map-subset-after-critic-fix.json",
+      "verdict": "pass",
+      "discrepancy": "C077 residual baseline had `50 expected`, `8 skipped`, `0 unexpected`, and `0 flaky`; all residuals were marker availability/card-overlap skips. C078 added deterministic marker/card setup in map E2E specs using visible card IDs, a scoped `/api/map-listings` route, fixed SF coordinates, `__e2eMapRef` zoom 16, `__e2eUpdateMarkers`, and explicit overlap assertions before hover/click/focus assertions. Prettier check on touched tests exited 0, and `pnpm run typecheck` exited 0. `c078-map-focused-after.json` exited 0 with `39 expected`, `0 skipped`, `0 unexpected`, `0 flaky`, runtime `215593.084ms`. Critic follow-up removed two assertion-masking paths after deterministic setup; `c078-critic-fix-focused.json` exited 0 with `2 expected`, `0 skipped`, `0 unexpected`, `0 flaky`, runtime `61675.725ms`, proving those popup assertions now execute. Final authoritative `c078-map-subset-after-critic-fix.json` exited 0 with `58 expected`, `0 skipped`, `0 unexpected`, `0 flaky`, runtime `358202.042ms`. No production marker popup/list sync bug was exposed. C079 later closes active chromium semantic/dedupe owner-baseline residuals; C080 later closes/downgrades dedupe non-Chromium/mobile and bounded release-gate provider breadth. Semantic non-Chromium/mobile runtime behavior remains a P1 ownership residual; broad non-gate map/provider candidates remain lower-priority confidence coverage.",
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V068",
+      "claim": "C079 closes active chromium semantic skips and the dedupe chromium marker parity catch-to-pass gap for their owner baselines with test-only deterministic semantic fixtures and direct marker assertions.",
+      "citation": "runtime-verification.md; evidence-register.md C079; 11-test-traceability-matrix.md; tests/e2e/semantic-search/semantic-search-results.anon.spec.ts:L44-L55; tests/e2e/semantic-search/semantic-search-similar-listings.anon.spec.ts:L24-L70, L130-L136; tests/e2e/dedupe/search-list-4-clone-grouping.dedupe.spec.ts:L8-L23; tests/e2e/dedupe/search-list-selectors-map-list-parity.dedupe.spec.ts:L8-L30; /home/surya/roomshare/playwright/.cache/c079-semantic-chromium-anon.json; /home/surya/roomshare/playwright/.cache/c079-dedupe-chromium.json; /home/surya/roomshare/playwright/.cache/c079-semantic-after.json; /home/surya/roomshare/playwright/.cache/c079-dedupe-chromium-after.json",
+      "verdict": "pass",
+      "discrepancy": "Planning semantic baseline `c079-semantic-chromium-anon.json` had `21 expected`, `8 skipped`, `0 unexpected`, `0 flaky`; skips were SS-08 zero result plus seven similar-listings missing/hidden-section cases due fixture embedding data. Planning dedupe baseline `c079-dedupe-chromium.json` had `14 expected`, `0 skipped`, `0 unexpected`, `0 flaky`, but two marker/parity tests had catch-to-pass masking when visible marker count failed. C079 made SS-08 use deterministic seeded query `E2E Dedupe Clone Group`, seeded deterministic E2E embeddings locally through Prisma and asserted 6 fixture rows updated, and changed dedupe marker/parity tests to assert marker counts directly. Prettier check on touched tests exited 0, `pnpm run typecheck` exited 0, and `git diff --check` on touched paths exited 0. Final semantic artifact `c079-semantic-after.json` exited 0 with `29 expected`, `0 skipped`, `0 unexpected`, `0 flaky`, runtime `84982.625ms`. Final dedupe artifact `c079-dedupe-chromium-after.json` exited 0 with `14 expected`, `0 skipped`, `0 unexpected`, `0 flaky`, runtime `55979.539ms`. Final Playwright used `E2E_BASE_URL=http://localhost:3020` because port 3000 was occupied by an unrelated Next server and the fixed webServer health check timed out, so C079 does not claim default-port behavior. No production search/dedupe bug was exposed.",
+      "recommendedFix": null
+    },
+    {
+      "claimId": "V069",
+      "claim": "C080 closes/downgrades the dedupe non-Chromium/mobile portion with Firefox, WebKit, Mobile Chrome, and Mobile Safari artifacts, closes/downgrades bounded release-gate provider breadth with WebKit and Mobile Safari SSR/client artifacts, and keeps semantic non-Chromium/mobile as a NOT VERIFIED P1 ownership gap.",
+      "citation": "runtime-verification.md; evidence-register.md C080; 11-test-traceability-matrix.md; 12-gaps-unknowns-and-questions.md G001-G002/G011; unknowns.md G001-G002/G011; /home/surya/roomshare/playwright/.cache/c080-dedupe-firefox.json; /home/surya/roomshare/playwright/.cache/c080-dedupe-webkit.json; /home/surya/roomshare/playwright/.cache/c080-dedupe-mobile-chrome.json; /home/surya/roomshare/playwright/.cache/c080-dedupe-mobile-safari.json; /home/surya/roomshare/playwright/.cache/c080-provider-webkit-ssr.json; /home/surya/roomshare/playwright/.cache/c080-provider-webkit-client.json; /home/surya/roomshare/playwright/.cache/c080-provider-mobile-safari-ssr.json; /home/surya/roomshare/playwright/.cache/c080-provider-mobile-safari-client.json",
+      "verdict": "pass",
+      "discrepancy": "C080 Planning confirmed docs still tracked map/provider breadth as active P1 before this continuation. Semantic ownership discovery listed 29 tests / 6 files, all owned by `chromium-anon`; `firefox-anon`, `webkit-anon`, `firefox`, `webkit`, `Mobile Chrome`, and `Mobile Safari` listed 0 semantic tests. Dedupe ownership discovery found 9 dedupe search-list tests per project under `chromium`, `firefox`, `webkit`, `Mobile Chrome`, and `Mobile Safari`, with setup dependency adding 5 auth setup tests to artifact totals. C080 dedupe baselines used `E2E_BASE_URL=http://localhost:3020` because port 3000 was serving a different app. `c080-dedupe-firefox.json` and `c080-dedupe-webkit.json` each reported `14 expected`, `0 skipped`, `0 unexpected`, and `0 flaky`, with 9 dedupe-only tests expected and 0 skipped. `c080-dedupe-mobile-chrome.json` and `c080-dedupe-mobile-safari.json` each reported `12 expected`, `2 skipped`, `0 unexpected`, and `0 flaky`, with 7 dedupe-only tests expected and 2 intentional desktop-only grouped-date panel contract skips; mobile replacement T-14 passed. Provider continuation verified the bounded release-gate config as scoped and safe: `playwright.search-release-gate.config.ts` defines setup/chromium/webkit/Mobile Safari, defaults to isolated port 3101, and supports start/dev web-server modes. List output showed chromium 21 listed / 4 files, webkit 21 listed / 4 files, Mobile Safari 21 listed / 4 files, for total config scope 53 tests = 5 setup + 16 specs x 3 projects. Provider baselines ran on port 3101 because port 3000 was occupied: `c080-provider-webkit-ssr.json` reported `16 expected`, `5 skipped`, `0 unexpected`, `0 flaky`; `c080-provider-webkit-client.json` reported `19 expected`, `2 skipped`, `0 unexpected`, `0 flaky`; `c080-provider-mobile-safari-ssr.json` reported `7 expected`, `14 skipped`, `0 unexpected`, `0 flaky`; and `c080-provider-mobile-safari-client.json` reported `10 expected`, `11 skipped`, `0 unexpected`, `0 flaky`. Skips are intentional project/mode ownership skips: desktop gate only on chromium/webkit, mobile gate only on Mobile Safari, and API gate only in client mode. No browser/provider limitation, harness issue, or product bug was observed in bounded release-gate provider breadth. Broad 164-test non-gate map/provider candidates and live provider-network visual breadth remain NOT VERIFIED lower-priority confidence coverage unless promoted.",
+      "recommendedFix": null
     }
   ],
   "coverageGaps": [
     {
       "manifestItem": "runtime browser behavior",
-      "gap": "The narrow smoke, filter/URL, sort/load-more pagination, desktop map, results-state, URL-state, anonymous/authenticated saved-listing, mobile map/list, search error-resilience, map error/a11y, /api/map-listings 500/429 browser error, focused API/unit Jest, PII scanner fixture, real payload PII scan, and release-gate commands now have evidence, but non-gate broader E2E coverage remains not runtime-verified.",
+      "gap": "The narrow smoke, filter/URL, sort/load-more pagination, desktop map, results-state, URL-state, anonymous/authenticated saved-listing, C066 saved-search owner-project browser command, C067 listing-card/security owner-project browser commands, C068 location owner-project browser commands, C070 focused lease-duration filter command, C071 full amenities filter command, C072 focused race/reset command, C072 related race/reset command, C073 affected/touched search-filter commands, C074 full chromium-anon zero-skip search-filter JSON/final list commands, C077 focused map JSON command, C078 focused two-spec, after-Critic focused popup, and final after-Critic five-spec zero-skip map JSON commands, C079 semantic chromium-anon and dedupe chromium owner-baseline JSON commands, C080 dedupe Firefox/WebKit/Mobile Chrome/Mobile Safari artifacts, C080 bounded release-gate provider WebKit/Mobile Safari SSR/client artifacts, mobile map/list, search error-resilience, map error/a11y, /api/map-listings 500/429 browser error, C065 broader chromium-anon map/list/map-tools commands, focused API/unit Jest, PII scanner fixture, real payload PII scan, and release-gate commands now have evidence. Semantic non-Chromium/mobile runtime behavior remains a NOT VERIFIED P1 ownership gap; C080 classifies semantic as a test ownership gap and closes/downgrades dedupe non-Chromium/mobile plus bounded release-gate map/provider breadth with artifacts. Broad 164-test non-gate map/provider candidates, live provider-network visual breadth, and retired low-results guidance/pagination-cap exact browser flows remain NOT VERIFIED lower-priority confidence coverage unless promoted.",
       "severity": "P1"
     },
     {
       "manifestItem": "test inventory",
-      "gap": "Tests are discovered and grouped in the manifest; focused search/map harness commands, focused API/unit Jest, the C063 V2 route/load-more action command, the P0 privacy suite, typecheck, the full search release gate, the C064 no-arg public payload fixture gate, and the real fixed payload scan have passed. Non-gate broader E2E commands have not passed in this session, and the attempted broader V2 service semantic suite currently has 2 expectation failures.",
+      "gap": "Tests are discovered and grouped in the manifest; focused search/map harness commands, focused API/unit Jest, the C063 V2 route/load-more action command, the P0 privacy suite, typecheck, the full search release gate, the C064 no-arg public payload fixture gate, the C065 broader chromium-anon map/list/map-tools commands, the C066 saved-search owner-project browser command, the C067 listing-card/security owner-project browser commands, the C068 location owner-project browser commands, the C069 semantic-service commands, the C070 focused lease-duration filter command, the C071 focused/full amenities commands, the C072 focused race/reset command, the C072 related race/reset command, the C073 affected/touched search-filter commands, the C074 full chromium-anon search-filter JSON and final list commands with `130 passed` / `0 skipped`, the C077 focused map JSON command with `50 expected` / `8 skipped` / `0 unexpected` / `0 flaky`, the C078 after-Critic focused popup JSON command with `2 expected` / `0 skipped` / `0 unexpected` / `0 flaky`, the C078 final focused map subset JSON command with `58 expected` / `0 skipped` / `0 unexpected` / `0 flaky`, the C079 semantic chromium-anon JSON command with `29 expected` / `0 skipped` / `0 unexpected` / `0 flaky`, the C079 dedupe chromium JSON command with `14 expected` / `0 skipped` / `0 unexpected` / `0 flaky`, the C080 dedupe Firefox/WebKit artifacts with `14 expected` / `0 skipped`, Mobile Chrome/Mobile Safari artifacts with `12 expected` / `2 skipped`, C080 provider WebKit SSR/client artifacts with `16 expected` / `5 skipped` and `19 expected` / `2 skipped`, C080 provider Mobile Safari SSR/client artifacts with `7 expected` / `14 skipped` and `10 expected` / `11 skipped`, all with `0 unexpected` / `0 flaky`, and the real fixed payload scan have passed. Remaining P1 follow-up evidence is semantic non-Chromium/mobile runtime behavior; dedupe non-Chromium/mobile and bounded release-gate map/provider breadth are closed/downgraded by C080. Broad 164-test non-gate map/provider candidates, live provider-network visual breadth, retired low-results guidance/pagination-cap exact browser flows, unrun saved-search action/component/saved-searches page, broader journey variants, location component/provider/geolocation variants, listing-card/security residual variants, and dedicated `/api/search/listings` fallback route-handler proof remain P2 confidence coverage after C066-C080.",
       "severity": "P1"
+    },
+    {
+      "manifestItem": "location autocomplete browser flow",
+      "gap": "C068 closes/reduces the pre-fix C067 location browser/test-runtime blocker after a test-only page-object wait-ordering fix: focused B1 passed with `1 passed`, and the full desktop-anonymous location spec passed with `4 passed`. Direct component/provider/geolocation variants and broader journeys remain confidence coverage.",
+      "severity": "P2"
     },
     {
       "manifestItem": "pagination and cursor reset behavior",
@@ -464,12 +581,12 @@
     },
     {
       "manifestItem": "API response contracts",
-      "gap": "The docs now include compact field/cache/error tables for the main contracts and the C063 V2/search-doc versus legacy fallback contract, but they are not generated OpenAPI schemas, do not enumerate every optional debug-only field combination, and still need dedicated `/api/search/listings` route-handler fallback coverage plus service semantic-suite repair/reclassification.",
+      "gap": "The docs now include compact field/cache/error tables for the main contracts, the C063 V2/search-doc versus legacy fallback contract, and C069 semantic-service suite proof, but they are not generated OpenAPI schemas, do not enumerate every optional debug-only field combination, and still need dedicated `/api/search/listings` route-handler fallback coverage.",
       "severity": "P2"
     },
     {
       "manifestItem": "map provider/runtime rendering",
-      "gap": "Desktop, mobile, map error/a11y, and /api/map-listings 500/429 browser behavior have passing search-harness coverage with mocked map resources. Provider terminology is now documented as MapLibre runtime with OpenFreeMap/OpenStreetMap map resources; dormant Stadia config and stale Mapbox comments/fixture names remain optional maintenance cleanup.",
+      "gap": "Desktop, mobile, map error/a11y, /api/map-listings 500/429 browser behavior, C065 broader chromium-anon map/list/map-tools behavior, C077 focused map skipped-case reduction, C078 focused map zero-skip stabilization, and C080 bounded release-gate WebKit/Mobile Safari SSR/client provider breadth have passing search-harness coverage. Provider terminology is now documented as MapLibre runtime with OpenFreeMap/OpenStreetMap map resources. Broad 164-test non-gate map/provider candidates and live provider-network visual breadth remain NOT VERIFIED lower-priority confidence coverage unless promoted. Dormant Stadia config and stale Mapbox comments/fixture names are separate cleanup items.",
       "severity": "P2"
     },
     {

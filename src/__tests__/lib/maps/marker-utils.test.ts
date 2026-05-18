@@ -10,6 +10,9 @@ import {
   groupListingsByCoord,
   groupExactMapListingClones,
   formatStackPriceRange,
+  planMarkerCollisionRendering,
+  type MarkerCollisionInput,
+  type MarkerScreenRect,
   type MapMarkerListing,
 } from "@/lib/maps/marker-utils";
 
@@ -273,6 +276,147 @@ describe("marker-utils", () => {
         "primary",
         "mini",
       ]);
+    });
+  });
+
+  describe("planMarkerCollisionRendering", () => {
+    const viewport: MarkerScreenRect = {
+      x: 0,
+      y: 0,
+      width: 500,
+      height: 300,
+    };
+
+    const createMarker = (
+      id: string,
+      x: number,
+      y: number,
+      overrides: Partial<MarkerCollisionInput> = {}
+    ): MarkerCollisionInput => ({
+      id,
+      tier: "primary",
+      point: { x, y },
+      pricePillSize: { width: 72, height: 30 },
+      dotSize: 10,
+      ...overrides,
+    });
+
+    it("keeps non-overlapping markers as price markers", () => {
+      const plan = planMarkerCollisionRendering({
+        markers: [
+          createMarker("a", 100, 100),
+          createMarker("b", 220, 100),
+          createMarker("c", 340, 100),
+        ],
+        viewport,
+      });
+
+      expect(plan.a.renderMode).toBe("price");
+      expect(plan.b.renderMode).toBe("price");
+      expect(plan.c.renderMode).toBe("price");
+      expect(Object.values(plan).map((decision) => decision.reason)).toEqual([
+        "accepted",
+        "accepted",
+        "accepted",
+      ]);
+    });
+
+    it("demotes an overlapping lower-priority marker to a dot", () => {
+      const plan = planMarkerCollisionRendering({
+        markers: [
+          createMarker("primary", 100, 100, { tier: "primary" }),
+          createMarker("mini", 104, 100, { tier: "mini" }),
+        ],
+        viewport,
+      });
+
+      expect(plan.primary.renderMode).toBe("price");
+      expect(plan.primary.reason).toBe("accepted");
+      expect(plan.mini.renderMode).toBe("dot");
+      expect(plan.mini.reason).toBe("collides-with-price");
+      expect(plan.mini.collidesWithId).toBe("primary");
+    });
+
+    it("lets active, hovered, and keyboard-focused markers win inactive collisions", () => {
+      const activePlan = planMarkerCollisionRendering({
+        markers: [
+          createMarker("inactive", 100, 100),
+          createMarker("active", 104, 100, { active: true }),
+        ],
+        viewport,
+      });
+      const hoveredPlan = planMarkerCollisionRendering({
+        markers: [
+          createMarker("inactive", 100, 100),
+          createMarker("hovered", 104, 100, { hovered: true }),
+        ],
+        viewport,
+      });
+      const focusedPlan = planMarkerCollisionRendering({
+        markers: [
+          createMarker("inactive", 100, 100),
+          createMarker("focused", 104, 100, { keyboardFocused: true }),
+        ],
+        viewport,
+      });
+
+      expect(activePlan.active.renderMode).toBe("price");
+      expect(activePlan.inactive.renderMode).toBe("dot");
+      expect(hoveredPlan.hovered.renderMode).toBe("price");
+      expect(hoveredPlan.inactive.renderMode).toBe("dot");
+      expect(focusedPlan.focused.renderMode).toBe("price");
+      expect(focusedPlan.inactive.renderMode).toBe("dot");
+    });
+
+    it("demotes a price marker that overlaps an avoid rect", () => {
+      const plan = planMarkerCollisionRendering({
+        markers: [
+          createMarker("cluster-neighbor", 120, 100),
+          createMarker("clear", 260, 100),
+        ],
+        viewport,
+        avoidRects: [{ x: 80, y: 70, width: 90, height: 60 }],
+      });
+
+      expect(plan["cluster-neighbor"].renderMode).toBe("dot");
+      expect(plan["cluster-neighbor"].reason).toBe("collides-with-avoid-rect");
+      expect(plan["cluster-neighbor"].collidesWithAvoidRectIndex).toBe(0);
+      expect(plan.clear.renderMode).toBe("price");
+    });
+
+    it("returns stable results when input order changes or arrays are recreated", () => {
+      const markers = [
+        createMarker("b-mini", 104, 100, { tier: "mini" }),
+        createMarker("a-primary", 100, 100, { tier: "primary" }),
+        createMarker("c-active", 108, 100, { active: true }),
+        createMarker("d-clear", 260, 100),
+      ];
+      const reversedMarkers = [...markers]
+        .reverse()
+        .map((marker) => ({ ...marker, point: { ...marker.point } }));
+
+      const firstPlan = planMarkerCollisionRendering({
+        markers,
+        viewport: { ...viewport },
+        avoidRects: [],
+      });
+      const secondPlan = planMarkerCollisionRendering({
+        markers: reversedMarkers,
+        viewport: { ...viewport },
+        avoidRects: [],
+      });
+
+      expect(secondPlan).toEqual(firstPlan);
+      expect(Object.keys(firstPlan)).toEqual([
+        "a-primary",
+        "b-mini",
+        "c-active",
+        "d-clear",
+      ]);
+      expect(firstPlan["c-active"].renderMode).toBe("price");
+      expect(firstPlan["a-primary"].renderMode).toBe("dot");
+      expect(firstPlan["b-mini"].renderMode).toBe("dot");
+      expect(firstPlan["d-clear"].renderMode).toBe("price");
     });
   });
 

@@ -42,6 +42,23 @@ describe("geocodeAddress", () => {
     );
   });
 
+  it("should include safe public area names returned by forward geocoding", async () => {
+    mockForwardGeocode.mockResolvedValueOnce({
+      lat: 37.764,
+      lng: -122.466,
+      publicAreaName: "Inner Sunset",
+    });
+
+    const result = await geocodeAddress("1800 Irving St, San Francisco, CA");
+
+    expect(result).toEqual({
+      status: "success",
+      lat: 37.764,
+      lng: -122.466,
+      publicAreaName: "Inner Sunset",
+    });
+  });
+
   it("should return not_found when no results found", async () => {
     mockForwardGeocode.mockResolvedValueOnce(null);
 

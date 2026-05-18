@@ -160,6 +160,7 @@ test.describe("Create Listing — Visual Regression Tests", () => {
     const data = validData();
     await clp.fillRequiredFields(data);
     await page.waitForLoadState("domcontentloaded");
+    await clp.titleInput.scrollIntoViewIfNeeded();
 
     // Mask the date value since it varies between runs
     const dateMask = page.locator(

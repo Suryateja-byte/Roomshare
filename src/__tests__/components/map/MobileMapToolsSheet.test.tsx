@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState, type ComponentProps } from "react";
 import MobileMapToolsSheet from "@/components/map/MobileMapToolsSheet";
@@ -71,15 +71,47 @@ describe("MobileMapToolsSheet", () => {
     const user = userEvent.setup();
     const onToggleDropMode = jest.fn();
 
-    render(
-      <StatefulSheet
-        onToggleDropMode={onToggleDropMode}
-      />
-    );
+    render(<StatefulSheet onToggleDropMode={onToggleDropMode} />);
 
     await user.click(screen.getByRole("button", { name: /more map tools/i }));
     await user.click(screen.getByRole("button", { name: /^drop pin$/i }));
     expect(onToggleDropMode).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("closes with Escape and returns focus to the trigger", async () => {
+    const user = userEvent.setup();
+
+    render(<StatefulSheet />);
+
+    const trigger = screen.getByRole("button", { name: /more map tools/i });
+    await user.click(trigger);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(trigger).toHaveFocus();
+    });
+  });
+
+  it("closes from the close button and returns focus to the trigger", async () => {
+    const user = userEvent.setup();
+
+    render(<StatefulSheet />);
+
+    const trigger = screen.getByRole("button", { name: /more map tools/i });
+    await user.click(trigger);
+    await user.click(screen.getByRole("button", { name: /close map tools/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(trigger).toHaveFocus();
+    });
   });
 });

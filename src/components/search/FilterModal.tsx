@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
@@ -23,17 +23,32 @@ import { DrawerZeroState } from "@/components/search/DrawerZeroState";
 import type { PriceHistogramBucket } from "@/app/api/search/facets/route";
 import type { FilterSuggestion } from "@/lib/near-matches";
 
+export interface FilterModalApplySnapshot {
+  minPrice?: number;
+  maxPrice?: number;
+  moveInDate: string;
+  endDate?: string;
+  leaseDuration: string;
+  roomType: string;
+  amenities: string[];
+  houseRules: string[];
+  languages: string[];
+  genderPreference: string;
+  householdGender: string;
+  minSlots?: number;
+}
+
 interface FilterModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onApply: () => void;
+  onApply: (snapshot: FilterModalApplySnapshot) => void;
   onClearAll: () => void;
   hasActiveFilters: boolean;
   activeFilterCount: number;
 
   // Filter values
   moveInDate: string;
-  endDate?: string;
+  endDate: string;
   leaseDuration: string;
   roomType: string;
   amenities: string[];
@@ -152,10 +167,103 @@ export function FilterModal({
   drawerSuggestions,
   onRemoveFilterSuggestion,
 }: FilterModalProps) {
+  const applyInFlightRef = useRef(false);
+  const onApplyRef = useRef(onApply);
+  const applySnapshotRef = useRef<FilterModalApplySnapshot>({
+    minPrice: minPriceProp,
+    maxPrice: maxPriceProp,
+    moveInDate,
+    endDate: endDate ?? "",
+    leaseDuration,
+    roomType,
+    amenities,
+    houseRules,
+    languages,
+    genderPreference,
+    householdGender,
+    minSlots,
+  });
+
+  onApplyRef.current = onApply;
+  applySnapshotRef.current = {
+    minPrice: minPriceProp,
+    maxPrice: maxPriceProp,
+    moveInDate,
+    endDate: endDate ?? "",
+    leaseDuration,
+    roomType,
+    amenities,
+    houseRules,
+    languages,
+    genderPreference,
+    householdGender,
+    minSlots,
+  };
+
   useBodyScrollLock(isOpen);
   const isDesktop = useMediaQuery("(min-width: 768px)");
   const isMobile = isDesktop === false;
-  const showEndDateField = Boolean(onEndDateChange);
+
+  useEffect(() => {
+    if (isOpen) {
+      applyInFlightRef.current = false;
+    }
+  }, [isOpen]);
+
+  const handleApply = useCallback(() => {
+    if (applyInFlightRef.current) return;
+    applyInFlightRef.current = true;
+    onApplyRef.current(applySnapshotRef.current);
+  }, []);
+
+  const mergeApplySnapshot = useCallback(
+    (patch: Partial<FilterModalApplySnapshot>) => {
+      applySnapshotRef.current = {
+        ...applySnapshotRef.current,
+        ...patch,
+      };
+    },
+    []
+  );
+
+  const handleToggleAmenity = useCallback(
+    (amenity: string) => {
+      const current = applySnapshotRef.current.amenities;
+      mergeApplySnapshot({
+        amenities: current.includes(amenity)
+          ? current.filter((item) => item !== amenity)
+          : [...current, amenity],
+      });
+      onToggleAmenity(amenity);
+    },
+    [mergeApplySnapshot, onToggleAmenity]
+  );
+
+  const handleToggleHouseRule = useCallback(
+    (rule: string) => {
+      const current = applySnapshotRef.current.houseRules;
+      mergeApplySnapshot({
+        houseRules: current.includes(rule)
+          ? current.filter((item) => item !== rule)
+          : [...current, rule],
+      });
+      onToggleHouseRule(rule);
+    },
+    [mergeApplySnapshot, onToggleHouseRule]
+  );
+
+  const handleToggleLanguage = useCallback(
+    (lang: string) => {
+      const current = applySnapshotRef.current.languages;
+      mergeApplySnapshot({
+        languages: current.includes(lang)
+          ? current.filter((item) => item !== lang)
+          : [...current, lang],
+      });
+      onToggleLanguage(lang);
+    },
+    [mergeApplySnapshot, onToggleLanguage]
+  );
 
   // Close on Escape key
   useEffect(() => {
@@ -264,10 +372,11 @@ export function FilterModal({
                       onChange={onMoveInDateChange}
                       placeholder="Select move-in date"
                       minDate={minMoveInDate}
+                      calendarMode="inline"
                     />
                   </div>
 
-                  {showEndDateField && (
+                  {onEndDateChange && (
                     <div className="space-y-2">
                       <label
                         htmlFor="filter-end-date"
@@ -277,10 +386,11 @@ export function FilterModal({
                       </label>
                       <DatePicker
                         id="filter-end-date"
-                        value={endDate}
-                        onChange={onEndDateChange!}
+                        value={endDate ?? ""}
+                        onChange={onEndDateChange}
                         placeholder="Select end date"
                         minDate={minEndDate ?? minMoveInDate}
+                        calendarMode="inline"
                       />
                     </div>
                   )}
@@ -429,7 +539,9 @@ export function FilterModal({
                             key={amenity}
                             type="button"
                             variant="filter"
-                            onClick={() => !isZero && onToggleAmenity(amenity)}
+                            onClick={() =>
+                              !isZero && handleToggleAmenity(amenity)
+                            }
                             data-active={isActive}
                             aria-pressed={isActive}
                             aria-disabled={isZero}
@@ -470,7 +582,9 @@ export function FilterModal({
                             key={rule}
                             type="button"
                             variant="filter"
-                            onClick={() => !isZero && onToggleHouseRule(rule)}
+                            onClick={() =>
+                              !isZero && handleToggleHouseRule(rule)
+                            }
                             data-active={isActive}
                             aria-pressed={isActive}
                             aria-disabled={isZero}
@@ -513,7 +627,7 @@ export function FilterModal({
                             key={code}
                             type="button"
                             variant="filter"
-                            onClick={() => onToggleLanguage(code)}
+                            onClick={() => handleToggleLanguage(code)}
                             data-active={true}
                             aria-pressed={true}
                             className="h-auto rounded-full px-3 py-2 text-sm font-medium"
@@ -547,7 +661,7 @@ export function FilterModal({
                             key={code}
                             type="button"
                             variant="filter"
-                            onClick={() => onToggleLanguage(code)}
+                            onClick={() => handleToggleLanguage(code)}
                             data-active={false}
                             aria-pressed={false}
                             className="h-auto rounded-full px-3 py-2 text-sm font-medium transition-all duration-200 hover:scale-[1.02]"
@@ -654,7 +768,7 @@ export function FilterModal({
                     )}
                     <Button
                       type="button"
-                      onClick={onApply}
+                      onClick={handleApply}
                       disabled={boundsRequired}
                       className={`h-12 flex-1 rounded-full text-white shadow-ambient disabled:cursor-not-allowed disabled:opacity-60 ${
                         count === 0 && !isCountLoading

@@ -26,7 +26,9 @@ export function SearchUrlCanonicalizer() {
       });
     }
 
-    const currentUrl = searchParamsString ? `${pathname}?${searchParamsString}` : pathname;
+    const currentUrl = searchParamsString
+      ? `${pathname}?${searchParamsString}`
+      : pathname;
     // CFM-604: canonical-on-write guarantee — canonical rewrites stay on the shared builder path.
     const canonicalUrl = buildCanonicalSearchUrl(
       normalizeSearchQuery(new URLSearchParams(searchParamsString))
@@ -35,7 +37,16 @@ export function SearchUrlCanonicalizer() {
       return;
     }
 
-    window.history.replaceState(null, "", canonicalUrl);
+    // This is a cosmetic URL cleanup, not a user navigation. Next patches the
+    // instance method and may start an App Router fetch; use the native browser
+    // method so stale canonicalization cannot race with later filter applies.
+    const nativeReplaceState = History.prototype.replaceState;
+    nativeReplaceState.call(
+      window.history,
+      window.history.state,
+      "",
+      canonicalUrl
+    );
   }, [pathname, searchParamsString]);
 
   return null;

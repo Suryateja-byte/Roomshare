@@ -4,31 +4,193 @@
  *
  * Covers error handling for map interactions and WCAG accessibility compliance.
  *
- * NOTE: Some error tests (10.2, 10.3) are skipped by default because v2 mode
- * provides map data via context (SearchV2DataContext), not /api/map-listings.
- * The viewport validation test (10.4) works in both v1 and v2 modes.
+ * NOTE: The viewport validation test (10.4) works in both v1 and v2 modes.
  */
 
 import {
   test,
   expect,
   tags,
-  timeouts,
   SF_BOUNDS,
   searchResultsContainer,
 } from "./helpers/test-utils";
 import { waitForMapReady, pollForMarkers } from "./helpers";
+import type { Page } from "@playwright/test";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 const SEARCH_URL = `/search?${boundsQS}`;
+const C078_MARKER_COORDS = { lat: 37.775, lng: -122.435 };
 
-// Valid viewport bounds for normal tests (SF area, within MAX_SPAN limits)
-const VALID_BOUNDS = {
-  minLng: -122.5,
-  maxLng: -122.0,
-  minLat: 37.5,
-  maxLat: 38.0,
-};
+async function getVisibleCardIdsForDeterministicMarkers(
+  page: Page,
+  minCount: number
+): Promise<string[]> {
+  await expect(async () => {
+    const ids = await page.evaluate(() => {
+      return Array.from(
+        document.querySelectorAll(
+          '[data-testid="listing-card"][data-listing-id]'
+        )
+      )
+        .filter((el) => {
+          const rect = el.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        })
+        .map((el) => el.getAttribute("data-listing-id"))
+        .filter((id): id is string => typeof id === "string");
+    });
+
+    expect(new Set(ids).size).toBeGreaterThanOrEqual(minCount);
+  }).toPass({ timeout: 30_000, intervals: [500, 1000, 2000] });
+
+  const ids = await page.evaluate(() => {
+    return Array.from(
+      document.querySelectorAll('[data-testid="listing-card"][data-listing-id]')
+    )
+      .filter((el) => {
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      })
+      .map((el) => el.getAttribute("data-listing-id"))
+      .filter((id): id is string => typeof id === "string");
+  });
+
+  return Array.from(new Set(ids));
+}
+
+async function getMarkerCardOverlaps(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const markerIds = Array.from(
+      document.querySelectorAll(".maplibregl-marker")
+    )
+      .filter((marker) => {
+        const rect = marker.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      })
+      .map((marker) =>
+        marker
+          .querySelector("[data-listing-id]")
+          ?.getAttribute("data-listing-id")
+      )
+      .filter((id): id is string => typeof id === "string");
+
+    const cardIds = new Set(
+      Array.from(
+        document.querySelectorAll(
+          '[data-testid="listing-card"][data-listing-id]'
+        )
+      )
+        .filter((card) => {
+          const rect = card.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        })
+        .map((card) => card.getAttribute("data-listing-id"))
+        .filter((id): id is string => typeof id === "string")
+    );
+
+    return markerIds.filter((id) => cardIds.has(id));
+  });
+}
+
+async function setupDeterministicMarkerCardOverlaps(
+  page: Page,
+  minCount: number
+): Promise<string[]> {
+  await expect(
+    searchResultsContainer(page).locator('[data-testid="listing-card"]').first()
+  ).toBeVisible({ timeout: 30_000 });
+
+  const cardIds = await getVisibleCardIdsForDeterministicMarkers(
+    page,
+    minCount
+  );
+  const mockListings = cardIds.map((id, index) => ({
+    id,
+    title: `C078 Deterministic Listing ${index + 1}`,
+    price: 1200 + index * 100,
+    availableSlots: 1 + index,
+    location: C078_MARKER_COORDS,
+    images: [],
+    ownerId: `c078-owner-${index + 1}`,
+  }));
+
+  await page.context().route("**/api/map-listings**", async (route) => {
+    const requestQueryHash =
+      route.request().headers()["x-search-query-hash"] ||
+      "c078-deterministic-markers";
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        kind: "ok",
+        data: {
+          listings: mockListings,
+          truncated: false,
+        },
+        meta: {
+          queryHash: requestQueryHash,
+          backendSource: "map-api",
+          responseVersion: "c078-deterministic-markers",
+        },
+      }),
+    });
+  });
+
+  await page.goto("/");
+  await page.waitForLoadState("domcontentloaded");
+
+  const mapListingsResponse = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/map-listings") && response.status() === 200,
+    { timeout: 30_000 }
+  );
+  await page.goto(SEARCH_URL, { waitUntil: "domcontentloaded" });
+  await expect(
+    searchResultsContainer(page).locator('[data-testid="listing-card"]').first()
+  ).toBeVisible({ timeout: 30_000 });
+  await expect(mapListingsResponse).resolves.toBeTruthy();
+
+  await waitForMapReady(page);
+  await page.waitForFunction(() => !!(window as any).__e2eMapRef, {
+    timeout: 30_000,
+  });
+
+  const jumped = await page.evaluate((coords) => {
+    return new Promise<boolean>((resolve) => {
+      const map = (window as any).__e2eMapRef;
+      if (!map) {
+        resolve(false);
+        return;
+      }
+
+      const setProgrammatic = (window as any).__e2eSetProgrammaticMove;
+      if (typeof setProgrammatic === "function") {
+        setProgrammatic(true);
+      }
+
+      let resolved = false;
+      const finish = () => {
+        if (resolved) return;
+        resolved = true;
+        resolve(true);
+      };
+
+      map.once("idle", finish);
+      map.jumpTo({ center: [coords.lng, coords.lat], zoom: 16 });
+      setTimeout(finish, 8000);
+    });
+  }, C078_MARKER_COORDS);
+  expect(jumped).toBe(true);
+
+  await expect(async () => {
+    await page.evaluate(() => (window as any).__e2eUpdateMarkers?.());
+    const overlapping = await getMarkerCardOverlaps(page);
+    expect(overlapping.length).toBeGreaterThanOrEqual(minCount);
+  }).toPass({ timeout: 45_000, intervals: [500, 1000, 2000, 5000] });
+
+  return (await getMarkerCardOverlaps(page)).slice(0, minCount);
+}
 
 // Invalid viewport bounds (exceeds MAX_LAT_SPAN=5 and MAX_LNG_SPAN=5)
 const INVALID_BOUNDS = {
@@ -49,37 +211,15 @@ test.describe("Map Error States and Accessibility", () => {
   test.beforeEach(async ({}, testInfo) => {
     test.slow(); // Map tests need extra time for WebGL rendering in CI
     const projectName = testInfo.project.name;
-    test.skip(projectName.includes("Mobile"), "Map tests require desktop viewport - skipping on mobile");
-    test.skip(projectName === "webkit", "Map tests have timing issues on webkit - skipping");
+    test.skip(
+      projectName.includes("Mobile"),
+      "Map tests require desktop viewport - skipping on mobile"
+    );
+    test.skip(
+      projectName === "webkit",
+      "Map tests have timing issues on webkit - skipping"
+    );
   });
-
-  // Helper: wait for map error banner
-  async function waitForMapError(
-    page: import("@playwright/test").Page,
-    errorPattern: RegExp,
-    timeout = timeouts.action
-  ) {
-    await page.waitForLoadState("domcontentloaded");
-
-    // Wait for map panel to render
-    const hideMapButton = page.getByRole("button", { name: /hide map/i });
-    await expect(hideMapButton).toBeVisible({ timeout: timeouts.navigation });
-
-    // Wait for loading to complete
-    const loadingText = page.getByText("Loading map...");
-    try {
-      await expect(loadingText).toBeVisible({ timeout: 2000 });
-      await expect(loadingText).not.toBeVisible({ timeout });
-    } catch {
-      // Loading text was never visible or already gone
-    }
-
-    // Look for error banner with role="alert"
-    const alertBanner = page
-      .getByRole("alert")
-      .filter({ hasText: errorPattern });
-    await expect(alertBanner).toBeVisible({ timeout });
-  }
 
   // ---------------------------------------------------------------------------
   // 10.x: Error States
@@ -143,56 +283,6 @@ test.describe("Map Error States and Accessibility", () => {
       }
     });
 
-    // NOTE: V2 mode provides map data via SearchV2DataContext, not /api/map-listings.
-    // This test is skipped by default but kept for v1 mode testing.
-    test.skip(`${tags.anon} 10.2 - Network error shows error banner with retry`, async ({
-      page,
-      network,
-    }) => {
-      // Mock server error for map-listings API
-      await network.mockApiResponse("**/api/map-listings*", {
-        status: 500,
-        body: { error: "Internal server error" },
-      });
-
-      await page.goto(
-        `/search?minLng=${VALID_BOUNDS.minLng}&maxLng=${VALID_BOUNDS.maxLng}&minLat=${VALID_BOUNDS.minLat}&maxLat=${VALID_BOUNDS.maxLat}`
-      );
-
-      // Wait for error banner
-      await waitForMapError(page, /Server error|Failed to load/i);
-
-      // Retry button should be visible
-      const retryButton = page.getByRole("button", { name: /retry/i });
-      await expect(retryButton).toBeVisible();
-
-      // Map container should still be present (graceful degradation)
-      const mapRegion = page.locator('[role="region"][aria-label*="map" i]');
-      if ((await mapRegion.count()) > 0) {
-        await expect(mapRegion.first()).toBeVisible();
-      }
-    });
-
-    // NOTE: V2 mode provides map data via context, not /api/map-listings.
-    // This test is skipped by default but kept for v1 mode testing.
-    test.skip(`${tags.anon} 10.3 - Rate limit (429) shows rate limit message`, async ({
-      page,
-      network,
-    }) => {
-      // Mock rate limit response
-      await network.mockApiResponse("**/api/map-listings*", {
-        status: 429,
-        body: { error: "Too many requests", retryAfter: 30 },
-      });
-
-      await page.goto(
-        `/search?minLng=${VALID_BOUNDS.minLng}&maxLng=${VALID_BOUNDS.maxLng}&minLat=${VALID_BOUNDS.minLat}&maxLat=${VALID_BOUNDS.maxLat}`
-      );
-
-      // Wait for rate limit message
-      await waitForMapError(page, /Too many requests|rate limit/i);
-    });
-
     test(`${tags.anon} 10.4 - Invalid bounds (zoom out too far) shows "Zoom in" message`, async ({
       page,
     }) => {
@@ -238,13 +328,9 @@ test.describe("Map Error States and Accessibility", () => {
       }
     });
 
-    test(`${tags.anon} 10.5 - Map remains interactive during error state`, async ({
+    test(`${tags.anon} 10.5 - Map remains interactive after map ready`, async ({
       page,
     }) => {
-      // Navigate to search page
-      await page.goto(SEARCH_URL);
-      await waitForMapReady(page);
-
       // Collect console errors
       const consoleErrors: string[] = [];
       page.on("console", (msg) => {
@@ -253,19 +339,33 @@ test.describe("Map Error States and Accessibility", () => {
         }
       });
 
-      // Try to interact with map controls
-      const hideMapBtn = page.getByRole("button", { name: /hide map/i });
-      test.skip(
-        !(await hideMapBtn.isVisible({ timeout: 5_000 }).catch(() => false)),
-        "Map visibility toggle is not rendered in this viewport/state"
-      );
-      await hideMapBtn.click();
+      // Navigate to search page
+      await page.goto(SEARCH_URL);
+      await waitForMapReady(page);
 
-      const showMapBtn = page.getByRole("button", { name: /show map/i });
-      if (await showMapBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await showMapBtn.click();
-        await expect(hideMapBtn).toBeVisible({ timeout: 2000 });
-      }
+      const mapRegion = page
+        .locator('[role="region"][aria-label*="map" i]')
+        .first();
+      await expect(mapRegion).toBeVisible();
+
+      const canvas = page.locator(".maplibregl-canvas").first();
+      await expect(canvas).toBeVisible();
+
+      const mapToolsButton = page
+        .locator('button[aria-label^="Map tools"]')
+        .first();
+      await expect(mapToolsButton).toBeVisible();
+
+      await mapToolsButton.click();
+      await expect(page.getByTestId("map-tools-drop-pin")).toBeVisible({
+        timeout: 5_000,
+      });
+
+      await expect(mapRegion).toBeVisible();
+      await expect(canvas).toBeVisible();
+      await expect(
+        page.locator('button[aria-label^="Map tools"]').first()
+      ).toBeVisible();
 
       // Filter out expected/benign errors
       const criticalErrors = consoleErrors.filter(
@@ -396,7 +496,10 @@ test.describe("Map Error States and Accessibility", () => {
       const markers = page.locator(".maplibregl-marker");
       const markerCount = await markers.count();
 
-      test.skip(markerCount === 0, "No markers available for keyboard navigation test");
+      test.skip(
+        markerCount === 0,
+        "No markers available for keyboard navigation test"
+      );
 
       // Try to focus on a marker
       const firstMarkerInner = markers
@@ -429,37 +532,28 @@ test.describe("Map Error States and Accessibility", () => {
       page,
     }) => {
       await page.goto(SEARCH_URL);
-      await waitForMapReady(page);
-
-      // Wait for markers to load
-      await pollForMarkers(page, 1).catch(() => {});
-
-      // Check for markers
-      const markers = page.locator(".maplibregl-marker");
-      const markerCount = await markers.count();
-
-      test.skip(markerCount === 0, "No markers available for focus management test");
+      const listingId = (
+        await setupDeterministicMarkerCardOverlaps(page, 1)
+      )[0]!;
 
       // Click a marker to open popup
-      await markers.first().click();
+      await page
+        .locator(`.maplibregl-marker [data-listing-id="${listingId}"]`)
+        .first()
+        .click();
 
-      // Check if popup is visible
       const popup = page.locator(".maplibregl-popup");
-      if (await popup.isVisible({ timeout: 2000 }).catch(() => false)) {
-        // Screen reader announcement should update with selected listing info
-        const srAnnouncement = page
-          .locator('.sr-only[role="status"][aria-live="polite"]')
-          .first();
-        const announcementText = await srAnnouncement.textContent();
+      await expect(popup).toBeVisible({ timeout: 2000 });
+      await expect(page.locator('[data-testid="map-popup-card"]')).toBeVisible({
+        timeout: 2000,
+      });
 
-        // Announcement should contain listing info when a marker is selected
-        // (may be empty initially, populated after selection)
-        if (announcementText && announcementText.trim()) {
-          expect(announcementText.toLowerCase()).toMatch(
-            /selected|listing|\$/i
-          );
-        }
-      }
+      // Screen reader announcement should update with selected listing info.
+      await expect(
+        page.locator('.sr-only[role="status"][aria-live="polite"]', {
+          hasText: /Selected listing: C078 Deterministic Listing 1/i,
+        })
+      ).toHaveCount(1, { timeout: 2000 });
     });
 
     // Bottom sheet tests require mobile viewport
@@ -544,7 +638,10 @@ test.describe("Map Error States and Accessibility", () => {
 
         // Find the drag handle slider
         const dragHandle = bottomSheet.locator('[role="slider"]');
-        test.skip((await dragHandle.count()) === 0, "Drag handle slider not found");
+        test.skip(
+          (await dragHandle.count()) === 0,
+          "Drag handle slider not found"
+        );
 
         // Focus on drag handle
         await dragHandle.first().focus();
@@ -555,7 +652,9 @@ test.describe("Map Error States and Accessibility", () => {
         await expect
           .poll(
             async () => {
-              const val = await dragHandle.first().getAttribute("aria-valuenow");
+              const val = await dragHandle
+                .first()
+                .getAttribute("aria-valuenow");
               return parseInt(val || "1", 10);
             },
             { timeout: 2000 }

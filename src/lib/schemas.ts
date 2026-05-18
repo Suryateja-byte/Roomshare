@@ -122,21 +122,24 @@ export const listingImagesSchema = z
 // ============================================
 // Move-in Date Validation Schema
 // ============================================
+function formatLocalDateOnly(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 const moveInDateValueSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD format")
   .refine(isStrictDateOnly, "Invalid calendar date")
   .refine((dateStr) => {
-    const date = new Date(dateStr + "T00:00:00Z");
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
-    return date >= today;
+    return dateStr >= formatLocalDateOnly(new Date());
   }, "Move-in date cannot be in the past")
   .refine((dateStr) => {
-    const date = new Date(dateStr + "T00:00:00Z");
     const maxDate = new Date();
     maxDate.setFullYear(maxDate.getFullYear() + 2);
-    return date <= maxDate;
+    return dateStr <= formatLocalDateOnly(maxDate);
   }, "Move-in date cannot be more than 2 years in the future");
 
 export const moveInDateSchema = moveInDateValueSchema

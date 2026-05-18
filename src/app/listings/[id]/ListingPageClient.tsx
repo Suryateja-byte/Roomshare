@@ -193,6 +193,10 @@ interface ViewerState {
   loaded: boolean;
 }
 
+interface SimilarListingsResponse {
+  listings?: Listing[];
+}
+
 interface CheckoutReturnNotice {
   tone: "info" | "success" | "error";
   message: string;
@@ -676,6 +680,9 @@ export default function ListingPageClient({
   const [checkoutReturnPhase, setCheckoutReturnPhase] =
     useState<CheckoutReturnPhase>("IDLE");
   const [viewerStateRefreshNonce, setViewerStateRefreshNonce] = useState(0);
+  const [clientSimilarListings, setClientSimilarListings] = useState<Listing[]>(
+    () => similarListings ?? []
+  );
   const hasImages = listing.images && listing.images.length > 0;
   const resolvedUserId = session?.user?.id ?? null;
   const resolvedIsOwner = isOwner || resolvedUserId === listing.ownerId;
@@ -735,6 +742,47 @@ export default function ListingPageClient({
         return gender;
     }
   };
+
+  useEffect(() => {
+    if (similarListings) {
+      setClientSimilarListings(similarListings);
+      return;
+    }
+
+    if (typeof fetch !== "function") {
+      return;
+    }
+
+    setClientSimilarListings([]);
+    const controller = new AbortController();
+
+    void (async () => {
+      try {
+        const response = await fetch(
+          `/api/listings/${encodeURIComponent(listing.id)}/similar`,
+          {
+            cache: "no-store",
+            signal: controller.signal,
+          }
+        );
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data = (await response.json()) as SimilarListingsResponse;
+        if (Array.isArray(data.listings)) {
+          setClientSimilarListings(data.listings);
+        }
+      } catch (error) {
+        if ((error as Error).name !== "AbortError") {
+          setClientSimilarListings([]);
+        }
+      }
+    })();
+
+    return () => controller.abort();
+  }, [listing.id, similarListings]);
 
   useEffect(() => {
     if (
@@ -1446,14 +1494,14 @@ export default function ListingPageClient({
               </div>
 
               {/* Similar Listings Section */}
-              {similarListings && similarListings.length > 0 && (
+              {clientSimilarListings.length > 0 && (
                 <div className="pt-8">
                   <div className="space-y-6">
                     <h2 className="text-xl font-bold font-display text-on-surface">
                       Similar listings
                     </h2>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                      {similarListings.map((similarListing) => (
+                      {clientSimilarListings.map((similarListing) => (
                         <ListingCard
                           key={similarListing.id}
                           listing={similarListing}

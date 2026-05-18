@@ -68,6 +68,38 @@ function getCategoryIconPath(category: string): string {
 // OpenFreeMap tile style URLs (matching search map)
 const OPENFREEMAP_STYLE_LIGHT = "https://tiles.openfreemap.org/styles/liberty";
 
+const HOME_MARKER_ROOT_CLASSES = [
+  "group",
+  "w-14",
+  "h-14",
+  "flex",
+  "items-center",
+  "justify-center",
+  "cursor-pointer",
+];
+
+const POI_MARKER_ROOT_CLASSES = [
+  "group",
+  "w-12",
+  "h-12",
+  "flex",
+  "items-center",
+  "justify-center",
+  "cursor-pointer",
+  "poi-marker",
+  "focus:outline-none",
+  "focus-visible:ring-2",
+  "focus-visible:ring-primary/30",
+  "focus-visible:ring-offset-2",
+];
+
+function addMarkerRootClasses(
+  element: HTMLDivElement,
+  classes: string[]
+): void {
+  element.classList.add(...classes);
+}
+
 /**
  * Create a custom home marker element using safe DOM methods
  *
@@ -82,8 +114,8 @@ function createHomeMarkerElement(): HTMLDivElement {
   // Outer wrapper - stable hover zone, larger than visual marker
   // This element captures hover events without changing size
   const wrapper = document.createElement("div");
-  wrapper.className =
-    "group w-14 h-14 flex items-center justify-center cursor-pointer";
+  addMarkerRootClasses(wrapper, HOME_MARKER_ROOT_CLASSES);
+  wrapper.setAttribute("data-testid", "nearby-home-marker");
 
   // Inner visual marker - scales on hover via group-hover
   const container = document.createElement("div");
@@ -198,8 +230,7 @@ function renderPOIMarkerElement(
   place: NearbyPlace,
   isHighlighted: boolean
 ): void {
-  element.className =
-    "group w-12 h-12 flex items-center justify-center cursor-pointer poi-marker focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2";
+  addMarkerRootClasses(element, POI_MARKER_ROOT_CLASSES);
   element.dataset.placeId = place.id;
   element.tabIndex = 0;
   element.setAttribute("role", "button");

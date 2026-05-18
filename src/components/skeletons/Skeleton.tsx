@@ -82,7 +82,7 @@ export function AvatarSkeleton({ size = 40 }: { size?: number }) {
 export function CardSkeleton({ className = "" }: { className?: string }) {
   return (
     <div
-      className={`rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-4 ${className}`}
+      className={`rounded-lg bg-surface-container-lowest p-4 shadow-ambient-sm ${className}`}
       aria-hidden="true"
       role="presentation"
     >

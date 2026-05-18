@@ -133,6 +133,20 @@ export default function MobileSearchOverlay({
   // Prevent body scroll when open
   useBodyScrollLock(isOpen);
 
+  const autocompleteBias = useMemo(() => {
+    const urlLocation = readSearchIntentState(
+      new URLSearchParams(searchParamsString)
+    ).selectedLocation;
+    const source = locationCoords ?? urlLocation;
+
+    return source
+      ? {
+          near: { lat: source.lat, lng: source.lng },
+          bounds: source.bounds,
+        }
+      : undefined;
+  }, [locationCoords, searchParamsString]);
+
   const handleLocationSelect = useCallback(
     (loc: {
       name: string;
@@ -265,7 +279,7 @@ export default function MobileSearchOverlay({
       );
       onClose();
     },
-    [onClose, recentSearches, router, searchParams, searchParamsString]
+    [onClose, router, searchParams, searchParamsString]
   );
 
   // Portal to document.body to escape the <header>'s stacking context (z-[1100]).
@@ -336,6 +350,7 @@ export default function MobileSearchOverlay({
                         }}
                         onLocationSelect={handleLocationSelect}
                         fallbackItems={locationFallbackItems}
+                        autocompleteBias={autocompleteBias}
                         placeholder="Enter city or area"
                         className="w-full h-12 rounded-xl border border-outline-variant/30 bg-surface-container-lowest px-4 pr-11 focus-within:border-primary/30 focus-within:ring-2 focus-within:ring-primary/30"
                         inputClassName="text-base text-on-surface placeholder:text-on-surface-variant"

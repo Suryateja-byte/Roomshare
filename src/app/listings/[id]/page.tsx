@@ -12,7 +12,6 @@ import { resolveListingDetailDateParams } from "@/lib/search/listing-detail-link
 import { resolvePublicAvailability } from "@/lib/search/public-availability";
 import { toPublicCoordinates } from "@/lib/search/public-coordinates";
 import { getPublicListingDetail } from "@/lib/listings/public-detail";
-import { getReadEmbeddingVersion } from "@/lib/embeddings/version";
 import ListingPageClient from "./ListingPageClient";
 
 const getListingWithLocation = cache(async (id: string) => {
@@ -32,47 +31,6 @@ const getListingWithLocation = cache(async (id: string) => {
       location: true,
     },
   });
-});
-
-/** Row shape returned by get_similar_listings SQL function */
-interface SimilarListingRow {
-  id: string;
-  title: string;
-  description: string;
-  price: number;
-  images: string[];
-  city: string;
-  state: string;
-  room_type: string | null;
-  available_slots: number;
-  total_slots: number;
-  amenities: string[];
-  household_languages: string[];
-  avg_rating: number;
-  review_count: number;
-  similarity: number;
-}
-
-/** Fetch similar listings using vector similarity. Non-critical — returns [] on failure. */
-const getSimilarListings = cache(async function getSimilarListings(
-  listingId: string
-): Promise<SimilarListingRow[]> {
-  if (!features.semanticSearch) return [];
-  try {
-    const embeddingVersion = getReadEmbeddingVersion();
-    const rows = await prisma.$queryRaw<
-      SimilarListingRow[]
-    >`SELECT * FROM get_similar_listings(
-        ${listingId}, ${embeddingVersion}, 4, 0.3
-      )`;
-    return rows;
-  } catch (err) {
-    logger.sync.error("Failed to fetch similar listings", {
-      listingId,
-      error: err instanceof Error ? err.message : String(err),
-    });
-    return [];
-  }
 });
 
 interface PageProps {
@@ -206,9 +164,6 @@ export default async function ListingPage({ params, searchParams }: PageProps) {
     notFound();
   }
 
-  // Start similar listings fetch early (runs in parallel with remaining queries)
-  const similarListingsPromise = getSimilarListings(id);
-
   const [rawCoordinates, reviews] = await Promise.all([
     (async () => {
       if (!listing.location) {
@@ -268,23 +223,6 @@ export default async function ListingPage({ params, searchParams }: PageProps) {
     isValid: resolvedAvailability.isValid,
     isPubliclyAvailable: resolvedAvailability.isPubliclyAvailable,
   };
-
-  const similarListingsRaw = await similarListingsPromise;
-
-  const similarListings = similarListingsRaw.map((row) => ({
-    id: row.id,
-    title: row.title,
-    description: row.description,
-    price: row.price,
-    images: row.images,
-    location: { city: row.city, state: row.state },
-    amenities: row.amenities,
-    householdLanguages: row.household_languages,
-    availableSlots: row.available_slots,
-    totalSlots: row.total_slots,
-    avgRating: row.avg_rating,
-    reviewCount: row.review_count,
-  }));
 
   // JSON-LD structured data for search engines.
   // Content uses sanitizeUnicode() for title/description — safe from injection.
@@ -392,7 +330,6 @@ export default async function ListingPage({ params, searchParams }: PageProps) {
         coordinates={coordinates}
         nearbyCoordinates={nearbyCoordinates}
         canViewExactLocation={canViewExactLocation}
-        similarListings={similarListings}
         viewToken={generateViewToken(listing.id)}
         initialStartDate={initialAvailabilityRange.initialStartDate}
         initialEndDate={initialAvailabilityRange.initialEndDate}

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { StatusNotice } from "@/components/ui/status-notice";
 import {
   SUPPORTED_LANGUAGES,
   getLanguageName,
@@ -54,6 +55,7 @@ import CharacterCounter from "@/components/CharacterCounter";
 import CreateCollisionModal from "@/components/listings/CreateCollisionModal";
 import type { CollisionSibling } from "@/lib/listings/collision-detector";
 import { emitListingCreateCollisionActionSelected } from "@/lib/search/search-telemetry-client";
+import { formatDateToYMD } from "@/lib/utils";
 
 interface ImageObject {
   id: string;
@@ -77,7 +79,11 @@ function FieldError({
 }) {
   if (!fieldErrors[field]) return null;
   return (
-    <p id={`${field}-error`} role="alert" className="text-red-500 text-xs mt-1">
+    <p
+      id={`${field}-error`}
+      role="alert"
+      className="text-destructive text-xs mt-1"
+    >
       {fieldErrors[field]}
     </p>
   );
@@ -146,6 +152,7 @@ export default function CreateListingForm({
   const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const submitSucceededRef = useRef(false);
   const idempotencyKeyRef = useRef(crypto.randomUUID());
+  const pendingFieldErrorFocusRef = useRef<string | null>(null);
 
   // Form field states for premium components
   const [description, setDescription] = useState("");
@@ -236,8 +243,7 @@ export default function CreateListingForm({
       setZip(persistedData.zip || "");
       let restoredMoveInDate = persistedData.moveInDate || "";
       if (restoredMoveInDate) {
-        const now = new Date();
-        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+        const todayStr = formatDateToYMD(new Date());
         if (restoredMoveInDate < todayStr) {
           restoredMoveInDate = "";
         }
@@ -309,6 +315,7 @@ export default function CreateListingForm({
 
   // Save when controlled states change (M-U1: fix operator precedence, M-U2: fix deps)
   useEffect(() => {
+    if (submitSucceededRef.current) return;
     if (!isHydrated || (!draftRestored && hasDraft)) return;
     saveData(collectFormData());
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -462,6 +469,14 @@ export default function CreateListingForm({
     requestAnimationFrame(() => errorBannerRef.current?.focus());
   };
 
+  useEffect(() => {
+    if (loading) return;
+    const field = pendingFieldErrorFocusRef.current;
+    if (!field) return;
+    pendingFieldErrorFocusRef.current = null;
+    document.getElementById(field)?.focus();
+  }, [loading, fieldErrors]);
+
   // Calculate image counts
   const successfulImages = uploadedImages.filter(
     (img) => img.uploadedUrl && !img.error
@@ -614,11 +629,13 @@ export default function CreateListingForm({
                 string
               >);
           setFieldErrors(newFieldErrors);
+          setError(json.error || "Please fix the highlighted fields");
+          window.scrollTo({ top: 0, behavior: "smooth" });
           const firstErrorKey = Object.keys(newFieldErrors)[0];
           if (firstErrorKey) {
-            const element = document.getElementById(firstErrorKey);
-            element?.focus();
+            pendingFieldErrorFocusRef.current = firstErrorKey;
           }
+          return;
         }
         throw new Error(json.error || "Failed to create listing");
       }
@@ -739,26 +756,26 @@ export default function CreateListingForm({
                   <div
                     className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
                       isComplete
-                        ? "bg-green-50 border-green-500"
+                        ? "bg-success/10 border-success"
                         : "bg-surface-container-high border-outline-variant/20"
                     }`}
                   >
                     {isComplete ? (
-                      <Check className="w-4 h-4 text-green-600" />
+                      <Check className="w-4 h-4 text-success" />
                     ) : (
                       <Icon className="w-4 h-4 text-on-surface-variant" />
                     )}
                   </div>
                   <span
                     className={`text-xs font-medium mt-2 text-center hidden sm:block transition-colors duration-300 ${
-                      isComplete ? "text-green-600" : "text-on-surface-variant"
+                      isComplete ? "text-success" : "text-on-surface-variant"
                     }`}
                   >
                     {section.label}
                   </span>
                   <span
                     className={`text-xs font-medium mt-2 text-center sm:hidden transition-colors duration-300 ${
-                      isComplete ? "text-green-600" : "text-on-surface-variant"
+                      isComplete ? "text-success" : "text-on-surface-variant"
                     }`}
                   >
                     {index + 1}
@@ -768,7 +785,7 @@ export default function CreateListingForm({
                 {index < FORM_SECTIONS.length - 1 && (
                   <div
                     className={`flex-1 h-0.5 mx-2 sm:mx-4 transition-colors duration-300 ${
-                      isComplete ? "bg-green-500" : "bg-surface-container-high"
+                      isComplete ? "bg-success" : "bg-surface-container-high"
                     }`}
                   />
                 )}
@@ -788,77 +805,79 @@ export default function CreateListingForm({
 
       {/* Draft Resume Banner */}
       {showDraftBanner && savedAt && (
-        <div
+        <StatusNotice
           role="status"
-          className="bg-blue-50 border border-outline-variant/20 px-4 py-4 rounded-xl mb-8 flex items-center justify-between gap-4"
+          variant="info"
+          icon={<FileText className="h-5 w-5" />}
+          title="You have a saved draft"
+          className="mb-8"
+          actions={
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={discardDraft}
+              >
+                Start Fresh
+              </Button>
+              <Button type="button" size="sm" onClick={restoreDraft}>
+                Resume Draft
+              </Button>
+            </>
+          }
         >
-          <div className="flex items-center gap-3">
-            <FileText className="w-5 h-5 text-blue-600 flex-shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-blue-900">
-                You have a saved draft
-              </p>
-              <p className="text-xs text-blue-600">
-                Last saved {formatTimeSince(savedAt)}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={discardDraft}
-              className="text-blue-700 border-blue-200 hover:bg-blue-100"
-            >
-              Start Fresh
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={restoreDraft}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              Resume Draft
-            </Button>
-          </div>
-        </div>
+          <p className="text-xs">Last saved {formatTimeSince(savedAt)}</p>
+        </StatusNotice>
       )}
 
       {error && (
-        <div
+        <StatusNotice
           ref={errorBannerRef}
           tabIndex={-1}
           role="alert"
+          variant="error"
           data-testid="form-error-banner"
-          className="bg-red-50 border border-red-100 text-red-600 px-4 py-4 rounded-xl mb-8 text-sm outline-none"
+          className="mb-8 outline-none"
         >
           {error}
-        </div>
+        </StatusNotice>
       )}
 
       {crossTabConflict && (
-        <div className="bg-yellow-50 border border-outline-variant/20 rounded-lg p-3 text-sm text-yellow-800 mb-4">
+        <StatusNotice
+          variant="warning"
+          className="mb-4"
+          actions={
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={dismissCrossTabConflict}
+            >
+              Dismiss
+            </Button>
+          }
+        >
           <p>
             This draft was modified in another tab. Reload to see the latest
             version.
           </p>
-          <button onClick={dismissCrossTabConflict} className="underline mt-1">
-            Dismiss
-          </button>
-        </div>
+        </StatusNotice>
       )}
 
       {/* Auto-save status indicator */}
       {!showDraftBanner && savedAt && !loading && (
         <div className="flex items-center justify-end gap-2 mb-4 text-xs text-on-surface-variant animate-in fade-in duration-300">
-          <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+          <CheckCircle className="w-3.5 h-3.5 text-success" />
           <span>Draft saved {formatTimeSince(savedAt)}</span>
         </div>
       )}
 
       <form
         ref={formRef}
+        data-testid="create-listing-form"
+        data-hydrated={isHydrated ? "true" : "false"}
         onSubmit={handleSubmit}
         noValidate
         onChange={() => saveData(collectFormData())}
@@ -886,7 +905,7 @@ export default function CreateListingForm({
               disabled={loading}
               aria-invalid={!!fieldErrors.title}
               aria-describedby={fieldErrors.title ? "title-error" : undefined}
-              className={fieldErrors.title ? "border-red-500" : ""}
+              className={fieldErrors.title ? "border-destructive" : ""}
             />
             <FieldError field="title" fieldErrors={fieldErrors} />
           </div>
@@ -905,7 +924,7 @@ export default function CreateListingForm({
               aria-describedby={
                 fieldErrors.description ? "description-error" : undefined
               }
-              className={`w-full bg-surface-canvas hover:bg-surface-container-high focus:bg-surface-container-lowest border rounded-xl px-4 py-3 sm:py-3.5 text-on-surface placeholder:text-on-surface-variant outline-none focus:ring-2 focus:ring-on-surface/5 focus:border-on-surface transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 resize-none leading-relaxed ${fieldErrors.description ? "border-red-500" : "border-outline-variant/20"}`}
+              className={`w-full bg-surface-canvas hover:bg-surface-container-high focus:bg-surface-container-lowest border rounded-xl px-4 py-3 sm:py-3.5 text-on-surface placeholder:text-on-surface-variant outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 resize-none leading-relaxed ${fieldErrors.description ? "border-destructive" : "border-outline-variant/20"}`}
               placeholder="What makes your place special? Describe the vibe, the light, and the lifestyle..."
               disabled={loading}
             />
@@ -934,7 +953,7 @@ export default function CreateListingForm({
                 disabled={loading}
                 aria-invalid={!!fieldErrors.price}
                 aria-describedby={fieldErrors.price ? "price-error" : undefined}
-                className={fieldErrors.price ? "border-red-500" : ""}
+                className={fieldErrors.price ? "border-destructive" : ""}
               />
               <FieldError field="price" fieldErrors={fieldErrors} />
             </div>
@@ -956,7 +975,7 @@ export default function CreateListingForm({
                 aria-describedby={
                   fieldErrors.totalSlots ? "totalSlots-error" : undefined
                 }
-                className={fieldErrors.totalSlots ? "border-red-500" : ""}
+                className={fieldErrors.totalSlots ? "border-destructive" : ""}
               />
               <FieldError field="totalSlots" fieldErrors={fieldErrors} />
             </div>
@@ -1049,7 +1068,7 @@ export default function CreateListingForm({
               aria-describedby={
                 fieldErrors.address ? "address-error" : undefined
               }
-              className={fieldErrors.address ? "border-red-500" : ""}
+              className={fieldErrors.address ? "border-destructive" : ""}
             />
             <FieldError field="address" fieldErrors={fieldErrors} />
           </div>
@@ -1067,7 +1086,7 @@ export default function CreateListingForm({
                 disabled={loading}
                 aria-invalid={!!fieldErrors.city}
                 aria-describedby={fieldErrors.city ? "city-error" : undefined}
-                className={fieldErrors.city ? "border-red-500" : ""}
+                className={fieldErrors.city ? "border-destructive" : ""}
               />
               <FieldError field="city" fieldErrors={fieldErrors} />
             </div>
@@ -1084,7 +1103,7 @@ export default function CreateListingForm({
                 disabled={loading}
                 aria-invalid={!!fieldErrors.state}
                 aria-describedby={fieldErrors.state ? "state-error" : undefined}
-                className={fieldErrors.state ? "border-red-500" : ""}
+                className={fieldErrors.state ? "border-destructive" : ""}
               />
               <FieldError field="state" fieldErrors={fieldErrors} />
             </div>
@@ -1101,7 +1120,7 @@ export default function CreateListingForm({
                 disabled={loading}
                 aria-invalid={!!fieldErrors.zip}
                 aria-describedby={fieldErrors.zip ? "zip-error" : undefined}
-                className={fieldErrors.zip ? "border-red-500" : ""}
+                className={fieldErrors.zip ? "border-destructive" : ""}
               />
               <FieldError field="zip" fieldErrors={fieldErrors} />
             </div>
@@ -1131,7 +1150,9 @@ export default function CreateListingForm({
               key={draftRestored ? "restored" : "initial"}
             />
             {fieldErrors.images && (
-              <p className="text-sm text-red-500 mt-1">{fieldErrors.images}</p>
+              <p className="text-sm text-destructive mt-1">
+                {fieldErrors.images}
+              </p>
             )}
           </div>
         </section>
@@ -1160,7 +1181,7 @@ export default function CreateListingForm({
               aria-describedby={
                 fieldErrors.amenities ? "amenities-error" : undefined
               }
-              className={fieldErrors.amenities ? "border-red-500" : ""}
+              className={fieldErrors.amenities ? "border-destructive" : ""}
             />
             <FieldError field="amenities" fieldErrors={fieldErrors} />
             <p className="text-xs text-on-surface-variant mt-2">
@@ -1170,7 +1191,10 @@ export default function CreateListingForm({
 
           <div>
             <Label htmlFor="moveInDate">
-              Move-In Date <span className="text-red-500" aria-hidden="true">*</span>
+              Move-In Date{" "}
+              <span className="text-destructive" aria-hidden="true">
+                *
+              </span>
               <span className="sr-only"> required</span>
             </Label>
             <DatePicker
@@ -1178,12 +1202,12 @@ export default function CreateListingForm({
               value={moveInDate}
               onChange={setMoveInDate}
               placeholder="Select move-in date"
-              minDate={new Date().toISOString().split("T")[0]}
+              minDate={formatDateToYMD(new Date())}
               aria-invalid={!!fieldErrors.moveInDate}
               aria-describedby={
                 fieldErrors.moveInDate ? "moveInDate-error" : undefined
               }
-              className={fieldErrors.moveInDate ? "border-red-500" : ""}
+              className={fieldErrors.moveInDate ? "border-destructive" : ""}
             />
             <FieldError field="moveInDate" fieldErrors={fieldErrors} />
             <p className="text-xs text-on-surface-variant mt-2">
@@ -1298,7 +1322,7 @@ export default function CreateListingForm({
               )}
             </div>
             {fieldErrors.householdLanguages && (
-              <p className="text-sm text-red-500 mt-1">
+              <p className="text-sm text-destructive mt-1">
                 {fieldErrors.householdLanguages}
               </p>
             )}
@@ -1366,7 +1390,7 @@ export default function CreateListingForm({
               aria-describedby={
                 fieldErrors.houseRules ? "houseRules-error" : undefined
               }
-              className={fieldErrors.houseRules ? "border-red-500" : ""}
+              className={fieldErrors.houseRules ? "border-destructive" : ""}
             />
             <FieldError field="houseRules" fieldErrors={fieldErrors} />
             <p className="text-xs text-on-surface-variant mt-2">
@@ -1425,7 +1449,7 @@ export default function CreateListingForm({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              <AlertTriangle className="w-5 h-5 text-warning" />
               Some Images Failed to Upload
             </AlertDialogTitle>
             <AlertDialogDescription>

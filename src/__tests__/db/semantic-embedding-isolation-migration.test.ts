@@ -29,17 +29,24 @@ describe("semantic embedding version isolation migration", () => {
       )
       .join("\n");
 
+  const scoreCastSql = () =>
+    fs.readFileSync(
+      path.resolve(
+        __dirname,
+        "../../../prisma/migrations/20260515030000_fix_semantic_score_casts/migration.sql"
+      ),
+      "utf8"
+    );
+
   it("filters semantic search candidates by embedding version and published status before ranking", () => {
     const sql = migrationSql();
 
     expect(sql).toContain("required_embedding_version text");
     expect(sql).toContain("sd.embedding_model = required_embedding_version");
-    expect(sql).toContain(
-      "sd.embedding_status IN ('COMPLETED', 'PARTIAL')"
-    );
-    expect(sql.indexOf("sd.embedding_model = required_embedding_version")).toBeLessThan(
-      sql.indexOf("ORDER BY f.embedding <=> query_embedding")
-    );
+    expect(sql).toContain("sd.embedding_status IN ('COMPLETED', 'PARTIAL')");
+    expect(
+      sql.indexOf("sd.embedding_model = required_embedding_version")
+    ).toBeLessThan(sql.indexOf("ORDER BY f.embedding <=> query_embedding"));
     expect(sql).not.toContain("CREATE INDEX CONCURRENTLY");
   });
 
@@ -49,13 +56,23 @@ describe("semantic embedding version isolation migration", () => {
 
     expect(sql).toContain("get_similar_listings");
     expect(sql).toContain("target_embedding");
-    expect(sql).toContain(
-      "embedding_model = required_embedding_version"
-    );
+    expect(sql).toContain("embedding_model = required_embedding_version");
     expect(indexes).toContain("idx_search_docs_embedding_model_status");
     expect(indexes).toContain("idx_search_docs_embedding_ga_hnsw");
     expect(indexes).toContain(
       "gemini-embedding-2.search-result.nosensitive-v1.d768"
     );
+  });
+
+  it("casts semantic score columns to double precision for the declared return shape", () => {
+    const sql = scoreCastSql();
+
+    expect(sql).toContain(
+      "CREATE OR REPLACE FUNCTION search_listings_semantic"
+    );
+    expect(sql).toContain("f.semantic_similarity::float8");
+    expect(sql).toContain("f.keyword_rank::float8");
+    expect(sql).toContain("f.combined_score::float8");
+    expect(sql).toContain("ts_rank_cd");
   });
 });

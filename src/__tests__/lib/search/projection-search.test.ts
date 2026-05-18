@@ -1,6 +1,9 @@
 jest.mock("@/lib/prisma", () => ({
   prisma: {
     $queryRawUnsafe: jest.fn(),
+    listing: {
+      findMany: jest.fn(),
+    },
     querySnapshot: {
       create: jest.fn(),
       findUnique: jest.fn(),
@@ -31,6 +34,7 @@ import { getProjectionReadEligibility } from "@/lib/search/projection-read-eligi
 import { getReadEmbeddingVersion } from "@/lib/embeddings/version";
 
 const mockQueryRawUnsafe = prisma.$queryRawUnsafe as jest.Mock;
+const mockListingFindMany = prisma.listing.findMany as jest.Mock;
 const mockSnapshotCreate = prisma.querySnapshot.create as jest.Mock;
 const mockSnapshotFindUnique = prisma.querySnapshot.findUnique as jest.Mock;
 const mockGetReadEmbeddingVersion = getReadEmbeddingVersion as jest.Mock;
@@ -79,6 +83,23 @@ function projectionRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function liveListing(overrides: Record<string, unknown> = {}) {
+  return {
+    id: overrides.id ?? "unit-1-inv-1",
+    status: overrides.status ?? "ACTIVE",
+    statusReason: overrides.statusReason ?? null,
+    openSlots: overrides.openSlots ?? 1,
+    totalSlots: overrides.totalSlots ?? 1,
+    moveInDate: overrides.moveInDate ?? new Date("2099-01-01T00:00:00.000Z"),
+    availableUntil:
+      overrides.availableUntil ?? new Date("2099-12-31T00:00:00.000Z"),
+    minStayMonths: overrides.minStayMonths ?? 1,
+    lastConfirmedAt: overrides.lastConfirmedAt ?? new Date(),
+    price: overrides.price ?? "1200",
+    roomType: overrides.roomType ?? "Private Room",
+  };
+}
+
 function createSnapshotMock() {
   mockSnapshotCreate.mockImplementation(async ({ data }) => ({
     id: "snapshot-phase04",
@@ -119,6 +140,10 @@ describe("Phase 04 projection search", () => {
     delete process.env.KILL_SWITCH_FORCE_CLUSTERS_ONLY;
     mockGetReadEmbeddingVersion.mockReturnValue("embed-v1");
     createSnapshotMock();
+    mockListingFindMany.mockImplementation(async ({ where }) => {
+      const ids = where?.id?.in ?? [];
+      return ids.map((id: string) => liveListing({ id }));
+    });
   });
 
   afterAll(() => {
@@ -196,7 +221,7 @@ describe("Phase 04 projection search", () => {
     });
 
     expect(result.response?.list.fullItems).toHaveLength(1);
-    expect(result.response?.list.fullItems?.[0]?.groupKey).toBe("unit-a:1");
+    expect(result.response?.list.fullItems?.[0]?.groupKey).toMatch(/^pg1_/);
     expect(
       result.response?.list.fullItems?.[0]?.groupSummary?.members
     ).toHaveLength(2);
@@ -227,6 +252,143 @@ describe("Phase 04 projection search", () => {
     expect(sql).not.toContain("upp.from_price::TEXT AS from_price");
     expect(sql).not.toContain("upp.matching_inventory_count,");
     expect(sql).not.toContain("search_doc");
+  });
+
+  it("filters Phase 04 projection rows to live listings the detail page can render", async () => {
+    mockQueryRawUnsafe.mockResolvedValueOnce([
+      projectionRow({
+        unit_id: "unit-a",
+        representative_inventory_id: "inv-a1",
+        inventory_ids: ["inv-a1", "inv-a2"],
+        matching_inventory_count: 2,
+      }),
+      projectionRow({
+        unit_id: "unit-b",
+        representative_inventory_id: "inv-b1",
+        inventory_ids: ["inv-b1"],
+      }),
+    ]);
+    mockListingFindMany.mockResolvedValueOnce([
+      liveListing({ id: "inv-a2", price: "1300" }),
+      liveListing({ id: "inv-b1", status: "PAUSED" }),
+    ]);
+
+    const result = await executeProjectionSearchV2({
+      parsed: parsed(),
+      params: { rawParams: {}, limit: 12, includeMap: true },
+    });
+
+    expect(result.response?.list.fullItems?.map((item) => item.id)).toEqual([
+      "inv-a2",
+    ]);
+    expect(
+      result.response?.list.fullItems?.[0]?.groupSummary?.members?.map(
+        (member) => member.listingId
+      )
+    ).toEqual(["inv-a2"]);
+    expect(result.response?.map.geojson.features).toHaveLength(1);
+    expect(mockSnapshotCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          orderedListingIds: ["inv-a2"],
+          orderedUnitKeys: ["unit-a:1"],
+          total: 1,
+        }),
+      })
+    );
+  });
+
+  it("drops projection inventory whose live host-managed availability is stale or invalid", async () => {
+    mockQueryRawUnsafe.mockResolvedValueOnce([
+      projectionRow({
+        unit_id: "unit-a",
+        representative_inventory_id: "inv-stale",
+        inventory_ids: ["inv-stale", "inv-empty", "inv-good"],
+        matching_inventory_count: 3,
+      }),
+    ]);
+    mockListingFindMany.mockResolvedValueOnce([
+      liveListing({
+        id: "inv-stale",
+        lastConfirmedAt: new Date("2000-01-01T00:00:00.000Z"),
+      }),
+      liveListing({ id: "inv-empty", openSlots: 0 }),
+      liveListing({ id: "inv-good", price: "1400" }),
+    ]);
+
+    const result = await executeProjectionSearchV2({
+      parsed: parsed(),
+      params: { rawParams: {}, limit: 12, includeMap: true },
+    });
+
+    expect(result.response?.list.fullItems?.map((item) => item.id)).toEqual([
+      "inv-good",
+    ]);
+    expect(
+      result.response?.list.fullItems?.[0]?.groupSummary?.siblingIds
+    ).toEqual([]);
+    expect(result.response?.list.total).toBe(1);
+  });
+
+  it("keeps multi-member Phase 04 groups coherent after filtering stale members", async () => {
+    mockQueryRawUnsafe.mockResolvedValueOnce([
+      projectionRow({
+        unit_id: "unit-a",
+        representative_inventory_id: "inv-stale",
+        inventory_ids: ["inv-stale", "inv-live-expensive", "inv-live-cheap"],
+        matching_inventory_count: 3,
+      }),
+    ]);
+    mockListingFindMany.mockResolvedValueOnce([
+      liveListing({
+        id: "inv-stale",
+        price: "900",
+        lastConfirmedAt: new Date("2000-01-01T00:00:00.000Z"),
+      }),
+      liveListing({ id: "inv-live-expensive", price: "1500" }),
+      liveListing({ id: "inv-live-cheap", price: "1200" }),
+    ]);
+
+    const result = await executeProjectionSearchV2({
+      parsed: parsed(),
+      params: { rawParams: {}, limit: 12, includeMap: true },
+    });
+
+    const item = result.response?.list.fullItems?.[0];
+    expect(item?.id).toBe("inv-live-cheap");
+    expect(item?.groupSummary?.siblingIds).toEqual(["inv-live-expensive"]);
+    expect(item?.groupSummary?.members).toEqual([
+      expect.objectContaining({
+        listingId: "inv-live-cheap",
+        openSlots: 1,
+        totalSlots: 1,
+        isCanonical: true,
+      }),
+      expect.objectContaining({
+        listingId: "inv-live-expensive",
+        openSlots: 1,
+        totalSlots: 1,
+        isCanonical: false,
+      }),
+    ]);
+    expect(item?.groupSummary?.combinedOpenSlots).toBe(2);
+    expect(item?.groupSummary?.combinedTotalSlots).toBe(2);
+    expect(item?.publicAvailability.openSlots).toBe(2);
+    expect(item?.publicAvailability.totalSlots).toBe(2);
+    expect(result.response?.list.total).toBe(1);
+    expect(
+      result.response?.map.geojson.features.map(
+        (feature) => feature.properties.id
+      )
+    ).toEqual(["inv-live-cheap"]);
+    expect(mockSnapshotCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          orderedListingIds: ["inv-live-cheap"],
+          orderedUnitKeys: ["unit-a:1"],
+        }),
+      })
+    );
   });
 
   it("pushes bounds predicates into SQL before the hard limit", async () => {
@@ -378,10 +540,12 @@ describe("Phase 04 projection search", () => {
       projectionRow({
         unit_id: "unit-a",
         representative_inventory_id: "inv-a1",
+        inventory_ids: ["inv-a1"],
       }),
       projectionRow({
         unit_id: "unit-c",
         representative_inventory_id: "inv-c1",
+        inventory_ids: ["inv-c1"],
       }),
     ]);
 
@@ -439,7 +603,7 @@ describe("Phase 04 projection search", () => {
     }
   });
 
-  it("hydrates Phase 04 map snapshots from stored map payload when present", async () => {
+  it("revalidates Phase 04 stored map snapshots before returning listing ids", async () => {
     mockSnapshotFindUnique.mockResolvedValue({
       id: "snapshot-phase04",
       queryHash: "hash-phase04",
@@ -451,7 +615,7 @@ describe("Phase 04 projection search", () => {
       rankerProfileVersion: "2026-04-19.search-ranker-v1",
       unitIdentityEpochFloor: 1,
       snapshotVersion: PHASE04_SNAPSHOT_VERSION,
-      orderedListingIds: ["inv-a1"],
+      orderedListingIds: ["stale-id"],
       orderedUnitKeys: ["unit-a:1"],
       mapPayload: {
         geojson: {
@@ -461,7 +625,7 @@ describe("Phase 04 projection search", () => {
               type: "Feature",
               geometry: { type: "Point", coordinates: [-122.42, 37.77] },
               properties: {
-                id: "inv-a1",
+                id: "stale-id",
                 title: "Room in Mission",
                 price: 1200,
                 image: null,
@@ -482,12 +646,20 @@ describe("Phase 04 projection search", () => {
       expiresAt: new Date(Date.now() + 60_000),
       createdAt: new Date("2026-04-23T00:00:00Z"),
     });
+    mockQueryRawUnsafe.mockResolvedValueOnce([
+      projectionRow({
+        unit_id: "unit-a",
+        representative_inventory_id: "inv-a1",
+        inventory_ids: ["inv-a1"],
+      }),
+    ]);
+    mockListingFindMany.mockResolvedValueOnce([liveListing({ id: "inv-a1" })]);
 
     const result = await hydratePhase04MapSnapshot({
       querySnapshotId: "snapshot-phase04",
     });
 
-    expect(mockQueryRawUnsafe).not.toHaveBeenCalled();
+    expect(mockQueryRawUnsafe).toHaveBeenCalled();
     expect(result).toMatchObject({ kind: "ok" });
     if ("kind" in result && result.kind === "ok") {
       expect(result.data.listings).toHaveLength(1);

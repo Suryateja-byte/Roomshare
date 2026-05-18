@@ -39,12 +39,16 @@ interface WrapperProps {
   initialValue?: string;
   onChangeSpy?: jest.Mock;
   onLocationSelectSpy?: jest.Mock;
+  autocompleteBias?: React.ComponentProps<
+    typeof LocationSearchInput
+  >["autocompleteBias"];
 }
 
 function ControlledWrapper({
   initialValue = "",
   onChangeSpy,
   onLocationSelectSpy,
+  autocompleteBias,
 }: WrapperProps) {
   const [value, setValue] = useState(initialValue);
 
@@ -58,6 +62,7 @@ function ControlledWrapper({
       onLocationSelect={(location) => {
         onLocationSelectSpy?.(location);
       }}
+      autocompleteBias={autocompleteBias}
     />
   );
 }
@@ -87,6 +92,7 @@ describe("LocationSearchInput - Input Sanitization", () => {
         initialValue={props.initialValue ?? ""}
         onChangeSpy={props.onChangeSpy ?? mockOnChange}
         onLocationSelectSpy={props.onLocationSelectSpy ?? mockOnLocationSelect}
+        autocompleteBias={props.autocompleteBias}
       />
     );
   };
@@ -108,6 +114,34 @@ describe("LocationSearchInput - Input Sanitization", () => {
       const url = mockFetch.mock.calls[0][0] as string;
       const parsedUrl = new URL(url, "http://localhost");
       expect(parsedUrl.searchParams.get("q")).toBe("San Francisco");
+    });
+
+    it("includes coarse map bias params when provided", async () => {
+      renderInput({
+        autocompleteBias: {
+          near: { lat: 37.7749, lng: -122.4194 },
+          bounds: [-122.6, 37.6, -122.2, 37.9],
+        },
+      });
+      const input = screen.getByRole("combobox");
+
+      await user.type(input, "Irving");
+      await act(async () => {
+        jest.advanceTimersByTime(350);
+      });
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalled();
+      });
+
+      const url = mockFetch.mock.calls[0][0] as string;
+      const parsedUrl = new URL(url, "http://localhost");
+      expect(parsedUrl.searchParams.get("nearLat")).toBe("37.7749");
+      expect(parsedUrl.searchParams.get("nearLng")).toBe("-122.4194");
+      expect(parsedUrl.searchParams.get("minLng")).toBe("-122.6");
+      expect(parsedUrl.searchParams.get("minLat")).toBe("37.6");
+      expect(parsedUrl.searchParams.get("maxLng")).toBe("-122.2");
+      expect(parsedUrl.searchParams.get("maxLat")).toBe("37.9");
     });
 
     it("does not trigger API for whitespace-only input", async () => {

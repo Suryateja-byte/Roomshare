@@ -217,6 +217,44 @@ test.describe("Create Listing — Functional Tests", () => {
       await clp.expectOnCreatePage();
       await clp.expectErrorBanner(/photo|image/i);
     });
+
+    test(`F-019: Validation — invalid total roommates ${tags.auth} ${tags.core}`, async ({
+      page,
+    }) => {
+      const clp = new CreateListingPage(page);
+      const data = validData({ totalSlots: "0" });
+
+      await clp.goto();
+      await clp.fillRequiredFields(data);
+      await clp.mockImageUpload();
+      await clp.uploadTestImage();
+      await clp.waitForUploadComplete();
+
+      await clp.submit();
+
+      await clp.expectOnCreatePage();
+      await clp.expectValidationError("totalSlots");
+      await clp.expectFieldAriaInvalid("totalSlots");
+    });
+
+    test(`F-020: Validation — missing move-in date ${tags.auth} ${tags.core}`, async ({
+      page,
+    }) => {
+      const clp = new CreateListingPage(page);
+      const data = validData();
+
+      await clp.goto();
+      await clp.fillBasics(data);
+      await clp.fillLocation(data);
+      await clp.mockImageUpload();
+      await clp.uploadTestImage();
+      await clp.waitForUploadComplete();
+
+      await clp.submit();
+
+      await clp.expectOnCreatePage();
+      await clp.expectValidationError("moveInDate");
+    });
   });
 
   // ────────────────────────────────────────────────────────

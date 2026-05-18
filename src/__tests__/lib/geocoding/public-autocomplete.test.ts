@@ -1,9 +1,14 @@
 const mockQueryRawUnsafe = jest.fn();
+const mockSearchPhoton = jest.fn();
 
 jest.mock("@/lib/prisma", () => ({
   prisma: {
     $queryRawUnsafe: (...args: unknown[]) => mockQueryRawUnsafe(...args),
   },
+}));
+
+jest.mock("@/lib/geocoding/photon", () => ({
+  searchPhoton: (...args: unknown[]) => mockSearchPhoton(...args),
 }));
 
 jest.mock("@/lib/geocoding/public-autocomplete-telemetry", () => ({
@@ -22,10 +27,13 @@ import {
   tokenizePublicAutocompleteText,
 } from "@/lib/geocoding/public-autocomplete";
 
+const PUBLIC_AUTOCOMPLETE_TEST_NOW = new Date("2026-05-02T00:00:00.000Z");
+
 describe("public autocomplete", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockQueryRawUnsafe.mockResolvedValue([]);
+    mockSearchPhoton.mockResolvedValue([]);
   });
 
   it("prefers public area labels when they are narrower than the city", () => {
@@ -95,7 +103,10 @@ describe("public autocomplete", () => {
     ]);
 
     await expect(
-      searchPublicAutocomplete("main", { limit: 5 })
+      searchPublicAutocomplete("main", {
+        limit: 5,
+        now: PUBLIC_AUTOCOMPLETE_TEST_NOW,
+      })
     ).resolves.toEqual([]);
   });
 
@@ -175,7 +186,10 @@ describe("public autocomplete", () => {
       },
     ]);
 
-    const results = await searchPublicAutocomplete("aus tx", { limit: 5 });
+    const results = await searchPublicAutocomplete("aus tx", {
+      limit: 5,
+      now: PUBLIC_AUTOCOMPLETE_TEST_NOW,
+    });
 
     expect(results).toEqual([
       {
@@ -193,6 +207,114 @@ describe("public autocomplete", () => {
     );
   });
 
+  it("merges safe external street suggestions with internal public areas using map bias", async () => {
+    mockQueryRawUnsafe.mockResolvedValueOnce([]);
+    mockSearchPhoton.mockResolvedValueOnce([
+      {
+        id: "N:poi",
+        place_name: "Irving Pizza, San Francisco, California, United States",
+        center: [-122.4187653, 37.7861368],
+        place_type: ["address"],
+      },
+      {
+        id: "W:123",
+        place_name: "Irving Street, San Francisco, California, United States",
+        center: [-122.466, 37.764],
+        place_type: ["address"],
+        bbox: [-122.51, 37.75, -122.43, 37.78],
+      },
+      {
+        id: "N:456",
+        place_name: "Irving, Texas, United States",
+        center: [-96.9489, 32.814],
+        place_type: ["place"],
+      },
+      {
+        id: "H:789",
+        place_name: "1800 Irving Street, San Francisco, California, United States",
+        center: [-122.477, 37.763],
+        place_type: ["address"],
+      },
+    ]);
+
+    const results = await searchPublicAutocomplete("Irving", {
+      limit: 5,
+      now: PUBLIC_AUTOCOMPLETE_TEST_NOW,
+      bias: {
+        near: { lat: 37.7749, lng: -122.4194 },
+      },
+    });
+
+    expect(mockSearchPhoton).toHaveBeenCalledWith("Irving", {
+      limit: 10,
+      near: { lat: 37.7749, lng: -122.4194 },
+    });
+    expect(results[0]).toEqual({
+      id: "place:W:123",
+      place_name: "Irving Street, San Francisco, California, United States",
+      center: [-122.466, 37.764],
+      place_type: ["street"],
+      bbox: [-122.51, 37.75, -122.43, 37.78],
+    });
+    expect(results.map((result) => result.place_name)).not.toContain(
+      "1800 Irving Street, San Francisco, California, United States"
+    );
+    expect(results.map((result) => result.place_name)).not.toContain(
+      "Irving Pizza, San Francisco, California, United States"
+    );
+  });
+
+  it("falls back to internal public-area suggestions when external place search fails", async () => {
+    mockSearchPhoton.mockRejectedValueOnce(new Error("photon unavailable"));
+    mockQueryRawUnsafe.mockResolvedValueOnce([
+      {
+        id: "listing-inner-sunset",
+        availabilitySource: "HOST_MANAGED",
+        availableSlots: 1,
+        openSlots: 1,
+        totalSlots: 1,
+        moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+        availableUntil: null,
+        minStayMonths: 1,
+        lastConfirmedAt: new Date("2026-04-20T00:00:00.000Z"),
+        status: "ACTIVE",
+        statusReason: null,
+        needsMigrationReview: false,
+        city: "San Francisco",
+        state: "CA",
+        publicAreaName: "Inner Sunset",
+        publicCellId: "37.7640,-122.4660",
+      },
+    ]);
+
+    await expect(
+      searchPublicAutocomplete("Inner Sunset", {
+        limit: 5,
+        now: PUBLIC_AUTOCOMPLETE_TEST_NOW,
+      })
+    ).resolves.toEqual([
+      {
+        id: expect.stringMatching(/^public:/),
+        place_name: "Inner Sunset, CA",
+        center: [-122.466, 37.764],
+        place_type: ["neighborhood"],
+        bbox: [-122.471, 37.759, -122.461, 37.769],
+      },
+    ]);
+  });
+
+  it("still blocks house-number street searches before database or external place lookup", async () => {
+    await expect(
+      searchPublicAutocomplete("1800 Irving St", {
+        limit: 5,
+        now: PUBLIC_AUTOCOMPLETE_TEST_NOW,
+      })
+    ).resolves.toEqual([]);
+
+    expect(mockQueryRawUnsafe).not.toHaveBeenCalled();
+    expect(mockSearchPhoton).not.toHaveBeenCalled();
+  });
+
   it("keeps the flag-on SQL away from address, zip, and exact-coordinate fields", () => {
     expect(PUBLIC_AUTOCOMPLETE_SELECT_SQL).not.toMatch(/loc\.address/i);
     expect(PUBLIC_AUTOCOMPLETE_SELECT_SQL).not.toMatch(/loc\.zip/i);
@@ -207,9 +329,9 @@ describe("public autocomplete", () => {
     );
     const source = fs.readFileSync(filePath, "utf8");
 
-    expect(source).not.toContain('loc.address');
-    expect(source).not.toContain('loc.zip');
-    expect(source).not.toContain('loc.coords');
-    expect(source).not.toContain('exact_point');
+    expect(source).not.toContain("loc.address");
+    expect(source).not.toContain("loc.zip");
+    expect(source).not.toContain("loc.coords");
+    expect(source).not.toContain("exact_point");
   });
 });

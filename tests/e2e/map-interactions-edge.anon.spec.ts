@@ -68,8 +68,128 @@ const BENIGN_ERROR_PATTERNS = [
 async function waitForSearchPage(page: Page, url = SEARCH_URL) {
   await page.goto(url);
   await page.waitForLoadState("domcontentloaded");
-  await page.locator("button").first().waitFor({ state: "visible", timeout: timeouts.navigation });
+  await page
+    .locator("button")
+    .first()
+    .waitFor({ state: "visible", timeout: timeouts.navigation });
   await waitForMapReady(page);
+}
+
+async function getVisibleMarkerIdClosestToRightAvoidSurface(
+  page: Page
+): Promise<string | null> {
+  return page.evaluate(() => {
+    const avoidElement = Array.from(
+      document.querySelectorAll<HTMLElement>("[data-map-avoid]")
+    ).find((element) => {
+      const rect = element.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    });
+    const avoidRect = avoidElement?.getBoundingClientRect();
+    const avoidCenterY = avoidRect
+      ? avoidRect.top + avoidRect.height / 2
+      : window.innerHeight / 2;
+    const candidates = Array.from(
+      document.querySelectorAll<HTMLElement>(
+        '.maplibregl-marker [data-listing-id][role="button"]'
+      )
+    )
+      .map((element) => {
+        const id = element.getAttribute("data-listing-id");
+        const rect = element.getBoundingClientRect();
+        if (!id || rect.width <= 0 || rect.height <= 0) return null;
+
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const distance = avoidRect
+          ? Math.abs(avoidRect.left - centerX) +
+            Math.abs(avoidCenterY - centerY) * 0.25
+          : window.innerWidth - centerX;
+
+        return { id, distance };
+      })
+      .filter((entry): entry is { id: string; distance: number } =>
+        Boolean(entry)
+      )
+      .sort((a, b) => a.distance - b.distance);
+
+    return candidates[0]?.id ?? null;
+  });
+}
+
+async function getVisibleMapOverlayOverlaps(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    type ClientBox = {
+      left: number;
+      top: number;
+      right: number;
+      bottom: number;
+      width: number;
+      height: number;
+    };
+
+    const toBox = (element: Element): ClientBox | null => {
+      const rect = element.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return null;
+
+      return {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+      };
+    };
+    const overlaps = (a: ClientBox, b: ClientBox) =>
+      a.left < b.right &&
+      a.right > b.left &&
+      a.top < b.bottom &&
+      a.bottom > b.top;
+    const labelFor = (element: Element) =>
+      element.getAttribute("data-testid") ||
+      element.getAttribute("aria-label") ||
+      element.getAttribute("role") ||
+      element.className?.toString() ||
+      element.tagName.toLowerCase();
+
+    const avoidElements = [
+      ...Array.from(document.querySelectorAll("[data-map-avoid]")),
+      ...Array.from(document.querySelectorAll('[role="status"]')).filter(
+        (element) => !element.classList.contains("sr-only")
+      ),
+    ];
+    const avoidBoxes = avoidElements
+      .map((element) => ({ element, box: toBox(element) }))
+      .filter(
+        (entry): entry is { element: Element; box: ClientBox } =>
+          entry.box !== null
+      );
+    const surfaceElements = [
+      document.querySelector('[data-testid="map-popup-card"]'),
+      document.querySelector(".maplibregl-popup"),
+      document.querySelector('.maplibregl-marker [data-focus-state="active"]'),
+    ].filter((element): element is Element => element !== null);
+    const surfaceBoxes = surfaceElements
+      .map((element) => ({ element, box: toBox(element) }))
+      .filter(
+        (entry): entry is { element: Element; box: ClientBox } =>
+          entry.box !== null
+      );
+
+    const findings: string[] = [];
+    for (const surface of surfaceBoxes) {
+      for (const avoid of avoidBoxes) {
+        if (overlaps(surface.box, avoid.box)) {
+          findings.push(
+            `${labelFor(surface.element)} overlaps ${labelFor(avoid.element)}`
+          );
+        }
+      }
+    }
+
+    return findings;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -93,7 +213,10 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
         "Map tests require desktop viewport - skipping on mobile"
       );
     }
-    test.skip(projectName === "webkit", "Map tests have timing issues on webkit - skipping");
+    test.skip(
+      projectName === "webkit",
+      "Map tests have timing issues on webkit - skipping"
+    );
   });
 
   // =========================================================================
@@ -180,7 +303,10 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
       browserName,
     }) => {
       // CDP (Chrome DevTools Protocol) is Chromium-only — skip on Firefox/WebKit
-      test.skip(browserName !== "chromium", "CDP network throttling is Chromium-only");
+      test.skip(
+        browserName !== "chromium",
+        "CDP network throttling is Chromium-only"
+      );
       // This test is timing-sensitive and observes a transient loading state.
       // In fast CI environments the loading placeholder may never be visible.
       // Mark as slow to get 3x timeout.
@@ -474,54 +600,105 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
         return;
       }
 
-      // Query the Mapbox source and layer for privacy circles
-      const privacyCircleInfo = await page.evaluate(() => {
-        const map = (window as any).__e2eMapRef;
-        if (!map) return null;
-
-        const hasSource = map.getSource("privacy-circles") !== undefined;
-        const hasLayer = (() => {
-          try {
-            return map.getLayer("privacy-circles") !== undefined;
-          } catch {
-            return false;
-          }
-        })();
-
-        return { hasSource, hasLayer };
-      });
-
-      if (!privacyCircleInfo) {
-        test.info().annotations.push({
-          type: "skip-reason",
-          description: "Map ref available but getSource/getLayer returned null",
-        });
-        return;
-      }
-
-      // If listings exist in bounds, privacy-circles source should be present.
       // If 0 listings, PrivacyCircle component returns null (no source added).
       const listingCards = searchResultsContainer(page).locator(
         selectors.listingCard
       );
       const cardCount = await listingCards.count();
 
-      if (cardCount > 0) {
-        // Listings exist -- privacy circle source should be present
-        expect(privacyCircleInfo.hasSource).toBe(true);
-        // Layer should also be present
-        if (privacyCircleInfo.hasSource) {
-          expect(privacyCircleInfo.hasLayer).toBe(true);
-        }
-      } else {
-        // No listings -- privacy circles may not be rendered
+      if (cardCount === 0) {
         test.info().annotations.push({
           type: "info",
           description:
             "No listing cards found in bounds. Privacy circle source may not be added " +
             "when there are 0 listings.",
         });
+        return;
       }
+
+      const displayedMarkerCount = await page
+        .waitForFunction(
+          () => {
+            const visibleMarkers = Array.from(
+              document.querySelectorAll<HTMLElement>(
+                '.maplibregl-marker [data-listing-id][role="button"]'
+              )
+            ).filter((element) => {
+              const rect = element.getBoundingClientRect();
+              const style = window.getComputedStyle(element);
+
+              return (
+                rect.width > 0 &&
+                rect.height > 0 &&
+                style.visibility !== "hidden" &&
+                style.display !== "none"
+              );
+            });
+
+            return visibleMarkers.length > 0 ? visibleMarkers.length : false;
+          },
+          undefined,
+          {
+            timeout: 30_000,
+          }
+        )
+        .then((handle) => handle.jsonValue())
+        .catch(() => 0);
+
+      if (displayedMarkerCount === 0) {
+        test.info().annotations.push({
+          type: "info",
+          description:
+            "Listing cards exist, but no unclustered listing markers are currently displayed. " +
+            "Privacy circles are derived from displayed marker positions and may be absent at clustered zoom.",
+        });
+        return;
+      }
+
+      const privacyCirclesReady = await page
+        .waitForFunction(
+          () => {
+            const map = (window as any).__e2eMapRef;
+            if (!map) return false;
+
+            try {
+              return (
+                map.getSource("privacy-circles") !== undefined &&
+                map.getLayer("privacy-circles") !== undefined
+              );
+            } catch {
+              return false;
+            }
+          },
+          undefined,
+          {
+            timeout: 30_000,
+          }
+        )
+        .then(() => true)
+        .catch(() => false);
+
+      const privacyCircleInfo = await page.evaluate(() => {
+        const map = (window as any).__e2eMapRef;
+        if (!map) return { hasSource: false, hasLayer: false };
+
+        try {
+          return {
+            hasSource: map.getSource("privacy-circles") !== undefined,
+            hasLayer: map.getLayer("privacy-circles") !== undefined,
+          };
+        } catch {
+          return { hasSource: false, hasLayer: false };
+        }
+      });
+
+      // Displayed unclustered listing markers should have privacy circles.
+      expect(
+        privacyCirclesReady,
+        "Expected privacy-circles source and layer to be registered within 30s when displayed listing markers exist"
+      ).toBe(true);
+      expect(privacyCircleInfo.hasSource).toBe(true);
+      expect(privacyCircleInfo.hasLayer).toBe(true);
     });
 
     test(`${tags.anon} 11.2 - Privacy circles scale with zoom level (P2)`, async ({
@@ -770,4 +947,59 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
     });
   });
 
+  // =========================================================================
+  // 13. Map viewport overlay avoidance
+  // =========================================================================
+  test.describe("13. Map viewport overlay avoidance", () => {
+    test(`${tags.anon} 13.1 - popup and selected price marker avoid right-side map UI`, async ({
+      page,
+    }) => {
+      await waitForSearchPage(page);
+
+      const mapAvailable = await isMapAvailable(page);
+      if (!mapAvailable) {
+        test.skip(
+          true,
+          "Map not available (WebGL unavailable in headless mode)"
+        );
+        return;
+      }
+
+      const hasMapRef = await waitForMapRef(page);
+      test.skip(!hasMapRef, "E2E map ref not exposed");
+
+      const markers = page.locator(
+        '.maplibregl-marker [data-listing-id][role="button"]'
+      );
+      await expect
+        .poll(() => markers.count(), {
+          timeout: 30_000,
+          message: "Waiting for visible map markers",
+        })
+        .toBeGreaterThan(0);
+
+      const markerId = await getVisibleMarkerIdClosestToRightAvoidSurface(page);
+      test.skip(!markerId, "No visible marker available near map controls");
+
+      const marker = page
+        .locator(
+          `.maplibregl-marker [data-listing-id="${markerId!.replace(/"/g, '\\"')}"][role="button"]`
+        )
+        .first();
+      await expect(marker).toBeVisible({ timeout: timeouts.action });
+      await marker.evaluate((element) => (element as HTMLElement).click());
+
+      await expect(page.getByTestId("map-popup-card")).toBeVisible({
+        timeout: timeouts.action,
+      });
+
+      await expect
+        .poll(() => getVisibleMapOverlayOverlaps(page), {
+          timeout: 10_000,
+          message:
+            "Popup and selected marker should not overlap visible map controls/status UI",
+        })
+        .toEqual([]);
+    });
+  });
 });

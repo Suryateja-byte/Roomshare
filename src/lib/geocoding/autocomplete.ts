@@ -18,6 +18,18 @@ export interface LocationAutocompleteErrorResponse {
   code: LocationAutocompleteErrorCode;
 }
 
+export interface LocationAutocompletePointBias {
+  lat: number;
+  lng: number;
+}
+
+export type LocationAutocompleteBoundsBias = [number, number, number, number];
+
+export interface LocationAutocompleteBias {
+  near?: LocationAutocompletePointBias;
+  bounds?: LocationAutocompleteBoundsBias;
+}
+
 export function sanitizeAutocompleteQuery(input: string): string {
   return input
     .trim()

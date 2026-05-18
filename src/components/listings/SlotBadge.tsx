@@ -37,19 +37,14 @@ const overlayBase =
   "bg-surface-container-lowest/90 backdrop-blur-sm shadow-ambient-sm rounded-lg";
 
 const overlayText = {
-  success: "text-green-700",
-  info: "text-blue-700",
-  destructive: "text-red-700",
-  warning: "text-amber-700",
+  success: "text-tertiary",
+  info: "text-on-surface-variant",
+  destructive: "text-destructive",
+  warning: "text-primary",
   neutral: "text-on-surface-variant",
 } as const;
 
 type StatusVariant = keyof typeof overlayText;
-
-interface ResolvedStatus {
-  label: string;
-  variant: StatusVariant;
-}
 
 function toStatusVariant(state: AvailabilityPresentationState): StatusVariant {
   switch (state) {
@@ -83,7 +78,7 @@ export function SlotBadge({
   });
 
   let label = presentation.primaryLabel;
-  let variant = toStatusVariant(presentation.state);
+  const variant = toStatusVariant(presentation.state);
 
   if (labelOverride) {
     label = labelOverride;
@@ -120,12 +115,8 @@ export function SlotBadge({
 
 function toBadgeVariant(
   variant: StatusVariant
-): "success" | "info" | "destructive" {
-  // Existing Badge component accepts success | info | destructive; map
-  // the freshness-aware variants onto the closest existing tone so we
-  // don't churn the design-token surface in this commit.
-  if (variant === "warning") return "info";
-  if (variant === "neutral") return "info";
+): "success" | "info" | "destructive" | "warning" | "default" {
+  if (variant === "neutral") return "default";
   return variant;
 }
 

@@ -20,13 +20,7 @@ import { emitSearchClientMetric } from "@/lib/search/search-telemetry-client";
 const mockRouterRefresh = jest.fn();
 
 const mockListingCard = jest.fn(
-  ({
-    listing,
-    href,
-  }: {
-    listing: ListingData;
-    href?: string;
-  }) => (
+  ({ listing, href }: { listing: ListingData; href?: string }) => (
     <div
       data-testid={`listing-${listing.id}`}
       data-href={href ?? `/listings/${listing.id}`}
@@ -36,11 +30,9 @@ const mockListingCard = jest.fn(
   )
 );
 
-const mockSplitStayCard = jest.fn(
-  (_props: Record<string, unknown>) => (
-    <div data-testid="split-stay-card">Split Stay</div>
-  )
-);
+const mockSplitStayCard = jest.fn((_props: Record<string, unknown>) => (
+  <div data-testid="split-stay-card">Split Stay</div>
+));
 
 // Mock fetchMoreListings server action
 jest.mock("@/app/search/actions", () => ({
@@ -240,6 +232,54 @@ describe("SearchResultsClient", () => {
       expect(screen.getByTestId("listing-2")).toBeInTheDocument();
     });
 
+    it("renders near-match separator and advisory before near-match listings", () => {
+      render(
+        <SearchResultsClient
+          {...defaultProps}
+          initialListings={[
+            createMockListing("exact", "Exact match"),
+            createMockListing("near", "Near match", { isNearMatch: true }),
+          ]}
+          initialNextCursor={null}
+          initialTotal={0}
+          hasConfirmedZeroResults={false}
+          nearMatchExpansion="Price range expanded to max $1,125"
+        />
+      );
+
+      expect(
+        screen.getByRole("separator", { name: /1 near match listing/i })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("Price range expanded to max $1,125")
+      ).toBeInTheDocument();
+    });
+
+    it("shows a refine prompt at the accumulated result cap", () => {
+      const cappedListings = Array.from({ length: 60 }, (_, index) =>
+        createMockListing(`cap-${index + 1}`)
+      );
+
+      render(
+        <SearchResultsClient
+          {...defaultProps}
+          initialListings={cappedListings}
+          initialNextCursor="cursor-after-cap"
+          initialTotal={100}
+        />
+      );
+
+      expect(
+        screen.getByText("You've reached the 60-result browsing limit")
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /refine search/i })
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /show more places/i })
+      ).not.toBeInTheDocument();
+    });
+
     it("renders result count", () => {
       render(<SearchResultsClient {...defaultProps} />);
 
@@ -252,11 +292,12 @@ describe("SearchResultsClient", () => {
         <SearchResultsClient {...defaultProps} browseMode={true} query="" />
       );
 
-      expect(container.querySelector('[data-testid="search-shell"]')).toHaveAttribute(
-        "data-browse-mode",
-        "true"
-      );
-      expect(screen.queryByTestId("suggested-searches")).not.toBeInTheDocument();
+      expect(
+        container.querySelector('[data-testid="search-shell"]')
+      ).toHaveAttribute("data-browse-mode", "true");
+      expect(
+        screen.queryByTestId("suggested-searches")
+      ).not.toBeInTheDocument();
     });
 
     it("passes canonical listing detail range hrefs when search includes moveInDate and endDate", () => {
@@ -375,7 +416,7 @@ describe("SearchResultsClient", () => {
           initialNextCursor={null}
           initialTotal={0}
           hasConfirmedZeroResults={true}
-          searchParamsString="q=test&bookingMode=WHOLE_UNIT&moveInDate=2026-05-01&endDate=2026-08-01"
+          searchParamsString="q=test&bookingMode=WHOLE_UNIT&moveInDate=2026-06-01&endDate=2026-08-01"
           filterParams={{}}
         />
       );
@@ -385,7 +426,7 @@ describe("SearchResultsClient", () => {
           expect.objectContaining({
             query: "test",
             bookingMode: "WHOLE_UNIT",
-            moveInDate: "2026-05-01",
+            moveInDate: "2026-06-01",
             endDate: "2026-08-01",
           })
         );
@@ -581,9 +622,11 @@ describe("SearchResultsClient", () => {
       fireEvent.click(screen.getByRole("button", { name: /show more/i }));
 
       await waitFor(() => {
-        // After loading, we should have 65 listings in state but cap message should appear
+        // After loading, display is capped at 60 and the refine prompt appears
         // The load more button should be hidden since we've reached the cap
-        expect(screen.getByText(/Showing 65 results/i)).toBeInTheDocument();
+        expect(
+          screen.getByText("You've reached the 60-result browsing limit")
+        ).toBeInTheDocument();
       });
 
       // Load more button should not be present (capped)
@@ -608,10 +651,61 @@ describe("SearchResultsClient", () => {
       );
 
       // Should show refinement message instead of load more
-      expect(screen.getByText(/adjusting your filters/i)).toBeInTheDocument();
+      expect(
+        screen.getByText("You've reached the 60-result browsing limit")
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /refine search/i })
+      ).toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: /show more/i })
       ).not.toBeInTheDocument();
+    });
+
+    it("clears the cap prompt after a keyed filter remount", () => {
+      const Wrapper = ({
+        params,
+        capped,
+      }: {
+        params: string;
+        capped: boolean;
+      }) => (
+        <SearchResultsClient
+          {...defaultProps}
+          key={params}
+          initialListings={
+            capped
+              ? Array.from({ length: 60 }, (_, i) =>
+                  createMockListing(`cap-${i}`)
+                )
+              : [
+                  createMockListing("filtered-1"),
+                  createMockListing("filtered-2"),
+                ]
+          }
+          initialNextCursor={capped ? "cursor-next" : "filtered-cursor"}
+          initialTotal={capped ? 100 : 12}
+          searchParamsString={params}
+        />
+      );
+
+      const { rerender } = render(<Wrapper params="q=test" capped />);
+      expect(
+        screen.getByText("You've reached the 60-result browsing limit")
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /show more/i })
+      ).not.toBeInTheDocument();
+
+      rerender(<Wrapper params="q=test&amenities=Wifi" capped={false} />);
+
+      expect(
+        screen.queryByText("You've reached the 60-result browsing limit")
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("listing-filtered-1")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /show more/i })
+      ).toBeInTheDocument();
     });
   });
 

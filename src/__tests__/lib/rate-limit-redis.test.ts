@@ -446,4 +446,90 @@ describe("rate-limit-redis", () => {
       expect(mockCheckRateLimit).toHaveBeenCalled();
     });
   });
+
+  describe("checkSearchSsrRateLimit", () => {
+    let checkSearchSsrRateLimit: (
+      ip: string
+    ) => Promise<{ success: boolean; retryAfter?: number }>;
+
+    beforeEach(async () => {
+      restoreRatelimitMock();
+      jest.resetModules();
+      const rateLimitModule = await import("@/lib/rate-limit-redis");
+      checkSearchSsrRateLimit = rateLimitModule.checkSearchSsrRateLimit;
+      restoreRuntimeMocks();
+    });
+
+    it("returns success when Redis burst and sustained limits pass", async () => {
+      mockLimit.mockResolvedValue({ success: true, reset: Date.now() + 60000 });
+
+      const result = await checkSearchSsrRateLimit("127.0.0.1");
+
+      expect(result.success).toBe(true);
+      expect(mockLimit).toHaveBeenCalledTimes(2);
+    });
+
+    it("uses in-memory fallback in development when Redis is not configured", async () => {
+      process.env.UPSTASH_REDIS_REST_URL = "";
+      process.env.UPSTASH_REDIS_REST_TOKEN = "";
+      Object.defineProperty(process.env, "NODE_ENV", {
+        value: "development",
+        writable: true,
+      });
+
+      restoreRatelimitMock();
+      jest.resetModules();
+      const rateLimitModule = await import("@/lib/rate-limit-redis");
+
+      const result = await rateLimitModule.checkSearchSsrRateLimit(
+        "127.0.0.1"
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockCheckRateLimit).not.toHaveBeenCalled();
+      expect(mockLimit).not.toHaveBeenCalled();
+    });
+
+    it("falls back to DB rate limiter in production when Redis is not configured", async () => {
+      process.env.UPSTASH_REDIS_REST_URL = "";
+      process.env.UPSTASH_REDIS_REST_TOKEN = "";
+      Object.defineProperty(process.env, "NODE_ENV", {
+        value: "production",
+        writable: true,
+      });
+      mockCheckRateLimit.mockResolvedValue({
+        success: true,
+        remaining: 119,
+        resetAt: new Date(Date.now() + 60000),
+      });
+
+      restoreRatelimitMock();
+      jest.resetModules();
+      const rateLimitModule = await import("@/lib/rate-limit-redis");
+
+      const result = await rateLimitModule.checkSearchSsrRateLimit(
+        "127.0.0.1"
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockCheckRateLimit).toHaveBeenCalledWith(
+        "127.0.0.1",
+        "redis-fallback:searchSsr",
+        { limit: 120, windowMs: 60000 }
+      );
+    });
+
+    it("uses in-memory fallback in development when Redis errors", async () => {
+      Object.defineProperty(process.env, "NODE_ENV", {
+        value: "development",
+        writable: true,
+      });
+      mockLimit.mockRejectedValue(new Error("Redis error"));
+
+      const result = await checkSearchSsrRateLimit("127.0.0.1");
+
+      expect(result.success).toBe(true);
+      expect(mockCheckRateLimit).not.toHaveBeenCalled();
+    });
+  });
 });

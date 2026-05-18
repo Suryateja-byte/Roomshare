@@ -12,6 +12,7 @@ interface DatePickerProps {
   minDate?: string;
   disabled?: boolean;
   className?: string;
+  calendarMode?: "popover" | "inline";
   id?: string;
   "aria-describedby"?: string;
   "aria-invalid"?: boolean;
@@ -40,12 +41,15 @@ export function DatePicker({
   minDate,
   disabled = false,
   className,
+  calendarMode = "popover",
   id,
   "aria-describedby": ariaDescribedBy,
   "aria-invalid": ariaInvalid,
 }: DatePickerProps) {
   const [mounted, setMounted] = React.useState(false);
   const [open, setOpen] = React.useState(false);
+  const generatedId = React.useId().replace(/:/g, "");
+  const calendarId = id ? `${id}-calendar` : `date-picker-${generatedId}`;
   const [viewDate, setViewDate] = React.useState(() => {
     if (value) {
       return parseLocalDate(value);
@@ -180,6 +184,150 @@ export function DatePicker({
   };
 
   const calendarDays = generateCalendarDays();
+  const triggerClassName = cn(
+    "w-full flex items-center justify-between gap-2 p-2.5 sm:p-3 rounded-lg",
+    "border border-outline-variant/20",
+    "bg-surface-container-lowest",
+    "hover:border-outline-variant/30",
+    "focus:outline-none focus:ring-2 focus:ring-primary/30",
+    "transition-all duration-200",
+    "disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-outline-variant/20",
+    "text-sm touch-target text-left",
+    className
+  );
+
+  const triggerContent = (
+    <>
+      <span
+        className={cn(value ? "text-on-surface" : "text-on-surface-variant")}
+      >
+        {value ? formatDisplayDate(value) : placeholder}
+      </span>
+      <div className="flex items-center gap-1">
+        {value && (
+          <span
+            role="button"
+            tabIndex={disabled ? -1 : 0}
+            onClick={(e) => {
+              if (disabled) return;
+              e.stopPropagation();
+              handleClear();
+            }}
+            onKeyDown={(e) => {
+              if (disabled) return;
+              if (e.key === "Enter" || e.key === " ") {
+                e.stopPropagation();
+                handleClear();
+              }
+            }}
+            className="p-0.5 hover:bg-surface-container-high rounded transition-colors"
+          >
+            <X className="w-3.5 h-3.5 text-on-surface-variant" />
+          </span>
+        )}
+        <Calendar className="w-4 h-4 text-on-surface-variant" />
+      </div>
+    </>
+  );
+
+  const renderCalendarPanel = (isInline: boolean) => (
+    <>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={(e) => {
+            e.stopPropagation();
+            handlePrevMonth();
+          }}
+          className="p-2 hover:bg-surface-container-high rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent"
+          aria-label="Previous month"
+        >
+          <ChevronLeft className="w-4 h-4 text-on-surface-variant" />
+        </button>
+        <span className="text-sm font-semibold text-on-surface">
+          {MONTHS[viewDate.getMonth()]} {viewDate.getFullYear()}
+        </span>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleNextMonth();
+          }}
+          className="p-2 hover:bg-surface-container-high rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent"
+          aria-label="Next month"
+        >
+          <ChevronRight className="w-4 h-4 text-on-surface-variant" />
+        </button>
+      </div>
+
+      {/* Day headers */}
+      <div className="grid grid-cols-7 gap-1 mb-2">
+        {DAYS.map((day) => (
+          <div
+            key={day}
+            className="h-8 flex items-center justify-center text-xs font-medium text-on-surface-variant uppercase tracking-[0.05em]"
+          >
+            {day}
+          </div>
+        ))}
+      </div>
+
+      {/* Calendar grid */}
+      <div className="grid grid-cols-7 gap-1">
+        {calendarDays.map((day, index) => {
+          const selected = isSelected(day.date);
+          const todayDate = isToday(day.date);
+
+          return (
+            <button
+              key={index}
+              type="button"
+              disabled={disabled || day.isDisabled}
+              onClick={() => handleDateSelect(day.date)}
+              className={cn(
+                "h-9 flex items-center justify-center text-sm rounded-lg transition-all duration-200",
+                isInline ? "w-full min-w-0" : "w-9",
+                !day.isCurrentMonth && "text-on-surface-variant",
+                day.isCurrentMonth &&
+                  !selected &&
+                  !day.isDisabled &&
+                  "text-on-surface hover:bg-surface-container-high",
+                day.isDisabled &&
+                  "text-on-surface-variant cursor-not-allowed",
+                todayDate && !selected && "ring-2 ring-on-surface/20",
+                selected && "bg-primary text-on-primary font-medium"
+              )}
+            >
+              {day.date.getDate()}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between mt-4 pt-3 border-t border-surface-container-high">
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={handleClear}
+          className="text-sm font-medium text-on-surface-variant hover:text-on-surface transition-colors disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:text-on-surface-variant"
+        >
+          Clear
+        </button>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={handleToday}
+          className="text-sm font-medium text-on-surface hover:text-on-surface-variant transition-colors disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:text-on-surface"
+        >
+          Today
+        </button>
+      </div>
+    </>
+  );
 
   // Render placeholder during SSR to prevent hydration mismatch
   if (!mounted) {
@@ -189,6 +337,7 @@ export function DatePicker({
         id={id}
         disabled={disabled}
         aria-describedby={ariaDescribedBy}
+        aria-invalid={ariaInvalid}
         className={cn(
           "w-full flex items-center justify-between gap-2 p-2.5 sm:p-3 rounded-lg",
           "border border-outline-variant/20",
@@ -214,6 +363,40 @@ export function DatePicker({
     );
   }
 
+  if (calendarMode === "inline") {
+    return (
+      <div className="w-full">
+        <button
+          type="button"
+          id={id}
+          disabled={disabled}
+          aria-describedby={ariaDescribedBy}
+          aria-expanded={open}
+          aria-controls={calendarId}
+          aria-invalid={ariaInvalid}
+          onClick={() => setOpen((isOpen) => !isOpen)}
+          className={triggerClassName}
+        >
+          {triggerContent}
+        </button>
+
+        {open && (
+          <div
+            id={calendarId}
+            className={cn(
+              "mt-2 w-full max-w-sm p-3 sm:p-4",
+              "bg-surface-container-lowest",
+              "rounded-lg border border-outline-variant/20",
+              "shadow-ambient"
+            )}
+          >
+            {renderCalendarPanel(true)}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger
@@ -221,52 +404,17 @@ export function DatePicker({
         id={id}
         disabled={disabled}
         aria-describedby={ariaDescribedBy}
+        aria-expanded={open}
+        aria-controls={calendarId}
         aria-invalid={ariaInvalid}
-        className={cn(
-          "w-full flex items-center justify-between gap-2 p-2.5 sm:p-3 rounded-lg",
-          "border border-outline-variant/20",
-          "bg-surface-container-lowest",
-          "hover:border-outline-variant/30",
-          "focus:outline-none focus:ring-2 focus:ring-primary/30",
-          "transition-all duration-200",
-          "disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-outline-variant/20",
-          "text-sm touch-target text-left",
-          className
-        )}
+        className={triggerClassName}
       >
-        <span
-          className={cn(value ? "text-on-surface" : "text-on-surface-variant")}
-        >
-          {value ? formatDisplayDate(value) : placeholder}
-        </span>
-        <div className="flex items-center gap-1">
-          {value && (
-            <span
-              role="button"
-              tabIndex={disabled ? -1 : 0}
-              onClick={(e) => {
-                if (disabled) return;
-                e.stopPropagation();
-                handleClear();
-              }}
-              onKeyDown={(e) => {
-                if (disabled) return;
-                if (e.key === "Enter" || e.key === " ") {
-                  e.stopPropagation();
-                  handleClear();
-                }
-              }}
-              className="p-0.5 hover:bg-surface-container-high rounded transition-colors"
-            >
-              <X className="w-3.5 h-3.5 text-on-surface-variant" />
-            </span>
-          )}
-          <Calendar className="w-4 h-4 text-on-surface-variant" />
-        </div>
+        {triggerContent}
       </Popover.Trigger>
 
       <Popover.Portal>
         <Popover.Content
+          id={calendarId}
           className={cn(
             "z-popover p-4",
             "bg-surface-container-lowest/95 backdrop-blur-[20px]",
@@ -280,99 +428,7 @@ export function DatePicker({
           sideOffset={8}
           align="start"
         >
-          {/* Header */}
-          <div className="flex items-center justify-between mb-4">
-              <button
-                type="button"
-                disabled={disabled}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handlePrevMonth();
-                }}
-                className="p-2 hover:bg-surface-container-high rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent"
-                aria-label="Previous month"
-              >
-              <ChevronLeft className="w-4 h-4 text-on-surface-variant" />
-            </button>
-            <span className="text-sm font-semibold text-on-surface">
-              {MONTHS[viewDate.getMonth()]} {viewDate.getFullYear()}
-            </span>
-              <button
-                type="button"
-                disabled={disabled}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleNextMonth();
-                }}
-                className="p-2 hover:bg-surface-container-high rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent"
-                aria-label="Next month"
-              >
-              <ChevronRight className="w-4 h-4 text-on-surface-variant" />
-            </button>
-          </div>
-
-          {/* Day headers */}
-          <div className="grid grid-cols-7 gap-1 mb-2">
-            {DAYS.map((day) => (
-              <div
-                key={day}
-                className="h-8 flex items-center justify-center text-xs font-medium text-on-surface-variant uppercase tracking-[0.05em]"
-              >
-                {day}
-              </div>
-            ))}
-          </div>
-
-          {/* Calendar grid */}
-          <div className="grid grid-cols-7 gap-1">
-            {calendarDays.map((day, index) => {
-              const selected = isSelected(day.date);
-              const todayDate = isToday(day.date);
-
-              return (
-                <button
-                  key={index}
-                  type="button"
-                  disabled={disabled || day.isDisabled}
-                  onClick={() => handleDateSelect(day.date)}
-                  className={cn(
-                    "h-9 w-9 flex items-center justify-center text-sm rounded-lg transition-all duration-200",
-                    !day.isCurrentMonth && "text-on-surface-variant",
-                    day.isCurrentMonth &&
-                      !selected &&
-                      !day.isDisabled &&
-                      "text-on-surface hover:bg-surface-container-high",
-                    day.isDisabled &&
-                      "text-on-surface-variant cursor-not-allowed",
-                    todayDate && !selected && "ring-2 ring-on-surface/20",
-                    selected && "bg-primary text-on-primary font-medium"
-                  )}
-                >
-                  {day.date.getDate()}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Footer */}
-          <div className="flex items-center justify-between mt-4 pt-3 border-t border-surface-container-high">
-            <button
-              type="button"
-              disabled={disabled}
-              onClick={handleClear}
-              className="text-sm font-medium text-on-surface-variant hover:text-on-surface transition-colors disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:text-on-surface-variant"
-            >
-              Clear
-            </button>
-            <button
-              type="button"
-              disabled={disabled}
-              onClick={handleToday}
-              className="text-sm font-medium text-on-surface hover:text-on-surface-variant transition-colors disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:text-on-surface"
-            >
-              Today
-            </button>
-          </div>
+          {renderCalendarPanel(false)}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

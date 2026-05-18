@@ -46,13 +46,13 @@ test.describe("Semantic Search - Results Quality", () => {
   }) => {
     test.skip(!SEMANTIC_ENABLED, "Requires ENABLE_SEMANTIC_SEARCH=true");
 
-    await page.goto(`/search?q=cozy+room+near+campus&${boundsQS}`);
+    await page.goto(`/search?q=E2E+Dedupe+Clone+Group&${boundsQS}`);
     await waitForSearchOutcome(page);
 
     const container = searchResultsContainer(page);
     const cards = container.locator('[data-testid="listing-card"]');
     const count = await cards.count();
-    test.skip(count === 0, "No results returned — cannot validate card fields");
+    expect(count).toBeGreaterThan(0);
 
     const firstCard = cards.first();
 

@@ -9,7 +9,7 @@ export function PageSkeleton() {
       aria-label="Loading page content"
     >
       {/* Header skeleton */}
-      <header className="border-b border-outline-variant/20 bg-surface-container-lowest px-4 py-3">
+      <header className="bg-surface-container-lowest/90 px-4 py-3 shadow-ambient-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between">
           <Skeleton variant="rounded" width={120} height={32} />
           <div className="flex items-center gap-4">
@@ -47,7 +47,7 @@ export function DashboardSkeleton() {
       aria-label="Loading dashboard"
     >
       {/* Sidebar skeleton */}
-      <aside className="fixed left-0 top-0 hidden h-full w-64 border-r border-outline-variant/20 bg-surface-container-lowest p-4 lg:block">
+      <aside className="fixed left-0 top-0 hidden h-full w-64 bg-surface-container-high p-4 shadow-ambient-sm lg:block">
         <Skeleton variant="rounded" width={140} height={32} className="mb-8" />
         <nav className="space-y-2">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -59,7 +59,7 @@ export function DashboardSkeleton() {
       {/* Main content */}
       <div className="lg:ml-64">
         {/* Header */}
-        <header className="border-b border-outline-variant/20 bg-surface-container-lowest px-6 py-4">
+        <header className="bg-surface-container-lowest/90 px-6 py-4 shadow-ambient-sm">
           <div className="flex items-center justify-between">
             <Skeleton variant="text" width={200} height={28} />
             <div className="flex items-center gap-4">
@@ -74,7 +74,7 @@ export function DashboardSkeleton() {
           {Array.from({ length: 4 }).map((_, i) => (
             <div
               key={i}
-              className="rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-4"
+              className="rounded-lg bg-surface-container-lowest p-4 shadow-ambient-sm"
             >
               <Skeleton
                 variant="text"
@@ -88,11 +88,11 @@ export function DashboardSkeleton() {
         </div>
 
         {/* Table skeleton */}
-        <div className="mx-6 rounded-lg border border-outline-variant/20 bg-surface-container-lowest">
-          <div className="border-b border-outline-variant/20 p-4">
+        <div className="mx-6 rounded-lg bg-surface-container-lowest p-4 shadow-ambient-sm">
+          <div className="rounded-lg bg-surface-canvas p-4">
             <Skeleton variant="text" width={150} height={24} />
           </div>
-          <div className="p-4">
+          <div className="mt-3 p-4">
             <TextSkeleton lines={8} />
           </div>
         </div>
@@ -123,7 +123,7 @@ export function ProfileSkeleton() {
         {Array.from({ length: 3 }).map((_, i) => (
           <section
             key={i}
-            className="rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-4"
+            className="rounded-lg bg-surface-container-lowest p-4 shadow-ambient-sm"
           >
             <Skeleton variant="text" width={120} height={20} className="mb-4" />
             <TextSkeleton lines={4} />
@@ -159,7 +159,7 @@ export function FormSkeleton() {
 
 export function ListingSkeleton() {
   return (
-    <div className="rounded-lg border border-outline-variant/20 bg-surface-container-lowest overflow-hidden">
+    <div className="rounded-lg bg-surface-container-lowest overflow-hidden shadow-ambient-sm">
       <Skeleton variant="rectangular" height={200} />
       <div className="p-4 space-y-3">
         <Skeleton variant="text" width="80%" height={20} />
@@ -215,7 +215,7 @@ export function SearchResultsSkeleton({ count = 6 }: { count?: number }) {
       </header>
 
       {/* Filter Bar Skeleton */}
-      <div className="w-full border-b border-outline-variant/20 bg-surface-container-lowest">
+      <div className="w-full bg-surface-container-lowest/90 shadow-ambient-sm">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-3">
           <div className="flex items-center gap-3">
             {/* Category tabs skeleton */}
@@ -224,7 +224,7 @@ export function SearchResultsSkeleton({ count = 6 }: { count?: number }) {
               <Skeleton variant="rounded" width={90} height={32} />
               <Skeleton variant="rounded" width={80} height={32} />
             </div>
-            <div className="h-8 w-px bg-surface-container-high hidden sm:block" />
+            <div className="hidden w-3 sm:block" />
             <div className="flex-1" />
             {/* More filters button */}
             <Skeleton
@@ -295,7 +295,7 @@ export function MessageListSkeleton() {
           {Array.from({ length: 8 }).map((_, i) => (
             <div
               key={i}
-              className="flex items-center gap-4 p-4 bg-surface-container-lowest rounded-lg border border-outline-variant/20"
+              className="flex items-center gap-4 p-4 bg-surface-container-lowest rounded-lg shadow-ambient-sm"
             >
               <Skeleton variant="circular" width={48} height={48} />
               <div className="flex-1 space-y-2">
@@ -319,9 +319,9 @@ export function ChatSkeleton() {
       aria-label="Loading chat"
     >
       <div className="mx-auto max-w-4xl px-4 py-8">
-        <div className="bg-surface-container-lowest rounded-lg border border-outline-variant/20 overflow-hidden">
+        <div className="bg-surface-container-lowest rounded-lg overflow-hidden shadow-ambient-sm">
           {/* Chat header */}
-          <div className="flex items-center gap-4 p-4 border-b border-outline-variant/20">
+          <div className="flex items-center gap-4 p-4 bg-surface-container-high/70">
             <Skeleton variant="circular" width={40} height={40} />
             <div className="space-y-1">
               <Skeleton variant="text" width={150} height={18} />
@@ -344,7 +344,7 @@ export function ChatSkeleton() {
             ))}
           </div>
           {/* Input */}
-          <div className="p-4 border-t border-outline-variant/20">
+          <div className="p-4 bg-surface-container-high/70">
             <Skeleton variant="rounded" height={44} />
           </div>
         </div>
@@ -365,29 +365,31 @@ export function AdminTableSkeleton() {
           <Skeleton variant="text" width={200} height={32} />
           <Skeleton variant="rounded" width={120} height={40} />
         </div>
-        <div className="bg-surface-container-lowest rounded-lg border border-outline-variant/20 overflow-hidden">
+        <div className="bg-surface-container-lowest rounded-lg p-4 shadow-ambient-sm">
           {/* Table header */}
-          <div className="grid grid-cols-5 gap-4 p-4 border-b border-outline-variant/20 bg-surface-canvas">
+          <div className="grid grid-cols-5 gap-4 rounded-lg bg-surface-canvas p-4">
             {Array.from({ length: 5 }).map((_, i) => (
               <Skeleton key={i} variant="text" width="80%" height={14} />
             ))}
           </div>
           {/* Table rows */}
-          {Array.from({ length: 10 }).map((_, i) => (
-            <div
-              key={i}
-              className="grid grid-cols-5 gap-4 p-4 border-b border-outline-variant/20"
-            >
-              {Array.from({ length: 5 }).map((_, j) => (
-                <Skeleton
-                  key={j}
-                  variant="text"
-                  width={`${60 + j * 10}%`}
-                  height={16}
-                />
-              ))}
-            </div>
-          ))}
+          <div className="mt-3 space-y-3">
+            {Array.from({ length: 10 }).map((_, i) => (
+              <div
+                key={i}
+                className="grid grid-cols-5 gap-4 rounded-lg bg-surface-canvas p-4"
+              >
+                {Array.from({ length: 5 }).map((_, j) => (
+                  <Skeleton
+                    key={j}
+                    variant="text"
+                    width={`${60 + j * 10}%`}
+                    height={16}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -409,7 +411,7 @@ export function BookingsSkeleton() {
           {Array.from({ length: 5 }).map((_, i) => (
             <div
               key={i}
-              className="flex gap-4 p-4 bg-surface-container-lowest rounded-lg border border-outline-variant/20"
+              className="flex gap-4 p-4 bg-surface-container-lowest rounded-lg shadow-ambient-sm"
             >
               <Skeleton variant="rounded" width={120} height={80} />
               <div className="flex-1 space-y-2">
@@ -444,7 +446,7 @@ export function SettingsSkeleton() {
           {Array.from({ length: 4 }).map((_, i) => (
             <section
               key={i}
-              className="bg-surface-container-lowest rounded-lg border border-outline-variant/20 p-6"
+              className="bg-surface-container-lowest rounded-lg p-6 shadow-ambient-sm"
             >
               <Skeleton
                 variant="text"
@@ -486,7 +488,7 @@ export function SavedSearchesSkeleton() {
           {Array.from({ length: 6 }).map((_, i) => (
             <div
               key={i}
-              className="flex items-center justify-between p-4 bg-surface-container-lowest rounded-lg border border-outline-variant/20"
+              className="flex items-center justify-between p-4 bg-surface-container-lowest rounded-lg shadow-ambient-sm"
             >
               <div className="space-y-2">
                 <Skeleton variant="text" width={180} height={18} />
@@ -519,7 +521,7 @@ export function NotificationsSkeleton() {
           {Array.from({ length: 10 }).map((_, i) => (
             <div
               key={i}
-              className="flex items-start gap-3 p-4 bg-surface-container-lowest rounded-lg border border-outline-variant/20"
+              className="flex items-start gap-3 p-4 bg-surface-container-lowest rounded-lg shadow-ambient-sm"
             >
               <Skeleton variant="circular" width={40} height={40} />
               <div className="flex-1 space-y-2">

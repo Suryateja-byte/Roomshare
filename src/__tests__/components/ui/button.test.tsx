@@ -26,7 +26,9 @@ describe("Button", () => {
     it("renders primary variant by default", () => {
       render(<Button>Primary</Button>);
       const button = screen.getByRole("button");
-      expect(button).toHaveClass("bg-primary");
+      expect(button).toHaveClass("bg-gradient-to-br");
+      expect(button).toHaveClass("from-primary");
+      expect(button).toHaveClass("to-primary-container");
     });
 
     it("renders outline variant", () => {
@@ -51,7 +53,22 @@ describe("Button", () => {
     it("renders destructive variant", () => {
       render(<Button variant="destructive">Delete</Button>);
       const button = screen.getByRole("button");
-      expect(button).toHaveClass("bg-red-600");
+      expect(button).toHaveClass("bg-destructive");
+      expect(button).toHaveClass("text-on-primary");
+    });
+
+    it("renders success variant with semantic tokens", () => {
+      render(<Button variant="success">Success</Button>);
+      const button = screen.getByRole("button");
+      expect(button).toHaveClass("bg-success");
+      expect(button).toHaveClass("text-on-primary");
+    });
+
+    it("renders warning variant with semantic tokens", () => {
+      render(<Button variant="warning">Warning</Button>);
+      const button = screen.getByRole("button");
+      expect(button).toHaveClass("bg-warning");
+      expect(button).toHaveClass("text-on-primary");
     });
   });
 

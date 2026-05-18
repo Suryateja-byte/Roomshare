@@ -42,6 +42,7 @@ import {
   normalizeSearchQuery,
   serializeSearchQuery,
 } from "@/lib/search/search-query";
+import { markPendingSearchNavigation } from "@/lib/search/pending-search-navigation";
 import { parseSearchParams } from "@/lib/search-params";
 import { getScenarioHeaderValue } from "@/lib/search/testing/search-scenarios";
 import { emitSearchClientMetric } from "@/lib/search/search-telemetry-client";
@@ -253,6 +254,13 @@ export function SearchResultsClient({
   const activeSearchParamsString = clientSideSearchEnabled
     ? canonicalSearchParamsString
     : searchParamsString;
+  const zeroResultsClearAllHref = useMemo(
+    () =>
+      `/search?${clearAllFilters(
+        new URLSearchParams(activeSearchParamsString)
+      )}`,
+    [activeSearchParamsString]
+  );
   const currentQueryHash = useMemo(
     () => getSearchQueryHash(currentNormalizedQuery),
     [currentNormalizedQuery]
@@ -1082,7 +1090,10 @@ export function SearchResultsClient({
             <>
               {/* CFM-604: canonical-on-write guarantee — clearAllFilters() serializes canonically. */}
               <Link
-                href={`/search?${clearAllFilters(new URLSearchParams(activeSearchParamsString))}`}
+                href={zeroResultsClearAllHref}
+                onClick={() =>
+                  markPendingSearchNavigation(zeroResultsClearAllHref)
+                }
                 className="touch-target mt-6 rounded-full border border-outline-variant/35 bg-surface-container-lowest px-4 py-2.5 text-sm font-medium text-on-surface transition-colors hover:border-on-surface-variant hover:bg-surface-canvas"
               >
                 Clear all filters

@@ -1,9 +1,16 @@
 "use client";
 
-import { memo, useState, useCallback, useMemo, useRef, useEffect } from "react";
-import Link from "next/link";
+import {
+  memo,
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+  useEffect,
+} from "react";
 import { useRouter } from "next/navigation";
 import { Star, Home, MapPin } from "lucide-react";
+import Link from "next/link";
 import FavoriteButton from "../FavoriteButton";
 import { ImageCarousel } from "./ImageCarousel";
 import { cn } from "@/lib/utils";
@@ -16,6 +23,7 @@ import {
   useListingFocusActions,
   useIsListingFocused,
 } from "@/contexts/ListingFocusContext";
+import { useSearchMapUI } from "@/contexts/SearchMapUIContext";
 import { SlotBadge } from "./SlotBadge";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import type {
@@ -180,12 +188,8 @@ function formatRoomType(roomType?: string): string | null {
 }
 
 const PLACEHOLDER_IMAGES = [
-  "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80",
-  "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80",
-  "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80",
-  "https://images.unsplash.com/photo-1484154218962-a1c002085d2f?auto=format&fit=crop&w=800&q=80",
-  "https://images.unsplash.com/photo-1502005229766-528352261b79?auto=format&fit=crop&w=800&q=80",
-  "https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=800&q=80",
+  "/images/home/hero-living-room.png",
+  "/images/auth/login-living-room.webp",
 ];
 
 interface ListingCardProps {
@@ -288,6 +292,7 @@ function ListingCardInner({
   const [isGroupDatesOpen, setIsGroupDatesOpen] = useState(false);
   const { setHovered, setActive, hasProvider, focusSourceRef } =
     useListingFocusActions();
+  const { focusListingOnMap } = useSearchMapUI();
   const { isHovered, isActive } = useIsListingFocused(listing.id);
   const router = useRouter();
   const isMobile = useMediaQuery("(max-width: 767px)") === true;
@@ -474,6 +479,7 @@ function ListingCardInner({
               e.preventDefault();
               e.stopPropagation();
               setActive(listing.id);
+              focusListingOnMap(listing.id);
             }}
             data-show-on-map-id={listing.id}
             className="relative p-1.5 rounded-full bg-surface-container-lowest/80 backdrop-blur-sm shadow-ambient-sm hover:bg-surface-container-lowest transition-colors before:absolute before:inset-0 before:-m-[10px] before:content-['']"

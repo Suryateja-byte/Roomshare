@@ -85,7 +85,12 @@
   "serverComponents": [
     {
       "path": "src/app/search/page.tsx",
-      "symbols": ["SearchPage", "renderLocationRequiredState", "renderRateLimitedState", "generateMetadata"],
+      "symbols": [
+        "SearchPage",
+        "renderLocationRequiredState",
+        "renderRateLimitedState",
+        "generateMetadata"
+      ],
       "responsibility": "SSR search result orchestration and fallback states.",
       "evidence": "L91-L117, L158-L162, L242-L623",
       "confidence": "Verified"
@@ -122,7 +127,11 @@
     },
     {
       "path": "src/components/PersistentMapWrapper.tsx",
-      "symbols": ["PersistentMapWrapper", "getMapRelevantParams", "v2MapDataToListings"],
+      "symbols": [
+        "PersistentMapWrapper",
+        "getMapRelevantParams",
+        "v2MapDataToListings"
+      ],
       "responsibility": "Persistent map data and rendering wrapper.",
       "evidence": "L4-L17, L66-L75, L95-L155, L200-L205, L365-L430",
       "confidence": "Verified"
@@ -314,21 +323,34 @@
     },
     {
       "path": "src/lib/data.ts",
-      "symbols": ["getListingsPaginated", "getMapListings", "getMapListingsResult"],
+      "symbols": [
+        "getListingsPaginated",
+        "getMapListings",
+        "getMapListingsResult"
+      ],
       "responsibility": "Legacy listing and map listing data helpers; includes map bounds guard.",
       "evidence": "L457-L464, L808-L845",
       "confidence": "Verified"
     },
     {
       "path": "src/lib/search/search-doc-queries.ts",
-      "symbols": ["getSearchDocListingsFirstPage", "getSearchDocMapListings", "getSearchDocLimitedCount", "semanticSearchQuery"],
+      "symbols": [
+        "getSearchDocListingsFirstPage",
+        "getSearchDocMapListings",
+        "getSearchDocLimitedCount",
+        "semanticSearchQuery"
+      ],
       "responsibility": "Search document query path for list results, map markers, counts, pagination cursors, and semantic search.",
       "evidence": "L1099, L1438, L1955, L2097-L2115, L2155, L2250, L2349-L2384",
       "confidence": "Verified"
     },
     {
       "path": "src/lib/search/cursor.ts",
-      "symbols": ["encodeKeysetCursor", "decodeKeysetCursor", "buildCursorFromRow"],
+      "symbols": [
+        "encodeKeysetCursor",
+        "decodeKeysetCursor",
+        "buildCursorFromRow"
+      ],
       "responsibility": "Keyset pagination cursor encoding/decoding/building.",
       "evidence": "L214, L256, L419",
       "confidence": "Verified"
@@ -365,7 +387,14 @@
   "searchParamParsers": [
     {
       "path": "src/lib/search-params.ts",
-      "symbols": ["parseSearchParams", "normalizeSearchFilters", "buildRawParamsFromSearchParams", "buildCanonicalFilterParamsFromSearchParams", "isBoundsRequired", "normalizeSortOption"],
+      "symbols": [
+        "parseSearchParams",
+        "normalizeSearchFilters",
+        "buildRawParamsFromSearchParams",
+        "buildCanonicalFilterParamsFromSearchParams",
+        "isBoundsRequired",
+        "normalizeSortOption"
+      ],
       "responsibility": "Canonical URL-to-filter parsing and normalization for search.",
       "evidence": "L4-L47, L54-L80, L110-L168, L207-L283, L534-L538, L582, L790-L906, L1021-L1024",
       "confidence": "Verified"
@@ -502,7 +531,7 @@
         "pnpm scan:public-payload-pii"
       ],
       "evidence": "package.json scripts discovered in Phase 4",
-      "status": "Partially run: focused `pnpm test -- ...` Jest commands passed for selected API/unit files; C063 focused V2 route/load-more action command passed; attempted broader V2 service command failed 2 semantic-search expectation tests; C064 `pnpm run scan:public-payload-pii` now passes as a deterministic no-arg gate over checked-in generic and Search Map public payload fixtures, while explicit leak-fixture scanning still fails as expected; original real search/map payload scan failed; after the P0 privacy fix, real captured `/api/search/v2`, `/api/search/listings`, `/api/map-listings`, and `/api/listings` payloads scanned cleanly; `pnpm run typecheck` and `pnpm run test:e2e:search-release-gate` passed locally; PR #119 is merged to `main` and final GitHub Actions checks passed for public payload PII scan, search release gates, all E2E shards, Stability E2E, Unit/API/Component/Type/Lint/Build, Search Smoke, Lighthouse, Vercel, and related search/filter checks; other package scripts not run locally"
+      "status": "Partially run: focused `pnpm test -- ...` Jest commands passed for selected API/unit files; C063 focused V2 route/load-more action command passed; C069 repaired the stale semantic-service fixture and the broader V2 route/action/service command now passes; C070 focused lease-duration, C071 focused/full amenities, C072 focused/related race-reset, C073 affected/touched/full chromium-anon search-filter commands, and C074 zero-skip chromium-anon search-filter commands passed with the C074 full JSON gate at `130 expected` / `0 skipped` and final list folder run at `130 passed`; C077 focused map JSON passed with `50 expected` / `8 skipped` / `0 unexpected` / `0 flaky` after fixing the zoom-only URL-bounds regression and reducing skipped map cases to dynamic marker availability/card-overlap skips; C078 after-Critic focused popup JSON `playwright/.cache/c078-critic-fix-focused.json` passed with `2 expected` / `0 skipped` / `0 unexpected` / `0 flaky`, and the final focused map subset JSON `playwright/.cache/c078-map-subset-after-critic-fix.json` passed with `58 expected` / `0 skipped` / `0 unexpected` / `0 flaky` after deterministic test-only marker/card overlap stabilization; C079 semantic chromium-anon JSON `playwright/.cache/c079-semantic-after.json` passed with `29 expected` / `0 skipped` / `0 unexpected` / `0 flaky`, C079 dedupe chromium JSON `playwright/.cache/c079-dedupe-chromium-after.json` passed with `14 expected` / `0 skipped` / `0 unexpected` / `0 flaky`, C080 dedupe Firefox/WebKit/Mobile Chrome/Mobile Safari artifacts passed or intentionally skipped only mobile desktop-contract cases, and C080 provider WebKit/Mobile Safari SSR/client artifacts passed with intentional project/mode ownership skips only and `0 unexpected` / `0 flaky`; C064 `pnpm run scan:public-payload-pii` now passes as a deterministic no-arg gate over checked-in generic and Search Map public payload fixtures, while explicit leak-fixture scanning still fails as expected; C065 broader chromium-anon map/list/map-tools Playwright commands passed; C066 owner-project Playwright command for saved search passed; C067 listing-card and security owner-project Playwright commands passed; C068 focused B1 and full desktop-anonymous location Playwright commands passed after the test-only page-object wait-ordering fix; original real search/map payload scan failed; after the P0 privacy fix, real captured `/api/search/v2`, `/api/search/listings`, `/api/map-listings`, and `/api/listings` payloads scanned cleanly; `pnpm run typecheck` and `pnpm run test:e2e:search-release-gate` passed locally; PR #119 is merged to `main` and final GitHub Actions checks passed for public payload PII scan, search release gates, all E2E shards, Stability E2E, Unit/API/Component/Type/Lint/Build, Search Smoke, Lighthouse, Vercel, and related search/filter checks; other package scripts remain unexecuted locally"
     },
     {
       "area": "Search route and server action tests",
@@ -576,7 +605,7 @@
         "src/__tests__/lib/maps/sanitize-map-listings.test.ts"
       ],
       "evidence": "Phase 4 test discovery",
-      "status": "Not run"
+      "status": "Partially passed: C066 `tests/e2e/search/search-saved-search.spec.ts` passed for its project-owned `desktop-authenticated` save/search-alert path and `failure-mocked` paywalled checkout path. Listed saved-search action/component/search-alert unit tests and `tests/e2e/saved/saved-searches.spec.ts` remain follow-up coverage unless separately run."
     },
     {
       "area": "Search state/context/hook tests",
@@ -645,7 +674,7 @@
         "tests/e2e/search/search-url-state.spec.ts"
       ],
       "evidence": "Phase 4 test traceability table; Phase 10 runtime-verification.md",
-      "status": "Partially passed: search-smoke, search-filters, search-map-desktop including C056 desktop list/map parity, search-map-mobile, search-pagination, C062 root pagination/sort reset, C062 map-bounds round-trip, search-results-states, search-saved-listing anonymous/authenticated project paths, and search-url-state passed; budget-validation, listing-card, location, saved-search, and security not run"
+      "status": "Partially passed: search-smoke, search-filters, search-map-desktop including C056 desktop list/map parity, search-map-mobile, search-pagination, C062 root pagination/sort reset, C062 map-bounds round-trip, search-results-states, search-saved-listing anonymous/authenticated project paths, C066 owner-project saved-search desktop-authenticated/failure-mocked paths, C067 listing-card desktop-anonymous/mobile-anonymous paths, C067 security desktop-anonymous/failure-mocked paths, C068 location desktop-anonymous focused B1/full spec paths, and search-url-state passed; budget-validation remains unexecuted"
     },
     {
       "area": "Additional search, map, URL, accessibility, resilience, and visual E2E specs",
@@ -666,13 +695,13 @@
         "tests/e2e/seo/search-seo-meta.anon.spec.ts"
       ],
       "evidence": "Phase 4 test discovery; Phase 10 runtime-verification.md",
-      "status": "Partially passed: search-error-resilience.anon, map-errors-a11y.anon, and C062 map-bounds-roundtrip.anon passed with their owning projects; other listed additional specs not run"
+      "status": "Partially passed: search-error-resilience.anon, map-errors-a11y.anon, C062 map-bounds-roundtrip.anon, C065 search-map-list-sync.anon / map-features.anon / map-search-results.anon / mobile-map-tools.anon, C077 final focused map JSON, C078 after-Critic focused popup JSON, C078 final after-Critic focused map subset JSON, and C080 bounded release-gate provider WebKit/Mobile Safari SSR/client artifacts passed with their owning projects; C077 fixed zoom-only URL-bounds behavior, C078 retired the 8 dynamic marker/card overlap skips with deterministic test-only setup, and C080 closed/downgraded the bounded release-gate map/provider P1. Broad 164-test non-gate map/provider candidates, live provider-network visual breadth, and other listed additional specs remain lower-priority follow-up coverage unless promoted"
     },
     {
       "area": "Search filter E2E suite",
       "paths": ["tests/e2e/search-filters/*.anon.spec.ts"],
-      "evidence": "Phase 4 test discovery",
-      "status": "Not run"
+      "evidence": "Phase 4 test discovery; C070-C074 runtime-verification.md evidence",
+      "status": "Passed for active chromium-anon filter folder: C070 focused lease-duration passed, C071 focused/full amenities passed, C072 focused/related race-reset passed, C073 affected applied-filter specs and touched applied-filter/reset specs passed, and C074 final full chromium-anon search-filter JSON/list gates passed with `130 passed` / `0 skipped`. Retired low-results guidance and pagination-cap exact browser flows are component/unit verified, not browser-executed."
     },
     {
       "area": "Pagination E2E suite",
@@ -684,7 +713,7 @@
       "area": "Semantic search E2E suite",
       "paths": ["tests/e2e/semantic-search/*.anon.spec.ts"],
       "evidence": "Phase 4 test discovery",
-      "status": "Not run"
+      "status": "Passed for chromium-anon owner baseline in C079: planning baseline `playwright/.cache/c079-semantic-chromium-anon.json` had `21 expected` / `8 skipped` / `0 unexpected` / `0 flaky`; C079 made SS-08 use deterministic seeded query `E2E Dedupe Clone Group` and seeded deterministic similar-listing embeddings locally through Prisma with an assertion that 6 fixture rows were updated; final `playwright/.cache/c079-semantic-after.json` exited 0 with `29 expected` / `0 skipped` / `0 unexpected` / `0 flaky`, runtime `84982.625ms`. C080 semantic ownership discovery found `pnpm exec playwright test tests/e2e/semantic-search --list` lists 29 tests / 6 files, all owned by `chromium-anon`; non-Chromium/mobile projects list 0 semantic tests, so semantic non-Chromium/mobile runtime behavior remains `NOT VERIFIED` as a P1 test ownership gap, not a provider failure."
     },
     {
       "area": "Search stability and release-gate E2E suites",
@@ -694,7 +723,7 @@
         "tests/e2e/search-release-gate/README.md"
       ],
       "evidence": "Phase 4 test discovery, package.json release-gate scripts, and Phase 10 runtime-verification.md",
-      "status": "Partially passed: `pnpm run test:e2e:search-release-gate` passed; search-stability suite not run separately"
+      "status": "Partially passed: `pnpm run test:e2e:search-release-gate` passed; C080 provider continuation confirmed `playwright.search-release-gate.config.ts` is bounded to setup/chromium/webkit/Mobile Safari with default isolated port 3101 and start/dev web-server modes, listed chromium 21 / webkit 21 / Mobile Safari 21 tests over 4 files each with total config scope 53 tests = 5 setup + 16 specs x 3 projects, and passed WebKit plus Mobile Safari SSR/client provider artifacts on port 3101 with only intentional project/mode ownership skips. Search-stability suite not run separately"
     },
     {
       "area": "Search journey E2E specs",
@@ -719,7 +748,7 @@
         "tests/e2e/dedupe/dedupe-helpers.ts"
       ],
       "evidence": "Phase 4 test discovery",
-      "status": "Not run"
+      "status": "Passed for chromium owner baseline in C079: planning baseline `playwright/.cache/c079-dedupe-chromium.json` had `14 expected` / `0 skipped` / `0 unexpected` / `0 flaky` but two marker/parity tests could catch visible-marker failures and pass without asserting; C079 changed those tests to assert marker counts directly; final `playwright/.cache/c079-dedupe-chromium-after.json` exited 0 with `14 expected` / `0 skipped` / `0 unexpected` / `0 flaky`, runtime `55979.539ms`. C080 closes/downgrades the dedupe non-Chromium/mobile portion: Firefox and WebKit artifacts each reported `14 expected` / `0 skipped` / `0 unexpected` / `0 flaky` with 9 dedupe-only tests expected and 0 skipped; Mobile Chrome and Mobile Safari each reported `12 expected` / `2 skipped` / `0 unexpected` / `0 flaky` with 7 dedupe-only tests expected and 2 intentional desktop-contract skips, while mobile replacement T-14 passed."
     },
     {
       "area": "Search E2E fixtures, helpers, and page objects",
@@ -748,7 +777,7 @@
     {
       "manifestArea": "apiRoutes/dataAccessFunctions/searchParamParsers",
       "coverageDoc": "05-api-contracts.md; 06-data-model-and-invariants.md; 13-url-search-param-reference.md; phase-4/02-api-data-flow.md",
-      "status": "Main public route contracts now have compact response/cache/error tables, and C063 extracts the V2/search-doc versus legacy fallback contract. Generated schemas, dedicated `/api/search/listings` fallback route-handler coverage, service semantic-suite repair, and every internal helper permutation remain explicit P2 follow-up coverage rather than final-gate blockers."
+      "status": "Main public route contracts now have compact response/cache/error tables, C063 extracts the V2/search-doc versus legacy fallback contract, and C069 verifies the repaired semantic-service suite. Generated schemas, dedicated `/api/search/listings` fallback route-handler coverage, and every internal helper permutation remain explicit P2 follow-up coverage rather than final-gate blockers."
     },
     {
       "manifestArea": "databaseModels/migrations",
@@ -758,7 +787,7 @@
     {
       "manifestArea": "tests",
       "coverageDoc": "11-test-traceability-matrix.md; runtime-verification.md; phase-4/05-test-traceability.md; 12-gaps-unknowns-and-questions.md G001, G002, G011, G012, G013",
-      "status": "Grouped into release-blocking tests and confidence-building inventory. Release-blocking commands have Phase 10/11/12 evidence, C063 adds focused V2 route/load-more action proof, and broader non-gate/service families are explicitly listed as confidence-building gaps."
+      "status": "Grouped into release-blocking tests and confidence-building inventory. Release-blocking commands have Phase 10/11/12 evidence, C063 adds focused V2 route/load-more action proof, C065 adds broader chromium-anon map-mode/list-map proof, C066 adds saved-search owner-project browser proof, C067 adds listing-card/security owner-project browser proof, C068 adds passing location owner-project browser proof after the page-object fix, C069 adds passing semantic-service proof after a stale fixture repair, C070 adds focused chromium-anon lease-duration filter proof, C071 adds focused/full amenities filter proof, C072 adds focused/related chromium-anon search-filter race/reset proof, C073 adds affected-spec and touched reset proof, C074 adds full chromium-anon zero-skip filter proof with the final JSON/list folder runs at `130 passed` / `0 skipped`, C077 adds focused map skipped-case reduction with `50 expected` / `8 skipped` / `0 unexpected` / `0 flaky`, C078 adds focused map zero-skip proof with after-Critic artifacts at `2 expected` / `0 skipped` and final subset `58 expected` / `0 skipped` / `0 unexpected` / `0 flaky`, C079 adds semantic/dedupe owner-baseline proof with `29 expected` / `0 skipped` and `14 expected` / `0 skipped`, and C080 adds dedupe Firefox/WebKit/Mobile Chrome/Mobile Safari proof with only intentional mobile desktop-contract skips plus bounded release-gate provider WebKit/Mobile Safari SSR/client proof with only intentional project/mode ownership skips. Remaining P1 residual is semantic non-Chromium/mobile runtime behavior, which C080 classifies as a test ownership gap rather than an observed provider failure. Broad 164-test non-gate map/provider candidates, live provider-network visual breadth, retired low-results guidance/pagination-cap exact browser flows, dedicated `/api/search/listings` fallback route-handler proof, location component/provider/geolocation, listing-card/security residual variants, and saved-search direct action/component/page variants are P2 confidence coverage."
     },
     {
       "manifestArea": "externalServices/environmentVariables",
@@ -871,11 +900,11 @@
     }
   ],
   "unknowns": [
-    "Runtime/browser behavior is now verified for the Phase 10/11/12 release-blocking search/map commands, including failure-mocked /api/map-listings 500/429 browser checks and C062 focused root pagination/sort reset plus map-bounds round-trip checks; broader non-gate E2E families remain confidence-building gaps.",
-    "Discovered tests are grouped in this manifest; the release-blocking subset, C063 V2 route/load-more action command, C064 no-arg public payload fixture gate, and focused API/unit/privacy checks have passing evidence, while broader grouped families are listed as not run and the broader V2 service semantic suite currently has 2 expectation failures.",
+    "Runtime/browser behavior is now verified for the Phase 10/11/12 release-blocking search/map commands, including failure-mocked /api/map-listings 500/429 browser checks, C062 focused root pagination/sort reset plus map-bounds round-trip checks, C065 broader chromium-anon map/list/map-tools checks, C066 saved-search owner-project browser checks, C067 listing-card/security owner-project browser checks, C068 location owner-project browser checks, C070 focused chromium-anon lease-duration filter checks, C071 focused/full amenities filter checks, C072 focused/related chromium-anon search-filter race/reset checks, C073 affected/touched skipped-case checks, C074 full chromium-anon zero-skip filter checks, C077 focused map skipped-case reduction checks, C078 after-Critic focused map zero-skip checks, C079 semantic/dedupe chromium owner-baseline checks, C080 dedupe Firefox/WebKit/Mobile Chrome/Mobile Safari checks, and C080 bounded release-gate provider WebKit/Mobile Safari SSR/client checks. Semantic non-Chromium/mobile runtime behavior remains an active P1 ownership residual; dedupe non-Chromium/mobile and bounded release-gate map/provider breadth are closed/downgraded by C080. Broad 164-test non-gate map/provider candidates and live provider-network visual breadth remain lower-priority confidence coverage unless promoted.",
+    "Discovered tests are grouped in this manifest; the release-blocking subset, C063 V2 route/load-more action command, C064 no-arg public payload fixture gate, C065 broader chromium-anon map/list/map-tools commands, C066 saved-search owner-project browser command, C067 listing-card/security owner-project browser commands, C068 location owner-project browser commands, C069 semantic-service commands, C070 focused lease-duration filter command, C071 focused/full amenities commands, C072 focused/related chromium-anon search-filter commands, C073 affected/touched skipped-case commands, C074 full chromium-anon zero-skip filter commands, C077 focused map JSON command, C078 after-Critic focused popup JSON command, C078 final focused map subset JSON command, C079 semantic chromium-anon JSON command, C079 dedupe chromium JSON command, C080 dedupe Firefox/WebKit/Mobile Chrome/Mobile Safari artifacts, C080 bounded release-gate provider WebKit/Mobile Safari SSR/client artifacts, and focused API/unit/privacy checks have passing evidence, while semantic non-Chromium/mobile runtime behavior remains a P1 ownership residual. C074 ran all active chromium-anon filter tests with `130 passed` and `0 skipped` after retiring the C073 18-skip residual; C078 ran the after-Critic focused popup assertions with `2 expected`, `0 skipped`, `0 unexpected`, and `0 flaky`, and final focused map subset with `58 expected`, `0 skipped`, `0 unexpected`, and `0 flaky` after deterministic marker/card overlap stabilization. Broad 164-test non-gate map/provider candidates, live provider-network visual breadth, retired low-results guidance and pagination-cap exact browser flows, unrun saved-search action/component/saved-searches page and broader journey variants plus dedicated `/api/search/listings` fallback route-handler proof, location component/provider/geolocation, and listing-card/security residual variants are P2 confidence coverage after C066-C080.",
     "Current source evidence shows an indirect contact-host handoff: search cards link to listing detail pages, and listing detail owns the Contact Host CTA; a direct search-card Contact Host CTA remains a P2 product question.",
     "The old manual/deferred Search-this-area control is removed, while current source evidence shows automatic map-pan search-as-move with canonical bounds updates and a `Searching this area...` status overlay; fresh browser proof remains optional P2 coverage.",
-    "Map provider terminology is reduced to a P2 maintenance cleanup: current docs identify MapLibre runtime with OpenFreeMap light style, local dark style, and OpenStreetMap fallback. Stadia config exists but is not proven active for Search Map, while stale Mapbox wording remains in comments, optional scripts, compatibility language, or fixture names.",
+    "Map provider terminology is reduced to a P2 maintenance cleanup: current docs identify MapLibre runtime with OpenFreeMap light style, local dark style, and OpenStreetMap fallback. C080 closes/downgrades bounded release-gate provider breadth; broad 164-test non-gate map/provider candidates and live provider-network visual breadth remain lower-priority confidence coverage unless promoted. Stadia config exists but is not proven active for Search Map, while stale Mapbox wording remains in comments, optional scripts, compatibility language, or fixture names.",
     "Some search-related files remain dirty or untracked; C057 records them as local-only discovery caveats, not standalone passing evidence.",
     "Grouped manifest entries are covered by the groupedCoverage table rather than by a generated per-file index; exact per-file inventory generation remains optional P2 follow-up work."
   ]

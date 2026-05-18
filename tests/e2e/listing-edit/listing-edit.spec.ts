@@ -1,197 +1,93 @@
 /**
- * Listing Edit Page E2E Tests (LE-01 through LE-18)
+ * Listing Edit Page E2E Tests (LE-01 through LE-11)
  *
- * Tests for the /listings/[id]/edit page covering:
- * - Auth & access guards (LE-01 to LE-03)
- * - Field editing assertions (LE-04 to LE-10)
- * - Image management (LE-11 to LE-13)
- * - Draft persistence (LE-14, LE-15)
- * - Form actions (LE-16 to LE-18)
+ * Current product behavior renders the host-managed availability edit form.
+ * The retired full-profile/image/draft edit surface is not returned by the
+ * page component, so this spec covers the active host-managed contract instead
+ * of carrying skip-only legacy assertions.
  */
 
-import {
-  test,
-  expect,
-  selectors,
-  SF_BOUNDS,
-  searchResultsContainer,
-} from "../helpers";
+import type { Page } from "@playwright/test";
+import { test, expect, waitForHydration } from "../helpers";
+import { seedListingId } from "./seed-manifest";
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+const OWNER_LISTING_TITLE = "Sunny Mission Room";
+const REVIEWER_LISTING_TITLE = "Reviewer Nob Hill Apartment";
+const EDIT_FORM = '[data-testid="edit-listing-form"]';
 
-/**
- * Find the first listing owned by the authenticated test user.
- * Navigates to search, grabs the first listing card href, returns the listing ID.
- */
-async function findOwnListingId(
-  page: import("@playwright/test").Page,
-  nav: any
-): Promise<string | null> {
-  await nav.goToSearch({ q: "Sunny Mission Room", bounds: SF_BOUNDS });
-  await page.waitForLoadState("domcontentloaded");
-
-  const container = searchResultsContainer(page);
-  const cards = container.locator(selectors.listingCard);
-  try {
-    await cards.first().waitFor({ state: "attached", timeout: 15000 });
-  } catch {
-    return null;
+function getRequiredSeedListingId(title: string): string {
+  const listingId = seedListingId(title);
+  if (!listingId) {
+    throw new Error(`Missing E2E seed listing id for "${title}"`);
   }
-  if ((await cards.count()) === 0) return null;
-
-  const listingIds: string[] = [];
-  const count = await cards.count();
-  for (let i = 0; i < count; i++) {
-    const href = await cards
-      .nth(i)
-      .locator('a[href^="/listings/"]')
-      .first()
-      .getAttribute("href");
-    const match = href?.match(/\/listings\/([^/?#]+)/);
-    if (match?.[1]) {
-      listingIds.push(match[1]);
-    }
-  }
-
-  for (const listingId of listingIds) {
-    await page.goto(`/listings/${listingId}/edit`);
-    await page.waitForLoadState("domcontentloaded");
-
-    if (page.url().includes(`/listings/${listingId}/edit`)) {
-      return listingId;
-    }
-  }
-
-  return null;
+  return listingId;
 }
 
-/**
- * Find the reviewer-owned listing ("Reviewer Nob Hill Apartment").
- * Returns the listing ID or null.
- */
-async function findReviewerListingId(
-  page: import("@playwright/test").Page,
-  nav: any
-): Promise<string | null> {
-  await nav.goToSearch({ q: "Reviewer Nob Hill", bounds: SF_BOUNDS });
-  await page.waitForLoadState("domcontentloaded");
+async function openEditPage(page: Page, listingId: string): Promise<void> {
+  const statusSnapshot = page
+    .waitForResponse(
+      (response) =>
+        response.url().includes(`/api/listings/${listingId}/status`) &&
+        response.status() === 200,
+      { timeout: 15_000 }
+    )
+    .catch(() => null);
 
-  const container = searchResultsContainer(page);
-  const cards = container.locator(selectors.listingCard);
-  try {
-    await cards.first().waitFor({ state: "attached", timeout: 15000 });
-  } catch {
-    return null;
-  }
-  if ((await cards.count()) === 0) return null;
-
-  // Find the card that matches the reviewer listing
-  const count = await cards.count();
-  for (let i = 0; i < count; i++) {
-    const cardText = await cards.nth(i).textContent();
-    if (cardText && /reviewer.*nob.*hill/i.test(cardText)) {
-      const link = cards.nth(i).locator('a[href^="/listings/"]').first();
-      const href = await link.getAttribute("href");
-      if (href) {
-        const match = href.match(/\/listings\/([^/?#]+)/);
-        return match ? match[1] : null;
-      }
-    }
-  }
-
-  // Fallback: just grab the first card (might be reviewer's)
-  const link = cards.first().locator('a[href^="/listings/"]').first();
-  const href = await link.getAttribute("href");
-  if (!href) return null;
-  const match = href.match(/\/listings\/([^/?#]+)/);
-  return match ? match[1] : null;
+  await page.goto(`/listings/${listingId}/edit`, {
+    waitUntil: "domcontentloaded",
+  });
+  await waitForHydration(page);
+  await expect(page.locator(EDIT_FORM)).toBeVisible({ timeout: 15_000 });
+  await statusSnapshot;
 }
 
-async function hasVisibleEditForm(
-  page: import("@playwright/test").Page
-): Promise<boolean> {
-  await page.waitForLoadState("networkidle").catch(() => {});
-  return page
-    .locator('[data-testid="edit-listing-form"]')
-    .first()
-    .isVisible()
-    .catch(() => false);
+async function expectHostManagedEditForm(page: Page): Promise<void> {
+  await expect(
+    page.getByRole("heading", { name: /host-managed availability/i })
+  ).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator("#openSlots")).toBeVisible();
+  await expect(page.locator("#totalSlots")).toBeVisible();
+  await expect(page.locator("#status")).toBeVisible();
 }
 
-async function hasLegacyEditFields(
-  page: import("@playwright/test").Page
-): Promise<boolean> {
-  return page
-    .locator('[data-testid="listing-title-input"]')
-    .first()
-    .isVisible()
-    .catch(() => false);
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Auth & Access Guards (LE-01, LE-02, LE-03)
-// ═══════════════════════════════════════════════════════════════════════════
-
-test.describe("Listing Edit — Auth & Access Guards", () => {
+test.describe("Listing Edit - Auth & Access Guards", () => {
   test("LE-01: unauthenticated user redirected to /login", async ({
     browser,
-    nav,
-    page,
   }) => {
-    test.slow();
-
-    // First, find a valid listing ID using the authenticated page
-    const listingId = await findOwnListingId(page, nav);
-    test.skip(!listingId, "No listing found to test with");
-
-    // Create a new context WITHOUT auth storageState
+    const listingId = getRequiredSeedListingId(OWNER_LISTING_TITLE);
     const unauthContext = await browser.newContext();
     const unauthPage = await unauthContext.newPage();
 
     try {
-      await unauthPage.goto(`/listings/${listingId}/edit`);
-      await unauthPage.waitForLoadState("networkidle").catch(() => {});
-
-      // Give the server time to redirect (if it will)
+      await unauthPage.goto(`/listings/${listingId}/edit`, {
+        waitUntil: "domcontentloaded",
+      });
       await unauthPage
-        .waitForURL(/\/(login|auth|signin)/, { timeout: 10000 })
+        .waitForURL(/\/(login|auth|signin)/, { timeout: 15_000 })
         .catch(() => {});
 
       const currentUrl = unauthPage.url();
-      const wasRedirected = !currentUrl.includes("/edit");
-
-      if (wasRedirected) {
-        // Redirect-based guard worked — pass
+      if (/(\/login|\/auth|\/signin)/.test(currentUrl)) {
         expect(currentUrl).toMatch(/\/(login|auth|signin)/);
-      } else {
-        // Dev server did not redirect; skip gracefully instead of failing
-        test.skip(
-          true,
-          "Next.js dev server does not reliably redirect unauthenticated users in E2E"
-        );
+        return;
       }
+
+      test.skip(
+        true,
+        "Next.js dev server does not reliably commit unauthenticated edit redirects in E2E"
+      );
     } finally {
       await unauthContext.close();
     }
   });
 
-  test("LE-02: non-owner redirected to listing detail (not /edit)", async ({
-    page,
-    nav,
-  }) => {
-    test.slow();
+  test("LE-02: non-owner redirected to listing detail", async ({ page }) => {
+    const reviewerListingId = getRequiredSeedListingId(REVIEWER_LISTING_TITLE);
 
-    // Find the reviewer's listing (not owned by testUser)
-    const reviewerListingId = await findReviewerListingId(page, nav);
-    test.skip(!reviewerListingId, "Reviewer listing not found — skipping");
+    await page.goto(`/listings/${reviewerListingId}/edit`, {
+      waitUntil: "domcontentloaded",
+    });
 
-    // Navigate to the edit page of a listing NOT owned by testUser
-    await page.goto(`/listings/${reviewerListingId}/edit`);
-    await page.waitForLoadState("domcontentloaded");
-
-    // Should redirect to /listings/[id] without /edit
     await expect
       .poll(
         () => {
@@ -202,607 +98,175 @@ test.describe("Listing Edit — Auth & Access Guards", () => {
           );
         },
         {
-          timeout: 15000,
-          message: "Expected redirect away from /edit to listing detail",
+          timeout: 15_000,
+          message: "Expected non-owner to be redirected away from /edit",
         }
       )
       .toBe(true);
   });
 
-  test("LE-03: owner can access edit page with pre-filled form", async ({
+  test("LE-03: owner can access the host-managed edit form", async ({
     page,
-    nav,
   }) => {
-    test.slow();
+    const listingId = getRequiredSeedListingId(OWNER_LISTING_TITLE);
 
-    const listingId = await findOwnListingId(page, nav);
-    test.skip(!listingId, "No listing found");
+    await openEditPage(page, listingId);
+    await expectHostManagedEditForm(page);
+  });
+});
 
-    await page.goto(`/listings/${listingId}/edit`);
-    await page.waitForLoadState("domcontentloaded");
+test.describe("Listing Edit - Host-Managed Availability Fields", () => {
+  test.beforeEach(async ({ page }) => {
+    const listingId = getRequiredSeedListingId(OWNER_LISTING_TITLE);
+    await openEditPage(page, listingId);
+    await expectHostManagedEditForm(page);
+  });
 
-    // If redirected away from /edit, this listing is not owned by testUser — skip gracefully
-    const currentUrl = page.url();
-    if (!currentUrl.includes("/edit")) {
-      test.skip(
-        true,
-        "Redirected away from /edit — listing not owned by testUser (findOwnListingId returned wrong listing)"
-      );
-      return;
-    }
+  test("LE-04: open and total slot inputs are visible, enabled, and populated", async ({
+    page,
+  }) => {
+    const openSlots = page.locator("#openSlots");
+    const totalSlots = page.locator("#totalSlots");
 
-    const form = page.locator('[data-testid="edit-listing-form"]').first();
-    await expect(form).toBeVisible({ timeout: 15000 });
+    await expect(openSlots).toBeEnabled();
+    await expect(totalSlots).toBeEnabled();
+    await expect(openSlots).toHaveValue(/\d+/);
+    await expect(totalSlots).toHaveValue(/\d+/);
+
+    const openSlotValue = Number(await openSlots.inputValue());
+    const totalSlotValue = Number(await totalSlots.inputValue());
+    expect(openSlotValue).toBeGreaterThanOrEqual(0);
+    expect(totalSlotValue).toBeGreaterThan(0);
+    expect(openSlotValue).toBeLessThanOrEqual(totalSlotValue);
+  });
+
+  test("LE-05: move-in and available-until date controls are present", async ({
+    page,
+  }) => {
+    await expect(page.getByText("Move-in Date")).toBeVisible();
+    await expect(page.locator("#moveInDate")).toBeVisible();
+    await expect(page.getByText("Available Until")).toBeVisible();
+    await expect(page.locator("#availableUntil")).toBeVisible();
+  });
+
+  test("LE-06: minimum stay and status controls expose the current contract", async ({
+    page,
+  }) => {
+    const minStay = page.locator("#minStayMonths");
+    const status = page.locator("#status");
+
+    await expect(minStay).toBeEnabled();
+    await expect(minStay).toHaveValue(/\d+/);
+    expect(Number(await minStay.inputValue())).toBeGreaterThanOrEqual(1);
+
+    await expect(status).toBeEnabled();
+    await expect(status).toHaveValue(/ACTIVE|PAUSED|RENTED/);
+    await expect(status.locator("option")).toHaveText([
+      "Active",
+      "Paused",
+      "Rented",
+    ]);
+  });
+
+  test("LE-07: expected version is visible but read-only", async ({ page }) => {
+    const expectedVersion = page.locator("#expectedVersion");
+
+    await expect(page.getByText("Expected Version")).toBeVisible();
+    await expect(expectedVersion).toBeVisible();
+    await expect(expectedVersion).toBeDisabled();
+    await expect(expectedVersion).toHaveValue(/\d+/);
+  });
+
+  test("LE-08: legacy full-profile edit controls are absent from the current surface", async ({
+    page,
+  }) => {
     await expect(
-      page
-        .getByRole("heading", { name: /edit listing/i })
-        .or(page.getByRole("heading", { name: /host-managed availability/i }))
-        .first()
-    ).toBeVisible({ timeout: 10000 });
-
-    if (await hasLegacyEditFields(page)) {
-      const titleInput = page
-        .locator('[data-testid="listing-title-input"]')
-        .first();
-      const titleValue = await titleInput.inputValue();
-      expect(titleValue.length).toBeGreaterThan(0);
-    } else {
-      await expect(page.locator("#openSlots")).toBeVisible({ timeout: 10000 });
-    }
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Field Editing — Read-Only Assertions (LE-04 through LE-10)
-// ═══════════════════════════════════════════════════════════════════════════
-
-test.describe("Listing Edit — Field Editing", () => {
-  let listingId: string | null = null;
-
-  test.beforeEach(async ({ page, nav }) => {
-    test.slow();
-    if (!listingId) {
-      listingId = await findOwnListingId(page, nav);
-    }
-    test.skip(!listingId, "No listing found");
-    await page.goto(`/listings/${listingId}/edit`);
-    await page.waitForLoadState("domcontentloaded");
-
-    const formVisible = await hasVisibleEditForm(page);
-    const legacyFieldsVisible = await hasLegacyEditFields(page);
-    if (!page.url().includes("/edit") || !formVisible || !legacyFieldsVisible) {
-      test.skip(
-        true,
-        "Legacy full edit fields are retired for contact-first host-managed listings"
-      );
-      return;
-    }
-  });
-
-  test("LE-04: title input is editable and pre-filled", async ({ page }) => {
-    const titleInput = page
-      .locator('[data-testid="listing-title-input"]')
-      .first();
-    await expect(titleInput).toBeVisible({ timeout: 10000 });
-    await expect(titleInput).toBeEnabled();
-
-    const value = await titleInput.inputValue();
-    expect(value.length).toBeGreaterThan(0);
-    // Seed data: first listing is "Sunny Mission Room"
-    expect(value).toMatch(/sunny mission/i);
-  });
-
-  test("LE-05: description textarea is editable and pre-filled", async ({
-    page,
-  }) => {
-    const descInput = page.locator('[data-testid="listing-description-input"]');
-    await expect(descInput).toBeVisible({ timeout: 10000 });
-    await expect(descInput).toBeEnabled();
-
-    const value = await descInput.inputValue();
-    expect(value.length).toBeGreaterThan(0);
-  });
-
-  test("LE-06: price input is editable and shows current price", async ({
-    page,
-  }) => {
-    const priceInput = page
-      .locator('[data-testid="listing-price-input"]')
-      .filter({ visible: true })
-      .first();
-    await expect(priceInput).toBeVisible({ timeout: 10000 });
-    await expect(priceInput).toBeEnabled();
-
-    const value = await priceInput.inputValue();
-    // Seed data price is 1200
-    expect(Number(value)).toBeGreaterThan(0);
-  });
-
-  test("LE-07: room type select dropdown is present with options", async ({
-    page,
-  }) => {
-    // The form uses Radix Select with id="roomType"
-    const roomTypeTrigger = page
-      .locator("#roomType")
-      .or(page.getByLabel(/room type/i));
-    await expect(roomTypeTrigger.first()).toBeVisible({ timeout: 10000 });
-
-    // Click to open the dropdown
-    await roomTypeTrigger.first().click();
-
-    // Verify options are visible in the dropdown content
-    const privateRoom = page.getByRole("option", { name: /private room/i });
-    const sharedRoom = page.getByRole("option", { name: /shared room/i });
-    const entirePlace = page.getByRole("option", { name: /entire place/i });
-
+      page.locator('[data-testid="listing-title-input"]')
+    ).toHaveCount(0);
     await expect(
-      privateRoom.or(sharedRoom).or(entirePlace).first()
-    ).toBeVisible({ timeout: 5000 });
-
-    // Close dropdown by pressing Escape
-    await page.keyboard.press("Escape");
-  });
-
-  test("LE-08: amenities field is pre-filled with comma-separated values", async ({
-    page,
-  }) => {
-    const amenitiesInput = page
-      .locator("#amenities")
-      .or(page.locator('input[name="amenities"]'));
-    await expect(amenitiesInput.first()).toBeVisible({ timeout: 10000 });
-
-    const value = await amenitiesInput.first().inputValue();
-    // Seed data: ['Wifi', 'Furnished', 'Kitchen', 'Parking'] joined with ', '
-    expect(value.length).toBeGreaterThan(0);
-    expect(value).toMatch(/wifi/i);
-  });
-
-  test("LE-09: location fields are pre-filled (address, city, state, zip)", async ({
-    page,
-  }) => {
-    const addressInput = page
-      .locator("#address")
-      .or(page.locator('input[name="address"]'));
-    const cityInput = page
-      .locator("#city")
-      .or(page.locator('input[name="city"]'));
-    const stateInput = page
-      .locator("#state")
-      .or(page.locator('input[name="state"]'));
-    const zipInput = page.locator("#zip").or(page.locator('input[name="zip"]'));
-
-    await expect(addressInput.first()).toBeVisible({ timeout: 10000 });
-
-    const address = await addressInput.first().inputValue();
-    const city = await cityInput.first().inputValue();
-    const state = await stateInput.first().inputValue();
-    const zip = await zipInput.first().inputValue();
-
-    // Seed data: 2400 Mission St, San Francisco, CA, 94110
-    expect(address.length).toBeGreaterThan(0);
-    expect(city.length).toBeGreaterThan(0);
-    expect(state.length).toBeGreaterThan(0);
-    expect(zip.length).toBeGreaterThan(0);
-  });
-
-  test("LE-10: move-in date field is present", async ({ page }) => {
-    // The DatePicker component renders a button (Popover trigger) with id="moveInDate"
-    const moveInLabel = page.getByText(/move-in date/i);
-    await expect(moveInLabel.first()).toBeVisible({ timeout: 10000 });
-
-    // The date picker has id="moveInDate" on its trigger
-    const datePicker = page
-      .locator("#moveInDate")
-      .or(page.getByRole("button", { name: /select.*date|move-in/i }));
-    await expect(datePicker.first()).toBeVisible({ timeout: 10000 });
+      page.locator('[data-testid="listing-description-input"]')
+    ).toHaveCount(0);
+    await expect(page.locator('input[type="file"]')).toHaveCount(0);
+    await expect(page.getByText(/you have unsaved edits/i)).not.toBeVisible();
   });
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Image Management (LE-11, LE-12, LE-13)
-// ═══════════════════════════════════════════════════════════════════════════
-
-test.describe("Listing Edit — Image Management", () => {
-  let listingId: string | null = null;
-
-  test.beforeEach(async ({ page, nav }) => {
-    test.slow();
-    if (!listingId) {
-      listingId = await findOwnListingId(page, nav);
-    }
-    test.skip(!listingId, "No listing found");
-    await page.goto(`/listings/${listingId}/edit`);
-    await page.waitForLoadState("domcontentloaded");
-    test.skip(
-      !(await hasVisibleEditForm(page)) || !(await hasLegacyEditFields(page)),
-      "Legacy full edit fields are retired for contact-first host-managed listings"
-    );
-  });
-
-  test("LE-11: existing images are displayed", async ({ page }) => {
-    // Seed data provides 2 unsplash images per listing
-    // Look for img elements within the Photos section
-    const photosSection = page.getByText(/photos/i).first();
-    await expect(photosSection).toBeVisible({ timeout: 10000 });
-
-    // Images should be rendered (either as img tags or background images)
-    const images = page
-      .locator('img[src*="unsplash"]')
-      .or(page.locator('img[src*="supabase"]'))
-      .or(page.locator('[data-testid="image-preview"]'));
-
-    // At least 1 image should be visible (seed data has 2)
-    await expect(images.first()).toBeVisible({ timeout: 10000 });
-    const count = await images.count();
-    expect(count).toBeGreaterThanOrEqual(1);
-  });
-
-  test("LE-12: image uploader area is visible", async ({ page }) => {
-    // ImageUploader renders a drag-and-drop zone with upload button
-    const uploadArea = page
-      .getByText(/add photos|drag.*drop|upload/i)
-      .or(page.locator('input[type="file"]'))
-      .or(page.getByRole("button", { name: /upload|add.*photo/i }));
-
-    await expect(uploadArea.first()).toBeAttached({ timeout: 10000 });
-  });
-
-  test("LE-13: image management section is present", async ({ page }) => {
-    // The Photos section header
-    const photosHeading = page.getByText(/photos/i).first();
-    await expect(photosHeading).toBeVisible({ timeout: 10000 });
-
-    // The helper text about adding photos
-    const helperText = page
-      .getByText(/add photos.*attract/i)
-      .or(page.getByText(/first image.*main photo/i));
-    await expect(helperText.first()).toBeVisible({ timeout: 10000 });
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Draft Persistence (LE-14, LE-15) — Serial because they share localStorage
-// ═══════════════════════════════════════════════════════════════════════════
-
-test.describe.serial("Listing Edit — Draft Persistence", () => {
-  let listingId: string | null = null;
-
-  test("LE-14: edit title → navigate away → return → draft banner appears", async ({
-    page,
-    nav,
-  }) => {
-    test.slow();
-
-    listingId = await findOwnListingId(page, nav);
-    test.skip(!listingId, "No listing found");
-
-    // Navigate to the edit page
-    await page.goto(`/listings/${listingId}/edit`);
-    await page.waitForLoadState("domcontentloaded");
-    test.skip(
-      !(await hasVisibleEditForm(page)) || !(await hasLegacyEditFields(page)),
-      "Legacy full edit fields are retired for contact-first host-managed listings"
-    );
-
-    // Dismiss any existing draft banner first
-    const existingBanner = page.getByText(/you have unsaved edits/i);
-    if (
-      await expect(existingBanner)
-        .toBeVisible({ timeout: 3000 })
-        .then(() => true)
-        .catch(() => false)
-    ) {
-      const discardBtn = page.getByRole("button", { name: /discard/i });
-      if (
-        await expect(discardBtn)
-          .toBeVisible({ timeout: 2000 })
-          .then(() => true)
-          .catch(() => false)
-      ) {
-        await discardBtn.click();
-        await expect(page.getByText(/you have unsaved edits/i)).not.toBeVisible({ timeout: 3000 }).catch(() => {});
-      }
-    }
-
-    // Edit the title to trigger form change and auto-save
-    const titleInput = page.locator('[data-testid="listing-title-input"]');
-    await titleInput.click();
-    await titleInput.fill("Draft Test Title Changed");
-
-    // Wait for auto-save (useFormPersistence saves on change events)
-    await page.waitForFunction(
-      (title) => localStorage.getItem(`edit-listing-draft-${title}`) !== null || true,
-      listingId,
-      { timeout: 5000 }
-    ).catch(() => {});
-
-    // Navigate away
-    await page.goto("/");
-    await page.waitForLoadState("domcontentloaded");
-
-    // Navigate back to the edit page
-    await page.goto(`/listings/${listingId}/edit`);
-    await page.waitForLoadState("domcontentloaded");
-    test.skip(
-      !(await hasVisibleEditForm(page)) || !(await hasLegacyEditFields(page)),
-      "Legacy full edit fields are retired for contact-first host-managed listings"
-    );
-
-    // Draft banner should appear: "You have unsaved edits"
-    const draftBanner = page.getByText(/you have unsaved edits/i);
-    await expect(draftBanner).toBeVisible({ timeout: 10000 });
-
-    // Should have "Resume Edits" button
-    const resumeBtn = page.getByRole("button", { name: /resume edits/i });
-    await expect(resumeBtn).toBeVisible({ timeout: 5000 });
-  });
-
-  test("LE-15: discard draft resets form to original values", async ({
-    page,
-    nav,
-  }) => {
-    test.slow();
-
-    // Use the same listingId from the previous test
-    if (!listingId) {
-      listingId = await findOwnListingId(page, nav);
-    }
-    test.skip(!listingId, "No listing found");
-
-    // Navigate to edit page — should show draft banner from LE-14
-    await page.goto(`/listings/${listingId}/edit`);
-    await page.waitForLoadState("domcontentloaded");
-    test.skip(
-      !(await hasVisibleEditForm(page)) || !(await hasLegacyEditFields(page)),
-      "Legacy full edit fields are retired for contact-first host-managed listings"
-    );
-
-    // Wait for draft banner
-    const draftBanner = page.getByText(/you have unsaved edits/i);
-    const hasBanner = await expect(draftBanner)
-      .toBeVisible({ timeout: 5000 })
-      .then(() => true)
-      .catch(() => false);
-
-    if (hasBanner) {
-      // Click Discard
-      const discardBtn = page.getByRole("button", { name: /discard/i });
-      await expect(discardBtn).toBeVisible({ timeout: 5000 });
-      await discardBtn.click();
-
-      // Banner should disappear
-      await expect(draftBanner).not.toBeVisible({ timeout: 5000 });
-    }
-
-    // Title should be back to original seed value
-    const titleInput = page.locator('[data-testid="listing-title-input"]');
-    await expect(titleInput).toBeVisible({ timeout: 10000 });
-    const value = await titleInput.inputValue();
-    // After discard, original value should be shown ("Sunny Mission Room")
-    expect(value).toMatch(/sunny mission/i);
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Form Actions (LE-16, LE-17, LE-18)
-// ═══════════════════════════════════════════════════════════════════════════
-
-test.describe("Listing Edit — Form Actions", () => {
-  let listingId: string | null = null;
-
-  test.beforeEach(async ({ page, nav }) => {
-    test.slow();
-    if (!listingId) {
-      listingId = await findOwnListingId(page, nav);
-    }
-    test.skip(!listingId, "No listing found");
-    // Clear any stale edit draft from prior tests (LE-14/LE-15)
-    await page.goto(`/listings/${listingId}/edit`);
-    await page.evaluate(
-      (id) => localStorage.removeItem(`edit-listing-draft-${id}`),
-      listingId
-    );
-    await page.reload();
-    await page.waitForLoadState("domcontentloaded");
-    test.skip(
-      !(await hasVisibleEditForm(page)) || !(await hasLegacyEditFields(page)),
-      "Legacy full edit fields are retired for contact-first host-managed listings"
-    );
-  });
-
-  test("LE-16: cancel button navigates back to listing detail", async ({
+test.describe("Listing Edit - Form Actions", () => {
+  test("LE-09: back-to-listing link returns to listing detail", async ({
     page,
   }) => {
-    await page.goto(`/listings/${listingId}/edit`);
-    await page.waitForLoadState("domcontentloaded");
-    test.skip(
-      !(await hasVisibleEditForm(page)) || !(await hasLegacyEditFields(page)),
-      "Legacy full edit fields are retired for contact-first host-managed listings"
-    );
+    const listingId = getRequiredSeedListingId(OWNER_LISTING_TITLE);
+    await openEditPage(page, listingId);
 
-    // The cancel button is a Link with data-testid="listing-cancel-button"
-    const cancelBtn = page
-      .locator('[data-testid="listing-cancel-button"]')
-      .first();
-    await expect(cancelBtn).toBeVisible({ timeout: 10000 });
-    await expect(cancelBtn).toHaveText(/back to listing/i);
+    const backLink = page.locator('[data-testid="listing-cancel-button"]');
+    await expect(backLink).toBeVisible();
+    await expect(backLink).toHaveAttribute("href", `/listings/${listingId}`);
 
-    // Get the href and navigate directly (click-based navigation is flaky in CI)
-    const href = await cancelBtn.getAttribute("href");
-    expect(href).toBeTruthy();
-    await page.goto(href!);
-    await page.waitForLoadState("domcontentloaded");
-    expect(page.url()).not.toContain("/edit");
-  });
-
-  test("LE-17: submit with no changes redirects to listing detail", async ({
-    page,
-  }) => {
-    await page.goto(`/listings/${listingId}/edit`);
-    await page.waitForLoadState("domcontentloaded");
-    test.skip(
-      !(await hasVisibleEditForm(page)) || !(await hasLegacyEditFields(page)),
-      "Legacy full edit fields are retired for contact-first host-managed listings"
-    );
-
-    // Dismiss any draft banner
-    const draftBanner = page.getByText(/you have unsaved edits/i);
-    if (
-      await expect(draftBanner)
-        .toBeVisible({ timeout: 3000 })
-        .then(() => true)
-        .catch(() => false)
-    ) {
-      const discardBtn = page.getByRole("button", { name: /discard/i });
-      if (
-        await expect(discardBtn)
-          .toBeVisible({ timeout: 2000 })
-          .then(() => true)
-          .catch(() => false)
-      ) {
-        await discardBtn.click();
-        await expect(page.getByText(/you have unsaved edits/i)).not.toBeVisible({ timeout: 3000 }).catch(() => {});
-      }
-    }
-
-    // The save button — check if it's enabled (it may be disabled when images.length === 0)
-    const saveBtn = page.locator('[data-testid="listing-save-button"]');
-    await expect(saveBtn).toBeVisible({ timeout: 10000 });
-
-    // Wait for images to load (button is disabled when images.length === 0)
-    // Give the ImageUploader time to initialize from listing.images
-    await expect(saveBtn).toBeEnabled({ timeout: 10000 }).catch(() => {});
-
-    const isEnabled = await saveBtn.isEnabled().catch(() => false);
-    if (!isEnabled) {
-      // Button may be disabled if images haven't loaded yet — skip gracefully
-      test.skip(true, "Save button disabled (images may not have loaded)");
-    }
-
-    // Click save (submitting unchanged data)
-    await saveBtn.click();
-
-    // Wait for response — check for error banner (e.g. PATCH rejects seed images)
-    await page.waitForLoadState("networkidle").catch(() => {});
-    const errorBanner = page.locator(
-      '.bg-red-50, [data-testid="error-banner"], [role="alert"]'
-    );
-    const hasError = await errorBanner
-      .first()
-      .isVisible({ timeout: 3000 })
-      .catch(() => false);
-    if (hasError) {
-      test.skip(
-        true,
-        "PATCH returned server error (likely seed image URL mismatch)"
-      );
-    }
-
-    // Should redirect to the listing detail page after successful PATCH
+    await backLink.click();
     await expect
-      .poll(
-        () => {
-          const url = page.url();
-          return (
-            url.includes(`/listings/${listingId}`) && !url.includes("/edit")
-          );
-        },
-        {
-          timeout: 20000,
-          message: "Expected redirect to listing detail after save",
-        }
-      )
-      .toBe(true);
+      .poll(() => page.url(), {
+        timeout: 15_000,
+        message: "Expected back link to leave edit page",
+      })
+      .toMatch(new RegExp(`/listings/${listingId}$`));
   });
 
-  test("LE-18: clear required title → submit → validation error shown", async ({
+  test("LE-10: cancel button returns to listing detail", async ({ page }) => {
+    const listingId = getRequiredSeedListingId(OWNER_LISTING_TITLE);
+    await openEditPage(page, listingId);
+
+    await page.getByRole("button", { name: /^Cancel$/ }).click();
+    await expect
+      .poll(() => page.url(), {
+        timeout: 15_000,
+        message: "Expected cancel button to leave edit page",
+      })
+      .toMatch(new RegExp(`/listings/${listingId}$`));
+  });
+
+  test("LE-11: server field errors render without leaving edit", async ({
     page,
   }) => {
-    await page.goto(`/listings/${listingId}/edit`);
-    await page.waitForLoadState("domcontentloaded");
-    test.skip(
-      !(await hasVisibleEditForm(page)) || !(await hasLegacyEditFields(page)),
-      "Legacy full edit fields are retired for contact-first host-managed listings"
-    );
+    const listingId = getRequiredSeedListingId(OWNER_LISTING_TITLE);
+    let sawPatchRequest = false;
 
-    // Dismiss any draft banner
-    const draftBanner = page.getByText(/you have unsaved edits/i);
-    if (
-      await expect(draftBanner)
-        .toBeVisible({ timeout: 3000 })
-        .then(() => true)
-        .catch(() => false)
-    ) {
-      const discardBtn = page.getByRole("button", { name: /discard/i });
-      if (
-        await expect(discardBtn)
-          .toBeVisible({ timeout: 2000 })
-          .then(() => true)
-          .catch(() => false)
-      ) {
-        await discardBtn.click();
-        await expect(page.getByText(/you have unsaved edits/i)).not.toBeVisible({ timeout: 3000 }).catch(() => {});
+    await page.route(`**/api/listings/${listingId}`, async (route) => {
+      if (route.request().method() !== "PATCH") {
+        await route.continue();
+        return;
       }
-    }
 
-    // Clear the required title field
-    const titleInput = page.locator('[data-testid="listing-title-input"]');
-    await expect(titleInput).toBeVisible({ timeout: 10000 });
-    await titleInput.clear();
-
-    // Wait for images to possibly load
-    await page.waitForLoadState("networkidle").catch(() => {});
-
-    const saveBtn = page.locator('[data-testid="listing-save-button"]');
-
-    // Try to submit — either browser validation fires or API returns error
-    // Use evaluate to call requestSubmit on the form to bypass disabled button state
-    const formSubmitted = await page.evaluate(() => {
-      const form = document.querySelector(
-        '[data-testid="edit-listing-form"]'
-      ) as HTMLFormElement;
-      if (form) {
-        // Check if the title input has required attribute
-        const titleInput = form.querySelector(
-          '[data-testid="listing-title-input"]'
-        ) as HTMLInputElement;
-        if (titleInput && titleInput.required && !titleInput.value) {
-          // Browser will show validation popup — check validity
-          return !form.checkValidity();
-        }
-      }
-      return false;
+      sawPatchRequest = true;
+      await route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: "Validation failed",
+          fields: {
+            openSlots: ["Active listings require at least one open slot"],
+          },
+        }),
+      });
     });
 
-    if (formSubmitted) {
-      // Browser's built-in validation should prevent submission
-      // Verify we're still on the edit page
-      expect(page.url()).toContain("/edit");
-    } else {
-      // If button is enabled, click it — API should return error
-      const isEnabled = await saveBtn.isEnabled().catch(() => false);
-      if (isEnabled) {
-        await saveBtn.click();
-        await page.waitForLoadState("networkidle").catch(() => {});
+    await openEditPage(page, listingId);
 
-        // Should show error message (either field error or general error)
-        const errorMsg = page
-          .getByText(/failed to save|title.*required|required/i)
-          .or(page.locator('[role="alert"]'))
-          .or(page.locator(".text-red-500, .text-red-600"));
+    await page.locator("#status").selectOption("ACTIVE");
+    await page.locator("#openSlots").fill("0");
 
-        // Either an error is shown OR we're still on the edit page
-        const hasError = await errorMsg
-          .first()
-          .isVisible({ timeout: 5000 })
-          .catch(() => false);
-        const stillOnEdit = page.url().includes("/edit");
-        expect(hasError || stillOnEdit).toBeTruthy();
-      } else {
-        // Button is disabled — form won't submit with empty required field
-        // This itself is a valid validation behavior
-        expect(page.url()).toContain("/edit");
-      }
-    }
+    const patchResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes(`/api/listings/${listingId}`) &&
+        response.request().method() === "PATCH" &&
+        response.status() === 400
+    );
+    await page.locator('[data-testid="listing-save-button"]').click();
+    await patchResponse;
+
+    expect(sawPatchRequest).toBe(true);
+    await expect(
+      page.getByText(/active listings require at least one open slot/i)
+    ).toBeVisible({ timeout: 10_000 });
+    expect(page.url()).toContain(`/listings/${listingId}/edit`);
   });
 });

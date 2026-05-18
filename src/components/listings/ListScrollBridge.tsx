@@ -21,6 +21,54 @@ import { useListingFocus } from "@/contexts/ListingFocusContext";
 /** Max render-cycle retries before auto-acknowledging a scroll request */
 const MAX_SCROLL_RETRIES = 10;
 
+function findScrollableAncestor(element: Element): HTMLElement | null {
+  let current = element.parentElement;
+
+  while (current && current !== document.body) {
+    const style = window.getComputedStyle(current);
+    const overflowY = style.overflowY;
+    const canScroll =
+      (overflowY === "auto" || overflowY === "scroll") &&
+      current.scrollHeight > current.clientHeight;
+
+    if (canScroll) {
+      return current;
+    }
+
+    current = current.parentElement;
+  }
+
+  return null;
+}
+
+function scrollCardIntoResultsView(targetCard: Element) {
+  const scrollParent = findScrollableAncestor(targetCard);
+
+  if (!scrollParent) {
+    targetCard.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+    });
+    return;
+  }
+
+  const parentRect = scrollParent.getBoundingClientRect();
+  const cardRect = targetCard.getBoundingClientRect();
+  const above = cardRect.top < parentRect.top;
+  const below = cardRect.bottom > parentRect.bottom;
+
+  if (!above && !below) return;
+
+  const delta = above
+    ? cardRect.top - parentRect.top
+    : cardRect.bottom - parentRect.bottom;
+
+  scrollParent.scrollTo({
+    top: scrollParent.scrollTop + delta,
+    behavior: "smooth",
+  });
+}
+
 export default function ListScrollBridge() {
   const { scrollRequest, ackScrollTo } = useListingFocus();
   const lastProcessedNonce = useRef<number | null>(null);
@@ -64,11 +112,8 @@ export default function ListScrollBridge() {
       return;
     }
 
-    // Element found - perform scroll
-    targetCard.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
-    });
+    // Element found - perform scroll inside the results pane when possible.
+    scrollCardIntoResultsView(targetCard);
 
     // Track nonce AFTER successful scroll to prevent double-processing
     // This ensures "not mounted yet" cases can retry on next render

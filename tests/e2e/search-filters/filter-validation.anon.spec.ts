@@ -217,8 +217,7 @@ test.describe("Filter Validation & Security", () => {
     // Page renders
 
     const region = appliedFiltersRegion(page);
-    const regionVisible = await region.isVisible().catch(() => false);
-    test.skip(!regionVisible, "Applied filters region not visible");
+    await expect(region).toBeVisible({ timeout: 10_000 });
 
     // Only one "Wifi" chip should appear (server deduplicates via Set)
     const wifiChips = region.getByText(/^Wifi$/i);
@@ -241,10 +240,8 @@ test.describe("Filter Validation & Security", () => {
     await page.waitForLoadState("domcontentloaded");
     await expect(searchResultsContainer(page)).toBeVisible({ timeout: 30_000 });
 
-
     const region = appliedFiltersRegion(page);
-    const regionVisible = await region.isVisible().catch(() => false);
-    test.skip(!regionVisible, "Applied filters region not visible");
+    await expect(region).toBeVisible({ timeout: 10_000 });
 
     // Chips should show canonical forms: "Wifi" and "Parking"
     const wifiChip = region.getByText(/Wifi/i).first();

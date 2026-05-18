@@ -22,6 +22,7 @@ import {
   normalizeSearchQuery,
   type NormalizedSearchQuery,
 } from "@/lib/search/search-query";
+import { markPendingSearchNavigation } from "@/lib/search/pending-search-navigation";
 
 /**
  * Batched filter values - represents pending filter state
@@ -104,7 +105,10 @@ function parseEnumParam(
 
 const ISO_LOCAL_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-function normalizeCommittedDateRange(moveInDate: string, endDate: string): {
+function normalizeCommittedDateRange(
+  moveInDate: string,
+  endDate: string
+): {
   moveInDate: string;
   endDate: string;
 } {
@@ -480,41 +484,48 @@ export function useBatchedFilters(
     setPendingState(committed);
   }, [committed]);
 
-  const commit = useCallback((overrides?: Partial<BatchedFilterValues>) => {
-    // After an explicit apply action, prioritize URL state for a short window.
-    // This avoids preserving stale dirty state during immediate back/forward transitions.
-    // 10s covers typical back/forward navigation latency with margin.
-    const FORCE_SYNC_WINDOW_MS = 10_000;
-    forceSyncUntilRef.current = Date.now() + FORCE_SYNC_WINDOW_MS;
-    const basePending = pendingRef.current;
-    const nextPending = overrides ? { ...basePending, ...overrides } : basePending;
-    const sanitizedPending = sanitizePendingFilters(nextPending);
+  const commit = useCallback(
+    (overrides?: Partial<BatchedFilterValues>) => {
+      // After an explicit apply action, prioritize URL state for a short window.
+      // This avoids preserving stale dirty state during immediate back/forward transitions.
+      // 10s covers typical back/forward navigation latency with margin.
+      const FORCE_SYNC_WINDOW_MS = 10_000;
+      forceSyncUntilRef.current = Date.now() + FORCE_SYNC_WINDOW_MS;
+      const basePending = pendingRef.current;
+      const nextPending = overrides
+        ? { ...basePending, ...overrides }
+        : basePending;
+      const sanitizedPending = sanitizePendingFilters(nextPending);
 
-    if (!filtersEqual(sanitizedPending, basePending)) {
-      pendingRef.current = sanitizedPending;
-      setPendingState(sanitizedPending);
-    }
+      if (!filtersEqual(sanitizedPending, basePending)) {
+        pendingRef.current = sanitizedPending;
+        setPendingState(sanitizedPending);
+      }
 
-    const currentQuery = normalizeSearchQuery(
-      new URLSearchParams(searchParams.toString())
-    );
-    // CFM-604: canonical-on-write guarantee — must go through buildCanonicalSearchUrl.
-    const searchUrl = buildCanonicalSearchUrl(
-      applySearchQueryChange(
-        currentQuery,
-        "filter",
-        buildSearchFilterPatchFromPending(sanitizedPending)
-      )
-    );
+      const currentQuery = normalizeSearchQuery(
+        new URLSearchParams(searchParams.toString())
+      );
+      // CFM-604: canonical-on-write guarantee — must go through buildCanonicalSearchUrl.
+      const searchUrl = buildCanonicalSearchUrl(
+        applySearchQueryChange(
+          currentQuery,
+          "filter",
+          buildSearchFilterPatchFromPending(sanitizedPending)
+        )
+      );
 
-    if (transitionContext) {
-      transitionContext.navigateWithTransition(searchUrl, {
-        reason: "filter",
-      });
-    } else {
-      router.push(searchUrl);
-    }
-  }, [searchParams, transitionContext, router]);
+      markPendingSearchNavigation(searchUrl);
+
+      if (transitionContext) {
+        transitionContext.navigateWithTransition(searchUrl, {
+          reason: "filter",
+        });
+      } else {
+        router.push(searchUrl);
+      }
+    },
+    [searchParams, transitionContext, router]
+  );
 
   return {
     pending,

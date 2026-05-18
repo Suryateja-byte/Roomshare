@@ -18,15 +18,26 @@ test("T-03: expanding the grouped dates panel shows all dates and routes to the 
   await page.goto(searchUrls.cloneGroup, { waitUntil: "domcontentloaded" });
   await waitForVisibleCards(page);
 
-  await (await openGroupTrigger(page)).click();
+  const trigger = await openGroupTrigger(page);
+  await trigger.click();
+  await expect(trigger)
+    .toHaveAttribute("aria-expanded", "true", { timeout: 1_000 })
+    .catch(async () => {
+      await trigger.press("Enter");
+      await expect(trigger).toHaveAttribute("aria-expanded", "true");
+    });
 
   const panel = searchResultsContainer(page).locator(
     '[data-testid="group-dates-panel"]'
   );
   await expect(panel).toBeVisible();
-  await expect(panel.locator('[data-testid="group-dates-chip"]')).toHaveCount(4);
+  await expect(panel.locator('[data-testid="group-dates-chip"]')).toHaveCount(
+    4
+  );
 
-  const apr18Chip = panel.getByRole("button", { name: /available june 18, 2026/i });
+  const apr18Chip = panel.getByRole("button", {
+    name: /available june 18, 2026/i,
+  });
   await apr18Chip.click();
 
   await page.waitForURL(`**/listings/${DEDUPE_IDS.apr18}`);

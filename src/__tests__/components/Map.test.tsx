@@ -39,6 +39,7 @@ let mockCanvas: ReturnType<typeof createMockCanvas>;
 let phoneViewportMatches = false;
 let mockActivePOICategories = new Set<string>();
 const mockTogglePOICategory = jest.fn();
+const mockGetClusterExpansionZoom = jest.fn(() => Promise.resolve(14));
 
 function createMockCanvas() {
   const listeners: Record<string, EventListener[]> = {};
@@ -145,7 +146,7 @@ function createMockMapInstance() {
     removeSource: jest.fn(),
     removeLayer: jest.fn(),
     getSource: jest.fn(() => ({
-      getClusterExpansionZoom: jest.fn(() => Promise.resolve(14)),
+      getClusterExpansionZoom: mockGetClusterExpansionZoom,
     })),
     // Return mock features to simulate unclustered listings
     querySourceFeatures: jest.fn(() => mockQuerySourceFeaturesData),
@@ -573,6 +574,17 @@ function setDesktopAvoidRects(
   });
 }
 
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+
+  return { promise, resolve, reject };
+}
+
 // --------------------------------------------------------------------------
 // Test Suite
 // --------------------------------------------------------------------------
@@ -585,6 +597,8 @@ describe("Map Component", () => {
     mockReplaceWithTransition.mockClear();
     mockPrivacyCircle.mockClear();
     mockTogglePOICategory.mockClear();
+    mockGetClusterExpansionZoom.mockReset();
+    mockGetClusterExpansionZoom.mockResolvedValue(14);
     mockSearchParams = new URLSearchParams();
     mockHoveredId = null;
     mockActiveId = null;
@@ -845,14 +859,18 @@ describe("Map Component", () => {
         name: /more map tools/i,
       });
       expect(moreToolsButton).toBeInTheDocument();
-      expect(screen.queryByTestId("mobile-map-tools-sheet")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("mobile-map-tools-sheet")
+      ).not.toBeInTheDocument();
 
       await act(async () => {
         fireEvent.click(moreToolsButton);
       });
 
       expect(screen.getByTestId("mobile-map-tools-sheet")).toBeInTheDocument();
-      expect(screen.getByTestId("mobile-map-tools-overlay")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("mobile-map-tools-overlay")
+      ).toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: /zoom in on map/i })
       ).not.toBeInTheDocument();
@@ -880,7 +898,9 @@ describe("Map Component", () => {
       });
 
       await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: /more map tools/i }));
+        fireEvent.click(
+          screen.getByRole("button", { name: /more map tools/i })
+        );
       });
       expect(screen.getByTestId("mobile-map-tools-sheet")).toBeInTheDocument();
 
@@ -1339,6 +1359,115 @@ describe("Map Component", () => {
       expect(screen.getByTestId("map-popup")).toBeInTheDocument();
     });
 
+    it("clears stale popup and active marker UI when the selected listing leaves the rendered set", async () => {
+      const remainingListings = mockListings.slice(1);
+      const { rerender } = render(<MapComponent listings={mockListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      let handlers = (
+        window as unknown as Record<string, { onIdle?: () => void }>
+      ).__mapHandlers;
+      await act(async () => {
+        handlers?.onIdle?.();
+      });
+
+      setDesktopMapPaneRect();
+
+      const markers = screen.getAllByTestId("map-marker");
+      await act(async () => {
+        fireEvent.click(markers[0]);
+      });
+
+      expect(screen.getByTestId("map-popup")).toBeInTheDocument();
+      expect(
+        within(screen.getByTestId("map-popup")).getByRole("link", {
+          name: /view details/i,
+        })
+      ).toHaveAttribute("href", "/listings/listing-1");
+
+      mockActiveId = mockListings[0].id;
+      mockQuerySourceFeaturesData = listingsToFeatures(remainingListings);
+
+      await act(async () => {
+        rerender(<MapComponent listings={remainingListings} />);
+      });
+
+      handlers = (window as unknown as Record<string, { onIdle?: () => void }>)
+        .__mapHandlers;
+      await act(async () => {
+        handlers?.onIdle?.();
+        jest.advanceTimersByTime(200);
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("map-popup")).not.toBeInTheDocument();
+      });
+      expect(mockSetActive).toHaveBeenCalledWith(null);
+      expect(
+        document.querySelector(`[data-listing-id="${mockListings[0].id}"]`)
+      ).not.toBeInTheDocument();
+
+      const remainingPins = document.querySelectorAll("[data-listing-id]");
+      expect(remainingPins).toHaveLength(remainingListings.length);
+      remainingPins.forEach((pin) => {
+        expect(pin).not.toHaveAttribute("data-focus-state", "active");
+      });
+    });
+
+    it("clears stale hover state when the hovered listing leaves the rendered set", async () => {
+      const removedListing = mockListings[0];
+      const remainingListings = mockListings.slice(1);
+      mockHoveredId = removedListing.id;
+
+      const { rerender } = render(<MapComponent listings={mockListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      let handlers = (
+        window as unknown as Record<string, { onIdle?: () => void }>
+      ).__mapHandlers;
+      await act(async () => {
+        handlers?.onIdle?.();
+      });
+
+      expect(
+        document.querySelector(`[data-listing-id="${removedListing.id}"]`)
+      ).toHaveAttribute("data-focus-state", "hovered");
+
+      mockQuerySourceFeaturesData = listingsToFeatures(remainingListings);
+
+      await act(async () => {
+        rerender(<MapComponent listings={remainingListings} />);
+      });
+
+      handlers = (window as unknown as Record<string, { onIdle?: () => void }>)
+        .__mapHandlers;
+      await act(async () => {
+        handlers?.onIdle?.();
+        jest.advanceTimersByTime(200);
+      });
+
+      await waitFor(() => {
+        expect(mockSetHovered).toHaveBeenCalledWith(null);
+      });
+
+      mockHoveredId = null;
+      await act(async () => {
+        rerender(<MapComponent listings={remainingListings} />);
+      });
+
+      const remainingPins = document.querySelectorAll("[data-listing-id]");
+      expect(remainingPins).toHaveLength(remainingListings.length);
+      remainingPins.forEach((pin) => {
+        expect(pin).not.toHaveAttribute("data-focus-state", "dimmed");
+      });
+    });
+
     it("preserves the canonical detail range in the desktop popup link", async () => {
       mockSearchParams = new URLSearchParams(
         "moveInDate=2026-05-01&endDate=2026-06-01"
@@ -1397,7 +1526,10 @@ describe("Map Component", () => {
         fireEvent.click(markers[0]);
       });
 
-      expect(screen.getByTestId("map-popup")).toHaveAttribute("anchor", "bottom");
+      expect(screen.getByTestId("map-popup")).toHaveAttribute(
+        "anchor",
+        "bottom"
+      );
       expect(mockMapInstance.unproject).not.toHaveBeenCalled();
       expect(mockMapInstance.easeTo).not.toHaveBeenCalled();
     });
@@ -1425,7 +1557,10 @@ describe("Map Component", () => {
         fireEvent.click(markers[0]);
       });
 
-      expect(screen.getByTestId("map-popup")).toHaveAttribute("anchor", "right");
+      expect(screen.getByTestId("map-popup")).toHaveAttribute(
+        "anchor",
+        "right"
+      );
       expect(mockMapInstance.easeTo).not.toHaveBeenCalled();
       expect(mockMapInstance.unproject).not.toHaveBeenCalled();
     });
@@ -1499,9 +1634,7 @@ describe("Map Component", () => {
       });
 
       setDesktopMapPaneRect();
-      setDesktopAvoidRects([
-        { left: 560, top: 20, width: 200, height: 240 },
-      ]);
+      setDesktopAvoidRects([{ left: 560, top: 20, width: 200, height: 240 }]);
       mockMapInstance.project.mockReturnValue({ x: 500, y: 340 });
 
       const markers = screen.getAllByTestId("map-marker");
@@ -1509,7 +1642,10 @@ describe("Map Component", () => {
         fireEvent.click(markers[0]);
       });
 
-      expect(screen.getByTestId("map-popup")).toHaveAttribute("anchor", "right");
+      expect(screen.getByTestId("map-popup")).toHaveAttribute(
+        "anchor",
+        "right"
+      );
       expect(mockMapInstance.easeTo).not.toHaveBeenCalled();
       expect(mockMapInstance.unproject).not.toHaveBeenCalled();
     });
@@ -1578,9 +1714,14 @@ describe("Map Component", () => {
         zoom: 15,
         duration: 280,
       });
-      expect(mockMapInstance.easeTo.mock.calls[0][0]).not.toHaveProperty("offset");
+      expect(mockMapInstance.easeTo.mock.calls[0][0]).not.toHaveProperty(
+        "offset"
+      );
       await waitFor(() => {
-        expect(screen.getByTestId("map-popup")).toHaveAttribute("anchor", "right");
+        expect(screen.getByTestId("map-popup")).toHaveAttribute(
+          "anchor",
+          "right"
+        );
       });
     });
 
@@ -2026,7 +2167,10 @@ describe("Map Component", () => {
       expect(mockMapInstance.flyTo).toHaveBeenCalled();
     });
 
-    it("should guard against rapid cluster clicks", async () => {
+    it("guards rapid cluster clicks while expansion zoom is still resolving", async () => {
+      const expansionZoom = createDeferred<number>();
+      mockGetClusterExpansionZoom.mockReturnValue(expansionZoom.promise);
+
       render(<MapComponent listings={mockListings} />);
 
       await act(async () => {
@@ -2048,22 +2192,168 @@ describe("Map Component", () => {
         originalEvent: { target: document.createElement("div") },
       };
 
-      // First click
-      await act(async () => {
+      act(() => {
+        handlers?.onClick?.(clusterClickEvent);
         handlers?.onClick?.(clusterClickEvent);
       });
 
-      const firstCallCount = mockMapInstance.flyTo.mock.calls.length;
+      expect(mockGetClusterExpansionZoom).toHaveBeenCalledTimes(1);
+      expect(mockMapInstance.flyTo).not.toHaveBeenCalled();
 
-      // Rapid second click (should be guarded)
-      // Note: The guard uses a ref that we can't directly control in this mock
-      // This test verifies the click handler structure exists
       await act(async () => {
+        expansionZoom.resolve(14);
+        await expansionZoom.promise;
+      });
+
+      expect(mockSetProgrammaticMove).toHaveBeenCalledWith(true);
+      expect(mockMapInstance.flyTo).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps existing markers during a temporary empty source query while expanding a cluster", async () => {
+      const expansionZoom = createDeferred<number>();
+      mockGetClusterExpansionZoom.mockReturnValue(expansionZoom.promise);
+
+      render(<MapComponent listings={mockListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      const handlers = (
+        window as unknown as Record<
+          string,
+          { onClick?: (e: unknown) => void; onIdle?: () => void }
+        >
+      ).__mapHandlers;
+
+      await act(async () => {
+        handlers?.onIdle?.();
+      });
+
+      expect(screen.getAllByTestId("map-marker")).toHaveLength(
+        mockListings.length
+      );
+
+      mockQuerySourceFeaturesData = [];
+
+      const clusterClickEvent = {
+        features: [
+          {
+            properties: { cluster_id: 123 },
+            geometry: { type: "Point", coordinates: [-122.4194, 37.7749] },
+          },
+        ],
+        lngLat: { lng: -122.4194, lat: 37.7749 },
+        originalEvent: { target: document.createElement("div") },
+      };
+
+      act(() => {
         handlers?.onClick?.(clusterClickEvent);
       });
 
-      // At minimum, should have processed the first click
-      expect(firstCallCount).toBeGreaterThanOrEqual(1);
+      await act(async () => {
+        handlers?.onIdle?.();
+      });
+
+      expect(screen.getAllByTestId("map-marker")).toHaveLength(
+        mockListings.length
+      );
+
+      mockQuerySourceFeaturesData = listingsToFeatures(mockListings);
+
+      await act(async () => {
+        expansionZoom.resolve(14);
+        await expansionZoom.promise;
+      });
+    });
+
+    it("keeps markers when stale source data is followed by empty source data before cluster expansion idles", async () => {
+      const expansionZoom = createDeferred<number>();
+      mockGetClusterExpansionZoom.mockReturnValue(expansionZoom.promise);
+
+      render(<MapComponent listings={mockListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      const handlers = (
+        window as unknown as Record<
+          string,
+          { onClick?: (e: unknown) => void; onIdle?: () => void }
+        >
+      ).__mapHandlers;
+
+      await act(async () => {
+        handlers?.onIdle?.();
+      });
+
+      expect(screen.getAllByTestId("map-marker")).toHaveLength(
+        mockListings.length
+      );
+
+      const sourcedataCallbacks = onCallbacks["sourcedata"] || [];
+      expect(sourcedataCallbacks.length).toBeGreaterThan(0);
+
+      const clusterClickEvent = {
+        features: [
+          {
+            properties: { cluster_id: 123 },
+            geometry: { type: "Point", coordinates: [-122.4194, 37.7749] },
+          },
+        ],
+        lngLat: { lng: -122.4194, lat: 37.7749 },
+        originalEvent: { target: document.createElement("div") },
+      };
+
+      act(() => {
+        handlers?.onClick?.(clusterClickEvent);
+      });
+
+      mockQuerySourceFeaturesData = listingsToFeatures(mockListings);
+      await act(async () => {
+        for (const cb of sourcedataCallbacks) {
+          cb({
+            sourceId: "listings",
+            sourceDataType: "content",
+            isSourceLoaded: false,
+          });
+        }
+      });
+
+      expect(screen.getAllByTestId("map-marker")).toHaveLength(
+        mockListings.length
+      );
+
+      mockQuerySourceFeaturesData = [];
+      await act(async () => {
+        for (const cb of sourcedataCallbacks) {
+          cb({
+            sourceId: "listings",
+            sourceDataType: "content",
+            isSourceLoaded: false,
+          });
+        }
+        jest.advanceTimersByTime(200);
+      });
+
+      expect(screen.getAllByTestId("map-marker")).toHaveLength(
+        mockListings.length
+      );
+
+      mockQuerySourceFeaturesData = listingsToFeatures(mockListings);
+      await act(async () => {
+        expansionZoom.resolve(14);
+        await expansionZoom.promise;
+      });
+
+      await act(async () => {
+        handlers?.onIdle?.();
+      });
+
+      expect(screen.getAllByTestId("map-marker")).toHaveLength(
+        mockListings.length
+      );
     });
 
     it("should clear isClusterExpandingRef on idle", async () => {
@@ -2326,6 +2616,93 @@ describe("Map Component", () => {
   });
 
   describe("keyboard navigation", () => {
+    it.each([
+      ["Enter", "Enter"],
+      ["Space", " "],
+    ])("opens and selects a marker with the %s key", async (_label, key) => {
+      render(<MapComponent listings={mockListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      const handlers = (
+        window as unknown as Record<string, { onIdle?: () => void }>
+      ).__mapHandlers;
+      await act(async () => {
+        handlers?.onIdle?.();
+      });
+
+      const markerButton = screen.getByRole("button", {
+        name: /cozy room in sf/i,
+      });
+      const event = new KeyboardEvent("keydown", {
+        key,
+        bubbles: true,
+        cancelable: true,
+      });
+
+      await act(async () => {
+        fireEvent(markerButton, event);
+      });
+
+      expect(event.defaultPrevented).toBe(true);
+      expect(mockSetActive).toHaveBeenCalledWith(mockListings[0].id);
+      expect(mockRequestScrollTo).toHaveBeenCalledWith(mockListings[0].id);
+      expect(screen.getByTestId("map-popup")).toBeInTheDocument();
+    });
+
+    it("prevents default and stops propagation for marker navigation keys at marker-list boundaries", async () => {
+      render(<MapComponent listings={mockListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      const handlers = (
+        window as unknown as Record<string, { onIdle?: () => void }>
+      ).__mapHandlers;
+      await act(async () => {
+        handlers?.onIdle?.();
+      });
+
+      const boundaryCases = [
+        { listingId: "listing-2", key: "ArrowUp" },
+        { listingId: "listing-2", key: "ArrowRight" },
+        { listingId: "listing-2", key: "Home" },
+        { listingId: "listing-3", key: "ArrowDown" },
+        { listingId: "listing-3", key: "ArrowLeft" },
+        { listingId: "listing-3", key: "End" },
+      ];
+
+      for (const boundaryCase of boundaryCases) {
+        const markerButton = document.querySelector<HTMLElement>(
+          `[data-listing-id="${boundaryCase.listingId}"]`
+        );
+        expect(markerButton).toBeInTheDocument();
+        markerButton!.focus();
+        expect(markerButton).toHaveFocus();
+
+        const event = new KeyboardEvent("keydown", {
+          key: boundaryCase.key,
+          bubbles: true,
+          cancelable: true,
+        });
+        const stopPropagation = jest.fn(event.stopPropagation.bind(event));
+        Object.defineProperty(event, "stopPropagation", {
+          value: stopPropagation,
+        });
+
+        fireEvent(markerButton!, event);
+
+        expect(event.defaultPrevented).toBe(true);
+        expect(stopPropagation).toHaveBeenCalled();
+        expect(markerButton).toHaveFocus();
+      }
+
+      expect(mockMapInstance.easeTo).not.toHaveBeenCalled();
+    });
+
     it("closes popup on Escape key", async () => {
       render(<MapComponent listings={mockListings} />);
 
@@ -2358,6 +2735,48 @@ describe("Map Component", () => {
       await waitFor(() => {
         expect(screen.queryByTestId("map-popup")).not.toBeInTheDocument();
       });
+    });
+
+    it("does not close the selected mobile preview when Escape is pressed with focus inside a dialog", async () => {
+      phoneViewportMatches = true;
+
+      render(
+        <MapComponent listings={mockListings} selectionPresentation="preview" />
+      );
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      const handlers = (
+        window as unknown as Record<string, { onIdle?: () => void }>
+      ).__mapHandlers;
+      await act(async () => {
+        handlers?.onIdle?.();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getAllByTestId("map-marker")[0]);
+      });
+      expect(screen.getByTestId("map-preview-card")).toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole("button", { name: /more map tools/i })
+        );
+      });
+
+      const closeButton = screen.getByRole("button", {
+        name: /close map tools/i,
+      });
+      closeButton.focus();
+      expect(closeButton).toHaveFocus();
+
+      await act(async () => {
+        fireEvent.keyDown(window, { key: "Escape" });
+      });
+
+      expect(screen.getByTestId("map-preview-card")).toBeInTheDocument();
     });
   });
 
@@ -2460,6 +2879,128 @@ describe("Map Component", () => {
         },
       }));
     });
+
+    const collidingListings = [
+      {
+        id: "collision-primary-1",
+        title: "Collision Primary 1",
+        price: 1200,
+        availableSlots: 2,
+        ownerId: "owner-collision-1",
+        images: ["https://example.com/collision-1.jpg"],
+        location: { lat: 37.7749, lng: -122.4194 },
+        tier: "primary" as const,
+      },
+      {
+        id: "collision-primary-2",
+        title: "Collision Primary 2",
+        price: 1300,
+        availableSlots: 1,
+        ownerId: "owner-collision-2",
+        images: ["https://example.com/collision-2.jpg"],
+        location: { lat: 37.77491, lng: -122.41939 },
+        tier: "primary" as const,
+      },
+    ];
+
+    const avoidRectListings = [
+      {
+        id: "avoid-primary-1",
+        title: "Avoid Rect Primary",
+        price: 1450,
+        availableSlots: 1,
+        ownerId: "owner-avoid-1",
+        images: ["https://example.com/avoid-1.jpg"],
+        location: { lat: 37.7751, lng: -122.4192 },
+        tier: "primary" as const,
+      },
+    ];
+
+    const desktopAvoidRect = {
+      left: 590,
+      top: 70,
+      width: 180,
+      height: 130,
+    };
+
+    const pointInsideDesktopAvoidRect = { x: 650, y: 130 };
+
+    function priceText(price: number) {
+      return `$${price.toLocaleString("en-US")}`;
+    }
+
+    function markerPinFor(listing: (typeof collidingListings)[number]) {
+      return screen.getByTestId(`map-pin-${listing.tier}-${listing.id}`);
+    }
+
+    function mockProjectionForListings(
+      listings: typeof collidingListings,
+      points: Array<{ x: number; y: number }>
+    ) {
+      const pointByCoordinate = new Map(
+        listings.map((listing, index) => [
+          `${listing.location.lng}:${listing.location.lat}`,
+          points[index],
+        ])
+      );
+
+      mockMapInstance.project.mockImplementation(
+        ([lng, lat]: [number, number]) => {
+          return pointByCoordinate.get(`${lng}:${lat}`) ?? { x: 400, y: 300 };
+        }
+      );
+    }
+
+    async function renderListingsAtZoom(
+      listings: typeof collidingListings,
+      zoom: number,
+      options: {
+        avoidRects?: Array<{
+          left: number;
+          top: number;
+          width: number;
+          height: number;
+        }>;
+      } = {}
+    ) {
+      mockMapInstance.getZoom = jest.fn(() => zoom);
+      mockQuerySourceFeaturesData = listingsToFeatures(listings);
+
+      const renderResult = render(<MapComponent listings={listings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      setDesktopMapPaneRect();
+      if (options.avoidRects) {
+        setDesktopAvoidRects(options.avoidRects);
+      }
+
+      const handlers = (
+        window as unknown as Record<
+          string,
+          { onMoveEnd?: (e: unknown) => void; onIdle?: () => void }
+        >
+      ).__mapHandlers;
+
+      await act(async () => {
+        handlers?.onIdle?.();
+      });
+
+      await act(async () => {
+        handlers?.onMoveEnd?.({
+          viewState: { zoom },
+          target: { getBounds: () => mockMapInstance.getBounds() },
+        });
+      });
+
+      await act(async () => {
+        jest.advanceTimersByTime(200);
+      });
+
+      return renderResult;
+    }
 
     it("shows all markers as dots when zoom < 12 (ZOOM_DOTS_ONLY)", async () => {
       // Start with zoom level below 12
@@ -2592,6 +3133,267 @@ describe("Map Component", () => {
         expect(ariaLabel).toBeTruthy();
         expect(ariaLabel).toMatch(/\$[\d,]+ per month/);
       });
+    });
+
+    it("collision planning demotes nearby inactive high-zoom markers without unmounting them", async () => {
+      mockProjectionForListings(collidingListings, [
+        { x: 400, y: 300 },
+        { x: 404, y: 302 },
+      ]);
+
+      await renderListingsAtZoom(collidingListings, 15);
+
+      expect(screen.getAllByTestId("map-marker")).toHaveLength(
+        collidingListings.length
+      );
+
+      const visiblePricePillIds = collidingListings
+        .filter((listing) =>
+          within(markerPinFor(listing)).queryByText(priceText(listing.price))
+        )
+        .map((listing) => listing.id);
+
+      expect(visiblePricePillIds).toHaveLength(1);
+
+      const demotedListings = collidingListings.filter(
+        (listing) => !visiblePricePillIds.includes(listing.id)
+      );
+      expect(demotedListings.length).toBeGreaterThanOrEqual(1);
+
+      demotedListings.forEach((listing) => {
+        const pin = markerPinFor(listing);
+        expect(pin).toBeInTheDocument();
+        expect(
+          within(pin).queryByText(priceText(listing.price))
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    it("demotes an inactive high-zoom price pill inside a desktop avoid rect without unmounting the marker", async () => {
+      const avoidRectListing = avoidRectListings[0];
+      mockProjectionForListings(avoidRectListings, [
+        pointInsideDesktopAvoidRect,
+      ]);
+
+      await renderListingsAtZoom(avoidRectListings, 15, {
+        avoidRects: [desktopAvoidRect],
+      });
+
+      const pin = markerPinFor(avoidRectListing);
+      expect(screen.getAllByTestId("map-marker")).toHaveLength(
+        avoidRectListings.length
+      );
+      expect(pin).toBeInTheDocument();
+      expect(
+        within(pin).queryByText(priceText(avoidRectListing.price))
+      ).not.toBeInTheDocument();
+    });
+
+    it("collision planning keeps an active demoted marker as a visible price pill", async () => {
+      const activeListing = collidingListings[1];
+      mockActiveId = activeListing.id;
+      mockProjectionForListings(collidingListings, [
+        { x: 400, y: 300 },
+        { x: 404, y: 302 },
+      ]);
+
+      await renderListingsAtZoom(collidingListings, 15);
+
+      const activePin = markerPinFor(activeListing);
+      expect(screen.getAllByTestId("map-marker")).toHaveLength(
+        collidingListings.length
+      );
+      expect(activePin).toHaveAttribute("data-focus-state", "active");
+      expect(
+        within(activePin).getByText(priceText(activeListing.price))
+      ).toBeInTheDocument();
+    });
+
+    it("keeps active, hovered, and keyboard-focused markers inside a desktop avoid rect as dots while preserving activation", async () => {
+      const avoidRectListing = avoidRectListings[0];
+
+      mockActiveId = avoidRectListing.id;
+      mockProjectionForListings(avoidRectListings, [
+        pointInsideDesktopAvoidRect,
+      ]);
+      const activeRender = await renderListingsAtZoom(avoidRectListings, 15, {
+        avoidRects: [desktopAvoidRect],
+      });
+
+      const activePin = markerPinFor(avoidRectListing);
+      expect(activePin).toHaveAttribute("data-focus-state", "active");
+      expect(
+        within(activePin).queryByText(priceText(avoidRectListing.price))
+      ).not.toBeInTheDocument();
+      await act(async () => {
+        fireEvent.click(activePin);
+      });
+      expect(screen.getByTestId("map-popup")).toBeInTheDocument();
+      activeRender.unmount();
+
+      mockActiveId = null;
+      mockHoveredId = avoidRectListing.id;
+      mockProjectionForListings(avoidRectListings, [
+        pointInsideDesktopAvoidRect,
+      ]);
+      const hoveredRender = await renderListingsAtZoom(avoidRectListings, 15, {
+        avoidRects: [desktopAvoidRect],
+      });
+
+      const hoveredPin = markerPinFor(avoidRectListing);
+      expect(hoveredPin).toHaveAttribute("data-focus-state", "hovered");
+      expect(
+        within(hoveredPin).queryByText(priceText(avoidRectListing.price))
+      ).not.toBeInTheDocument();
+      hoveredRender.unmount();
+
+      mockHoveredId = null;
+      mockProjectionForListings(avoidRectListings, [
+        pointInsideDesktopAvoidRect,
+      ]);
+      await renderListingsAtZoom(avoidRectListings, 15, {
+        avoidRects: [desktopAvoidRect],
+      });
+
+      const focusedPin = markerPinFor(avoidRectListing);
+      await act(async () => {
+        focusedPin.focus();
+      });
+      expect(focusedPin).toHaveFocus();
+
+      await waitFor(() => {
+        expect(
+          within(focusedPin).queryByText(priceText(avoidRectListing.price))
+        ).not.toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.keyDown(focusedPin, { key: "Enter" });
+      });
+      expect(screen.getByTestId("map-popup")).toBeInTheDocument();
+    });
+
+    it("collision planning keeps hovered and keyboard-focused demoted markers as visible price pills", async () => {
+      const hoveredListing = collidingListings[1];
+      mockHoveredId = hoveredListing.id;
+      mockProjectionForListings(collidingListings, [
+        { x: 400, y: 300 },
+        { x: 404, y: 302 },
+      ]);
+
+      const { unmount } = render(<MapComponent listings={collidingListings} />);
+
+      mockQuerySourceFeaturesData = listingsToFeatures(collidingListings);
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+      setDesktopMapPaneRect();
+      let handlers = (
+        window as unknown as Record<
+          string,
+          { onMoveEnd?: (e: unknown) => void; onIdle?: () => void }
+        >
+      ).__mapHandlers;
+      await act(async () => {
+        handlers?.onIdle?.();
+        handlers?.onMoveEnd?.({
+          viewState: { zoom: 15 },
+          target: { getBounds: () => mockMapInstance.getBounds() },
+        });
+        jest.advanceTimersByTime(200);
+      });
+
+      const hoveredPin = markerPinFor(hoveredListing);
+      expect(hoveredPin).toHaveAttribute("data-focus-state", "hovered");
+      expect(
+        within(hoveredPin).getByText(priceText(hoveredListing.price))
+      ).toBeInTheDocument();
+
+      unmount();
+
+      mockHoveredId = null;
+      mockProjectionForListings(collidingListings, [
+        { x: 400, y: 300 },
+        { x: 404, y: 302 },
+      ]);
+      await renderListingsAtZoom(collidingListings, 15);
+
+      const focusedListing = collidingListings[1];
+      const focusedPin = markerPinFor(focusedListing);
+      expect(
+        within(focusedPin).queryByText(priceText(focusedListing.price))
+      ).not.toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.focus(focusedPin);
+      });
+
+      await waitFor(() => {
+        expect(
+          within(focusedPin).getByText(priceText(focusedListing.price))
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("clears keyboard focus when a focused marker leaves rendered marker positions while its listing remains", async () => {
+      const remainingListing = collidingListings[0];
+      const focusedListing = collidingListings[1];
+      mockProjectionForListings(collidingListings, [
+        { x: 400, y: 300 },
+        { x: 404, y: 302 },
+      ]);
+
+      await renderListingsAtZoom(collidingListings, 15);
+
+      const focusedPin = markerPinFor(focusedListing);
+      expect(
+        within(focusedPin).queryByText(priceText(focusedListing.price))
+      ).not.toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.focus(focusedPin);
+      });
+
+      await waitFor(() => {
+        expect(
+          within(focusedPin).getByText(priceText(focusedListing.price))
+        ).toBeInTheDocument();
+      });
+
+      const handlers = (
+        window as unknown as Record<string, { onIdle?: () => void }>
+      ).__mapHandlers;
+
+      mockQuerySourceFeaturesData = listingsToFeatures([remainingListing]);
+      await act(async () => {
+        handlers?.onIdle?.();
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.queryByTestId(
+            `map-pin-${focusedListing.tier}-${focusedListing.id}`
+          )
+        ).not.toBeInTheDocument();
+      });
+      expect(markerPinFor(remainingListing)).toBeInTheDocument();
+
+      mockQuerySourceFeaturesData = listingsToFeatures(collidingListings);
+      await act(async () => {
+        handlers?.onIdle?.();
+      });
+
+      await waitFor(() => {
+        expect(screen.getAllByTestId("map-marker")).toHaveLength(
+          collidingListings.length
+        );
+      });
+
+      const restoredPin = markerPinFor(focusedListing);
+      expect(
+        within(restoredPin).queryByText(priceText(focusedListing.price))
+      ).not.toBeInTheDocument();
+      expect(restoredPin).not.toHaveFocus();
     });
 
     it("updates marker tier display when zoom changes from low to high", async () => {

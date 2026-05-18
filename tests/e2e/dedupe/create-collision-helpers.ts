@@ -1,6 +1,9 @@
 import type { Page } from "@playwright/test";
 import { expect } from "../helpers";
-import { CreateListingPage, type CreateListingData } from "../page-objects/create-listing.page";
+import {
+  CreateListingPage,
+  type CreateListingData,
+} from "../page-objects/create-listing.page";
 import { testApi } from "../helpers/stability-helpers";
 
 const OWNER_EMAIL = process.env.E2E_TEST_EMAIL || "e2e-test@roomshare.dev";
@@ -30,6 +33,7 @@ export async function seedCollisionListings(
   page: Page,
   params: {
     title: string;
+    ownerEmail?: string;
     address?: string;
     city?: string;
     state?: string;
@@ -43,7 +47,7 @@ export async function seedCollisionListings(
     page,
     "seedCollisionListings",
     {
-      ownerEmail: OWNER_EMAIL,
+      ownerEmail: params.ownerEmail ?? OWNER_EMAIL,
       title: params.title,
       address: params.address ?? COLLISION_ADDRESS.address,
       city: params.city ?? COLLISION_ADDRESS.city,
@@ -56,7 +60,9 @@ export async function seedCollisionListings(
   );
 
   if (!response.ok) {
-    throw new Error(`seedCollisionListings failed: ${JSON.stringify(response.data)}`);
+    throw new Error(
+      `seedCollisionListings failed: ${JSON.stringify(response.data)}`
+    );
   }
 
   return response.data.listingIds;
@@ -117,13 +123,14 @@ export function buildCollisionFormData(
 
 export async function openPreparedCreateListingPage(
   page: Page,
-  data: CreateListingData
+  data: CreateListingData,
+  ownerEmail?: string
 ): Promise<CreateListingPage> {
   const createPage = new CreateListingPage(page);
   await createPage.goto();
   await createPage.fillRequiredFields(data);
   await createPage.fillOptionalFields({ moveInDate: "today" });
-  await createPage.mockImageUpload();
+  await createPage.mockImageUpload(ownerEmail);
   await createPage.uploadTestImage();
   await createPage.waitForUploadComplete();
   return createPage;

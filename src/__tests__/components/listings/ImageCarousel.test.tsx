@@ -93,6 +93,14 @@ describe("ImageCarousel", () => {
     mockEmblaApi.selectedScrollSnap.mockReturnValue(0);
   });
 
+  it("uses a local fallback image when no images are provided", () => {
+    render(<ImageCarousel images={[]} alt="Room in San Francisco" />);
+
+    const image = screen.getByAltText("Room in San Francisco");
+    expect(image.getAttribute("src")).toMatch(/^\/(?!\/)/);
+    expect(image.getAttribute("src")).not.toMatch(/^https?:\/\//);
+  });
+
   it("allows a normal image click to bubble to the parent listing link", () => {
     const { carousel, onNavigate } = renderLinkedCarousel();
 

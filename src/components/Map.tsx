@@ -65,7 +65,13 @@ import {
   MAP_FETCH_MAX_LAT_SPAN,
   MAP_FETCH_MAX_LNG_SPAN,
 } from "@/lib/constants";
-import { groupExactMapListingClones } from "@/lib/maps/marker-utils";
+import {
+  groupExactMapListingClones,
+  planMarkerCollisionRendering,
+  type MarkerCollisionInput,
+  type MarkerCollisionPlan,
+  type MarkerScreenRect,
+} from "@/lib/maps/marker-utils";
 import {
   SEARCH_MOBILE_PREVIEW_CARD_OFFSET,
   SNAP_COLLAPSED,
@@ -91,6 +97,29 @@ import {
   m,
   useReducedMotion,
 } from "framer-motion";
+
+const MARKER_NAVIGATION_KEYS = new Set([
+  "ArrowUp",
+  "ArrowDown",
+  "ArrowLeft",
+  "ArrowRight",
+  "Home",
+  "End",
+]);
+const ACTIVE_DIALOG_SELECTOR = '[role="dialog"], [aria-modal="true"]';
+
+function isEventFocusedInsideDialog(eventTarget: EventTarget | null): boolean {
+  const targetDialog =
+    eventTarget instanceof Element
+      ? eventTarget.closest(ACTIVE_DIALOG_SELECTOR)
+      : null;
+  const focusedDialog =
+    document.activeElement instanceof Element
+      ? document.activeElement.closest(ACTIVE_DIALOG_SELECTOR)
+      : null;
+
+  return Boolean(targetDialog || focusedDialog);
+}
 
 /** Parse a string to float and validate it's a finite number within an optional range. */
 function safeParseFloat(
@@ -510,6 +539,35 @@ function translateLocalRect(
   });
 }
 
+function getMapAvoidRects(container: HTMLElement | null): LocalRect[] {
+  if (!container) return [];
+
+  const containerRect = container.getBoundingClientRect();
+
+  return Array.from(container.querySelectorAll<HTMLElement>("[data-map-avoid]"))
+    .map((element) => {
+      const rect = element.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return null;
+
+      return createLocalRect({
+        left: rect.left - containerRect.left,
+        top: rect.top - containerRect.top,
+        width: rect.width,
+        height: rect.height,
+      });
+    })
+    .filter((rect): rect is LocalRect => rect !== null);
+}
+
+function toMarkerScreenRect(rect: LocalRect): MarkerScreenRect {
+  return {
+    x: rect.left,
+    y: rect.top,
+    width: rect.width,
+    height: rect.height,
+  };
+}
+
 function getDesktopPopupRectForAnchor(
   anchor: DesktopPopupAnchor,
   point: { x: number; y: number },
@@ -789,6 +847,29 @@ function getClusterCountLayerDark(textScale: number): LayerProps {
 // Zoom thresholds for two-tier pin display
 const ZOOM_DOTS_ONLY = 10; // Below: all pins are gray dots (no price)
 const ZOOM_TOP_N_PINS = 14; // 12-14: primary = price pins, mini = dots. 14+: all price pins
+const MARKER_PRICE_PILL_MIN_WIDTH = 56;
+const MARKER_PRICE_PILL_MAX_WIDTH = 132;
+const MARKER_PRICE_PILL_HEIGHT = 36;
+const MARKER_PRICE_PILL_HORIZONTAL_PADDING = 32;
+const MARKER_PRICE_PILL_AVERAGE_CHAR_WIDTH = 8;
+const MARKER_DOT_SIZE = 12;
+
+function estimateMarkerPricePillSize(price: number) {
+  const formattedPrice = formatPrice(price);
+  const width = Math.min(
+    MARKER_PRICE_PILL_MAX_WIDTH,
+    Math.max(
+      MARKER_PRICE_PILL_MIN_WIDTH,
+      formattedPrice.length * MARKER_PRICE_PILL_AVERAGE_CHAR_WIDTH +
+        MARKER_PRICE_PILL_HORIZONTAL_PADDING
+    )
+  );
+
+  return {
+    width,
+    height: MARKER_PRICE_PILL_HEIGHT,
+  };
+}
 
 // Module-level constant: prevent double-click zoom on markers
 const preventDoubleClickZoom = (e: React.MouseEvent) => {
@@ -812,7 +893,10 @@ interface MarkerPinContentProps {
   currentZoom: number;
   isHovered: boolean;
   isActive: boolean;
+  isKeyboardFocused: boolean;
   isViewed: boolean;
+  forceDot: boolean;
+  forceDotForAvoidRect: boolean;
 }
 
 const MarkerPinContent = React.memo(function MarkerPinContent({
@@ -821,13 +905,21 @@ const MarkerPinContent = React.memo(function MarkerPinContent({
   currentZoom,
   isHovered,
   isActive,
+  isKeyboardFocused,
   isViewed,
+  forceDot,
+  forceDotForAvoidRect,
 }: MarkerPinContentProps) {
   const isMini = tier === "mini";
   const showAsDot =
-    currentZoom < ZOOM_DOTS_ONLY || (currentZoom < ZOOM_TOP_N_PINS && isMini);
+    forceDot ||
+    currentZoom < ZOOM_DOTS_ONLY ||
+    (currentZoom < ZOOM_TOP_N_PINS && isMini);
 
-  if (showAsDot && !isHovered && !isActive) {
+  if (
+    forceDotForAvoidRect ||
+    (showAsDot && !isHovered && !isActive && !isKeyboardFocused)
+  ) {
     return (
       <m.div layout>
         <div
@@ -886,6 +978,8 @@ interface MapMarkerItemProps {
   isDimmed: boolean;
   isKeyboardFocused: boolean;
   isViewed: boolean;
+  forceDot: boolean;
+  forceDotForAvoidRect: boolean;
   onClickById: (id: string) => void;
   onPointerEnter: (e: React.PointerEvent<HTMLDivElement>) => void;
   onPointerLeave: (e: React.PointerEvent<HTMLDivElement>) => void;
@@ -908,6 +1002,8 @@ const MapMarkerItem = React.memo(function MapMarkerItem({
   isDimmed,
   isKeyboardFocused,
   isViewed,
+  forceDot,
+  forceDotForAvoidRect,
   onClickById,
   onPointerEnter,
   onPointerLeave,
@@ -949,16 +1045,9 @@ const MapMarkerItem = React.memo(function MapMarkerItem({
         e.preventDefault();
         e.stopPropagation();
         onClickById(listingId);
-      } else if (
-        [
-          "ArrowUp",
-          "ArrowDown",
-          "ArrowLeft",
-          "ArrowRight",
-          "Home",
-          "End",
-        ].includes(e.key)
-      ) {
+      } else if (MARKER_NAVIGATION_KEYS.has(e.key)) {
+        e.preventDefault();
+        e.stopPropagation();
         onKeyboardNav(e, listingId);
       }
     },
@@ -1012,7 +1101,10 @@ const MapMarkerItem = React.memo(function MapMarkerItem({
           currentZoom={currentZoom}
           isHovered={isHovered}
           isActive={isActive}
+          isKeyboardFocused={isKeyboardFocused}
           isViewed={isViewed}
+          forceDot={forceDot}
+          forceDotForAvoidRect={forceDotForAvoidRect}
         />
         {/* Pulsing ring on hover/active for visibility on dense maps */}
         {(isHovered || isActive) && (
@@ -1354,6 +1446,7 @@ export default function MapComponent({
     height: DESKTOP_POPUP_FALLBACK_CARD_HEIGHT_PX,
   });
   const [popupPlacementRevision, setPopupPlacementRevision] = useState(0);
+  const [mapAvoidRectsRevision, setMapAvoidRectsRevision] = useState(0);
   const handledDesktopPopupCorrectionTokenRef = useRef<string | null>(null);
   const [showMobileToolsSheet, setShowMobileToolsSheet] = useState(false);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
@@ -1409,6 +1502,7 @@ export default function MapComponent({
   const previewBackgroundClickGuardTimeoutRef = useRef<NodeJS.Timeout | null>(
     null
   );
+
   const clearPreviewBackgroundClickGuard = useCallback(() => {
     ignoreNextPreviewBackgroundClickRef.current = false;
     if (previewBackgroundClickGuardTimeoutRef.current) {
@@ -1680,22 +1774,29 @@ export default function MapComponent({
       if (isClusterExpandingRef.current) return;
 
       const clusterId = feature.properties?.cluster_id;
-      if (!clusterId) return;
+      if (typeof clusterId !== "number") return;
 
       const mapboxSource = mapRef.current.getSource("listings") as
         | GeoJSONSource
         | undefined;
       if (!mapboxSource) return;
 
+      isClusterExpandingRef.current = true;
+
       try {
         const zoom = await mapboxSource.getClusterExpansionZoom(clusterId);
-        if (!feature.geometry || feature.geometry.type !== "Point") return;
+        if (!feature.geometry || feature.geometry.type !== "Point") {
+          isClusterExpandingRef.current = false;
+          return;
+        }
         // P0 Issue #25: Guard against stale callback after unmount
-        if (!isMountedRef.current) return;
+        if (!isMountedRef.current) {
+          isClusterExpandingRef.current = false;
+          return;
+        }
 
         // Mark as programmatic move to prevent follow-up auto-search from firing.
         setProgrammaticMove(true);
-        isClusterExpandingRef.current = true;
         pendingSearchAfterZoomRef.current = true;
         // P1-FIX (#109): Safety timeout to clear BOTH flags if moveEnd/onIdle don't fire.
         // This prevents isClusterExpandingRef from getting stuck if animation is interrupted.
@@ -1779,9 +1880,9 @@ export default function MapComponent({
     // P0 Issue #25: Guard against state update after unmount
     if (!isMountedRef.current) return 0;
 
-    // CLUSTER FIX: Skip setting empty state during cluster expansion
-    // querySourceFeatures returns [] before tiles load after flyTo
-    // Only allow empty state if NOT expanding (normal pan/zoom to empty area)
+    // CLUSTER FIX: Skip setting empty state during cluster expansion.
+    // querySourceFeatures can return stale non-empty data and then [] before
+    // idle confirms the zoom/source cycle is stable.
     if (unique.length === 0 && isClusterExpandingRef.current) {
       return 0; // Tiles not loaded yet, retry will happen on onIdle
     }
@@ -1968,6 +2069,85 @@ export default function MapComponent({
     }));
   }, [markerPositions]);
 
+  const markerCollisionPlan = useMemo<MarkerCollisionPlan>(() => {
+    const mapInstance = mapRef.current?.getMap();
+    const container = mapContainerRef.current;
+    const paneWidth =
+      mapPaneSize.width ||
+      container?.clientWidth ||
+      container?.getBoundingClientRect().width ||
+      0;
+    const paneHeight =
+      mapPaneSize.height ||
+      container?.clientHeight ||
+      container?.getBoundingClientRect().height ||
+      0;
+
+    if (!mapInstance || paneWidth <= 0 || paneHeight <= 0) {
+      return {};
+    }
+
+    const markers: MarkerCollisionInput[] = markerPositions.map(
+      (position, index) => {
+        const projectedPoint = mapInstance.project([
+          position.lng,
+          position.lat,
+        ]);
+        const memberIds = position.memberIds;
+
+        return {
+          id: position.listing.id,
+          memberIds,
+          tier: position.listing.tier ?? "primary",
+          point: {
+            x: projectedPoint.x,
+            y: projectedPoint.y,
+          },
+          pricePillSize: estimateMarkerPricePillSize(position.listing.price),
+          dotSize: MARKER_DOT_SIZE,
+          active: activeId ? memberIds.includes(activeId) : false,
+          hovered: hoveredId ? memberIds.includes(hoveredId) : false,
+          keyboardFocused: keyboardFocusedId
+            ? memberIds.includes(keyboardFocusedId)
+            : false,
+          priority: markerPositions.length - index,
+        };
+      }
+    );
+    const avoidRects = getMapAvoidRects(container).map(toMarkerScreenRect);
+
+    return planMarkerCollisionRendering({
+      markers,
+      viewport: {
+        x: 0,
+        y: 0,
+        width: paneWidth,
+        height: paneHeight,
+      },
+      avoidRects,
+    });
+  }, [
+    activeId,
+    canFullscreen,
+    currentZoom,
+    hoveredId,
+    isDesktopViewport,
+    isFullscreen,
+    isMapLoaded,
+    isPhoneViewport,
+    isWebglContextLost,
+    keyboardFocusedId,
+    mapAvoidRectsRevision,
+    mapPaneSize.height,
+    mapPaneSize.width,
+    mapPortalContainer,
+    markerPositions,
+    popupPlacementRevision,
+    showMobileToolsSheet,
+    showSearchStatus,
+    viewportInfoMessage,
+  ]);
+
   // Sorted marker positions for keyboard navigation (top-to-bottom, left-to-right)
   // This provides intuitive arrow key navigation order based on visual position
   const sortedMarkerPositions = useMemo(() => {
@@ -2127,13 +2307,6 @@ export default function MapComponent({
     [findMarkerIndex, sortedMarkerPositions]
   );
 
-  // Clear keyboard focus when clicking elsewhere or when markers change
-  useEffect(() => {
-    if (keyboardFocusedId && !markerPositionById.has(keyboardFocusedId)) {
-      setKeyboardFocusedId(null);
-    }
-  }, [keyboardFocusedId, markerPositionById]);
-
   // Stabilize initial view state so it's only computed once on mount.
   // Prevents SF default from being re-applied when listings temporarily become empty.
   // In controlled mode, this is used as the starting point before parent provides viewState.
@@ -2267,26 +2440,7 @@ export default function MapComponent({
   }, [usesPopupSelection, isPhoneViewport, selectedListing?.id]);
 
   const getDesktopPopupAvoidRects = useCallback((): LocalRect[] => {
-    const container = mapContainerRef.current;
-    if (!container) return [];
-
-    const containerRect = container.getBoundingClientRect();
-
-    return Array.from(
-      container.querySelectorAll<HTMLElement>("[data-map-avoid]")
-    )
-      .map((element) => {
-        const rect = element.getBoundingClientRect();
-        if (rect.width <= 0 || rect.height <= 0) return null;
-
-        return createLocalRect({
-          left: rect.left - containerRect.left,
-          top: rect.top - containerRect.top,
-          width: rect.width,
-          height: rect.height,
-        });
-      })
-      .filter((rect): rect is LocalRect => rect !== null);
+    return getMapAvoidRects(mapContainerRef.current);
   }, []);
 
   const getDesktopPopupPlacementForListing = useCallback(
@@ -2401,6 +2555,7 @@ export default function MapComponent({
     isPhoneViewport,
     selectedListing,
     getDesktopPopupPlacementForListing,
+    mapAvoidRectsRevision,
     popupPlacementRevision,
   ]);
 
@@ -2409,7 +2564,7 @@ export default function MapComponent({
       return null;
     }
 
-    return `${selectedListing.id}:${mapPaneSize.width}:${mapPaneSize.height}:${desktopPopupSize.width}:${desktopPopupSize.height}:${isFullscreen ? "1" : "0"}:${popupPlacementRevision}`;
+    return `${selectedListing.id}:${mapPaneSize.width}:${mapPaneSize.height}:${desktopPopupSize.width}:${desktopPopupSize.height}:${isFullscreen ? "1" : "0"}:${mapAvoidRectsRevision}:${popupPlacementRevision}`;
   }, [
     usesPopupSelection,
     isPhoneViewport,
@@ -2419,6 +2574,7 @@ export default function MapComponent({
     desktopPopupSize.width,
     desktopPopupSize.height,
     isFullscreen,
+    mapAvoidRectsRevision,
     popupPlacementRevision,
   ]);
 
@@ -2816,6 +2972,10 @@ export default function MapComponent({
       setActive(null);
     }
 
+    if (hoveredId && !listings.find((l) => l.id === hoveredId)) {
+      setHovered(null);
+    }
+
     // P1-FIX (#106): Clear selectedListing popup if the listing no longer exists.
     // Prevents showing stale popup data after search results update.
     if (
@@ -2834,7 +2994,23 @@ export default function MapComponent({
       (window as unknown as Record<string, unknown>).__roomshare = roomshare;
       roomshare.markerCount = listings.length;
     }
-  }, [listings, activeId, selectedListingId, setActive, setSelectedListing]);
+  }, [
+    listings,
+    activeId,
+    hoveredId,
+    selectedListingId,
+    setActive,
+    setHovered,
+    setSelectedListing,
+  ]);
+
+  useEffect(() => {
+    if (!isMountedRef.current) return;
+
+    if (keyboardFocusedId && !markerPositionById.has(keyboardFocusedId)) {
+      setKeyboardFocusedId(null);
+    }
+  }, [keyboardFocusedId, markerPositionById]);
 
   useEffect(() => {
     if (searchStatusTimerRef.current) {
@@ -2967,6 +3143,8 @@ export default function MapComponent({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && selectedListing) {
+        if (isEventFocusedInsideDialog(e.target)) return;
+
         e.stopImmediatePropagation(); // Prevent other Escape handlers (e.g., bottom sheet)
         handleSelectedListingClose();
       }
@@ -3417,6 +3595,48 @@ export default function MapComponent({
     mobileMapStatus !== null && !hasPhonePreviewCard;
   const shouldShowDesktopEmptyState =
     isPhoneViewport === false && hasConfirmedEmptyViewport;
+  const activePOICategoryKey = Array.from(activePOICategories).sort().join("|");
+  const hasUserPin = userPin !== null;
+
+  useEffect(() => {
+    const container = mapContainerRef.current;
+    if (!container) return;
+
+    setMapAvoidRectsRevision((current) => current + 1);
+
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => {
+      setMapAvoidRectsRevision((current) => current + 1);
+    });
+
+    container
+      .querySelectorAll<HTMLElement>("[data-map-avoid]")
+      .forEach((element) => observer.observe(element));
+
+    return () => observer.disconnect();
+  }, [
+    activePOICategoryKey,
+    canFullscreen,
+    hasUserPin,
+    isDesktopViewport,
+    isDropMode,
+    isFullscreen,
+    isMapLoaded,
+    isPhoneViewport,
+    isWebglContextLost,
+    mapPaneSize.height,
+    mapPaneSize.width,
+    mapPortalContainer,
+    shouldShowDesktopEmptyState,
+    shouldShowMobileStatusCard,
+    showMobileToolsSheet,
+    showSearchStatus,
+    viewportInfoMessage,
+  ]);
+
   const [lightMapStyle, setLightMapStyle] = useState<
     string | StyleSpecification
   >(LIGHT_STYLE_FALLBACK);
@@ -4129,14 +4349,13 @@ export default function MapComponent({
             tileLoadingTimerRef.current = null;
           }
           setAreTilesLoading(false);
-          // CLUSTER FIX: Clear expansion flag AFTER tiles are loaded
-          // This ensures updateUnclusteredListings has valid data
-          if (isClusterExpandingRef.current) {
-            isClusterExpandingRef.current = false;
-          }
           // Fix 2: Re-query unclustered features after all tiles rendered.
           // onIdle is the most reliable signal that tiles are fully loaded.
-          updateUnclusteredListings();
+          const wasClusterExpanding = isClusterExpandingRef.current;
+          const visibleMarkerCount = updateUnclusteredListings();
+          if (wasClusterExpanding && visibleMarkerCount > 0) {
+            isClusterExpandingRef.current = false;
+          }
         }}
         onClick={async (e: MapLayerMouseEvent) => {
           // User pin drop takes priority
@@ -4266,6 +4485,16 @@ export default function MapComponent({
             MarkerPinContent inside each item only re-renders when its 4 primitive props change. */}
         {markerPositions.map((position) =>
           (() => {
+            const isHovered = hoveredId
+              ? position.memberIds.includes(hoveredId)
+              : false;
+            const isActive = activeId
+              ? position.memberIds.includes(activeId)
+              : false;
+            const isKeyboardFocused = keyboardFocusedId
+              ? position.memberIds.includes(keyboardFocusedId)
+              : false;
+            const collisionDecision = markerCollisionPlan[position.listing.id];
             const availabilityPresentation = getAvailabilityPresentation({
               availableSlots: position.listing.availableSlots,
               totalSlots: position.listing.totalSlots,
@@ -4284,21 +4513,17 @@ export default function MapComponent({
                 availabilityAriaLabel={availabilityPresentation.ariaLabel}
                 tier={position.listing.tier}
                 currentZoom={currentZoom}
-                isHovered={
-                  hoveredId ? position.memberIds.includes(hoveredId) : false
-                }
-                isActive={
-                  activeId ? position.memberIds.includes(activeId) : false
-                }
+                isHovered={isHovered}
+                isActive={isActive}
                 isDimmed={
                   !!hoveredId && !position.memberIds.includes(hoveredId)
                 }
-                isKeyboardFocused={
-                  keyboardFocusedId
-                    ? position.memberIds.includes(keyboardFocusedId)
-                    : false
-                }
+                isKeyboardFocused={isKeyboardFocused}
                 isViewed={viewedIds.has(position.listing.id)}
+                forceDot={collisionDecision?.renderMode === "dot"}
+                forceDotForAvoidRect={
+                  collisionDecision?.reason === "collides-with-avoid-rect"
+                }
                 onClickById={handleMarkerClickById}
                 onPointerEnter={handleMarkerPointerEnter}
                 onPointerLeave={handleMarkerPointerLeave}

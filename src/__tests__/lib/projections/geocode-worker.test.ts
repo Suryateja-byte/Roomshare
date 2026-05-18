@@ -43,8 +43,17 @@ function makeEvent(overrides?: Partial<GeocodeOutboxEvent>): GeocodeOutboxEvent 
 
 type GeocodeFn = typeof geocodeAddress;
 
-function mockSuccess(lat = -33.8688, lng = 151.2099): jest.MockedFunction<GeocodeFn> {
-  return jest.fn().mockResolvedValue({ status: "success", lat, lng });
+function mockSuccess(
+  lat = -33.8688,
+  lng = 151.2099,
+  publicAreaName?: string
+): jest.MockedFunction<GeocodeFn> {
+  return jest.fn().mockResolvedValue({
+    status: "success",
+    lat,
+    lng,
+    publicAreaName,
+  });
 }
 
 function mockNotFound(): jest.MockedFunction<GeocodeFn> {
@@ -248,5 +257,26 @@ describe("handleGeocodeNeeded()", () => {
     );
     // Should be rounded to 2dp
     expect(rows[0].public_cell_id).toBe("-33.88,151.23");
+  });
+
+  it("stores the safe public area name returned by geocoding", async () => {
+    const event = makeEvent();
+    const unitId = event.aggregateId;
+
+    await fixture.insertPhysicalUnit({
+      id: unitId,
+      canonicalAddressHash: `hash-${unitId}`,
+    });
+
+    await withTx((tx) =>
+      handleGeocodeNeeded(tx, event, {
+        geocode: mockSuccess(37.764, -122.466, "Inner Sunset"),
+      })
+    );
+
+    const rows = await fixture.query(
+      `SELECT public_area_name FROM physical_units WHERE id = '${unitId}'`
+    );
+    expect(rows[0].public_area_name).toBe("Inner Sunset");
   });
 });

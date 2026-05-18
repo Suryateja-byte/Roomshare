@@ -1,0 +1,14 @@
+flowchart LR
+  Host["Host"] --> Create["POST /api/listings"]
+  Host --> Patch["PATCH /api/listings/[id]"]
+  Create --> ListingRow["Listing row availability fields"]
+  Patch --> ListingRow
+  ListingRow --> Resolver["resolvePublicAvailability"]
+  Resolver --> Search["Search/list/map transforms"]
+  Resolver --> ViewerState["GET viewer-state"]
+  Search --> Cards["ListingCard and SlotBadge"]
+  ViewerState --> Contract["Privacy-first contact contract"]
+  Contract --> CTA["ContactHostButton"]
+  CTA --> Conversation["startConversation"]
+  Conversation --> Messaging["Conversation"]
+  Booking["Booking/hold tables"] -. "retired by Phase 09" .-> Historical["Historical only"]

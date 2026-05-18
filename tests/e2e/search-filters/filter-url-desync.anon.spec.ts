@@ -20,7 +20,6 @@ import {
   buildSearchUrl,
   waitForUrlParam,
   waitForUrlStable,
-  rapidClick,
 } from "../helpers";
 
 test.describe("Filter URL-UI Desync", () => {
@@ -75,6 +74,11 @@ test.describe("Filter URL-UI Desync", () => {
     // Verify URL no longer has amenities param
     const currentUrl = new URL(page.url());
     expect(currentUrl.searchParams.has("amenities")).toBe(false);
+
+    // Ensure Back has produced a rendered search page before treating a missing
+    // chip region as success. Under WSL/dev-server load the page can briefly be
+    // blank while the unfiltered route is still hydrating.
+    await waitForSearchReady(page);
 
     // Verify applied filters region is either not visible or has no chips
     // Use auto-retry since DOM may still be updating after goBack
@@ -203,28 +207,46 @@ test.describe("Filter URL-UI Desync", () => {
     await closeFilterModal(page);
   });
 
-  test(`${tags.filter} Rapid category bar toggling maintains URL consistency`, async ({
+  test(`${tags.filter} Sequential room-type quick-filter changes maintain URL consistency`, async ({
     page,
   }) => {
     // Navigate and wait for search to be ready
     await waitForSearchReady(page);
 
-    // Locate category bar buttons
-    const categoryBarLinks = page.locator(
-      '[data-testid="category-bar"] a, [role="tablist"] a'
+    const trigger = searchResultsContainer(page).getByTestId(
+      "quick-filter-room-type"
     );
-    const firstCategory = categoryBarLinks.first();
+    await expect(trigger).toBeVisible({ timeout: 30_000 });
 
-    // Check if category bar is visible
-    const isVisible = await firstCategory.isVisible().catch(() => false);
+    for (const roomType of ["Private Room", "Shared Room", "Private Room"]) {
+      await trigger.click();
+      const popover = page.getByTestId("quick-filter-room-type-popover");
+      await expect(popover).toBeVisible({ timeout: 10_000 });
+      const option = popover.getByRole("button", {
+        name: new RegExp(`^${roomType}(?: \\(\\d+\\))?$`, "i"),
+      });
+      await expect(option).toBeVisible({ timeout: 10_000 });
 
-    test.skip(!isVisible, "Category bar not visible");
+      if (await option.isDisabled()) {
+        await expect(option).toBeDisabled();
+        await page.keyboard.press("Escape");
+        await expect(popover).not.toBeVisible({ timeout: 10_000 });
+        continue;
+      }
 
-    // Rapid click the first category link 3 times
-    await rapidClick(firstCategory, 3, 100);
+      await option.click();
+      await expect(popover).not.toBeVisible({ timeout: 10_000 });
+    }
 
-    // Wait for URL to stabilize
     await waitForUrlStable(page);
+
+    await expect
+      .poll(
+        () =>
+          new URL(page.url(), "http://localhost").searchParams.get("roomType"),
+        { timeout: 30_000, message: "URL to settle on a roomType value" }
+      )
+      .toBe("Private Room");
 
     // Verify page displays results or empty state (no error)
     const hasResults = await searchResultsContainer(page)

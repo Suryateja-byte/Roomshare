@@ -32,9 +32,7 @@ describe("buildSearchDocWhereConditions", () => {
     // Base conditions must filter to ACTIVE status only
     // PAUSED, DRAFT, ARCHIVED, etc. listings must never appear in search
     expect(conditions).toContain(`l.status = 'ACTIVE'`);
-    expect(conditions).toContain(
-      `COALESCE(FALSE, FALSE) = FALSE`
-    );
+    expect(conditions).toContain(`COALESCE(FALSE, FALSE) = FALSE`);
     expect(conditions).toContain(
       `COALESCE(l."statusReason", '') NOT IN ('MIGRATION_REVIEW', 'ADMIN_PAUSED', 'SUPPRESSED')`
     );
@@ -368,6 +366,18 @@ describe("buildOrderByClause", () => {
 });
 
 describe("SearchDoc projection mapping", () => {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const FRESH_LAST_CONFIRMED_AT = new Date(Date.now() - DAY_MS).toISOString();
+  const STALE_LAST_CONFIRMED_AT = new Date(
+    Date.now() - 40 * DAY_MS
+  ).toISOString();
+  const FUTURE_MOVE_IN_DATE = new Date(Date.now() + 14 * DAY_MS)
+    .toISOString()
+    .slice(0, 10);
+  const FUTURE_AVAILABLE_UNTIL = new Date(Date.now() + 210 * DAY_MS)
+    .toISOString()
+    .slice(0, 10);
+
   function createHostManagedRaw(overrides: Record<string, unknown> = {}) {
     return {
       id: "listing-1",
@@ -379,9 +389,9 @@ describe("SearchDoc projection mapping", () => {
       totalSlots: 4,
       availabilitySource: "HOST_MANAGED" as const,
       openSlots: 2,
-      availableUntil: "2026-12-01",
+      availableUntil: FUTURE_AVAILABLE_UNTIL,
       minStayMonths: 3,
-      lastConfirmedAt: "2026-04-15T12:30:00.000Z",
+      lastConfirmedAt: FRESH_LAST_CONFIRMED_AT,
       status: "ACTIVE",
       statusReason: null,
       needsMigrationReview: false,
@@ -391,7 +401,7 @@ describe("SearchDoc projection mapping", () => {
       primaryHomeLanguage: "English",
       leaseDuration: "6_months",
       roomType: "private",
-      moveInDate: "2026-06-01",
+      moveInDate: FUTURE_MOVE_IN_DATE,
       viewCount: 10,
       city: "San Francisco",
       state: "CA",
@@ -419,7 +429,7 @@ describe("SearchDoc projection mapping", () => {
   it("suppresses stale HOST_MANAGED rows from list projection", () => {
     const results = mapRawListingsToPublic([
       createHostManagedRaw({
-        lastConfirmedAt: "2026-03-20T12:30:00.000Z",
+        lastConfirmedAt: STALE_LAST_CONFIRMED_AT,
       }),
     ]);
 
@@ -475,7 +485,7 @@ describe("SearchDoc projection mapping", () => {
   it("suppresses stale HOST_MANAGED rows from map projection", () => {
     const results = mapRawMapListingsToPublic([
       createHostManagedRaw({
-        lastConfirmedAt: "2026-03-20T12:30:00.000Z",
+        lastConfirmedAt: STALE_LAST_CONFIRMED_AT,
       }),
     ]);
 
@@ -513,10 +523,10 @@ describe("SearchDoc projection mapping", () => {
         availabilitySource: "HOST_MANAGED",
         openSlots: 2,
         totalSlots: 4,
-        availableFrom: "2026-06-01",
-        availableUntil: "2026-12-01",
+        availableFrom: FUTURE_MOVE_IN_DATE,
+        availableUntil: FUTURE_AVAILABLE_UNTIL,
         minStayMonths: 3,
-        lastConfirmedAt: "2026-04-15T12:30:00.000Z",
+        lastConfirmedAt: FRESH_LAST_CONFIRMED_AT,
       })
     );
     expect(mapResult.publicAvailability).toMatchObject(
@@ -525,7 +535,9 @@ describe("SearchDoc projection mapping", () => {
     expect(mapResult.availabilitySource).toBe(
       mapResult.publicAvailability.availabilitySource
     );
-    expect(mapResult.availableSlots).toBe(mapResult.publicAvailability.openSlots);
+    expect(mapResult.availableSlots).toBe(
+      mapResult.publicAvailability.openSlots
+    );
     expect(mapResult.totalSlots).toBe(mapResult.publicAvailability.totalSlots);
   });
 
@@ -538,7 +550,7 @@ describe("SearchDoc projection mapping", () => {
       }),
       createHostManagedRaw({
         id: "stale-host-managed",
-        lastConfirmedAt: "2026-03-20T12:30:00.000Z",
+        lastConfirmedAt: STALE_LAST_CONFIRMED_AT,
       }),
       createHostManagedRaw({
         id: "needs-migration-review",
@@ -559,9 +571,9 @@ describe("SearchDoc projection mapping", () => {
       }),
     ];
 
-    expect(mapRawListingsToPublic(fixtures).map((listing) => listing.id)).toEqual([
-      "eligible-host-managed",
-    ]);
+    expect(
+      mapRawListingsToPublic(fixtures).map((listing) => listing.id)
+    ).toEqual(["eligible-host-managed"]);
     expect(
       mapRawMapListingsToPublic(fixtures).map((listing) => listing.id)
     ).toEqual(["eligible-host-managed"]);

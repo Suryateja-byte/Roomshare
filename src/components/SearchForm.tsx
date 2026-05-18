@@ -173,12 +173,13 @@ export default function SearchForm({
   variant?: "default" | "compact" | "home";
 }) {
   const searchParams = useSearchParams();
+  const searchParamsString = searchParams.toString();
   const isCompact = variant === "compact";
   const isHome = variant === "home";
   const formRef = useRef<HTMLFormElement | null>(null);
   const locationInputRef = useRef<HTMLInputElement | null>(null);
   const initialIntentState = readSearchIntentState(
-    new URLSearchParams(searchParams.toString())
+    new URLSearchParams(searchParamsString)
   );
   const [location, setLocation] = useState(initialIntentState.locationInput);
   // Show "What" field when semantic search env var is set.
@@ -240,6 +241,19 @@ export default function SearchForm({
   const [locationValidationAttempted, setLocationValidationAttempted] =
     useState(false);
   const [locationWarningPulse, setLocationWarningPulse] = useState(0);
+  const autocompleteBias = useMemo(() => {
+    const urlLocation = readSearchIntentState(
+      new URLSearchParams(searchParamsString)
+    ).selectedLocation;
+    const source = selectedCoords ?? urlLocation;
+
+    return source
+      ? {
+          near: { lat: source.lat, lng: source.lng },
+          bounds: source.bounds,
+        }
+      : undefined;
+  }, [searchParamsString, selectedCoords]);
   const [geoLoading, setGeoLoading] = useState(false);
 
   const [hasMounted, setHasMounted] = useState(false);
@@ -373,7 +387,7 @@ export default function SearchForm({
   // Filter state sync is handled by useBatchedFilters internally
   useEffect(() => {
     const nextIntentState = readSearchIntentState(
-      new URLSearchParams(searchParams.toString())
+      new URLSearchParams(searchParamsString)
     );
     setSelectedCoords(nextIntentState.selectedLocation);
     // Don't overwrite user's in-progress typing with URL state.
@@ -382,7 +396,7 @@ export default function SearchForm({
       setLocation(nextIntentState.locationInput);
     }
     setWhatQuery(nextIntentState.vibeInput);
-  }, [searchParams]);
+  }, [searchParamsString]);
 
   const router = useRouter();
   const transitionContext = useSearchTransitionSafe();
@@ -1125,6 +1139,7 @@ export default function SearchForm({
               }}
               inputRef={locationInputRef}
               fallbackItems={recentLocationFallbackItems}
+              autocompleteBias={autocompleteBias}
               ariaInvalid={showLocationWarning}
               ariaErrorMessage={
                 showLocationWarning ? "location-warning" : undefined

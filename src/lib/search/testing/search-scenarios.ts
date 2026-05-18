@@ -131,15 +131,13 @@ function createListing(
     totalSlots: overrides.totalSlots ?? 2,
     amenities: overrides.amenities ?? ["Wifi", "Laundry"],
     houseRules: overrides.houseRules ?? ["No Smoking"],
-    householdLanguages:
-      overrides.householdLanguages ?? ["English", "Spanish"],
+    householdLanguages: overrides.householdLanguages ?? ["English", "Spanish"],
     primaryHomeLanguage: overrides.primaryHomeLanguage ?? "English",
     genderPreference: overrides.genderPreference,
     householdGender: overrides.householdGender,
     leaseDuration: overrides.leaseDuration ?? "6 months",
     roomType: overrides.roomType ?? "Private Room",
-    moveInDate:
-      overrides.moveInDate ?? new Date("2026-06-01T00:00:00.000Z"),
+    moveInDate: overrides.moveInDate ?? new Date("2026-06-01T00:00:00.000Z"),
     location: {
       city: locationLabel.split(",")[0] || "Austin",
       state: locationLabel.split(",")[1]?.trim() || "TX",
@@ -158,7 +156,9 @@ function createListing(
   };
 }
 
-function buildBaseListings(query: NormalizedSearchQuery): PublicSearchListing[] {
+function buildBaseListings(
+  query: NormalizedSearchQuery
+): PublicSearchListing[] {
   return [
     createListing(query, "a", 900, 0.012, -0.015, {
       amenities: ["Wifi", "Parking"],
@@ -283,9 +283,7 @@ function buildDefaultScenarioData(
   return paginateScenarioListings(sorted, cursor);
 }
 
-function buildSlowScenarioData(
-  query: NormalizedSearchQuery
-): ScenarioListData {
+function buildSlowScenarioData(query: NormalizedSearchQuery): ScenarioListData {
   const maxPrice = query.maxPrice ?? 0;
   const isSlow = maxPrice > 0 && maxPrice <= 1200;
   const title = isSlow ? "Slow result" : "Fast result";
@@ -302,6 +300,36 @@ function buildSlowScenarioData(
     items: [item],
     nextCursor: null,
     total: 1,
+  };
+}
+
+function buildNearMatchScenarioData(
+  query: NormalizedSearchQuery
+): ScenarioListData {
+  const exact = createListing(query, "exact", 1000, 0.004, -0.004, {
+    title: "Exact match near you",
+    amenities: ["Wifi"],
+    roomType: "Private Room",
+  });
+  const nearPrice = createListing(query, "near-price", 1125, 0.009, 0.006, {
+    title: "Near match over budget",
+    amenities: ["Wifi"],
+    roomType: "Private Room",
+    isNearMatch: true,
+  });
+  const nearDate = createListing(query, "near-date", 1050, -0.007, 0.008, {
+    title: "Near match alternate date",
+    amenities: ["Wifi", "Laundry"],
+    roomType: "Private Room",
+    moveInDate: new Date("2026-06-08T00:00:00.000Z"),
+    isNearMatch: true,
+  });
+
+  return {
+    items: [exact, nearPrice, nearDate],
+    nextCursor: null,
+    total: 3,
+    nearMatchExpansion: "Price range expanded to max $1,125",
   };
 }
 
@@ -379,6 +407,14 @@ export async function buildScenarioSearchListState(
   }
 
   if (scenario === "near-match") {
+    if (query.nearMatches) {
+      return {
+        kind: "ok",
+        data: buildNearMatchScenarioData(query),
+        meta: buildMeta("v2"),
+      };
+    }
+
     return {
       kind: "zero-results",
       suggestions: [
@@ -451,6 +487,16 @@ export async function buildScenarioSearchMapState(
   }
 
   if (scenario === "near-match") {
+    if (query.nearMatches) {
+      return {
+        kind: "ok",
+        data: {
+          listings: toMapListings(buildNearMatchScenarioData(query).items),
+        },
+        meta,
+      };
+    }
+
     return {
       kind: "zero-results",
       meta,

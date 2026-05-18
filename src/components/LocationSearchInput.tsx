@@ -26,6 +26,7 @@ import {
   LOCATION_AUTOCOMPLETE_DEFAULT_LIMIT,
   LOCATION_AUTOCOMPLETE_MIN_QUERY_LENGTH,
   sanitizeAutocompleteQuery,
+  type LocationAutocompleteBias,
   type LocationAutocompleteErrorCode,
   type LocationAutocompleteErrorResponse,
   type LocationAutocompleteSuccessResponse,
@@ -67,6 +68,7 @@ interface LocationSearchInputProps {
   inputRef?: MutableRefObject<HTMLInputElement | null>;
   fallbackItems?: LocationSearchFallbackItem[];
   fallbackTitle?: string;
+  autocompleteBias?: LocationAutocompleteBias;
   ariaInvalid?: boolean;
   ariaErrorMessage?: string;
   ariaDescribedBy?: string;
@@ -170,12 +172,27 @@ function normalizeAutocompleteResults(
 
 async function fetchAutocompleteSuggestions(
   query: string,
-  signal: AbortSignal
+  signal: AbortSignal,
+  autocompleteBias?: LocationAutocompleteBias
 ): Promise<LocationSuggestion[]> {
   const params = new URLSearchParams({
     q: query,
     limit: String(LOCATION_AUTOCOMPLETE_DEFAULT_LIMIT),
   });
+
+  if (autocompleteBias?.near) {
+    params.set("nearLat", String(autocompleteBias.near.lat));
+    params.set("nearLng", String(autocompleteBias.near.lng));
+  }
+
+  if (autocompleteBias?.bounds) {
+    const [minLng, minLat, maxLng, maxLat] = autocompleteBias.bounds;
+    params.set("minLng", String(minLng));
+    params.set("minLat", String(minLat));
+    params.set("maxLng", String(maxLng));
+    params.set("maxLat", String(maxLat));
+  }
+
   const url = `/api/geocoding/autocomplete?${params.toString()}`;
 
   let response: Response;
@@ -230,6 +247,7 @@ export default function LocationSearchInput({
   inputRef: forwardedInputRef,
   fallbackItems = [],
   fallbackTitle = "Recent locations",
+  autocompleteBias,
   ariaInvalid,
   ariaErrorMessage,
   ariaDescribedBy,
@@ -352,7 +370,8 @@ export default function LocationSearchInput({
       try {
         const results = await fetchAutocompleteSuggestions(
           sanitized,
-          controller.signal
+          controller.signal,
+          autocompleteBias
         );
         const shouldRevealSuggestions =
           showSuggestionsRef.current || document.activeElement === inputRef.current;
@@ -414,7 +433,7 @@ export default function LocationSearchInput({
         }
       }
     },
-    [clearTransientState]
+    [autocompleteBias, clearTransientState]
   );
 
   useEffect(() => {

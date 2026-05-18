@@ -399,7 +399,9 @@ function dedupeListingRows<T extends ListingRaw>(
   limit: number
 ): DedupedListingRows<T> {
   const fallbackCursorBoundaryRow =
-    limit > 0 && rows.length > 0 ? rows[Math.min(limit - 1, rows.length - 1)] : null;
+    limit > 0 && rows.length > 0
+      ? rows[Math.min(limit - 1, rows.length - 1)]
+      : null;
 
   if (!features.searchListingDedup) {
     return {
@@ -824,17 +826,13 @@ function buildSearchDocWhereConditionsInternal(
     endDate,
   } = filterParams;
 
-  const {
-    effectiveAvailableSql,
-    slotConditionSql,
-    params,
-    nextParamIndex,
-  } = buildSearchDocListAvailabilitySqlFragments({
-    minAvailableSlots,
-    moveInDate,
-    endDate,
-    startParamIndex: 1,
-  });
+  const { effectiveAvailableSql, slotConditionSql, params, nextParamIndex } =
+    buildSearchDocListAvailabilitySqlFragments({
+      minAvailableSlots,
+      moveInDate,
+      endDate,
+      startParamIndex: 1,
+    });
 
   const conditions: string[] = [
     slotConditionSql,
@@ -1126,8 +1124,12 @@ export function mapRawListingsToPublic(listings: ListingRaw[]): ListingData[] {
   return listings
     .filter((l) => hasValidCoordinates(Number(l.lat), Number(l.lng)))
     .map((l) => {
-      const { moveInDate, availableUntil, lastConfirmedAt, resolvedAvailability } =
-        resolveRawPublicAvailability(l);
+      const {
+        moveInDate,
+        availableUntil,
+        lastConfirmedAt,
+        resolvedAvailability,
+      } = resolveRawPublicAvailability(l);
 
       if (
         !isListingEligibleForPublicSearch({
@@ -1481,13 +1483,17 @@ async function expandWithNearMatches(
 
   const exactIds = new Set(items.map((item) => item.id));
   const exactGroupKeys = new Set(
-    items.map((item) => item.groupKey).filter((groupKey): groupKey is string => !!groupKey)
+    items
+      .map((item) => item.groupKey)
+      .filter((groupKey): groupKey is string => !!groupKey)
   );
 
   const nearMatchItems = expandedResult.items
     // Expanded rows can collapse into an already-emitted canonical group.
     .filter(
-      (item) => !exactIds.has(item.id) && !(item.groupKey && exactGroupKeys.has(item.groupKey))
+      (item) =>
+        !exactIds.has(item.id) &&
+        !(item.groupKey && exactGroupKeys.has(item.groupKey))
     )
     .slice(0, LOW_RESULTS_THRESHOLD)
     .map((item) => {
@@ -1654,7 +1660,6 @@ async function getSearchDocListingsPaginatedInternal(
       nearMatches &&
       !hasNextPage &&
       items.length < LOW_RESULTS_THRESHOLD &&
-      items.length > 0 &&
       safePage === 1
     ) {
       // Route through cached wrapper so near-match expansion benefits from
@@ -2079,12 +2084,7 @@ export async function getSearchDocListingsFirstPage(
     let nearMatchCount = 0;
     let nearMatchExpansion: string | undefined;
 
-    if (
-      nearMatches &&
-      !hasNextPage &&
-      items.length < LOW_RESULTS_THRESHOLD &&
-      items.length > 0
-    ) {
+    if (nearMatches && !hasNextPage && items.length < LOW_RESULTS_THRESHOLD) {
       // Route through cached offset wrapper instead of uncached self-recursion (#34)
       const result = await expandWithNearMatches(items, params, (p) =>
         getSearchDocListingsPaginated(p)
@@ -2224,7 +2224,11 @@ async function filterSemanticRowsToCurrentEmbeddingVersion(
         AND embedding_model = $2
         AND embedding_status = ANY($3::text[])
     `,
-    [rows.map((row) => row.id), embeddingVersion, [...PUBLISHED_EMBEDDING_STATUSES]]
+    [
+      rows.map((row) => row.id),
+      embeddingVersion,
+      [...PUBLISHED_EMBEDDING_STATUSES],
+    ]
   );
 
   const eligibleIds = new Set(eligibleRows.map((row) => row.id));
@@ -2250,7 +2254,8 @@ export async function semanticSearchQuery(
 ): Promise<SemanticSearchRow[] | null> {
   if (!features.semanticSearch) return null;
 
-  const rawQuery = filterParams.vibeQuery?.trim() ?? filterParams.query?.trim() ?? "";
+  const rawQuery =
+    filterParams.vibeQuery?.trim() ?? filterParams.query?.trim() ?? "";
   const queryText = sanitizeSearchQuery(rawQuery);
   if (!isValidQuery(queryText) || queryText.length < 3) return null;
 

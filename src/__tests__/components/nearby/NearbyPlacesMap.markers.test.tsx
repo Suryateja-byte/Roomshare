@@ -47,6 +47,10 @@ class MockMarker {
 
   constructor(element: HTMLDivElement) {
     this.element = element;
+    this.element.classList.add(
+      "maplibregl-marker",
+      "maplibregl-marker-anchor-center"
+    );
   }
 
   setLngLat = jest.fn((coords: [number, number]) => {
@@ -197,6 +201,18 @@ describe("NearbyPlacesMap - Marker Registry And Semantics", () => {
     return marker;
   };
 
+  const getHomeMarker = () => {
+    const marker = createdMarkers.find(
+      (candidate) => candidate.element.dataset.testid === "nearby-home-marker"
+    );
+
+    if (!marker) {
+      throw new Error("No home marker found");
+    }
+
+    return marker;
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
     createdMarkers.length = 0;
@@ -212,6 +228,12 @@ describe("NearbyPlacesMap - Marker Registry And Semantics", () => {
     const poiMarker = getPOIMarker("place-1");
     const markerCountAfterInitialRender = createdMarkers.length;
 
+    expect(poiMarker.element).toHaveClass(
+      "maplibregl-marker",
+      "maplibregl-marker-anchor-center",
+      "poi-marker"
+    );
+
     const updatedPlace = createMockPlace("place-1", {
       name: "Updated Pharmacy",
       address: "456 Market St",
@@ -225,11 +247,18 @@ describe("NearbyPlacesMap - Marker Registry And Semantics", () => {
         listingLat={listingLat}
         listingLng={listingLng}
         places={[updatedPlace]}
+        highlightedPlaceId="place-1"
       />
     );
     await flushMapInit();
 
     expect(createdMarkers).toHaveLength(markerCountAfterInitialRender);
+    expect(poiMarker.element).toHaveClass(
+      "maplibregl-marker",
+      "maplibregl-marker-anchor-center",
+      "poi-marker",
+      "highlighted"
+    );
     expect(poiMarker.setLngLat).toHaveBeenLastCalledWith([-122.41, 37.785]);
     expect(poiMarker.popup?.setHTML).toHaveBeenCalledWith(
       expect.stringContaining("Updated Pharmacy")
@@ -242,6 +271,22 @@ describe("NearbyPlacesMap - Marker Registry And Semantics", () => {
     const markerVisual = poiMarker.element.firstElementChild as HTMLDivElement;
     expect(markerVisual.style.borderColor).toBe(
       normalizeCssColor(getCategoryColors("pharmacy").markerBorder)
+    );
+  });
+
+  it("preserves MapLibre-owned classes on the listing marker root", async () => {
+    await renderLoadedMap();
+
+    const homeMarker = getHomeMarker();
+
+    expect(homeMarker.element).toHaveAttribute(
+      "data-testid",
+      "nearby-home-marker"
+    );
+    expect(homeMarker.element).toHaveClass(
+      "maplibregl-marker",
+      "maplibregl-marker-anchor-center",
+      "group"
     );
   });
 

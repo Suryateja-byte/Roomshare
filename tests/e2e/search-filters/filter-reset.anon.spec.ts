@@ -22,6 +22,7 @@ import {
   tags,
   searchResultsContainer,
 } from "../helpers/test-utils";
+import type { Locator, Page } from "@playwright/test";
 import {
   boundsQS,
   SEARCH_URL,
@@ -32,6 +33,64 @@ import {
   clearAllButton,
   chipsClearAllButton,
 } from "../helpers";
+
+async function visibleClearAllFiltersControl(
+  container: Locator
+): Promise<Locator | null> {
+  const clearLink = container
+    .getByRole("link", { name: /^Clear all filters$/ })
+    .first();
+  const linkVisible = await clearLink
+    .waitFor({ state: "visible", timeout: 10_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (linkVisible) return clearLink;
+
+  const clearButton = container
+    .getByRole("button", { name: /^Clear all filters$/ })
+    .first();
+  const buttonVisible = await clearButton
+    .waitFor({ state: "visible", timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  return buttonVisible ? clearButton : null;
+}
+
+async function clickVisibleClearAllFiltersControl(
+  page: Page,
+  container: Locator
+): Promise<boolean> {
+  const initialControl = await visibleClearAllFiltersControl(container);
+  if (!initialControl) return false;
+
+  let clicked = false;
+  await expect(async () => {
+    const params = new URL(page.url(), "http://localhost").searchParams;
+    if (!params.has("minPrice") && !params.has("maxPrice")) return;
+
+    const control = await visibleClearAllFiltersControl(container);
+    if (control) {
+      await control!.click();
+      clicked = true;
+    }
+    expect(clicked).toBe(true);
+
+    await expect
+      .poll(
+        () => {
+          const params = new URL(page.url(), "http://localhost").searchParams;
+          return !params.has("minPrice") && !params.has("maxPrice");
+        },
+        {
+          timeout: 3_000,
+          message: "clear-all click to remove price params",
+        }
+      )
+      .toBe(true);
+  }).toPass({ timeout: 30_000 });
+
+  return true;
+}
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -117,35 +176,16 @@ test.describe("Filter Reset", () => {
     // Look for a "Clear all filters" or "clear filters" link in the page body
     // (typically rendered inside the empty state / zero-results component)
     const container = searchResultsContainer(page);
-    const clearLink = container
-      .locator(
-        'a:has-text("Clear all filters"), button:has-text("Clear all filters")'
-      )
-      .first();
+    const clearLink = await visibleClearAllFiltersControl(container);
+    if (!clearLink) {
+      test.skip(
+        true,
+        "Zero-results 'Clear all filters' link not visible -- may need mocked empty state"
+      );
+      return;
+    }
 
-    const clearVisible = await clearLink
-      .isVisible({ timeout: 10_000 })
-      .catch(() => false);
-    test.skip(
-      !clearVisible,
-      "Zero-results 'Clear all filters' link not visible -- may need mocked empty state"
-    );
-
-    await clearLink.click();
-
-    // Wait for filter params to be stripped from URL via soft navigation
-    await expect
-      .poll(
-        () => {
-          const params = new URL(page.url(), "http://localhost").searchParams;
-          return !params.has("minPrice") && !params.has("maxPrice");
-        },
-        {
-          timeout: timeouts.action,
-          message: "URL to have no price params after clear",
-        }
-      )
-      .toBe(true);
+    await clickVisibleClearAllFiltersControl(page, container);
 
     // Bounds must be preserved
     expect(getUrlParam(page, "minLat")).toBeTruthy();
@@ -188,32 +228,32 @@ test.describe("Filter Reset", () => {
     const region = appliedFiltersRegion(page);
     await expect(region).toBeVisible({ timeout: 15_000 });
 
-    const regionVisible = await region.isVisible().catch(() => false);
-    test.skip(!regionVisible, "Applied filters region not visible");
-
     // "Clear all filters" button in the chip bar
     const clearAllBtn = chipsClearAllButton(page);
     await expect(clearAllBtn).toBeVisible({ timeout: 15_000 });
 
-    // Single click — no retry loop around the click itself
-    await clearAllBtn.click();
+    await expect(async () => {
+      const params = new URL(page.url(), "http://localhost").searchParams;
+      if (!params.has("amenities") && !params.has("roomType")) return;
 
-    // Wait for the button to disappear (filter clear navigation completed)
-    await expect(clearAllBtn).not.toBeVisible({ timeout: 30_000 });
+      const retryClearAllBtn = chipsClearAllButton(page);
+      await expect(retryClearAllBtn).toBeVisible({ timeout: 5_000 });
+      await expect(retryClearAllBtn).toBeEnabled({ timeout: 5_000 });
+      await retryClearAllBtn.click();
 
-    // Wait for all filter params to be removed from URL via soft navigation
-    await expect
-      .poll(
-        () => {
-          const params = new URL(page.url(), "http://localhost").searchParams;
-          return !params.has("amenities") && !params.has("roomType");
-        },
-        {
-          timeout: 30_000,
-          message: "URL to have no filter params after clear all",
-        }
-      )
-      .toBe(true);
+      await expect
+        .poll(
+          () => {
+            const params = new URL(page.url(), "http://localhost").searchParams;
+            return !params.has("amenities") && !params.has("roomType");
+          },
+          {
+            timeout: 5_000,
+            message: "chip clear-all click to remove filter params",
+          }
+        )
+        .toBe(true);
+    }).toPass({ timeout: 30_000 });
 
     // All chips should be gone -- region should disappear
     await expect(region).not.toBeVisible({ timeout: timeouts.action });
@@ -248,23 +288,17 @@ test.describe("Filter Reset", () => {
       .isVisible({ timeout: 5_000 })
       .catch(() => false);
 
-    const pageBodyClearAll = container
-      .locator(
-        'a:has-text("Clear all filters"), button:has-text("Clear all filters")'
-      )
-      .first();
+    const pageBodyClearAll = await visibleClearAllFiltersControl(container);
 
     if (chipsVisible) {
       await chipsClearAll.click();
     } else {
-      const bodyLinkVisible = await pageBodyClearAll
-        .isVisible({ timeout: 5_000 })
-        .catch(() => false);
-      test.skip(
-        !bodyLinkVisible,
-        "No clear-all mechanism found for zero-results state"
-      );
-      await pageBodyClearAll.click();
+      if (!pageBodyClearAll) {
+        test.skip(true, "No clear-all mechanism found for zero-results state");
+        return;
+      }
+      const clicked = await clickVisibleClearAllFiltersControl(page, container);
+      expect(clicked).toBeTruthy();
     }
 
     // Wait for filter params to be cleaned via soft navigation

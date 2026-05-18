@@ -59,6 +59,8 @@ export interface PaginationMockOptions {
   delayMs?: number;
   /** Which load-more call index should fail, 1-based (0 = never fail) */
   failOnLoadMore?: number;
+  /** Which load-more call index should return a rate-limit result, 1-based (0 = never) */
+  rateLimitOnLoadMore?: number;
   /**
    * When true, freeze map-driven URL updates during delayed pagination flows.
    * This prevents the map from calling router.replace() with new bounds during
@@ -279,6 +281,7 @@ export async function setupPaginationMock(
     itemsPerPage = 12,
     delayMs = 0,
     failOnLoadMore = 0,
+    rateLimitOnLoadMore = 0,
     freezeMapNavigations = delayMs > 0,
   } = options;
 
@@ -303,6 +306,7 @@ export async function setupPaginationMock(
   let _loadMoreCallCount = 0;
   let _successfulLoadCount = 0;
   let _failedOnce = false;
+  let _rateLimitedOnce = false;
 
   // Only intercept POST requests to the search page (server actions).
   // Use a regex that matches /search with optional query string.
@@ -337,6 +341,31 @@ export async function setupPaginationMock(
       // Abort the request to simulate a network/server error.
       // The component's catch block will set loadError state.
       await route.abort("failed");
+      return;
+    }
+
+    const shouldRateLimit =
+      rateLimitOnLoadMore > 0 &&
+      _loadMoreCallCount === rateLimitOnLoadMore &&
+      !_rateLimitedOnce;
+
+    if (shouldRateLimit) {
+      _rateLimitedOnce = true;
+
+      if (delayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: "text/x-component; charset=utf-8",
+        body: encodeAsRSCResponse({
+          items: [],
+          nextCursor: encodeMockCursor(0),
+          hasNextPage: true,
+          rateLimited: true,
+        }),
+      });
       return;
     }
 

@@ -912,8 +912,8 @@ describe("SearchForm", () => {
     });
 
     it("preserves a valid moveInDate/endDate range on search submit", async () => {
-      mockSearchParams.set("moveInDate", "2026-05-01");
-      mockSearchParams.set("endDate", "2026-06-01");
+      mockSearchParams.set("moveInDate", "2026-06-01");
+      mockSearchParams.set("endDate", "2026-07-01");
       mockSearchParams.set("lat", "37.7749");
       mockSearchParams.set("lng", "-122.4194");
 
@@ -923,8 +923,8 @@ describe("SearchForm", () => {
       jest.advanceTimersByTime(500);
 
       const pushCall = mockPush.mock.calls[0]?.[0] ?? "";
-      expect(pushCall).toContain("moveInDate=2026-05-01");
-      expect(pushCall).toContain("endDate=2026-06-01");
+      expect(pushCall).toContain("moveInDate=2026-06-01");
+      expect(pushCall).toContain("endDate=2026-07-01");
     });
 
     it("lets the filters drawer create a valid search range", async () => {
@@ -932,16 +932,16 @@ describe("SearchForm", () => {
 
       await user.click(screen.getByRole("button", { name: /filters/i }));
       fireEvent.change(screen.getByPlaceholderText("Select move-in date"), {
-        target: { value: "2026-05-01" },
+        target: { value: "2026-06-01" },
       });
       fireEvent.change(screen.getByPlaceholderText("Select end date"), {
-        target: { value: "2026-06-01" },
+        target: { value: "2026-07-01" },
       });
       fireEvent.click(screen.getByTestId("filter-modal-apply"));
 
       const pushCall = mockPush.mock.calls[0]?.[0] ?? "";
-      expect(pushCall).toContain("moveInDate=2026-05-01");
-      expect(pushCall).toContain("endDate=2026-06-01");
+      expect(pushCall).toContain("moveInDate=2026-06-01");
+      expect(pushCall).toContain("endDate=2026-07-01");
     });
 
     it("drops invalid endDate values from the applied search range", async () => {

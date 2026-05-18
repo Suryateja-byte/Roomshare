@@ -6,6 +6,8 @@
  */
 
 const mockPush = jest.fn();
+let mockSearchParams = "q=Chicago&amenities=Wifi";
+let mockSearchParamsObject = new URLSearchParams(mockSearchParams);
 const mockLocationSearchInput = jest.fn(
   ({
     className,
@@ -34,7 +36,7 @@ jest.mock("next/navigation", () => ({
   useRouter: () => ({
     push: mockPush,
   }),
-  useSearchParams: () => new URLSearchParams("q=Chicago&amenities=Wifi"),
+  useSearchParams: () => mockSearchParamsObject,
 }));
 
 jest.mock("framer-motion", () => ({
@@ -134,6 +136,8 @@ import { MAP_FLY_TO_EVENT } from "@/components/SearchForm";
 describe("MobileSearchOverlay", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSearchParams = "q=Chicago&amenities=Wifi";
+    mockSearchParamsObject = new URLSearchParams(mockSearchParams);
   });
 
   it("passes shell classes to the mobile location field and keeps text styles on the input", () => {
@@ -186,6 +190,29 @@ describe("MobileSearchOverlay", () => {
         primaryText: "Irving, TX",
       }),
     ]);
+  });
+
+  it("passes current URL location as autocomplete bias", () => {
+    mockSearchParams =
+      "locationLabel=San+Francisco&lat=37.7749&lng=-122.4194&minLng=-122.6&minLat=37.6&maxLng=-122.2&maxLat=37.9";
+    mockSearchParamsObject = new URLSearchParams(mockSearchParams);
+
+    render(
+      <MobileSearchOverlay
+        isOpen
+        onClose={jest.fn()}
+        onOpenFilters={jest.fn()}
+      />
+    );
+
+    const props = mockLocationSearchInput.mock.calls.at(-1)?.[0] as {
+      autocompleteBias?: unknown;
+    };
+
+    expect(props.autocompleteBias).toEqual({
+      near: { lat: 37.7749, lng: -122.4194 },
+      bounds: [-122.6, 37.6, -122.2, 37.9],
+    });
   });
 
   it("renders the locate icon inside the location field shell", () => {

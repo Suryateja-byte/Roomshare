@@ -16,6 +16,7 @@ import {
   waitForSearchReady,
   openFilterModal,
   applyButton,
+  clearAllButton,
   filterDialog,
   buildSearchUrl,
   waitForUrlStable,
@@ -36,6 +37,7 @@ test.describe("Filter Race Conditions", () => {
     page,
   }) => {
     await waitForSearchReady(page);
+    await waitForUrlStable(page, 1500);
 
     // Open filter modal
     await openFilterModal(page);
@@ -53,13 +55,18 @@ test.describe("Filter Race Conditions", () => {
     // Verify button is still interactive (not broken by rapid clicks)
     await expect(wifiToggle).toBeVisible();
 
-    // Do one final clean click to set a deterministic "pressed" state
-    // React may batch rapid clicks unpredictably, so we normalize here
-    const currentState = await wifiToggle.getAttribute("aria-pressed");
-    if (currentState !== "true") {
+    // Normalize with a clean off -> on sequence after the stress clicks.
+    // A transient "true" immediately after rapid forced clicks can still be
+    // followed by a pending React update from the stress sequence.
+    await expect(async () => {
+      const currentState = await wifiToggle.getAttribute("aria-pressed");
+      if (currentState === "true") {
+        await wifiToggle.click();
+        await expect(wifiToggle).toHaveAttribute("aria-pressed", "false");
+      }
       await wifiToggle.click();
-      await expect(wifiToggle).toHaveAttribute("aria-pressed", "true", { timeout: 3_000 });
-    }
+      await expect(wifiToggle).toHaveAttribute("aria-pressed", "true");
+    }).toPass({ timeout: 10_000 });
 
     // Now assert the known state
     await expect(wifiToggle).toHaveAttribute("aria-pressed", "true");
@@ -204,6 +211,7 @@ test.describe("Filter Race Conditions", () => {
 
   test(`${tags.filter} Double-click on Apply button (P0)`, async ({ page }) => {
     await waitForSearchReady(page);
+    await waitForUrlStable(page, 1500);
 
     // Capture navigation count before interaction
     const getNavCount = captureNavigationCount(page);
@@ -318,14 +326,15 @@ test.describe("Filter Race Conditions", () => {
 
     const amenitiesGroup = page.locator('[aria-label="Select amenities"]');
     const wifiToggle = amenitiesGroup.getByRole("button", { name: /^Wifi/i });
-    // Toggle Wifi with retry for React re-render race
-    await expect(async () => {
-      const currentState = await wifiToggle.getAttribute("aria-pressed");
-      if (currentState !== "true") {
-        await wifiToggle.click();
-      }
-      await expect(wifiToggle).toHaveAttribute("aria-pressed", "true");
-    }).toPass({ timeout: 10_000 });
+
+    await expect(wifiToggle).toBeVisible({ timeout: 10_000 });
+    await expect(wifiToggle).not.toBeDisabled();
+    const currentState = await wifiToggle.getAttribute("aria-pressed");
+    if (currentState !== "true") {
+      await wifiToggle.click();
+    }
+    await expect(wifiToggle).toHaveAttribute("aria-pressed", "true");
+    await expect(clearAllButton(page)).toBeVisible({ timeout: 5_000 });
 
     // Apply filters
     await applyFilters(page);

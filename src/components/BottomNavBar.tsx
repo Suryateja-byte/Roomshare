@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { triggerLightHaptic } from "@/lib/haptics";
 import Link from "next/link";
 import { Search, Heart, PlusCircle, MessageSquare, User } from "lucide-react";
@@ -46,8 +47,19 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
+const PROTECTED_NAV_PATHS = new Set([
+  "/saved",
+  "/listings/create",
+  "/messages",
+  "/profile",
+]);
+
+const loginCallbackHref = (path: string) =>
+  `/login?callbackUrl=${encodeURIComponent(path)}`;
+
 export default function BottomNavBar() {
   const pathname = usePathname();
+  const { status } = useSession();
   const [visible, setVisible] = useState(true);
   const lastScrollY = useRef(0);
   const ticking = useRef(false);
@@ -109,11 +121,15 @@ export default function BottomNavBar() {
         {NAV_ITEMS.map((item) => {
           const isActive = item.matchPaths.some((p) => pathname.startsWith(p));
           const Icon = item.icon;
+          const href =
+            status === "unauthenticated" && PROTECTED_NAV_PATHS.has(item.href)
+              ? loginCallbackHref(item.href)
+              : item.href;
 
           return (
             <Link
               key={item.href}
-              href={item.href}
+              href={href}
               onClick={() => triggerLightHaptic()}
               className={`
                 flex flex-col items-center justify-center

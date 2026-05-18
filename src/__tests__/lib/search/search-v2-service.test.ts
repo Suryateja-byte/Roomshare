@@ -355,6 +355,10 @@ const BOUNDS = {
   maxLng: -122.35,
 };
 
+function freshLastConfirmedAt(): Date {
+  return new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+}
+
 function makeListingData(overrides: Partial<ListingData> = {}): ListingData {
   const listing = {
     id: "listing-1",
@@ -508,7 +512,7 @@ function setupDefaultMocks({
         moveInDate: new Date("2026-05-01T00:00:00.000Z"),
         availableUntil: null,
         minStayMonths: 1,
-        lastConfirmedAt: new Date("2026-04-20T00:00:00.000Z"),
+        lastConfirmedAt: freshLastConfirmedAt(),
       }));
     }
   );

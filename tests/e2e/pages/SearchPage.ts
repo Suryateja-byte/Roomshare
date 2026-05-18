@@ -185,12 +185,12 @@ export class SearchPage {
     query: string,
     optionName: RegExp | string
   ) {
+    await this.waitForDesktopHeaderHydrated();
+    await this.desktopHeaderLocationInput().click();
     const autocompleteResponse = this.page.waitForResponse(
       (response) => response.url().includes("/api/geocoding/autocomplete"),
       { timeout: 10_000 }
     );
-    await this.waitForDesktopHeaderHydrated();
-    await this.desktopHeaderLocationInput().click();
     await this.desktopHeaderLocationInput().fill(query);
     await expect(this.desktopHeaderLocationInput()).toHaveValue(query);
     await expect((await autocompleteResponse).ok()).toBe(true);

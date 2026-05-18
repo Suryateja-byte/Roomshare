@@ -9,7 +9,7 @@ function cn(...inputs: ClassValue[]) {
 
 const variantClasses = {
   primary:
-    "bg-primary text-on-primary shadow-ambient hover:bg-primary/90 focus-visible:ring-primary/30",
+    "bg-gradient-to-br from-primary to-primary-container text-on-primary shadow-ambient hover:from-primary-container hover:to-primary focus-visible:ring-primary/30",
   outline:
     "bg-transparent border border-outline-variant/40 text-on-surface hover:bg-surface-container-high focus-visible:ring-primary/30",
   ghost:
@@ -17,11 +17,11 @@ const variantClasses = {
   white:
     "bg-surface-container-lowest text-on-surface shadow-ambient-sm focus-visible:ring-primary/30",
   destructive:
-    "bg-red-600 text-white hover:bg-red-700 shadow-ambient-sm focus-visible:ring-red-600/30",
+    "bg-destructive text-on-primary hover:bg-destructive/90 shadow-ambient-sm focus-visible:ring-destructive/30",
   success:
-    "bg-green-600 text-white hover:bg-green-700 shadow-ambient-sm focus-visible:ring-green-600/30",
+    "bg-success text-on-primary hover:bg-success/90 shadow-ambient-sm focus-visible:ring-success/30",
   warning:
-    "bg-amber-500 text-white hover:bg-amber-600 shadow-ambient-sm focus-visible:ring-amber-500/30",
+    "bg-warning text-on-primary hover:bg-warning/90 shadow-ambient-sm focus-visible:ring-warning/30",
   accent:
     "bg-tertiary text-on-primary hover:bg-tertiary/90 focus-visible:ring-primary/30",
   "accent-ghost":
@@ -29,7 +29,7 @@ const variantClasses = {
   secondary:
     "bg-surface-container-high text-on-surface hover:bg-surface-container-high/80 focus-visible:ring-primary/30",
   "ghost-inverse":
-    "text-surface-container-high hover:text-white hover:bg-white/10 focus-visible:ring-white/30",
+    "text-surface-container-high hover:text-on-primary hover:bg-on-primary/10 focus-visible:ring-on-primary/30",
   filter:
     "border border-outline-variant/35 bg-surface-container-lowest text-on-surface-variant shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] hover:border-on-surface-variant hover:bg-surface-canvas data-[active=true]:border-on-surface data-[active=true]:bg-on-surface data-[active=true]:text-on-primary data-[active=true]:shadow-ambient-sm focus-visible:ring-primary/30",
 };

@@ -44,7 +44,6 @@ import {
   usePendingV2QueryHash,
   type V2MapData,
 } from "@/contexts/SearchV2DataContext";
-import { useSearchListResultIds } from "@/contexts/SearchListResultsContext";
 import { useActivePanBoundsState } from "@/contexts/ActivePanBoundsContext";
 import { useSearchTestScenario } from "@/contexts/SearchTestScenarioContext";
 import { MapErrorBoundary } from "@/components/map/MapErrorBoundary";
@@ -67,7 +66,7 @@ import { emitSearchClientMetric } from "@/lib/search/search-telemetry-client";
 const LazyDynamicMap = lazy(() => import("./DynamicMap"));
 
 const MAP_FETCH_DEBOUNCE_MS = 250;
-const MAP_FETCH_TIMEOUT_MS = 15_000;
+const MAP_FETCH_TIMEOUT_MS = 30_000;
 
 // Spatial cache constants
 const SPATIAL_CACHE_MAX_ENTRIES = 20;
@@ -330,24 +329,7 @@ function MapDataLoadingBar() {
       aria-hidden="true"
       data-testid="map-data-loading-bar"
     >
-      <div className="h-full bg-on-surface/80 animate-[shimmer_1.5s_ease-in-out_infinite] origin-left" />
-      <style jsx>{`
-        @keyframes shimmer {
-          0% {
-            transform: translateX(-100%);
-          }
-          100% {
-            transform: translateX(200%);
-          }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          div {
-            animation: none;
-            opacity: 0.7;
-            transform: none;
-          }
-        }
-      `}</style>
+      <div className="h-full bg-on-surface/80 animate-pulse origin-left" />
     </div>
   );
 }
@@ -381,7 +363,6 @@ export default function PersistentMapWrapper({
   const shellInstanceId = useId();
   const searchParams = useSearchParams();
   const testScenario = useSearchTestScenario();
-  const listResultIds = useSearchListResultIds();
   const [listings, setListings] = useState<MapListingData[]>([]);
   // mapSource tracks whether the most recent data came from a client fetch ('v1') or SSR payload ('v2')
   const [mapSource, setMapSource] = useState<"v1" | "v2">("v1");
@@ -551,16 +532,6 @@ export default function PersistentMapWrapper({
     prevEffectiveListingsRef.current = effectiveListings;
     return effectiveListings;
   }, [effectiveListings]);
-  const listBackedEffectiveListings = useMemo(() => {
-    if (listResultIds === null) return stableEffectiveListings;
-    if (listResultIds.length === 0) return [];
-
-    const listIdSet = new Set(listResultIds);
-    return stableEffectiveListings.filter((listing) =>
-      listIdSet.has(listing.id)
-    );
-  }, [listResultIds, stableEffectiveListings]);
-
   // UX-13 FIX: Compute effective truncation status.
   // V1 path uses explicit `truncated` flag from API response (LIMIT+1 detection).
   // V2 path uses listing count heuristic (V2MapData type doesn't include truncated yet).
@@ -820,13 +791,15 @@ export default function PersistentMapWrapper({
         // Reset retry counter on successful fetch
         retryCountRef.current = 0;
       } catch (err) {
+        const isActiveRequest = latestMapRequestRef.current === requestKey;
+
         if (didTimeout && (err as Error).name === "AbortError") {
           // Timeout-triggered abort — show user-friendly error
-          if (latestMapRequestRef.current === requestKey) {
+          if (isActiveRequest) {
             setError("Map data request timed out. Please try again.");
           }
         } else if ((err as Error).name !== "AbortError") {
-          if (latestMapRequestRef.current === requestKey) {
+          if (isActiveRequest) {
             console.error("Failed to fetch map listings:", err);
             setError((err as Error).message || "Failed to load map data");
           }
@@ -1162,7 +1135,7 @@ export default function PersistentMapWrapper({
       <MapErrorBoundary>
         <Suspense fallback={<MapLoadingPlaceholder />}>
           <LazyDynamicMap
-            listings={listBackedEffectiveListings}
+            listings={stableEffectiveListings}
             suppressEmptyState={Boolean(infoMessage)}
             selectionPresentation={isDesktop === false ? "preview" : "popup"}
           />
