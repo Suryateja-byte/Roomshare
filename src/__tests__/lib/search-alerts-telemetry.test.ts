@@ -75,6 +75,9 @@ import {
   triggerInstantAlerts,
 } from "@/lib/search-alerts";
 
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+const freshLastConfirmedAt = () => new Date(Date.now() - ONE_DAY_MS);
+
 describe("search-alerts telemetry routing", () => {
   const mockUser = {
     id: "user-123",
@@ -129,7 +132,7 @@ describe("search-alerts telemetry routing", () => {
         moveInDate: new Date("2026-05-01T00:00:00.000Z"),
         availableUntil: null,
         minStayMonths: 1,
-        lastConfirmedAt: new Date("2026-04-20T00:00:00.000Z"),
+        lastConfirmedAt: freshLastConfirmedAt(),
       },
     ]);
     (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
@@ -146,7 +149,7 @@ describe("search-alerts telemetry routing", () => {
       moveInDate: new Date("2026-05-01T00:00:00.000Z"),
       availableUntil: null,
       minStayMonths: 1,
-      lastConfirmedAt: new Date("2026-04-20T00:00:00.000Z"),
+      lastConfirmedAt: freshLastConfirmedAt(),
     });
     (prisma.alertSubscription.upsert as jest.Mock).mockResolvedValue({
       id: "subscription-123",

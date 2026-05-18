@@ -50,6 +50,9 @@ import {
 
 const mockExecuteRawUnsafe = prisma.$executeRawUnsafe as jest.Mock;
 
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+const freshLastConfirmedAt = () => new Date(Date.now() - ONE_DAY_MS);
+
 // Helper to create mock listing data
 function createMockSearchDocRow(id: string, overrides = {}) {
   return {
@@ -64,7 +67,7 @@ function createMockSearchDocRow(id: string, overrides = {}) {
     openSlots: 2,
     availableUntil: null,
     minStayMonths: 1,
-    lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
+    lastConfirmedAt: freshLastConfirmedAt(),
     status: "ACTIVE",
     statusReason: null,
     needsMigrationReview: false,
@@ -226,7 +229,7 @@ describe("Unbounded Browse Protection", () => {
           openSlots: 2,
           availableUntil: null,
           minStayMonths: 1,
-          lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
+          lastConfirmedAt: freshLastConfirmedAt(),
           status: "ACTIVE",
           statusReason: null,
           needsMigrationReview: false,
@@ -278,7 +281,7 @@ describe("Unbounded Browse Protection", () => {
           openSlots: 2,
           availableUntil: null,
           minStayMonths: 1,
-          lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
+          lastConfirmedAt: freshLastConfirmedAt(),
           status: "ACTIVE",
           statusReason: null,
           needsMigrationReview: false,

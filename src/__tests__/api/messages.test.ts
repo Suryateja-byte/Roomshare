@@ -90,6 +90,9 @@ import { auth } from "@/auth";
 import { checkEmailVerified } from "@/app/actions/suspension";
 import { withRateLimit } from "@/lib/with-rate-limit";
 
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+const freshLastConfirmedAt = () => new Date(Date.now() - ONE_DAY_MS);
+
 describe("Messages API", () => {
   const mockSession = {
     user: { id: "user-123", name: "Test User", email: "test@example.com" },
@@ -381,7 +384,7 @@ describe("Messages API", () => {
           moveInDate: new Date("2026-05-01T00:00:00.000Z"),
           availableUntil: null,
           minStayMonths: 1,
-          lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
+          lastConfirmedAt: freshLastConfirmedAt(),
         },
       });
       (prisma.blockedUser.findFirst as jest.Mock).mockResolvedValueOnce({
@@ -412,7 +415,7 @@ describe("Messages API", () => {
           moveInDate: new Date("2026-05-01T00:00:00.000Z"),
           availableUntil: null,
           minStayMonths: 1,
-          lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
+          lastConfirmedAt: freshLastConfirmedAt(),
         },
       });
       (prisma.blockedUser.findFirst as jest.Mock).mockResolvedValueOnce({
@@ -449,7 +452,7 @@ describe("Messages API", () => {
           moveInDate: new Date("2026-05-01T00:00:00.000Z"),
           availableUntil: null,
           minStayMonths: 1,
-          lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
+          lastConfirmedAt: freshLastConfirmedAt(),
           owner: { isSuspended: true },
         },
       });
@@ -483,7 +486,7 @@ describe("Messages API", () => {
           moveInDate: new Date("2026-05-01T00:00:00.000Z"),
           availableUntil: null,
           minStayMonths: 1,
-          lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
+          lastConfirmedAt: freshLastConfirmedAt(),
         },
       };
       const mockMessage = {
@@ -545,7 +548,7 @@ describe("Messages API", () => {
           moveInDate: new Date("2026-05-01T00:00:00.000Z"),
           availableUntil: null,
           minStayMonths: 1,
-          lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
+          lastConfirmedAt: freshLastConfirmedAt(),
         },
       });
       (prisma.message.create as jest.Mock).mockResolvedValue({
