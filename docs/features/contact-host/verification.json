@@ -75,7 +75,7 @@
     {
       "claimId": "V-CH-010",
       "claim": "Interaction census rows include trigger, code path, state/API effect, UI result, failure behavior, evidence, and current evidence-backed test status.",
-      "citation": "03-interaction-census.md; evidence-register.md CH-E032-CH-E049",
+      "citation": "03-interaction-census.md; evidence-register.md CH-E032-CH-E050",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -91,7 +91,7 @@
     {
       "claimId": "V-CH-012",
       "claim": "The test matrix separates release-blocking checks from confidence-building checks, records focused Jest/API/security/component, Chromium messaging, focused listing-detail Contact Host, Mobile Chrome no-deps, setup-backed Mobile Chrome, P1 unit/API follow-up commands, and PR #123 full-sharded Playwright CI as passed, records the failed pre-fix and first-fix Mobile Chrome attempts as historical, records the blocked local messaging functional E2E attempt, and keeps broader E2E/runtime gaps explicit.",
-      "citation": "11-test-traceability-matrix.md; phase-4/05-test-traceability.md; evidence-register.md CH-E032-CH-E049",
+      "citation": "11-test-traceability-matrix.md; phase-4/05-test-traceability.md; evidence-register.md CH-E032-CH-E050",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -99,7 +99,7 @@
     {
       "claimId": "V-CH-013",
       "claim": "Runtime verification is explicitly marked PARTIALLY VERIFIED, with remaining unverified browser/runtime behavior not described as current verified behavior.",
-      "citation": "README.md; runtime-verification.md; 12-gaps-unknowns-and-questions.md; evidence-register.md CH-E038-CH-E049; 12-gaps-unknowns-and-questions.md CH-G001-CH-G002",
+      "citation": "README.md; runtime-verification.md; 12-gaps-unknowns-and-questions.md; evidence-register.md CH-E038-CH-E050; 12-gaps-unknowns-and-questions.md CH-G001-CH-G002",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -114,8 +114,8 @@
     },
     {
       "claimId": "V-CH-015",
-      "claim": "The Phase 11 round-trip status reconciles historical Phase 1/2 and Phase 4 snapshots with current focused runtime/test evidence and preserves viewer-state full contract, checkout browser return, Supabase RLS, skipped/fixme messaging realtime cases, message-length, email, and broader-matrix items as explicit P1/P2 gaps while adding schema/test-name detail for reconstruction.",
-      "citation": "round-trip-review.md; 00-feature-boundary.md; phase-4/05-test-traceability.md; 05-api-contracts.md; 11-test-traceability-matrix.md; evidence-register.md CH-E032-CH-E049",
+      "claim": "The Phase 11 round-trip status reconciles historical Phase 1/2 and Phase 4 snapshots with current focused runtime/test evidence and preserves viewer-state full contract, checkout browser return, production Supabase policies/publications, skipped/fixme messaging realtime cases, message-length, email, and broader-matrix items as explicit P1/P2 gaps while adding schema/test-name detail for reconstruction.",
+      "citation": "round-trip-review.md; 00-feature-boundary.md; phase-4/05-test-traceability.md; 05-api-contracts.md; 11-test-traceability-matrix.md; evidence-register.md CH-E032-CH-E050",
       "verdict": "pass",
       "discrepancy": null,
       "recommendedFix": null
@@ -124,12 +124,12 @@
   "coverageGaps": [
     {
       "manifestItem": "Runtime/browser contact-host flows",
-      "gap": "Chromium dedupe passed earlier. Current verification passed Chromium messaging, focused listing-detail Contact Host runtime, Mobile Chrome no-deps, setup-backed Mobile Chrome, P1 unit/API follow-up checks, and PR #123 full-sharded Playwright CI for configured projects after stabilizing historical failures. Suspended/paywall/unavailable listing-detail states, checkout browser return, blocked UI browser flow, Supabase RLS, skipped/fixme messaging realtime cases, actual email delivery, and browser coverage outside configured CI projects are not runtime verified. A local focused messaging functional E2E attempt was blocked before spec execution by missing local DATABASE_URL.",
+      "gap": "Chromium dedupe passed earlier. Current verification passed Chromium messaging, focused listing-detail Contact Host runtime, Mobile Chrome no-deps, setup-backed Mobile Chrome, P1 unit/API follow-up checks, and PR #123 full-sharded Playwright CI for configured projects after stabilizing historical failures. CH-E050 source inspection found no repo-backed messaging RLS policy or realtime publication entry. Suspended/paywall/unavailable listing-detail states, checkout browser return, blocked UI browser flow, production Supabase policies/publications, skipped/fixme messaging realtime cases, actual email delivery, and browser coverage outside configured CI projects are not runtime verified. A local focused messaging functional E2E attempt was blocked before spec execution by missing local DATABASE_URL.",
       "severity": "P1"
     },
     {
       "manifestItem": "Release-blocking tests",
-      "gap": "Focused component/API/security/unit tests, focused MessagesPageClient tests, Chromium messaging E2E, focused listing-detail Contact Host E2E, Mobile Chrome messages no-deps, setup-backed Mobile Chrome, P1 checkout/session/paywall/restoration/email-helper/suspension/contact-attempt tests, and PR #123 full-sharded Playwright CI passed after the follow-up stabilization. Broader browser matrix outside configured CI projects plus targeted checkout browser return, Supabase RLS, and skipped/fixme realtime tests have not been completed in this documentation pass.",
+      "gap": "Focused component/API/security/unit tests, focused MessagesPageClient tests, Chromium messaging E2E, focused listing-detail Contact Host E2E, Mobile Chrome messages no-deps, setup-backed Mobile Chrome, P1 checkout/session/paywall/restoration/email-helper/suspension/contact-attempt tests, and PR #123 full-sharded Playwright CI passed after the follow-up stabilization. Broader browser matrix outside configured CI projects plus targeted checkout browser return, production Supabase policy/publication verification, and skipped/fixme realtime tests have not been completed in this documentation pass.",
       "severity": "P1"
     },
     {

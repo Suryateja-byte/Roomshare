@@ -513,11 +513,11 @@
     }
   ],
   "unknowns": [
-    "Runtime/browser behavior for listing detail contact CTA is partially verified by focused Chromium listing-detail Contact Host E2E; Mobile Chrome no-deps and setup-backed Mobile Chrome messages passed after the second-pass fix; PR #123 full-sharded Playwright CI passed for configured projects and includes runnable messaging functional-core cases; paywall dialog, checkout browser return, Supabase RLS, skipped/fixme messaging realtime cases, email, suspended/paywall-required/unavailable listing states, and browser coverage outside configured CI projects remain NOT VERIFIED.",
+    "Runtime/browser behavior for listing detail contact CTA is partially verified by focused Chromium listing-detail Contact Host E2E; Mobile Chrome no-deps and setup-backed Mobile Chrome messages passed after the second-pass fix; PR #123 full-sharded Playwright CI passed for configured projects and includes runnable messaging functional-core cases; CH-E050 adds realtime/polling source inspection; paywall dialog, checkout browser return, production Supabase policies/publications, skipped/fixme messaging realtime cases, email, suspended/paywall-required/unavailable listing states, and browser coverage outside configured CI projects remain NOT VERIFIED.",
     "Search/map listing-card direct contact entry point is UNKNOWN.",
-    "Supabase realtime delivery/RLS, skipped two-user polling, unread badge, failed-message retry, and explicit polling fallback behavior remain UNKNOWN at runtime.",
+    "Production Supabase messaging policies/publications, skipped two-user polling, unread badge, failed-message retry, and explicit runtime polling fallback behavior remain UNKNOWN; CH-E050 found no repo-backed messaging RLS policy or realtime publication entry.",
     "Actual email delivery and notification preference behavior are NOT VERIFIED at runtime.",
-    "Release-blocking versus confidence-building test classification exists in 11-test-traceability-matrix.md; checkout browser return, Supabase RLS, skipped/fixme messaging realtime cases, email, suspended/paywall-required/unavailable listing states, and broader matrix execution remain incomplete.",
+    "Release-blocking versus confidence-building test classification exists in 11-test-traceability-matrix.md; checkout browser return, production Supabase policies/publications, skipped/fixme messaging realtime cases, email, suspended/paywall-required/unavailable listing states, and broader matrix execution remain incomplete.",
     "Client/server message length mismatch needs later evidence: ChatWindow uses 500, MessagesPageClient uses 1000, server action schema allows 2000.",
     "Broader profile-completion or user-verification gates beyond email verification and suspension are UNKNOWN until Phase 4 auth/profile tracing."
   ]

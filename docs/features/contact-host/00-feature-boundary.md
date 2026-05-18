@@ -7,10 +7,10 @@ Slug: `contact-host`
 Evidence status: historical Phase 1/2 boundary snapshot. Runtime/browser
 behavior and test execution were `NOT VERIFIED` in this phase. Current focused
 runtime/test status is recorded in `runtime-verification.md`,
-`11-test-traceability-matrix.md`, and `evidence-register.md` CH-E032-CH-E049.
+`11-test-traceability-matrix.md`, and `evidence-register.md` CH-E032-CH-E050.
 
-Source of truth: merged `main` commit `b9e6cea0` after PR #123 was
-squash-merged, with follow-up documentation evidence recorded in CH-E046-CH-E049.
+Source of truth: merged `main` commit `e0d8ca96` after PR #124 was
+merged, with follow-up documentation evidence recorded in CH-E046-CH-E050.
 Production code was not modified.
 
 ## Included
@@ -88,7 +88,7 @@ Production code was not modified.
   helpers, contactability, paywall/contact attempts, conversation deduplication,
   messaging journeys, mobile messaging, and notifications. Test execution was
   `NOT VERIFIED` in Phase 1/2; later focused command results are tracked in
-  `evidence-register.md` CH-E032-CH-E049 and
+  `evidence-register.md` CH-E032-CH-E050 and
   `11-test-traceability-matrix.md`. Phase 1/2 evidence:
   `src/__tests__/components/ContactHostButton.test.tsx:33-289`,
   `src/__tests__/api/messages.test.ts:93-621`,
@@ -114,12 +114,12 @@ Production code was not modified.
 - Private feedback is adjacent to messaging threads and included only as route
   context, not as part of conversation creation. Evidence:
   `src/app/messages/[id]/page.tsx:76-125`.
-- Runtime UX, real email delivery, real Stripe checkout, Supabase realtime, and
-  production database behavior were not verified in Phase 1/2. Current runtime
+- Runtime UX, real email delivery, real Stripe checkout, Supabase realtime or
+  policy configuration, and production database behavior were not verified in Phase 1/2. Current runtime
   evidence is partial: focused Jest/API/security/component checks, Chromium
   messaging, Mobile Chrome no-deps, setup-backed Mobile Chrome, focused
   Chromium listing-detail Contact Host checks, and PR #123 runnable messaging
-  functional-core CI coverage pass; checkout browser return, Supabase RLS,
+  functional-core CI coverage pass; checkout browser return, production Supabase policies/publications,
   skipped/fixme messaging realtime cases, email, suspended/paywall-required/unavailable
   listing-detail states, and browser coverage outside configured CI projects
   remain gaps.
@@ -139,9 +139,9 @@ Production code was not modified.
 | Question | Why it matters | Status |
 |---|---|---|
 | Does any search/map listing card trigger contact host directly, or only navigate to listing detail? | A direct card action would expand the feature boundary and interaction census. | `UNKNOWN`; needs Phase 4 source and browser pass. |
-| Which tests are release-blocking for contact-host versus confidence-building? | Later docs need a test matrix that does not overstate unrun tests. | Classified in `11-test-traceability-matrix.md`; checkout browser return, Supabase RLS, skipped/fixme messaging realtime cases, email, broader browser matrix, and suspended/paywall/unavailable listing-detail state execution remain gaps. |
+| Which tests are release-blocking for contact-host versus confidence-building? | Later docs need a test matrix that does not overstate unrun tests. | Classified in `11-test-traceability-matrix.md`; checkout browser return, production Supabase policies/publications, skipped/fixme messaging realtime cases, email, broader browser matrix, and suspended/paywall/unavailable listing-detail state execution remain gaps. |
 | Is the visible contact-host UI a modal/form or a direct button-to-thread flow for all states? | User-action docs must describe actual visible behavior. | Partially verified: contact button, focused listing-detail Chromium states, Chromium messaging journey, Mobile Chrome no-deps, and setup-backed Mobile Chrome inbox/thread passed; paywall checkout and suspended/paywall/unavailable listing states remain gaps. |
 | Are notification emails actually delivered in runtime environments? | Source queues email send calls, but delivery depends on environment/configuration. | `NOT VERIFIED`; requires runtime/email evidence. |
-| Does Supabase realtime work, and when does polling take over? | Messaging UX depends on realtime or fallback behavior. | Partially known: PR #123 CI includes runnable messaging functional-core cases, but Supabase RLS, skipped two-user polling, unread badge, failed-message retry, and explicit realtime fallback behavior remain gaps. |
+| Does Supabase realtime work, and when does polling take over? | Messaging UX depends on realtime or fallback behavior. | Partially known: PR #123 CI includes runnable messaging functional-core cases, and CH-E050 found client-side realtime/polling source plus test-source coverage. CH-E050 also found no repo-backed messaging RLS policy or realtime publication entry, so production Supabase policies/publications, skipped two-user polling, unread badge, failed-message retry, and explicit runtime realtime fallback behavior remain gaps. |
 | Are booking-system assumptions fully removed from contact-host docs? | Contact-host appears to be contact-first, not booking-first. | Current boundary excludes booking/holds; later docs should keep historical booking references explicitly marked if they appear. |
 | Is there any broader profile-completion or user-verification gate beyond email verification and suspension? | The requested profile/suspension boundary needs accurate requirements without inventing a guard. | `UNKNOWN`; needs Phase 4 auth/profile pass. |

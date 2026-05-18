@@ -5,7 +5,9 @@ evidence where available. Contact button, `/api/messages`, listing
 contactability, focused Chromium listing-detail, Chromium messaging, Mobile
 Chrome no-deps messaging, setup-backed Mobile Chrome messaging, P1 unit/API
 follow-up checks, and PR #123 runnable messaging functional-core CI coverage
-pass. Checkout browser return, Supabase RLS, skipped/fixme messaging realtime
+pass. CH-E050 adds source/test-source inspection for realtime/polling and finds
+no repo-backed messaging RLS/publication proof. Checkout browser return,
+production Supabase policies/publications, skipped/fixme messaging realtime
 cases, actual email delivery, suspended/paywall/unavailable listing states, and
 browser coverage outside configured CI projects remain gaps.
 
