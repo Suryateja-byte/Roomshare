@@ -51,6 +51,33 @@ Implementation work uses a phase-gated workflow coordinated by
   and the reusable skill in
   [`.agents/skills/implementation-triad/SKILL.md`](.agents/skills/implementation-triad/SKILL.md).
 
+## Feature Documentation Harness
+
+Use the evidence-first feature documentation harness when documenting a complex
+feature.
+
+1. Do not write final documentation first.
+2. First create or update:
+   - `manifest.json`
+   - `source-map.md`
+   - `evidence-register.md`
+   - `interaction-census.md`
+3. Every factual claim must cite evidence:
+   - file path and line range
+   - test command and result
+   - browser observation
+   - schema or migration reference
+   - or `UNKNOWN` / `NOT VERIFIED`
+4. Separate current behavior, intended behavior, inferred behavior, and unknown
+   behavior.
+5. Do not modify production code unless explicitly asked.
+6. Documentation output goes under `docs/features/[feature-slug]/`.
+7. If evidence is missing, mark it as a gap instead of guessing.
+8. Final documentation must pass an adversarial verification pass.
+
+Follow the detailed playbook in
+[`.agents/workflows/feature-documentation-harness.md`](.agents/workflows/feature-documentation-harness.md).
+
 ## Code Navigation
 
 ### Tool Selection: LSP vs Grep/Glob
@@ -102,3 +129,146 @@ Implementation work uses a phase-gated workflow coordinated by
 - If LSP server is not running or still initializing → fall back to grep
 - If LSP returns no results (dynamic code, untyped JS) → supplement with grep
 - For files LSP doesn't cover (JSON, YAML, Markdown, config) → always use grep
+
+## Roomshare E2E Testing Rules
+
+When implementing search/map user-flow tests:
+
+- Use Playwright Test with TypeScript.
+- Test user-visible behavior first: roles, labels, text, URLs, visible warnings,
+  focused listing, modal states, and bottom-sheet states.
+- Prefer `getByRole`, `getByLabel`, `getByText`, and `getByTestId` only where
+  semantic locators are not stable enough.
+- Do not use long CSS/XPath chains.
+- Each test must be isolated and able to run independently.
+- Use fixtures for seeded users, listings, search data, auth state, and cleanup.
+- Use `storageState` for logged-in user tests.
+- Mock external APIs when needed: geocoding, map tile/style failures,
+  map/search API failures, rate-limit responses, checkout/paywall routes.
+- Never hit real payment APIs in E2E.
+- Avoid fixed sleeps. Use Playwright auto-waiting and web-first assertions.
+- For every implemented flow, assert:
+  - no page crash
+  - no unhandled console error or page error
+  - expected visible UI state
+  - canonical URL state
+  - correct result behavior
+  - correct auth/paywall redirect behavior when applicable
+- Run the narrow test first, then the related spec file, then the full search
+  suite.
+- Return a final verification report with commands run, passing/failing tests,
+  files changed, and known gaps.
+
+## Roomshare Create Listing E2E Testing Rules
+
+When implementing host `/listings/create` user-flow tests:
+
+- Use Playwright Test with TypeScript.
+- Keep create-listing form tests under `tests/e2e/create-listing`.
+- Keep duplicate-listing/collision tests under `tests/e2e/dedupe`.
+- Reuse and extend `tests/e2e/page-objects/create-listing.page.ts` before
+  adding one-off selectors in specs.
+- Test user-visible behavior first: warnings, field errors, focused invalid
+  fields, disabled submit states, upload cards, dialogs, toasts, redirects, and
+  preserved form values.
+- Prefer `getByRole`, `getByLabel`, `getByText`, and existing `data-testid`
+  values only where semantic locators are not stable enough.
+- Separate anonymous, authenticated host, incomplete-profile, suspended,
+  unverified, mocked-failure, and dedupe/collision flows.
+- Use `storageState` for authenticated host flows; use an empty storage state
+  for anonymous redirect tests.
+- Mock external or flaky dependencies when the UI behavior is the target:
+  image upload/storage, geocoding, rate-limit responses, CSRF failures, network
+  failures, and search-sync delay/failure states.
+- Do not hit real third-party storage, payment, or geocoding providers in CI.
+- Avoid fixed sleeps. Use Playwright auto-waiting, request/response waits, and
+  web-first assertions.
+- For upload tests, use fixture images or in-memory `FilePayload` data. Do not
+  commit large binary files just to prove the 5MB limit.
+- Any test that creates a real listing must clean it up through an existing test
+  helper or deterministic cleanup path.
+- For successful publish flows, assert:
+  - no page crash
+  - no unhandled console error or page error
+  - success toast appears
+  - draft storage is cleared
+  - navigation guard is disabled
+  - redirect lands on `/listings/{id}`
+  - duplicate submits do not create duplicate records when applicable
+- For failure flows, assert:
+  - form data is preserved
+  - the user sees a usable error
+  - server field errors map to the right fields
+  - focus moves to the first invalid field where the UI owns focus behavior
+- Run the narrow test first, then the related create-listing or dedupe spec
+  file, then the relevant suite/project in CI.
+- Return a final verification report with commands run, passing/failing tests,
+  files changed, known gaps, and any product bugs found.
+
+## Production Readiness Review Rules
+
+Use the release-readiness harness under `docs/review` for whole-project audits.
+The harness is evidence-gated: a finding is valid only when it is tied to exact
+code evidence and a concrete failure mode.
+
+### Audit Phase Rules
+
+- Treat this repository as a production system, not a demo.
+- Do not edit code during audit phases unless the user explicitly asks for a
+  fix.
+- Before suggesting a finding, cite exact files, functions, routes, actions, or
+  migrations.
+- Explain the failure mode, impact, and a reproduction path or test idea.
+- Assign severity `P0`, `P1`, `P2`, or `P3`, plus confidence
+  `High`, `Medium`, or `Low`.
+- Mark speculative items as `HYPOTHESIS`; do not record them as confirmed
+  issues until code, test, runtime, or scanner evidence supports them.
+- Check `docs/review/review_ledger.md` before recording an issue and mark
+  duplicates explicitly.
+- Challenge every `P0` or `P1` finding for plausible false positives before it
+  becomes release-blocking.
+
+### Severity Model
+
+- `P0`: exploitable security issue, data corruption, auth bypass, production
+  cannot build or deploy.
+- `P1`: serious regression, broken critical flow, missing validation on a public
+  surface, high-risk race condition, or critical privacy leak.
+- `P2`: important reliability, UX, performance, observability, or test gap that
+  is not release-blocking for MVP.
+- `P3`: cleanup, refactor, maintainability, or non-critical polish.
+
+`P0` and `P1` issues are release blockers. `P2` and `P3` issues are not release
+blockers unless several combine into a material production risk.
+
+### High-Risk Areas
+
+Treat these as `P0` or `P1` unless proven otherwise:
+
+- Authentication bypass.
+- Authorization or RBAC bypass.
+- PII leakage.
+- Secret exposure.
+- SQL, command, template, XSS, CSRF, or SSRF injection.
+- Unsafe file upload.
+- Broken payment, booking, contact, messaging, listing, or availability
+  invariant.
+- Data corruption or unsafe migration.
+- Race condition in critical writes.
+- Missing server-side validation on a public API route or server action.
+- Logging sensitive data.
+- Production build, deploy, or migration failure.
+- Missing regression test for a critical bug fix.
+
+### Fix Verification
+
+Before any issue is marked fixed in `docs/review/review_ledger.md`:
+
+- Add or update a regression test when practical.
+- Run the smallest relevant test first.
+- Run the relevant release gates from
+  `docs/review/production_readiness_matrix.md`.
+- Record commands run, pass/fail results, files changed, remaining risk, and
+  verification gaps in the ledger.
+- Run an adversarial re-review against fixed `P0` and `P1` findings before
+  declaring a release candidate.

@@ -85,6 +85,7 @@ memory-bank/activeContext.md
 !.agents/workflows/
 .agents/workflows/*
 !.agents/workflows/implementation-triad.md
+!.agents/workflows/feature-documentation-harness.md
 !.agents/skills/
 .agents/skills/*
 !.agents/skills/implementation-triad/
