@@ -105,6 +105,9 @@ const mockedFeatures = features as {
   disablePayments: boolean;
 };
 
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+const freshLastConfirmedAt = () => new Date(Date.now() - ONE_DAY_MS);
+
 describe("POST /api/payments/checkout", () => {
   const originalNodeEnv = process.env.NODE_ENV;
 
@@ -143,7 +146,7 @@ describe("POST /api/payments/checkout", () => {
       moveInDate: new Date("2026-05-01T00:00:00.000Z"),
       availableUntil: null,
       minStayMonths: 1,
-      lastConfirmedAt: new Date("2026-04-20T00:00:00.000Z"),
+      lastConfirmedAt: freshLastConfirmedAt(),
     });
     mockEvaluateMessageStartPaywall.mockResolvedValue({
       summary: {

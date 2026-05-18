@@ -22,6 +22,9 @@ import {
   tokenizePublicAutocompleteText,
 } from "@/lib/geocoding/public-autocomplete";
 
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+const freshLastConfirmedAt = () => new Date(Date.now() - ONE_DAY_MS);
+
 describe("public autocomplete", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -83,7 +86,7 @@ describe("public autocomplete", () => {
         moveInDate: new Date("2026-05-01T00:00:00.000Z"),
         availableUntil: null,
         minStayMonths: 1,
-        lastConfirmedAt: new Date("2026-04-20T00:00:00.000Z"),
+        lastConfirmedAt: freshLastConfirmedAt(),
         status: "ACTIVE",
         statusReason: null,
         needsMigrationReview: false,
@@ -110,7 +113,7 @@ describe("public autocomplete", () => {
         moveInDate: new Date("2026-05-01T00:00:00.000Z"),
         availableUntil: null,
         minStayMonths: 1,
-        lastConfirmedAt: new Date("2026-04-20T00:00:00.000Z"),
+        lastConfirmedAt: freshLastConfirmedAt(),
         status: "ACTIVE",
         statusReason: null,
         needsMigrationReview: false,
@@ -128,7 +131,7 @@ describe("public autocomplete", () => {
         moveInDate: new Date("2026-05-01T00:00:00.000Z"),
         availableUntil: null,
         minStayMonths: 1,
-        lastConfirmedAt: new Date("2026-04-20T00:00:00.000Z"),
+        lastConfirmedAt: freshLastConfirmedAt(),
         status: "ACTIVE",
         statusReason: null,
         needsMigrationReview: false,
@@ -164,7 +167,7 @@ describe("public autocomplete", () => {
         moveInDate: new Date("2026-05-01T00:00:00.000Z"),
         availableUntil: null,
         minStayMonths: 1,
-        lastConfirmedAt: new Date("2026-04-20T00:00:00.000Z"),
+        lastConfirmedAt: freshLastConfirmedAt(),
         status: "ACTIVE",
         statusReason: null,
         needsMigrationReview: true,

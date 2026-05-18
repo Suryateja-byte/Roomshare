@@ -93,6 +93,9 @@ import { GET, POST } from "@/app/api/messages/route";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+const freshLastConfirmedAt = () => new Date(Date.now() - ONE_DAY_MS);
+
 // Helper to create mock request using native Request
 function createMockRequest(
   url: string,
@@ -508,7 +511,7 @@ describe("Messages Pagination (P1-03)", () => {
           moveInDate: new Date("2026-05-01T00:00:00.000Z"),
           availableUntil: null,
           minStayMonths: 1,
-          lastConfirmedAt: new Date("2026-04-20T12:00:00.000Z"),
+          lastConfirmedAt: freshLastConfirmedAt(),
         },
       });
     });
