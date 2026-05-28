@@ -181,6 +181,7 @@ test.describe("Create Listing — Accessibility Tests", () => {
     const clp = new CreateListingPage(page);
     await clp.goto();
     await clp.mockImageUpload();
+    await clp.mockListingApiSuccess("keyboard-submit-listing");
 
     const data = validData();
     await clp.fillRequiredFields(data);
@@ -190,16 +191,17 @@ test.describe("Create Listing — Accessibility Tests", () => {
     // Focus the submit button and press Enter
     await clp.submitButton.focus();
     await expect(clp.submitButton).toBeFocused();
-    await page.keyboard.press("Enter");
-
-    // Should either submit successfully or show server validation
-    // We verify the form was submitted by waiting for a network response
-    const response = await page.waitForResponse(
+    const responsePromise = page.waitForResponse(
       (resp) =>
         resp.url().includes("/api/listings") &&
         resp.request().method() === "POST",
       { timeout: timeouts.navigation }
     );
+    await page.keyboard.press("Enter");
+
+    // Should either submit successfully or show server validation
+    // We verify the form was submitted by waiting for a network response
+    const response = await responsePromise;
     expect(response.status()).toBeLessThan(500);
   });
 

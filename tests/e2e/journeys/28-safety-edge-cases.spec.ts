@@ -141,15 +141,12 @@ test.describe("J45: Report a Listing", () => {
     }
 
     // Step 6: Verify confirmation — ReportButton shows inline "Thank you" text
-    const hasToast = await page
+    const confirmation = page
       .locator(selectors.toast)
-      .isVisible()
-      .catch(() => false);
-    const hasConfirm = await page
-      .getByText(/reported|submitted|thank/i)
-      .isVisible()
-      .catch(() => false);
-    expect(hasToast || hasConfirm).toBeTruthy();
+      .filter({ hasText: /reported|submitted|thank/i })
+      .or(page.getByText(/reported|submitted|thank/i))
+      .first();
+    await expect(confirmation).toBeVisible({ timeout: timeouts.action });
   });
 });
 

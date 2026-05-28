@@ -29,7 +29,7 @@ test.describe("VE: Page Structure", () => {
       page.getByRole("heading", { name: /Verification Link Expired/i })
     ).toBeVisible({ timeout: timeouts.navigation });
     await expect(
-      page.locator("p").filter({ hasText: /no longer valid/i })
+      page.getByText(/no longer valid/i).first()
     ).toBeVisible();
   });
 

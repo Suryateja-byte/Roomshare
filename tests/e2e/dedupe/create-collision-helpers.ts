@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 import { expect } from "../helpers";
 import { CreateListingPage, type CreateListingData } from "../page-objects/create-listing.page";
 import { testApi } from "../helpers/stability-helpers";
+import { signAddressSuggestionToken } from "../../../src/lib/geocoding/address-suggestion-token";
 
 const OWNER_EMAIL = process.env.E2E_TEST_EMAIL || "e2e-test@roomshare.dev";
 
@@ -115,13 +116,104 @@ export function buildCollisionFormData(
   };
 }
 
+async function getOwnerId(page: Page): Promise<string> {
+  const response = await testApi<{ id: string }>(page, "findUserByEmail", {
+    email: OWNER_EMAIL,
+  });
+
+  if (!response.ok) {
+    throw new Error(`findUserByEmail failed: ${JSON.stringify(response.data)}`);
+  }
+
+  return response.data.id;
+}
+
+async function mockAddressSuggestionForCollision(
+  page: Page,
+  data: CreateListingData
+): Promise<void> {
+  const ownerId = await getOwnerId(page);
+  const issuedAt = Date.now();
+  const addressSuggestionToken = signAddressSuggestionToken({
+    provider: "google",
+    precision: "PREMISE",
+    sourceId: `e2e-collision:${data.address}:${data.zipCode}`,
+    userId: ownerId,
+    address: data.address,
+    city: data.city,
+    state: data.state,
+    zip: data.zipCode,
+    lat: 37.7861,
+    lng: -122.4094,
+    issuedAt,
+    expiresAt: issuedAt + 15 * 60 * 1000,
+  });
+
+  await page.route("**/api/geocoding/address-autocomplete?**", async (route) => {
+    const requestUrl = new URL(route.request().url());
+    const query = requestUrl.searchParams.get("q") ?? "";
+    if (!query.toLowerCase().includes(data.address.toLowerCase())) {
+      await route.continue();
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        suggestions: [
+          {
+            id: `e2e-collision-${data.zipCode}`,
+            label: `${data.address}, ${data.city}, ${data.state} ${data.zipCode}`,
+            primaryText: data.address,
+            secondaryText: `${data.city}, ${data.state} ${data.zipCode}`,
+            address: data.address,
+            city: data.city,
+            state: data.state,
+            zip: data.zipCode,
+            lat: 37.7861,
+            lng: -122.4094,
+            precision: "PREMISE",
+            provider: "google",
+            addressSuggestionToken,
+          },
+        ],
+      }),
+    });
+  });
+}
+
+async function selectCollisionAddressSuggestion(
+  page: Page,
+  createPage: CreateListingPage,
+  data: CreateListingData
+): Promise<void> {
+  await mockAddressSuggestionForCollision(page, data);
+  await createPage.addressInput.fill(data.address);
+  await expect(
+    page.getByRole("listbox", { name: "Address suggestions" })
+  ).toBeVisible();
+  const providerSuggestion = page
+    .getByRole("option")
+    .filter({ hasText: data.address })
+    .filter({ hasText: data.city })
+    .first();
+  await expect(providerSuggestion).toBeVisible();
+  await providerSuggestion.click();
+  await expect(createPage.addressInput).toHaveValue(data.address);
+  await expect(createPage.cityInput).toHaveValue(data.city);
+  await expect(createPage.stateInput).toHaveValue(data.state);
+  await expect(createPage.zipInput).toHaveValue(data.zipCode);
+}
+
 export async function openPreparedCreateListingPage(
   page: Page,
   data: CreateListingData
 ): Promise<CreateListingPage> {
   const createPage = new CreateListingPage(page);
   await createPage.goto();
-  await createPage.fillRequiredFields(data);
+  await createPage.fillBasics(data);
+  await selectCollisionAddressSuggestion(page, createPage, data);
   await createPage.fillOptionalFields({ moveInDate: "today" });
   await createPage.mockImageUpload();
   await createPage.uploadTestImage();
