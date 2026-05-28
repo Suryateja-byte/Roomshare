@@ -235,18 +235,19 @@ test.describe("Create Listing — Functional Tests", () => {
       });
 
       await clp.goto();
-      await expect(page.getByText(/you can publish now/i)).toBeVisible();
       await expect(
-        page.getByText(/profile must be at least/i)
-      ).toHaveCount(0);
-      await expect(
-        page.getByText(/complete id verification/i)
-      ).toHaveCount(0);
+        page.getByText(/you can publish now/i).first()
+      ).toBeVisible();
+      await expect(page.getByText(/profile must be at least/i)).toHaveCount(0);
+      await expect(page.getByText(/complete id verification/i)).toHaveCount(0);
 
       await page.evaluate(() => {
         localStorage.setItem(
           "listing-draft",
-          JSON.stringify({ data: { title: "stale draft" }, savedAt: Date.now() })
+          JSON.stringify({
+            data: { title: "stale draft" },
+            savedAt: Date.now(),
+          })
         );
       });
 
@@ -490,9 +491,7 @@ test.describe("Create Listing — Functional Tests", () => {
       const clp = new CreateListingPage(page);
       await clp.goto();
 
-      await expect(
-        page.getByText(/profile must be at least/i)
-      ).toHaveCount(0);
+      await expect(page.getByText(/profile must be at least/i)).toHaveCount(0);
       const profileGuidance = page.getByText(/you can publish now/i).first();
       const isVisible = await profileGuidance.isVisible().catch(() => false);
 

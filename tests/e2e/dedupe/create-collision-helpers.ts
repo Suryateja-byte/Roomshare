@@ -164,9 +164,9 @@ async function mockAddressSuggestionForCollision(
     expiresAt: issuedAt + 15 * 60 * 1000,
   });
 
-  await page.route(
-    /\/api\/geocoding\/address-autocomplete(?:\?|$)/,
-    async (route) => {
+  await page
+    .context()
+    .route("**/api/geocoding/address-autocomplete**", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -190,8 +190,7 @@ async function mockAddressSuggestionForCollision(
           ],
         }),
       });
-    }
-  );
+    });
 }
 
 async function selectCollisionAddressSuggestion(
@@ -199,16 +198,8 @@ async function selectCollisionAddressSuggestion(
   createPage: CreateListingPage,
   data: CreateListingData
 ): Promise<void> {
-  await mockAddressSuggestionForCollision(page, data);
-  const suggestionsResponse = page.waitForResponse(
-    (response) =>
-      response.url().includes("/api/geocoding/address-autocomplete") &&
-      response.request().method() === "GET" &&
-      response.status() === 200,
-    { timeout: 15_000 }
-  );
+  await createPage.addressInput.fill("");
   await createPage.addressInput.fill(data.address);
-  await suggestionsResponse;
   await expect(
     page.getByRole("listbox", { name: "Address suggestions" })
   ).toBeVisible();
@@ -230,6 +221,7 @@ export async function openPreparedCreateListingPage(
   data: CreateListingData
 ): Promise<CreateListingPage> {
   const createPage = new CreateListingPage(page);
+  await mockAddressSuggestionForCollision(page, data);
   await createPage.goto();
   await createPage.fillBasics(data);
   await selectCollisionAddressSuggestion(page, createPage, data);
