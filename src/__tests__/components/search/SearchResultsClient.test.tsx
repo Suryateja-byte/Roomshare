@@ -20,13 +20,7 @@ import { emitSearchClientMetric } from "@/lib/search/search-telemetry-client";
 const mockRouterRefresh = jest.fn();
 
 const mockListingCard = jest.fn(
-  ({
-    listing,
-    href,
-  }: {
-    listing: ListingData;
-    href?: string;
-  }) => (
+  ({ listing, href }: { listing: ListingData; href?: string }) => (
     <div
       data-testid={`listing-${listing.id}`}
       data-href={href ?? `/listings/${listing.id}`}
@@ -36,11 +30,9 @@ const mockListingCard = jest.fn(
   )
 );
 
-const mockSplitStayCard = jest.fn(
-  (_props: Record<string, unknown>) => (
-    <div data-testid="split-stay-card">Split Stay</div>
-  )
-);
+const mockSplitStayCard = jest.fn((_props: Record<string, unknown>) => (
+  <div data-testid="split-stay-card">Split Stay</div>
+));
 
 // Mock fetchMoreListings server action
 jest.mock("@/app/search/actions", () => ({
@@ -264,11 +256,12 @@ describe("SearchResultsClient", () => {
         <SearchResultsClient {...defaultProps} browseMode={true} query="" />
       );
 
-      expect(container.querySelector('[data-testid="search-shell"]')).toHaveAttribute(
-        "data-browse-mode",
-        "true"
-      );
-      expect(screen.queryByTestId("suggested-searches")).not.toBeInTheDocument();
+      expect(
+        container.querySelector('[data-testid="search-shell"]')
+      ).toHaveAttribute("data-browse-mode", "true");
+      expect(
+        screen.queryByTestId("suggested-searches")
+      ).not.toBeInTheDocument();
     });
 
     it("passes canonical listing detail range hrefs when search includes moveInDate and endDate", () => {
@@ -340,10 +333,14 @@ describe("SearchResultsClient", () => {
       render(<SearchResultsClient {...defaultProps} />);
 
       await waitFor(() => {
-        expect(screen.getByText("Don't miss out")).toBeInTheDocument();
+        expect(
+          screen.getByText("New places, straight to you")
+        ).toBeInTheDocument();
       });
 
-      const callout = screen.getByText("Don't miss out").closest("section");
+      const callout = screen
+        .getByText("New places, straight to you")
+        .closest("section");
       expect(callout).toHaveClass("hidden");
       expect(callout).toHaveClass("md:flex");
     });

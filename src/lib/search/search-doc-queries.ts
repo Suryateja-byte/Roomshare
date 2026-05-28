@@ -21,6 +21,7 @@ import { wrapDatabaseError } from "@/lib/errors";
 import { unstable_cache } from "next/cache";
 import type {
   FilterParams,
+  HostIdentityStatus,
   ListingData,
   MapListingData,
   PaginatedResultHybrid,
@@ -81,6 +82,10 @@ function isPresent<T>(value: T | null | undefined): value is T {
   return value != null;
 }
 
+function normalizeHostIdentityStatus(value: unknown): HostIdentityStatus {
+  return value === "verified" || value === "unverified" ? value : "unknown";
+}
+
 // ============================================
 // Raw Query Result Interfaces (M6 fix)
 // ============================================
@@ -102,6 +107,7 @@ interface MapListingRaw {
   status: string;
   statusReason: string | null;
   needsMigrationReview?: boolean | null;
+  hostIdentityStatus?: HostIdentityStatus | null;
   primaryImage: string | null;
   roomType: string | null;
   moveInDate: string | Date | null;
@@ -143,6 +149,7 @@ interface ListingRaw {
   viewCount: number | string;
   ownerId?: string;
   normalizedAddress?: string | null;
+  hostIdentityStatus?: HostIdentityStatus | null;
   address?: string | null;
   city: string;
   state: string;
@@ -839,6 +846,7 @@ function buildSearchDocWhereConditionsInternal(
   const conditions: string[] = [
     slotConditionSql,
     `l.status = 'ACTIVE'`,
+    `u."isSuspended" = FALSE`,
     `COALESCE(FALSE, FALSE) = FALSE`,
     `COALESCE(l."statusReason", '') NOT IN ('MIGRATION_REVIEW', 'ADMIN_PAUSED', 'SUPPRESSED')`,
     "d.lat IS NOT NULL",
@@ -1078,6 +1086,7 @@ async function getSearchDocLimitedCountInternal(
       SELECT d.id
       FROM listing_search_docs d
       JOIN "Listing" l ON l.id = d.id
+      JOIN "User" u ON u.id = l."ownerId"
       WHERE ${whereClause}
       LIMIT ${HYBRID_COUNT_THRESHOLD + 1}
     ) subq
@@ -1154,6 +1163,7 @@ export function mapRawListingsToPublic(listings: ListingRaw[]): ListingData[] {
         lastConfirmedAt,
         status: l.status,
         statusReason: l.statusReason,
+        hostIdentityStatus: normalizeHostIdentityStatus(l.hostIdentityStatus),
         amenities: l.amenities || [],
         houseRules: l.houseRules || [],
         householdLanguages: l.householdLanguages || [],
@@ -1218,6 +1228,9 @@ export function mapRawMapListingsToPublic(
           lastConfirmedAt,
           status: listing.status,
           statusReason: listing.statusReason,
+          hostIdentityStatus: normalizeHostIdentityStatus(
+            listing.hostIdentityStatus
+          ),
           location: {
             city: listing.city ?? undefined,
             state: listing.state ?? undefined,
@@ -1284,6 +1297,7 @@ export async function getSearchDocListingsByIds(
       FALSE as "needsMigrationReview",
       l."ownerId" as "ownerId",
       l."normalizedAddress" as "normalizedAddress",
+      CASE WHEN u."isVerified" THEN 'verified' ELSE 'unverified' END as "hostIdentityStatus",
       d.amenities,
       d.house_rules as "houseRules",
       d.household_languages as "householdLanguages",
@@ -1301,7 +1315,11 @@ export async function getSearchDocListingsByIds(
       d.review_count as "reviewCount"
     FROM listing_search_docs d
     JOIN "Listing" l ON l.id = d.id
+    JOIN "User" u ON u.id = l."ownerId"
     WHERE d.id = ANY($1::text[])
+      AND l.status = 'ACTIVE'
+      AND u."isSuspended" = FALSE
+      AND COALESCE(l."statusReason", '') NOT IN ('MIGRATION_REVIEW', 'ADMIN_PAUSED', 'SUPPRESSED')
   `;
 
   const rows = await queryWithTimeout<ListingRaw>(sqlQuery, [listingIds]);
@@ -1382,6 +1400,7 @@ async function getSearchDocMapListingsInternal(
       l.status::text as status,
       l."statusReason" as "statusReason",
       FALSE as "needsMigrationReview",
+      CASE WHEN u."isVerified" THEN 'verified' ELSE 'unverified' END as "hostIdentityStatus",
       d.images[1] as "primaryImage",
       d.room_type as "roomType",
       l."moveInDate" as "moveInDate",
@@ -1395,6 +1414,7 @@ async function getSearchDocMapListingsInternal(
       d.listing_created_at as "createdAt"
     FROM listing_search_docs d
     JOIN "Listing" l ON l.id = d.id
+    JOIN "User" u ON u.id = l."ownerId"
     WHERE ${whereClause}
     ORDER BY ${orderByClause}
     LIMIT $${paramIndex}
@@ -1603,6 +1623,7 @@ async function getSearchDocListingsPaginatedInternal(
         FALSE as "needsMigrationReview",
         l."ownerId" as "ownerId",
         l."normalizedAddress" as "normalizedAddress",
+        CASE WHEN u."isVerified" THEN 'verified' ELSE 'unverified' END as "hostIdentityStatus",
         d.amenities,
         d.house_rules as "houseRules",
         d.household_languages as "householdLanguages",
@@ -1622,6 +1643,7 @@ async function getSearchDocListingsPaginatedInternal(
         d.review_count as "reviewCount"
       FROM listing_search_docs d
       JOIN "Listing" l ON l.id = d.id
+      JOIN "User" u ON u.id = l."ownerId"
       WHERE ${whereClause}
       ORDER BY ${orderByClause}
       LIMIT $${paramIndex++} OFFSET $${paramIndex++}
@@ -1818,6 +1840,7 @@ export async function getSearchDocListingsWithKeyset(
         FALSE as "needsMigrationReview",
         l."ownerId" as "ownerId",
         l."normalizedAddress" as "normalizedAddress",
+        CASE WHEN u."isVerified" THEN 'verified' ELSE 'unverified' END as "hostIdentityStatus",
         d.amenities,
         d.house_rules as "houseRules",
         d.household_languages as "householdLanguages",
@@ -1843,6 +1866,7 @@ export async function getSearchDocListingsWithKeyset(
         d.listing_created_at::text as "_cursorCreatedAt"
       FROM listing_search_docs d
       JOIN "Listing" l ON l.id = d.id
+      JOIN "User" u ON u.id = l."ownerId"
       WHERE ${whereClause}
       ORDER BY ${orderByClause}
       LIMIT $${paramIndex++}
@@ -2026,6 +2050,7 @@ export async function getSearchDocListingsFirstPage(
         FALSE as "needsMigrationReview",
         l."ownerId" as "ownerId",
         l."normalizedAddress" as "normalizedAddress",
+        CASE WHEN u."isVerified" THEN 'verified' ELSE 'unverified' END as "hostIdentityStatus",
         d.amenities,
         d.house_rules as "houseRules",
         d.household_languages as "householdLanguages",
@@ -2051,6 +2076,7 @@ export async function getSearchDocListingsFirstPage(
         d.listing_created_at::text as "_cursorCreatedAt"
       FROM listing_search_docs d
       JOIN "Listing" l ON l.id = d.id
+      JOIN "User" u ON u.id = l."ownerId"
       WHERE ${whereClause}
       ORDER BY ${orderByClause}
       LIMIT $${paramIndex++}
@@ -2375,6 +2401,7 @@ export function mapSemanticRowsToListingData(
       reviewCount: Number(row.review_count) || 0,
       viewCount: Number(row.view_count) || 0,
       createdAt: row.listing_created_at ?? new Date(),
+      hostIdentityStatus: "unknown",
       location: {
         // address and zip intentionally omitted — "only included in listing detail, not search" (search-types.ts:37)
         city: row.city,

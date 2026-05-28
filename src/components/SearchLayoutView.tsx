@@ -38,6 +38,7 @@ export default function SearchLayoutView({ children }: SearchLayoutViewProps) {
     toggleMap,
     showMap,
     hideMap,
+    canShowMap,
     isLoading,
   } = useMapPreference();
 
@@ -45,7 +46,9 @@ export default function SearchLayoutView({ children }: SearchLayoutViewProps) {
     {
       key: "m",
       preventInInput: true,
-      action: toggleMap,
+      action: () => {
+        if (canShowMap) toggleMap();
+      },
       description: "Toggle map/list view",
     },
   ]);
@@ -56,6 +59,7 @@ export default function SearchLayoutView({ children }: SearchLayoutViewProps) {
       showMap={showMap}
       hideMap={hideMap}
       shouldShowMap={shouldShowMap}
+      canShowMap={canShowMap}
     >
       {/* Bridge: Scrolls listing card into view when map marker is clicked */}
       <ListScrollBridge />
@@ -65,6 +69,7 @@ export default function SearchLayoutView({ children }: SearchLayoutViewProps) {
           <PersistentMapWrapper shouldRenderMap={shouldRenderMap} />
         }
         shouldShowMap={shouldShowMap}
+        canShowMap={canShowMap}
         onToggle={toggleMap}
         isLoading={isLoading}
       >

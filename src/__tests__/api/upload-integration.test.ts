@@ -16,6 +16,7 @@ jest.mock("@/auth", () => ({
 
 jest.mock("@/app/actions/suspension", () => ({
   checkSuspension: jest.fn().mockResolvedValue({ suspended: false }),
+  checkEmailVerified: jest.fn().mockResolvedValue({ verified: true }),
 }));
 
 jest.mock("@/lib/with-rate-limit", () => ({
@@ -97,7 +98,7 @@ process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
 
 import { auth } from "@/auth";
-import { checkSuspension } from "@/app/actions/suspension";
+import { checkEmailVerified, checkSuspension } from "@/app/actions/suspension";
 import { createClient } from "@supabase/supabase-js";
 
 // ---------------------------------------------------------------------------
@@ -181,6 +182,7 @@ describe("POST /api/upload", () => {
     jest.clearAllMocks();
     (auth as jest.Mock).mockResolvedValue(mockSession);
     (checkSuspension as jest.Mock).mockResolvedValue({ suspended: false });
+    (checkEmailVerified as jest.Mock).mockResolvedValue({ verified: true });
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -219,6 +221,39 @@ describe("POST /api/upload", () => {
     expect(response.status).toBe(400);
     const body = await response.json();
     expect(body.error).toBe("No file provided");
+  });
+
+  it("returns 403 for listing uploads when email is not verified before storage work", async () => {
+    (checkEmailVerified as jest.Mock).mockResolvedValue({
+      verified: false,
+      error: "Please verify your email",
+    });
+    const sharpMock = jest.requireMock("sharp") as jest.Mock;
+
+    const file = createFakeFile(JPEG_MAGIC, "photo.jpg", "image/jpeg");
+    const request = makeUploadRequest(file, "listing");
+    const response = await POST(request as any);
+
+    expect(checkEmailVerified).toHaveBeenCalledWith("user-123");
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.error).toBe("Please verify your email");
+    expect(createClient).not.toHaveBeenCalled();
+    expect(sharpMock).not.toHaveBeenCalled();
+  });
+
+  it("does not require email verification for profile uploads", async () => {
+    (checkEmailVerified as jest.Mock).mockResolvedValue({
+      verified: false,
+      error: "Please verify your email",
+    });
+
+    const file = createFakeFile(JPEG_MAGIC, "photo.jpg", "image/jpeg");
+    const request = makeUploadRequest(file, "profile");
+    const response = await POST(request as any);
+
+    expect(response.status).toBe(200);
+    expect(checkEmailVerified).not.toHaveBeenCalled();
   });
 
   it("returns 400 for invalid MIME type", async () => {
@@ -271,6 +306,10 @@ describe("POST /api/upload", () => {
     }));
     jest.doMock("@/lib/with-rate-limit", () => ({
       withRateLimit: jest.fn().mockResolvedValue(null),
+    }));
+    jest.doMock("@/app/actions/suspension", () => ({
+      checkSuspension: jest.fn().mockResolvedValue({ suspended: false }),
+      checkEmailVerified: jest.fn().mockResolvedValue({ verified: true }),
     }));
     jest.doMock("@/lib/logger", () => ({
       logger: {
@@ -352,12 +391,18 @@ describe("POST /api/upload", () => {
     expect(body.path).toBeDefined();
   });
 
-  it("returns 500 when Supabase upload fails", async () => {
-    // Override the mock for this test to simulate upload failure
+  it("returns 502 when Supabase storage API upload fails", async () => {
     const mockFrom = jest.fn(() => ({
       upload: jest.fn().mockResolvedValue({
         data: null,
-        error: { name: "StorageError", message: "Upload failed" },
+        error: {
+          __isStorageError: true,
+          namespace: "storage",
+          name: "StorageApiError",
+          message: "Bucket not found",
+          status: 404,
+          statusCode: "NoSuchBucket",
+        },
       }),
       getPublicUrl: jest.fn(),
       remove: jest.fn(),
@@ -366,83 +411,50 @@ describe("POST /api/upload", () => {
       storage: { from: mockFrom },
     });
 
-    // Re-import to pick up the new mock
-    jest.resetModules();
+    const file = createFakeFile(JPEG_MAGIC, "photo.jpg", "image/jpeg");
+    const request = makeUploadRequest(file);
+    const response = await POST(request as any);
 
-    // Set up mocks again after reset
-    jest.doMock("@/auth", () => ({
-      auth: jest.fn().mockResolvedValue(mockSession),
-    }));
-    jest.doMock("@/lib/with-rate-limit", () => ({
-      withRateLimit: jest.fn().mockResolvedValue(null),
-    }));
-    jest.doMock("@/lib/logger", () => ({
-      logger: {
-        info: jest.fn().mockResolvedValue(undefined),
-        warn: jest.fn().mockResolvedValue(undefined),
-        sync: { error: jest.fn(), warn: jest.fn() },
-      },
-    }));
-    jest.doMock("@/lib/api-error-handler", () => ({
-      captureApiError: jest.fn().mockImplementation(() => {
-        const { NextResponse } = jest.requireMock("next/server");
-        return NextResponse.json(
-          { error: "Internal server error" },
-          { status: 500 }
-        );
+    expect(response.status).toBe(502);
+    const body = await response.json();
+    expect(body.error).toBe("Unable to upload image. Please try again.");
+    expect(body.error).not.toBe("Internal server error");
+  });
+
+  it("returns 503 when Supabase wraps a network upload failure", async () => {
+    const mockFrom = jest.fn(() => ({
+      upload: jest.fn().mockResolvedValue({
+        data: null,
+        error: {
+          __isStorageError: true,
+          namespace: "storage",
+          name: "StorageUnknownError",
+          message: "fetch failed",
+          originalError: {
+            name: "Error",
+            message: "getaddrinfo ENOTFOUND test.supabase.co",
+            code: "ENOTFOUND",
+          },
+        },
       }),
-      apiErrorResponse: jest.fn(),
+      getPublicUrl: jest.fn(),
+      remove: jest.fn(),
     }));
-    jest.doMock("@supabase/supabase-js", () => ({
-      createClient: jest.fn(() => ({
-        storage: {
-          from: jest.fn(() => ({
-            upload: jest.fn().mockResolvedValue({
-              data: null,
-              error: { name: "StorageError", message: "Upload failed" },
-            }),
-            getPublicUrl: jest.fn(),
-            remove: jest.fn(),
-          })),
-        },
-      })),
-    }));
-    jest.doMock("next/server", () => ({
-      NextResponse: {
-        json: (
-          data: unknown,
-          init?: { status?: number; headers?: Record<string, string> }
-        ) => {
-          const headers = new Map(Object.entries(init?.headers || {}));
-          return {
-            status: init?.status || 200,
-            json: async () => data,
-            headers,
-          };
-        },
-      },
-    }));
-    // Mock sharp to succeed so we reach the Supabase upload path
-    jest.doMock("sharp", () => {
-      const chain = {
-        rotate: jest.fn().mockReturnThis(),
-        gif: jest.fn().mockReturnThis(),
-        toBuffer: jest.fn().mockResolvedValue(Buffer.from([0xff, 0xd8, 0xff])),
-      };
-      return jest.fn(() => chain);
+    (createClient as jest.Mock).mockReturnValueOnce({
+      storage: { from: mockFrom },
     });
-
-    const { POST: POST2 } = await import("@/app/api/upload/route");
 
     const file = createFakeFile(JPEG_MAGIC, "photo.jpg", "image/jpeg");
     const request = makeUploadRequest(file);
-    const response = await POST2(request as any);
+    const response = await POST(request as any);
 
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(503);
+    expect(response.headers.get("Retry-After")).toBe("30");
     const body = await response.json();
-    // After jest.resetModules(), the captureApiError mock returns 'Internal server error'
-    // for caught exceptions, or the route returns 'Failed to upload' for Supabase errors
-    expect(body.error).toMatch(/Failed to upload|Internal server error/);
+    expect(body.error).toBe(
+      "Unable to connect to storage service. Please try again."
+    );
+    expect(body.error).not.toBe("Internal server error");
   });
 });
 
@@ -558,6 +570,10 @@ describe("DELETE /api/upload", () => {
     }));
     jest.doMock("@/lib/with-rate-limit", () => ({
       withRateLimit: jest.fn().mockResolvedValue(null),
+    }));
+    jest.doMock("@/app/actions/suspension", () => ({
+      checkSuspension: jest.fn().mockResolvedValue({ suspended: false }),
+      checkEmailVerified: jest.fn().mockResolvedValue({ verified: true }),
     }));
     jest.doMock("@/lib/logger", () => ({
       logger: {

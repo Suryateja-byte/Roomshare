@@ -2,38 +2,28 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { X, ChevronRight, User } from "lucide-react";
+import { X, ChevronRight, ShieldCheck } from "lucide-react";
 
-interface ProfileWarningBannerProps {
-  percentage: number;
-  missing: string[];
-}
-
-export default function ProfileWarningBanner({
-  percentage,
-  missing,
-}: ProfileWarningBannerProps) {
+export default function ProfileWarningBanner() {
   const [isDismissed, setIsDismissed] = useState(false);
 
   if (isDismissed) return null;
-
-  // Only show if profile is less than 60% complete
-  if (percentage >= 60) return null;
 
   return (
     <div className="mb-6 bg-amber-50 border border-outline-variant/20 rounded-xl p-4">
       <div className="flex items-start gap-3">
         <div className="flex-shrink-0 p-2 bg-amber-100 rounded-lg">
-          <User className="w-5 h-5 text-amber-600" />
+          <ShieldCheck className="w-5 h-5 text-amber-600" aria-hidden="true" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <div>
               <h3 className="text-sm font-semibold text-amber-900">
-                Complete your profile for better results
+                Build trust with renters
               </h3>
               <p className="text-sm text-amber-700 mt-0.5">
-                Listings from complete profiles get 3x more inquiries.
+                You can publish now. Completing your profile or getting identity
+                verified can help renters trust your listing.
               </p>
             </div>
             <button
@@ -45,47 +35,11 @@ export default function ProfileWarningBanner({
             </button>
           </div>
 
-          {/* Progress bar */}
-          <div className="mt-3">
-            <div className="flex items-center justify-between text-xs mb-1">
-              <span className="text-amber-600">
-                Profile {percentage}% complete
-              </span>
-              <span className="text-amber-500">
-                {missing.length} items remaining
-              </span>
-            </div>
-            <div className="w-full bg-amber-200 rounded-full h-1.5">
-              <div
-                className="h-1.5 rounded-full bg-amber-500 transition-all"
-                style={{ width: `${percentage}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Quick tips */}
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {missing.slice(0, 2).map((item, index) => (
-              <span
-                key={index}
-                className="inline-flex items-center text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full"
-              >
-                {item}
-              </span>
-            ))}
-            {missing.length > 2 && (
-              <span className="text-xs text-amber-500">
-                +{missing.length - 2} more
-              </span>
-            )}
-          </div>
-
-          {/* CTA */}
           <Link
             href="/profile/edit"
             className="inline-flex items-center gap-1 mt-3 text-sm font-medium text-amber-700 hover:text-amber-900 transition-colors"
           >
-            Complete profile
+            Improve profile
             <ChevronRight className="w-4 h-4" />
           </Link>
         </div>

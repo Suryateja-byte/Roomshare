@@ -14,14 +14,14 @@ interface SearchResultsToolbarProps {
   hasResults: boolean;
 }
 
-const toolbarButtonClassName = `inline-flex h-11 min-h-[44px] items-center justify-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${QUICK_FILTER_INACTIVE_CLASSNAME}`;
+const toolbarButtonClassName = `inline-flex h-11 min-h-[44px] items-center justify-center gap-2 rounded-[1.25rem] border px-5 text-sm font-semibold transition-colors shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${QUICK_FILTER_INACTIVE_CLASSNAME}`;
 
 export default function SearchResultsToolbar({
   currentSort,
   hasResults,
 }: SearchResultsToolbarProps) {
   const [isHydrated, setIsHydrated] = useState(false);
-  const { shouldShowMap, toggleMap } = useSearchMapUI();
+  const { shouldShowMap, toggleMap, canShowMap } = useSearchMapUI();
   const mapAriaLabel = shouldShowMap ? "Hide results map" : "Show results map";
   const mapLabel = shouldShowMap ? "Hide map" : "Show map";
 
@@ -40,12 +40,12 @@ export default function SearchResultsToolbar({
             <SortSelect currentSort={currentSort} />
           </div>
           <div data-testid="desktop-toolbar-save-search" className="shrink-0">
-            <SaveSearchButton className="inline-flex h-11 min-h-[44px] items-center gap-2 rounded-full border border-outline-variant/20 bg-transparent px-4 text-sm font-medium text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" />
+            <SaveSearchButton className="inline-flex h-11 min-h-[44px] items-center gap-2 rounded-[1.25rem] border border-outline-variant/20 bg-surface-container-lowest/72 px-5 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-lowest" />
           </div>
         </>
       ) : null}
 
-      {isHydrated ? (
+      {isHydrated && canShowMap ? (
         <button
           type="button"
           onClick={toggleMap}
@@ -56,7 +56,7 @@ export default function SearchResultsToolbar({
             toolbarButtonClassName,
             "min-w-[124px]",
             shouldShowMap &&
-              "border-outline-variant/50 bg-surface-container text-on-surface hover:border-on-surface-variant"
+              "border-outline-variant/20 bg-surface-container-lowest text-on-surface"
           )}
         >
           <Map

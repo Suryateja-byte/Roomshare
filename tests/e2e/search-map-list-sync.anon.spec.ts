@@ -41,6 +41,7 @@ import {
   getAllCardListingIds,
   isMapAvailable,
   waitForMapRef,
+  prepareUnclusteredMarkerViewport,
   zoomToExpandClusters,
   waitForMarkersWithClusterExpansion,
   countActiveCards,
@@ -370,6 +371,32 @@ test.describe("Map-List Synchronization", () => {
   // =========================================================================
 
   test.describe("Group 1: Marker -> Card Sync (P0)", () => {
+    test("1.0 - Prepared marker click keeps marker, popup, and card selection synchronized", async ({
+      page,
+    }) => {
+      const prepared = await prepareUnclusteredMarkerViewport(page);
+      test.skip(!prepared, "Could not prepare an unclustered marker viewport");
+
+      const markerIds = await getAllMarkerListingIds(page);
+      const cardIds = new Set(await getAllCardListingIds(page));
+      const listingId = markerIds.find((id) => cardIds.has(id));
+      test.skip(!listingId, "No visible marker has a matching rendered card");
+
+      await clickMarkerByListingId(page, listingId!);
+      await waitForCardHighlight(page, listingId!, timeouts.action);
+
+      const cardState = await getCardState(page, listingId!);
+      const markerState = await getMarkerState(page, listingId!);
+      expect(cardState.isActive).toBe(true);
+      expect(markerState.isActive).toBe(true);
+      await expect(page.locator(".maplibregl-popup")).toBeVisible({
+        timeout: timeouts.action,
+      });
+      await expect(page.locator('[data-testid="map-popup-card"]')).toBeVisible({
+        timeout: timeouts.action,
+      });
+    });
+
     test("1.1 - Click marker -> corresponding card gets ring-2 highlight", async ({
       page,
     }) => {
@@ -1629,6 +1656,13 @@ test.describe("Map-List Synchronization", () => {
 
       test.skip((await showOnMapBtn.count()) === 0, "No 'Show on map' button found");
 
+      const mapListingRequests: string[] = [];
+      await page.route("**/api/map-listings**", async (route) => {
+        mapListingRequests.push(route.request().url());
+        await route.continue();
+      });
+      const urlBeforeClick = page.url();
+
       await showOnMapBtn.click();
 
       // Card should now have active ring and the desktop popup should use the
@@ -1645,6 +1679,54 @@ test.describe("Map-List Synchronization", () => {
       await expect(async () => {
         await expectPopupWithinMapPane(page);
       }).toPass({ timeout: timeouts.action, intervals: [200, 500, 1000] });
+      expect(page.url()).toBe(urlBeforeClick);
+      expect(mapListingRequests).toHaveLength(0);
+    });
+
+    test("Clicking 'Show on map' while the desktop map is hidden opens and focuses the map", async ({
+      page,
+    }) => {
+      const cardId = await getFirstCardId(page);
+      test.skip(!cardId, "No card");
+
+      const mapToggle = page.locator('[data-testid="desktop-toolbar-map-toggle"]');
+      await expect(mapToggle).toBeVisible({ timeout: timeouts.action });
+      if ((await mapToggle.getAttribute("aria-pressed")) !== "false") {
+        await mapToggle.click();
+      }
+      await expect(mapToggle).toHaveAttribute("aria-pressed", "false", {
+        timeout: timeouts.action,
+      });
+      await expect(page.locator('[data-testid="map-shell"]')).toHaveCount(0, {
+        timeout: timeouts.action,
+      });
+
+      const showOnMapBtn = searchResultsContainer(page).locator(
+        `[data-testid="listing-card"][data-listing-id="${cardId}"] button[aria-label="Show on map"]`
+      );
+      test.skip((await showOnMapBtn.count()) === 0, "No 'Show on map' button found");
+
+      await showOnMapBtn.click();
+
+      await expect(mapToggle).toHaveAttribute("aria-pressed", "true", {
+        timeout: timeouts.action,
+      });
+      await expect(page.locator('[data-testid="map-shell"]')).toBeVisible({
+        timeout: timeouts.navigation,
+      });
+      await expect
+        .poll(() => page.evaluate(() => Boolean((window as any).__e2eMapRef)), {
+          timeout: timeouts.navigation,
+          message: "Expected map to remount after hidden Show on map",
+        })
+        .toBe(true);
+      await waitForCardHighlight(page, cardId!, timeouts.action);
+      await expect(page.locator(".maplibregl-popup")).toBeVisible({
+        timeout: timeouts.action,
+      });
+      await expect(page.locator('[data-testid="map-popup-card"]')).toBeVisible({
+        timeout: timeouts.action,
+      });
     });
   });
 });

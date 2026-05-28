@@ -380,6 +380,128 @@ export async function isMapAvailable(page: Page): Promise<boolean> {
  * Zoom in programmatically to expand clusters into individual markers.
  * Uses E2E hooks to avoid triggering auto-search URL updates.
  */
+export async function prepareUnclusteredMarkerViewport(
+  page: Page
+): Promise<boolean> {
+  const prepared = await page.evaluate(async () => {
+    type ListingFeature = {
+      geometry?: {
+        type?: string;
+        coordinates?: unknown;
+      };
+      properties?: {
+        id?: unknown;
+      };
+    };
+    type GeoJsonSourceLike = {
+      _data?: {
+        features?: ListingFeature[];
+      };
+    };
+    type E2EMapLike = {
+      getSource: (id: string) => GeoJsonSourceLike | undefined;
+      querySourceFeatures: (id: string) => ListingFeature[];
+      jumpTo: (options: { center: [number, number]; zoom: number }) => void;
+      once: (event: "idle", callback: () => void) => void;
+    };
+
+    const win = window as typeof window & {
+      __e2eMapRef?: E2EMapLike;
+      __e2eSetProgrammaticMove?: (isProgrammatic: boolean) => void;
+      __e2eUpdateMarkers?: () => number;
+    };
+    const map = win.__e2eMapRef;
+    if (!map) return false;
+
+    const getPointCoords = (
+      feature: ListingFeature | undefined
+    ): [number, number] | null => {
+      const coords = feature?.geometry?.coordinates;
+      if (
+        !Array.isArray(coords) ||
+        typeof coords[0] !== "number" ||
+        typeof coords[1] !== "number"
+      ) {
+        return null;
+      }
+
+      return [coords[0], coords[1]];
+    };
+
+    const source = map.getSource("listings");
+    const sourceFeatures = Array.isArray(source?._data?.features)
+      ? source._data.features
+      : [];
+    const queriedFeatures = map.querySourceFeatures("listings");
+    const visibleCardIds = new Set(
+      Array.from(document.querySelectorAll("[data-listing-card-id]"))
+        .map((element) => element.getAttribute("data-listing-card-id"))
+        .filter((id): id is string => id !== null)
+    );
+    const featureListingId = (feature: ListingFeature): string | null =>
+      typeof feature.properties?.id === "string" ? feature.properties.id : null;
+    const listingFeature =
+      sourceFeatures.find(
+        (feature) =>
+          feature.geometry?.type === "Point" &&
+          visibleCardIds.has(featureListingId(feature) ?? "")
+      ) ??
+      queriedFeatures.find(
+        (feature) =>
+          feature.geometry?.type === "Point" &&
+          visibleCardIds.has(featureListingId(feature) ?? "")
+      ) ??
+      sourceFeatures.find((feature) => feature.geometry?.type === "Point") ??
+      queriedFeatures.find((feature) => feature.geometry?.type === "Point");
+    const center = getPointCoords(listingFeature);
+    if (!center) return false;
+
+    win.__e2eSetProgrammaticMove?.(true);
+    map.jumpTo({ center, zoom: 15 });
+    await new Promise<void>((resolve) => {
+      map.once("idle", resolve);
+      window.setTimeout(resolve, 3_000);
+    });
+    win.__e2eSetProgrammaticMove?.(false);
+    win.__e2eUpdateMarkers?.();
+    await new Promise((resolve) =>
+      window.requestAnimationFrame(() =>
+        window.requestAnimationFrame(resolve)
+      )
+    );
+
+    return (
+      document.querySelectorAll(".maplibregl-marker [data-listing-id]")
+        .length > 0
+    );
+  });
+
+  if (!prepared) return false;
+
+  try {
+    await expect
+      .poll(
+        async () => {
+          await page.evaluate(() => {
+            const win = window as typeof window & {
+              __e2eUpdateMarkers?: () => number;
+            };
+            win.__e2eUpdateMarkers?.();
+          });
+          return page.locator(".maplibregl-marker:visible").count();
+        },
+        {
+          timeout: 15_000,
+          message: "Waiting for unclustered markers after viewport prep",
+        }
+      )
+      .toBeGreaterThan(0);
+    return true;
+  } catch {
+    return (await page.locator(".maplibregl-marker:visible").count()) > 0;
+  }
+}
+
 export async function zoomToExpandClusters(page: Page): Promise<boolean> {
   // Check if individual markers are already visible
   const existingCount = await page
@@ -390,64 +512,7 @@ export async function zoomToExpandClusters(page: Page): Promise<boolean> {
   const hasMapRef = await waitForMapRef(page);
   if (!hasMapRef) return false;
 
-  // Get a listing location to center on
-  const listingCenter = await page.evaluate(() => {
-    const map = (window as any).__e2eMapRef;
-    if (map && map.getSource("listings")) {
-      try {
-        const features = map.querySourceFeatures("listings");
-        if (features.length > 0) {
-          const coords = features[0].geometry.coordinates;
-          return { lng: coords[0], lat: coords[1] };
-        }
-      } catch {
-        // ignore
-      }
-    }
-    return null;
-  });
-
-  // Zoom to uncluster
-  const zoomed = await page.evaluate(
-    ({ center }) => {
-      return new Promise<boolean>((resolve) => {
-        const map = (window as any).__e2eMapRef;
-        const setProgrammatic = (window as any).__e2eSetProgrammaticMove;
-        if (!map || !setProgrammatic) {
-          resolve(false);
-          return;
-        }
-        setProgrammatic(true);
-        map.once("idle", () => resolve(true));
-        const opts: any = { zoom: 15 };
-        if (center) opts.center = [center.lng, center.lat];
-        map.jumpTo(opts);
-        setTimeout(() => resolve(true), 10000);
-      });
-    },
-    { center: listingCenter }
-  );
-
-  if (!zoomed) return false;
-
-  // Trigger marker update after tiles load
-  await page.evaluate(() => {
-    const updateMarkers = (window as any).__e2eUpdateMarkers;
-    if (typeof updateMarkers === "function") updateMarkers();
-  });
-
-  // Poll until markers appear rather than using a fixed timeout
-  try {
-    await expect
-      .poll(() => page.locator(".maplibregl-marker:visible").count(), {
-        timeout: 15_000,
-        message: "Waiting for markers after cluster expansion",
-      })
-      .toBeGreaterThan(0);
-    return true;
-  } catch {
-    return (await page.locator(".maplibregl-marker:visible").count()) > 0;
-  }
+  return prepareUnclusteredMarkerViewport(page);
 }
 
 /**

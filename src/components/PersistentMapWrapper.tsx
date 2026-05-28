@@ -66,6 +66,7 @@ import { emitSearchClientMetric } from "@/lib/search/search-telemetry-client";
 const LazyDynamicMap = lazy(() => import("./DynamicMap"));
 
 const MAP_FETCH_DEBOUNCE_MS = 250;
+const MAP_PAN_FETCH_DEBOUNCE_MS = 250;
 const MAP_FETCH_TIMEOUT_MS = 15_000;
 
 // Spatial cache constants
@@ -161,6 +162,24 @@ function getFilterKey(searchParams: URLSearchParams): string {
   const filtered = buildCanonicalFilterParamsFromSearchParams(searchParams);
   filtered.sort();
   return filtered.toString();
+}
+
+function getListingStabilityKey(listings: MapListingData[]): string {
+  return listings
+    .map((listing) =>
+      [
+        listing.id,
+        listing.title,
+        listing.price,
+        listing.availableSlots,
+        listing.totalSlots ?? "",
+        listing.tier ?? "",
+        listing.location.lat,
+        listing.location.lng,
+        listing.images?.[0] ?? "",
+      ].join(":")
+    )
+    .join(",");
 }
 
 // Legacy map-relevant key list kept as explicit documentation and fallback shape.
@@ -307,47 +326,75 @@ function MapInfoBanner({ message }: { message: string }) {
 function MapLoadingPlaceholder() {
   return (
     <div
-      className="w-full h-full bg-surface-container-high flex flex-col items-center justify-center gap-3"
+      data-testid="map-loading-placeholder"
+      className="relative h-full w-full overflow-hidden bg-surface-canvas"
       role="status"
       aria-label="Loading map"
     >
       <span className="sr-only">Loading map</span>
-      <div className="w-10 h-10 rounded-full bg-outline-variant/20 animate-pulse" />
-      <div className="flex flex-col items-center gap-1.5">
-        <div className="w-24 h-2 rounded-full bg-outline-variant/20 animate-pulse" />
-        <div className="w-16 h-2 rounded-full bg-outline-variant/15 animate-pulse" />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 opacity-80"
+        style={{
+          backgroundImage: [
+            "linear-gradient(90deg, rgba(255,255,255,0.82) 1px, transparent 1px)",
+            "linear-gradient(0deg, rgba(255,255,255,0.78) 1px, transparent 1px)",
+            "radial-gradient(circle at 18% 20%, rgba(220,193,185,0.32) 0%, rgba(220,193,185,0.2) 22%, transparent 24%)",
+            "radial-gradient(circle at 76% 72%, rgba(234,232,227,0.72) 0%, rgba(234,232,227,0.36) 18%, transparent 20%)",
+            "linear-gradient(28deg, transparent 43%, rgba(255,255,255,0.84) 44%, rgba(255,255,255,0.84) 45%, transparent 46%)",
+            "linear-gradient(153deg, transparent 48%, rgba(255,255,255,0.78) 49%, rgba(255,255,255,0.78) 50%, transparent 51%)",
+          ].join(", "),
+          backgroundPosition:
+            "0 0, 0 0, -90px -40px, 52% 55%, 0 0, 32px -20px",
+          backgroundSize:
+            "104px 104px, 104px 104px, 620px 420px, 520px 360px, 240px 240px, 280px 280px",
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-gradient-to-br from-surface-container-lowest/45 via-surface-canvas/24 to-surface-container-high/35"
+      />
+
+      <div
+        aria-hidden="true"
+        className="absolute right-4 top-6 z-10 flex flex-col gap-2"
+      >
+        {[0, 1, 2, 3].map((item) => (
+          <div
+            key={item}
+            className="flex h-11 w-11 items-center justify-center rounded-xl border border-outline-variant/20 bg-surface-container-lowest/92 shadow-ambient-sm backdrop-blur-md"
+          >
+            <div className="h-4 w-4 rounded-sm border border-on-surface-variant/35" />
+          </div>
+        ))}
+      </div>
+
+      <div className="absolute inset-0 z-10 flex -translate-y-28 flex-col items-center justify-center gap-4 px-4 text-center md:translate-y-0">
+        <div className="relative h-16 w-16" aria-hidden="true">
+          <div className="absolute inset-0 rounded-full border-[6px] border-outline-variant/30" />
+          <div className="absolute inset-0 rounded-full border-[6px] border-transparent border-l-primary border-t-primary animate-spin motion-reduce:animate-none" />
+        </div>
+        <div>
+          <p className="text-base font-semibold text-on-surface">
+            Loading map...
+          </p>
+          <p className="mt-1 text-sm text-on-surface-variant">
+            Preparing nearby listings
+          </p>
+        </div>
       </div>
     </div>
   );
 }
 
-// Thin loading bar at top of map when fetching new marker data
+// Marker-refresh loading remains exposed for tests without drawing chrome.
 function MapDataLoadingBar() {
   return (
     <div
-      className="absolute top-0 left-0 right-0 z-20 h-1 overflow-hidden pointer-events-none"
+      className="pointer-events-none absolute h-px w-px overflow-hidden opacity-0"
       aria-hidden="true"
       data-testid="map-data-loading-bar"
-    >
-      <div className="h-full bg-on-surface/80 animate-[shimmer_1.5s_ease-in-out_infinite] origin-left" />
-      <style jsx>{`
-        @keyframes shimmer {
-          0% {
-            transform: translateX(-100%);
-          }
-          100% {
-            transform: translateX(200%);
-          }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          div {
-            animation: none;
-            opacity: 0.7;
-            transform: none;
-          }
-        }
-      `}</style>
-    </div>
+    />
   );
 }
 
@@ -439,6 +486,16 @@ export default function PersistentMapWrapper({
     matchingV2Data !== null || matchingLastV2Data !== null;
   const isAwaitingCurrentV2Data =
     isV2Enabled && pendingV2QueryHash === currentQueryHash;
+  const staleLastV2Data =
+    isV2Enabled && isAwaitingCurrentV2Data ? lastV2Data : null;
+  const hasStaleV2Data = staleLastV2Data !== null;
+  const hasRenderableV2Fallback = hasAnyV2Data || hasStaleV2Data;
+  const v2FetchGuardRef = useRef({
+    isV2Enabled: false,
+    currentQueryHash: "",
+    hasCurrentV2Data: false,
+    isAwaitingCurrentV2Data: false,
+  });
 
   // P2-FIX (#115): Mark data path as determined when we receive any signal
   // Check if URL has bounds (indicates V1 path with known location)
@@ -480,6 +537,15 @@ export default function PersistentMapWrapper({
   }, [v2MapData, isV2Enabled]);
 
   useEffect(() => {
+    v2FetchGuardRef.current = {
+      isV2Enabled,
+      currentQueryHash,
+      hasCurrentV2Data: hasAnyV2Data,
+      isAwaitingCurrentV2Data,
+    };
+  }, [currentQueryHash, hasAnyV2Data, isAwaitingCurrentV2Data, isV2Enabled]);
+
+  useEffect(() => {
     spatialCacheRef.current.clear();
     lastFetchedBoundsRef.current = null;
     previousListingsRef.current = [];
@@ -492,7 +558,9 @@ export default function PersistentMapWrapper({
     // P2-FIX (#124): Use lastV2Data state (not ref) so memo properly recalculates
     // We strictly use V2 data ONLY if it's the active source (not overridden by recent client fetch)
     const activeV2Data =
-      mapSource === "v2" ? (matchingV2Data ?? matchingLastV2Data) : null;
+      mapSource === "v2"
+        ? (matchingV2Data ?? matchingLastV2Data ?? staleLastV2Data)
+        : null;
     if (activeV2Data) {
       return v2MapDataToListings(activeV2Data).slice(0, MAX_MAP_MARKERS);
     }
@@ -533,20 +601,24 @@ export default function PersistentMapWrapper({
     mapSource,
     matchingV2Data,
     matchingLastV2Data,
+    staleLastV2Data,
     listings,
     isFetchingMapData,
   ]);
 
   // H2 FIX: Stabilize listings reference for Map.tsx GeoJSON memo.
-  // When effectiveListings recomputes but contains the same listing IDs,
+  // When effectiveListings recomputes but contains the same marker payload,
   // return the previous reference to prevent unnecessary GeoJSON rebuild.
   const prevEffectiveListingsRef = useRef(effectiveListings);
+  const prevEffectiveListingsKeyRef = useRef(
+    getListingStabilityKey(effectiveListings)
+  );
   const stableEffectiveListings = useMemo(() => {
-    const prevIds = prevEffectiveListingsRef.current.map((l) => l.id).join(",");
-    const nextIds = effectiveListings.map((l) => l.id).join(",");
-    if (prevIds === nextIds) {
+    const nextKey = getListingStabilityKey(effectiveListings);
+    if (prevEffectiveListingsKeyRef.current === nextKey) {
       return prevEffectiveListingsRef.current;
     }
+    prevEffectiveListingsKeyRef.current = nextKey;
     prevEffectiveListingsRef.current = effectiveListings;
     return effectiveListings;
   }, [effectiveListings]);
@@ -564,7 +636,8 @@ export default function PersistentMapWrapper({
 
   // Track current params to detect changes for debouncing
   const lastFetchedParamsRef = useRef<string | null>(null);
-  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const searchFetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const panFetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // P1-#4 FIX: Separate abort controllers for search and pan effects.
   // Previously shared — a pan during a search debounce would abort the search
   // controller, causing the search fetch to silently fail with AbortError.
@@ -774,6 +847,15 @@ export default function PersistentMapWrapper({
           return;
         }
 
+        const v2Guard = v2FetchGuardRef.current;
+        if (
+          v2Guard.isV2Enabled &&
+          v2Guard.currentQueryHash === requestQueryHash &&
+          (v2Guard.hasCurrentV2Data || v2Guard.isAwaitingCurrentV2Data)
+        ) {
+          return;
+        }
+
         const fetched = data.data.listings || [];
         // UX-13 FIX: Read truncation flag from API response (LIMIT+1 detection)
         setIsMapTruncated(data.data.truncated === true);
@@ -810,12 +892,18 @@ export default function PersistentMapWrapper({
         // Reset retry counter on successful fetch
         retryCountRef.current = 0;
       } catch (err) {
-        if (didTimeout && (err as Error).name === "AbortError") {
+        const requestWasAborted =
+          signal?.aborted || timeoutController.signal.aborted;
+
+        if (didTimeout && requestWasAborted) {
           // Timeout-triggered abort — show user-friendly error
           if (latestMapRequestRef.current === requestKey) {
             setError("Map data request timed out. Please try again.");
           }
-        } else if ((err as Error).name !== "AbortError") {
+        } else if (
+          (err as Error).name !== "AbortError" &&
+          !requestWasAborted
+        ) {
           if (latestMapRequestRef.current === requestKey) {
             console.error("Failed to fetch map listings:", err);
             setError((err as Error).message || "Failed to load map data");
@@ -948,8 +1036,8 @@ export default function PersistentMapWrapper({
     }
 
     // Clear any pending fetch timeout
-    if (fetchTimeoutRef.current) {
-      clearTimeout(fetchTimeoutRef.current);
+    if (searchFetchTimeoutRef.current) {
+      clearTimeout(searchFetchTimeoutRef.current);
     }
 
     // M6-MAP: Client AbortController cancels the fetch but cannot cancel the
@@ -973,7 +1061,7 @@ export default function PersistentMapWrapper({
     const paddedParamsString = getMapRelevantParams(paddedParams);
 
     // Small debounce to coalesce rapid URL updates without adding noticeable lag.
-    fetchTimeoutRef.current = setTimeout(() => {
+    searchFetchTimeoutRef.current = setTimeout(() => {
       lastFetchedParamsRef.current = paramsString;
       fetchListings(
         paddedParamsString,
@@ -984,8 +1072,8 @@ export default function PersistentMapWrapper({
     }, MAP_FETCH_DEBOUNCE_MS);
 
     return () => {
-      if (fetchTimeoutRef.current) {
-        clearTimeout(fetchTimeoutRef.current);
+      if (searchFetchTimeoutRef.current) {
+        clearTimeout(searchFetchTimeoutRef.current);
       }
       if (retryTimeoutRef.current) {
         clearTimeout(retryTimeoutRef.current);
@@ -1007,6 +1095,7 @@ export default function PersistentMapWrapper({
   // Proactive fetching during map pan (triggered via activePanBounds)
   useEffect(() => {
     if (!activePanBounds || !shouldRenderMap) return;
+    if (isV2Enabled && (hasAnyV2Data || isAwaitingCurrentV2Data)) return;
 
     // Skip fetch on overly-wide in-flight drag bounds and preserve current markers.
     const latSpan = activePanBounds.maxLat - activePanBounds.minLat;
@@ -1039,14 +1128,15 @@ export default function PersistentMapWrapper({
 
     if (paddedParamsString === lastFetchedParamsRef.current) return;
 
-    if (fetchTimeoutRef.current) clearTimeout(fetchTimeoutRef.current);
+    if (panFetchTimeoutRef.current) clearTimeout(panFetchTimeoutRef.current);
     abortFetchController(panAbortRef.current, "superseded");
 
     const abortController = new AbortController();
     panAbortRef.current = abortController;
 
-    // Fast debounce for dragging
-    fetchTimeoutRef.current = setTimeout(() => {
+    // Trailing debounce for dragging: if the user keeps moving, avoid issuing
+    // a fetch that will immediately be superseded by the next pan sample.
+    panFetchTimeoutRef.current = setTimeout(() => {
       lastFetchedParamsRef.current = paddedParamsString;
       fetchListings(
         paddedParamsString,
@@ -1054,15 +1144,20 @@ export default function PersistentMapWrapper({
         paddedBounds,
         currentQueryHash
       );
-    }, 100);
+    }, MAP_PAN_FETCH_DEBOUNCE_MS);
 
     return () => {
+      if (panFetchTimeoutRef.current) {
+        clearTimeout(panFetchTimeoutRef.current);
+      }
       abortFetchController(panAbortRef.current, "cleanup");
     };
   }, [
     activePanBounds,
     abortFetchController,
     currentQueryHash,
+    hasAnyV2Data,
+    isAwaitingCurrentV2Data,
     searchParams,
     shouldRenderMap,
     isV2Enabled,
@@ -1098,9 +1193,10 @@ export default function PersistentMapWrapper({
   // P2-FIX (#115): Also show placeholder when data path hasn't been determined yet.
   // This prevents the brief empty map flash between mount and v2 signal.
   const showInitialPlaceholder =
-    !dataPathDetermined || isAwaitingCurrentV2Data || (isV2Enabled && !hasAnyV2Data);
+    !dataPathDetermined || (isV2Enabled && !hasRenderableV2Fallback);
   const showV2LoadingOverlay =
-    isAwaitingCurrentV2Data || (isV2Enabled && !hasV2Data && hasAnyV2Data);
+    isAwaitingCurrentV2Data ||
+    (isV2Enabled && !hasV2Data && hasRenderableV2Fallback);
 
   // CRITICAL: Don't render map component if shouldRenderMap is false
   // This prevents MapLibre GL JS from loading until needed

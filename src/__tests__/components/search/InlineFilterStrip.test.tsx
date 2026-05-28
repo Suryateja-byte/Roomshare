@@ -231,10 +231,34 @@ describe("InlineFilterStrip", () => {
     expect(
       screen.getByTestId("desktop-results-heading-section")
     ).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "24 places in Dallas" })).toBeInTheDocument();
+    const heading = screen.getByRole("heading", {
+      name: "24 places in Dallas",
+    });
+    expect(heading).toBeInTheDocument();
+    expect(heading).toHaveAttribute("tabindex", "-1");
+    expect(heading).toHaveClass("focus:outline-none");
+    expect(heading.className).not.toMatch(/focus-visible:ring/);
+    expect(heading.className).not.toMatch(/focus-visible:rounded/);
+    expect(heading.className).not.toMatch(/focus-visible:ring-offset/);
     expect(screen.getByText(/showing top listings/i)).toBeInTheDocument();
     expect(screen.getByText(/1–12/)).toBeInTheDocument();
     expect(screen.getByTestId("toolbar-slot")).toBeInTheDocument();
+  });
+
+  it("renders desktop applied filters in a separate wrapping row", () => {
+    mockSearchParams = new URLSearchParams(
+      `minPrice=1200&maxPrice=1800&roomType=Private+Room`
+    );
+
+    render(<InlineFilterStrip />);
+
+    expect(
+      screen.getByTestId("desktop-applied-filters-row")
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("inline-applied-filters-row")
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("$1,200 - $1,800")).toBeInTheDocument();
   });
 
   it("keeps the mobile strip on the full drawer flow", () => {

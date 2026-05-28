@@ -10,6 +10,7 @@ import type { PublicAvailability } from "./public-availability";
 import type {
   GroupContextPresentation,
   GroupSummary,
+  HostIdentityStatus,
   PublicSearchListing,
 } from "@/lib/search-types";
 
@@ -36,6 +37,7 @@ export interface SearchV2FeatureProperties {
   availableSlots: number;
   publicAvailability: PublicAvailability;
   groupContext?: GroupContextPresentation | null;
+  hostIdentityStatus?: HostIdentityStatus;
   /** @deprecated No longer populated in API responses (S3 security fix) */
   ownerId?: string;
 }
@@ -69,6 +71,7 @@ export interface SearchV2ListItem {
   publicAvailability: PublicAvailability;
   groupSummary?: GroupSummary | null;
   groupContext?: GroupContextPresentation | null;
+  hostIdentityStatus?: HostIdentityStatus;
   /** Relevance score hint for debugging/sorting */
   scoreHint?: number | null;
 }

@@ -18,6 +18,7 @@ import { encodeSnapshotCursor } from "@/lib/search/cursor";
 import {
   executeProjectionSearchV2,
   getProjectionSearchCount,
+  hasProjectionFreshnessHoles,
   hydratePhase04MapSnapshot,
 } from "@/lib/search/projection-search";
 import { PHASE04_SNAPSHOT_VERSION } from "@/lib/search/query-snapshots";
@@ -222,6 +223,16 @@ describe("Phase 04 projection search", () => {
     const sql = String(mockQueryRawUnsafe.mock.calls[0][0]);
     expect(sql).toContain("inventory_search_projection");
     expect(sql).toContain("unit_public_projection");
+    expect(sql).toContain('INNER JOIN "Listing" l');
+    expect(sql).toContain('INNER JOIN "User" u');
+    expect(sql).toContain("l.id = isp.inventory_id");
+    expect(sql).toContain(`u."isSuspended" = FALSE`);
+    expect(sql).toContain("l.status = 'ACTIVE'");
+    expect(sql).toContain(`COALESCE(l."statusReason", '') NOT IN`);
+    expect(sql).toContain(`l."openSlots" > 0`);
+    expect(sql).toContain(`l."openSlots" <= l."totalSlots"`);
+    expect(sql).toContain(`l."moveInDate" IS NOT NULL`);
+    expect(sql).toContain(`l."lastConfirmedAt" > NOW() - INTERVAL '21 days'`);
     expect(sql).toContain("GROUP BY");
     expect(sql).toContain("MIN(isp.price)::TEXT AS from_price");
     expect(sql).toContain(
@@ -254,6 +265,37 @@ describe("Phase 04 projection search", () => {
     expect(sql.indexOf("split_part")).toBeLessThan(sql.indexOf("LIMIT 256"));
     expect(sql).toContain("OR");
     expect(sql).toContain("upp.public_cell_id");
+  });
+
+  it("detects public search-doc rows with missing Phase 04 projections", async () => {
+    mockQueryRawUnsafe.mockResolvedValueOnce([{ id: "listing-fresh-hole" }]);
+
+    const result = await hasProjectionFreshnessHoles({
+      parsed: parsed({
+        filterParams: {
+          bounds: {
+            minLat: 32.5,
+            maxLat: 33.2,
+            minLng: -97.3,
+            maxLng: -96.5,
+          },
+          minPrice: 600,
+          maxPrice: 900,
+        },
+      }),
+    });
+
+    expect(result).toBe(true);
+    const sql = String(mockQueryRawUnsafe.mock.calls[0][0]);
+    expect(sql).toContain("FROM listing_search_docs d");
+    expect(sql).toContain("LEFT JOIN listing_inventories li");
+    expect(sql).toContain("LEFT JOIN inventory_search_projection isp");
+    expect(sql).toContain("LEFT JOIN unit_public_projection upp");
+    expect(sql).toContain(
+      "li.publish_status IN ('PENDING_GEOCODE', 'PENDING_PROJECTION')"
+    );
+    expect(sql).toContain("isp.inventory_id IS NULL");
+    expect(sql).toContain("upp.unit_id IS NULL");
   });
 
   it("rejects text projection reads instead of joining semantic projections", async () => {
@@ -440,9 +482,16 @@ describe("Phase 04 projection search", () => {
     if ("kind" in result && result.kind === "ok") {
       expect(result.data.listings).toHaveLength(1);
     }
+    const sql = String(mockQueryRawUnsafe.mock.calls[0][0]);
+    expect(sql).toContain('INNER JOIN "Listing" l');
+    expect(sql).toContain('INNER JOIN "User" u');
+    expect(sql).toContain(`u."isSuspended" = FALSE`);
+    expect(sql).toContain("l.status = 'ACTIVE'");
+    expect(sql).toContain(`l."openSlots" > 0`);
+    expect(sql).toContain(`l."lastConfirmedAt" > NOW() - INTERVAL '21 days'`);
   });
 
-  it("hydrates Phase 04 map snapshots from stored map payload when present", async () => {
+  it("revalidates Phase 04 map snapshots from ordered unit keys even when stored map payload is present", async () => {
     mockSnapshotFindUnique.mockResolvedValue({
       id: "snapshot-phase04",
       queryHash: "hash-phase04",
@@ -464,8 +513,8 @@ describe("Phase 04 projection search", () => {
               type: "Feature",
               geometry: { type: "Point", coordinates: [-122.42, 37.77] },
               properties: {
-                id: "inv-a1",
-                title: "Room in Mission",
+                id: "stale-inv",
+                title: "Stale room",
                 price: 1200,
                 image: null,
                 availableSlots: 1,
@@ -485,17 +534,29 @@ describe("Phase 04 projection search", () => {
       expiresAt: new Date(Date.now() + 60_000),
       createdAt: new Date("2026-04-23T00:00:00Z"),
     });
+    mockQueryRawUnsafe.mockResolvedValueOnce([
+      projectionRow({
+        unit_id: "unit-a",
+        representative_inventory_id: "inv-a1",
+      }),
+    ]);
 
     const result = await hydratePhase04MapSnapshot({
       querySnapshotId: "snapshot-phase04",
     });
 
-    expect(mockQueryRawUnsafe).not.toHaveBeenCalled();
+    expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(1);
     expect(result).toMatchObject({ kind: "ok" });
     if ("kind" in result && result.kind === "ok") {
       expect(result.data.listings).toHaveLength(1);
       expect(result.data.listings[0]?.id).toBe("inv-a1");
     }
+    const sql = String(mockQueryRawUnsafe.mock.calls[0][0]);
+    expect(sql).toContain('INNER JOIN "Listing" l');
+    expect(sql).toContain('INNER JOIN "User" u');
+    expect(sql).toContain(`u."isSuspended" = FALSE`);
+    expect(sql).toContain("l.status = 'ACTIVE'");
+    expect(sql).toContain(`l."openSlots" > 0`);
   });
 
   it("rejects Phase 04 map snapshots when the requested query hash mismatches stored payload", async () => {

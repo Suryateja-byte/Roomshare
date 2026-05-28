@@ -8,6 +8,7 @@ import FloatingMapButton from "./search/FloatingMapButton";
 import { useListingFocus } from "@/contexts/ListingFocusContext";
 import { useMobileSearch } from "@/contexts/MobileSearchContext";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { SEARCH_SPLIT_VIEW_MEDIA_QUERY } from "@/lib/search-layout";
 import { cn } from "@/lib/utils";
 
 const MOBILE_SNAP_MAP = 0;
@@ -19,6 +20,8 @@ interface SearchViewToggleProps {
   mapComponent: React.ReactNode;
   /** Whether the map should be visible */
   shouldShowMap: boolean;
+  /** Whether the current viewport can display an inline map pane */
+  canShowMap: boolean;
   /** Toggle map visibility callback */
   onToggle: () => void;
   /** Whether the preference is still loading (hydrating from localStorage) */
@@ -31,6 +34,7 @@ export default function SearchViewToggle({
   children,
   mapComponent,
   shouldShowMap,
+  canShowMap,
   onToggle,
   isLoading,
   resultHeaderText,
@@ -39,6 +43,7 @@ export default function SearchViewToggle({
   const desktopListScrollRef = useRef<HTMLDivElement>(null);
   const desktopListContentRef = useRef<HTMLDivElement>(null);
   const isDesktop = useMediaQuery("(min-width: 768px)");
+  const isSplitViewport = useMediaQuery(SEARCH_SPLIT_VIEW_MEDIA_QUERY);
   const [hasMounted, setHasMounted] = useState(false);
   const [mobileSnap, setMobileSnap] = useState(MOBILE_SNAP_PEEK);
   const [showDesktopTopFade, setShowDesktopTopFade] = useState(false);
@@ -114,10 +119,12 @@ export default function SearchViewToggle({
   }, []);
 
   // Prevent dual Mapbox mount: render map in exactly one container.
-  // During SSR (isDesktop === undefined), default to desktop container
-  // since `hidden md:flex` handles CSS visibility correctly.
   const renderMapInMobile = isDesktop === false;
-  const renderMapInDesktop = isDesktop !== false && shouldShowMap;
+  const renderMapInDesktop =
+    isDesktop === true &&
+    isSplitViewport === true &&
+    canShowMap &&
+    shouldShowMap;
 
   // Render children in BOTH containers before mount so SSR HTML matches
   // client hydration regardless of viewport (CSS md:hidden / hidden md:flex
@@ -133,7 +140,7 @@ export default function SearchViewToggle({
   const isMobileActive = isDesktop === false;
   const showChildrenInMobile = !hasMounted || isMobileActive;
   const showChildrenInDesktop = !hasMounted || !isMobileActive;
-  const desktopScrollInsetClass = shouldShowMap
+  const desktopScrollInsetClass = renderMapInDesktop
     ? "right-3 lg:right-4"
     : "right-2 lg:right-3";
 
@@ -197,7 +204,7 @@ export default function SearchViewToggle({
   }, [
     isDesktop,
     searchParamsKey,
-    shouldShowMap,
+    renderMapInDesktop,
     showChildrenInDesktop,
     updateDesktopOverflowState,
   ]);
@@ -244,19 +251,22 @@ export default function SearchViewToggle({
       <div
         aria-hidden={isResolved && isMobileActive ? true : undefined}
         {...(isResolved && isMobileActive ? { inert: true } : {})}
-        className="hidden md:flex flex-1 overflow-hidden"
+        className="hidden flex-1 overflow-hidden bg-surface-canvas md:flex"
       >
         {/* Left Panel: List View - Adjusts width based on map visibility */}
         <div
           data-testid="search-results-container"
-          className={`relative h-full min-h-0 overflow-hidden bg-surface-canvas transition-all duration-300 ${
-            shouldShowMap ? "w-[60%] lg:w-[55%]" : "w-full"
-          }`}
+          className={cn(
+            "relative h-full min-h-0 overflow-hidden bg-surface-canvas transition-all duration-300",
+            renderMapInDesktop
+              ? "w-[55%] min-w-[42rem] max-w-[58rem] 2xl:w-[52%] 2xl:max-w-[66rem]"
+              : "w-full"
+          )}
         >
           <div
             className={cn(
               "relative h-full min-h-0",
-              shouldShowMap ? "pr-3 lg:pr-4" : "pr-2 lg:pr-3"
+              renderMapInDesktop ? "pr-3 lg:pr-5" : "pr-2 lg:pr-3"
             )}
           >
             <div
@@ -294,19 +304,24 @@ export default function SearchViewToggle({
           </div>
         </div>
 
-        {/* Right Panel: Map View (45%) */}
+        {/* Right Panel: Map View */}
         {renderMapInDesktop && (
-          <div className="relative h-full min-h-0 w-[40%] flex-shrink-0 overflow-hidden bg-surface-container-high/50 lg:w-[45%]">
+          <div
+            data-testid="desktop-search-map-panel"
+            className="relative h-full min-h-0 min-w-0 flex-1 overflow-hidden bg-surface-container-high/35 p-2 pl-0 lg:p-3 lg:pl-0"
+          >
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-y-0 left-0 z-[1] w-4 bg-gradient-to-r from-surface-canvas via-surface-container-high/70 to-transparent lg:w-5"
+              className="pointer-events-none absolute inset-y-3 left-0 z-[1] w-5 rounded-l-[1.5rem] bg-gradient-to-r from-surface-canvas via-surface-container-high/45 to-transparent lg:w-6"
             />
-            <div className="h-full pl-2 lg:pl-3">{mapComponent}</div>
+            <div className="relative h-full overflow-hidden rounded-[1.25rem] bg-surface-container shadow-[inset_0_0_0_1px_rgba(220,193,185,0.18),0_18px_48px_-34px_rgba(27,28,25,0.42)]">
+              {mapComponent}
+            </div>
           </div>
         )}
 
         {/* Desktop Show Map Button - Only visible when map is hidden */}
-        {!shouldShowMap && (
+        {canShowMap && isSplitViewport === true && !shouldShowMap && (
           <button
             onClick={onToggle}
             disabled={isLoading}

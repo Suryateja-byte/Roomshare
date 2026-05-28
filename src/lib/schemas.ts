@@ -279,6 +279,12 @@ export const createListingApiSchema = createListingSchema.extend({
   primaryHomeLanguage: primaryHomeLanguageSchema,
   moveInDate: requiredMoveInDateSchema,
   bookingMode: listingBookingModeSchema,
+  addressSuggestionToken: z
+    .string()
+    .trim()
+    .max(4096, "Address suggestion token is invalid")
+    .optional()
+    .transform((value) => (value && value.length > 0 ? value : undefined)),
 });
 
 export type CreateListingApiInput = z.infer<typeof createListingApiSchema>;
@@ -295,6 +301,12 @@ export const createListingClientSchema = createListingSchema.extend({
   householdGender: listingHouseholdGenderSchema,
   moveInDate: requiredMoveInDateSchema,
   bookingMode: listingBookingModeSchema,
+  addressSuggestionToken: z
+    .string()
+    .trim()
+    .max(4096, "Address suggestion token is invalid")
+    .optional()
+    .transform((value) => (value && value.length > 0 ? value : undefined)),
 });
 
 // Booking validation schema with industry-standard 30-day minimum

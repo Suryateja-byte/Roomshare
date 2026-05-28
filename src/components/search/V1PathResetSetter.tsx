@@ -10,19 +10,16 @@ import {
  * V1PathResetSetter - Resets V2 context state when V1 fallback path runs.
  *
  * This component signals "v1 mode active" by resetting V2 context state.
- * It renders on EVERY page load (both V1 and V2 paths) at page.tsx:433.
+ * It renders whenever the search page is not injecting fresh V2 map data.
  *
- * NOTE: V2MapDataSetter (the v2 success path counterpart) exists but is
- * NOT currently rendered anywhere in production code. The V2 map data path
- * is dead code — V2 search LIST data works via executeSearchV2, but V2 MAP
- * data (GeoJSON/pins) is never injected into context. When V2 map feature
- * ships, V2MapDataSetter should be wired into page.tsx.
+ * NOTE: V2MapDataSetter is the v2 success path counterpart and owns fresh
+ * unified list/map payload injection when available.
  *
  * What this component does:
  * - Sets isV2Enabled = false (tells PersistentMapWrapper to use V1 fetch)
  * - Sets v2MapData = null with version guard (prevents race with V2MapDataSetter if wired)
  *
- * @see V2MapDataSetter for the v2 success path (currently unrendered)
+ * @see V2MapDataSetter for the v2 success path.
  * @see PersistentMapWrapper for the race guard that depends on this state
  */
 export function V1PathResetSetter() {

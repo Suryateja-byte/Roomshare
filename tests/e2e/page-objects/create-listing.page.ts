@@ -189,14 +189,19 @@ export class CreateListingPage {
   }
 
   private async selectMoveInDate() {
-    // DatePicker is a Radix Popover button trigger; select "Today" as a valid
-    // required date without relying on a text input.
+    // DatePicker is a Radix Popover button trigger, not a text input. Choose
+    // the first enabled calendar day so timezone boundaries do not make the
+    // footer "Today" action a no-op when minDate is already tomorrow in UTC.
     await this.moveInDateInput.waitFor({ state: "visible", timeout: 5000 });
     await this.moveInDateInput.scrollIntoViewIfNeeded();
     await this.moveInDateInput.click();
-    const todayButton = this.page.getByRole("button", { name: "Today" });
-    await todayButton.waitFor({ state: "visible", timeout: 5000 });
-    await todayButton.click();
+    const enabledDayButton = this.page
+      .locator('[data-radix-popper-content-wrapper] button:not([disabled])')
+      .filter({ hasText: /^\d+$/ })
+      .first();
+    await enabledDayButton.waitFor({ state: "visible", timeout: 5000 });
+    await enabledDayButton.click();
+    await expect(this.moveInDateInput).not.toContainText(/select move-in date/i);
   }
 
   async fillAllFields(data: CreateListingData) {
@@ -222,9 +227,11 @@ export class CreateListingPage {
 
   // ── Image Upload ──
 
-  private async resolveMockUploadUserId(): Promise<string> {
+  private async resolveMockUploadUserId(ownerEmail?: string): Promise<string> {
     const fallbackUserId = process.env.E2E_TEST_USER_ID || "e2e-test-user";
     const secret = process.env.E2E_TEST_SECRET;
+    const email =
+      ownerEmail || process.env.E2E_TEST_EMAIL || "e2e-test@roomshare.dev";
 
     if (!secret) {
       return fallbackUserId;
@@ -235,7 +242,7 @@ export class CreateListingPage {
         data: {
           action: "findUserByEmail",
           params: {
-            email: process.env.E2E_TEST_EMAIL || "e2e-test@roomshare.dev",
+            email,
           },
         },
         headers: {
@@ -259,11 +266,11 @@ export class CreateListingPage {
    * Mock /api/upload to return instant fake Supabase URLs.
    * Call before uploading images.
    */
-  async mockImageUpload() {
+  async mockImageUpload(options?: { ownerEmail?: string }) {
     let uploadCount = 0;
     const supabaseBaseUrl =
       process.env.NEXT_PUBLIC_SUPABASE_URL || "https://fake.supabase.co";
-    const userId = await this.resolveMockUploadUserId();
+    const userId = await this.resolveMockUploadUserId(options?.ownerEmail);
     await this.page.route("**/api/upload", async (route) => {
       uploadCount++;
       const id = `mock-${Date.now()}-${uploadCount}`;

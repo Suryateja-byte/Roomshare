@@ -269,6 +269,8 @@ export const RATE_LIMITS = {
   listingStatus: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute
   publicCacheState: { limit: 120, windowMs: 60 * 1000 }, // 120 per minute
   publicAutocomplete: { limit: 120, windowMs: 60 * 1000 }, // 120 per minute
+  // Private address PII; no durable cache, so keep provider calls bounded.
+  addressAutocomplete: { limit: 30, windowMs: 60 * 1000 },
   // Sensitive account actions
   changePassword: { limit: 5, windowMs: 60 * 60 * 1000 }, // 5 per hour
   verifyPassword: { limit: 10, windowMs: 60 * 60 * 1000 }, // 10 per hour

@@ -86,7 +86,10 @@ import {
   isPhase04ProjectionReadsEnabled,
 } from "@/lib/flags/phase04";
 import { getReadEmbeddingVersion } from "@/lib/embeddings/version";
-import { executeProjectionSearchV2 } from "@/lib/search/projection-search";
+import {
+  executeProjectionSearchV2,
+  hasProjectionFreshnessHoles,
+} from "@/lib/search/projection-search";
 import {
   getProjectionReadEligibility,
   type ProjectionReadEligibility,
@@ -654,12 +657,32 @@ export async function executeSearchV2(
 
     if (isPhase04ProjectionReadsEnabled()) {
       const projectionEligibility = getProjectionReadEligibility(parsed);
-      if (projectionEligibility.supported) {
-        return executeProjectionSearchV2({ params, parsed });
-      }
-
       const cursorStr = getFirstValue(params.rawParams.cursor);
-      if (cursorStr) {
+      if (projectionEligibility.supported) {
+        if (!cursorStr) {
+          try {
+            const hasFreshnessHoles = await hasProjectionFreshnessHoles({
+              parsed,
+            });
+            if (hasFreshnessHoles) {
+              logger.sync.warn("phase04_projection_freshness_fallback", {
+                queryHash,
+                reason: "projection_freshness_hole",
+              });
+            } else {
+              return executeProjectionSearchV2({ params, parsed });
+            }
+          } catch (err) {
+            logger.sync.warn("phase04_projection_freshness_guard_failed", {
+              queryHash,
+              error: sanitizeErrorMessage(err),
+            });
+            return executeProjectionSearchV2({ params, parsed });
+          }
+        } else {
+          return executeProjectionSearchV2({ params, parsed });
+        }
+      } else if (cursorStr) {
         const decoded = decodeCursorAny(cursorStr, sortOption);
         if (decoded?.type === "snapshot" && decoded.cursor.v === 4) {
           return {
@@ -972,10 +995,21 @@ export async function executeSearchV2(
       warnings.push(VIBE_SOFT_FALLBACK_WARNING);
     }
 
-    // Determine mode based on mapListings count (not list total)
+    const hasConfirmedEmptyList =
+      listResult.total === 0 && listResult.items.length === 0;
+    const responseMapListings = hasConfirmedEmptyList ? [] : mapListings;
+    const responseMapTruncated = hasConfirmedEmptyList
+      ? undefined
+      : mapTruncated;
+    const responseMapTotalCandidates = hasConfirmedEmptyList
+      ? undefined
+      : mapTotalCandidates;
+
+    // Determine mode based on response map count (not list total).
+    // A confirmed empty list must not ship broader or stale map candidates.
     const mode = forceClustersOnly
       ? "geojson"
-      : determineMode(mapListings.length);
+      : determineMode(responseMapListings.length);
     const versionMeta = getSearchV2VersionMeta({
       useSearchDoc,
       usedSemanticSearch,
@@ -1006,9 +1040,9 @@ export async function executeSearchV2(
         }>
       | undefined;
 
-    if (rankerEnabled && shouldIncludePins(mapListings.length)) {
+    if (rankerEnabled && shouldIncludePins(responseMapListings.length)) {
       // Adapt mapListings to RankableListing interface
-      const rankableListings: RankableListing[] = mapListings.map(
+      const rankableListings: RankableListing[] = responseMapListings.map(
         (listing) => ({
           id: listing.id,
           price: listing.price,
@@ -1057,10 +1091,10 @@ export async function executeSearchV2(
     // Transform map data (geojson always, pins only when sparse)
     // Pass scoreMap for score-based pin tiering when ranking is enabled
     // Include truncation info when map results exceed MAX_MAP_MARKERS
-    const transformedMapResponse = transformToMapResponse(mapListings, {
+    const transformedMapResponse = transformToMapResponse(responseMapListings, {
       scoreMap,
-      truncated: mapTruncated,
-      totalCandidates: mapTotalCandidates,
+      truncated: responseMapTruncated,
+      totalCandidates: responseMapTotalCandidates,
     });
     const mapResponse = applyPhase04MapKillSwitches(transformedMapResponse);
 
@@ -1149,7 +1183,7 @@ export async function executeSearchV2(
     logger.sync.info("search_latency", {
       durationMs: searchDurationMs,
       listCount: listResult?.items?.length ?? 0,
-      mapCount: mapListings?.length ?? 0,
+      mapCount: responseMapListings?.length ?? 0,
       mode,
       cached: false,
     });

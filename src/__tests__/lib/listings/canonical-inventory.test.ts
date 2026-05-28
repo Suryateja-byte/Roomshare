@@ -20,6 +20,23 @@ jest.mock("@/lib/projections/tombstone", () => ({
   }),
 }));
 
+jest.mock("@/lib/projections/inventory-projection", () => ({
+  rebuildInventorySearchProjection: jest.fn().mockResolvedValue({
+    updated: true,
+    skippedStale: false,
+    targetStatus: "PUBLISHED",
+  }),
+}));
+
+jest.mock("@/lib/projections/unit-projection", () => ({
+  rebuildUnitPublicProjection: jest.fn().mockResolvedValue({
+    upserted: true,
+    deleted: false,
+    matchingInventoryCount: 1,
+    sourceVersion: BigInt(1),
+  }),
+}));
+
 import {
   resolveCanonicalPublishStatus,
   syncCanonicalListingInventory,
@@ -27,10 +44,15 @@ import {
 import { resolveOrCreateUnit } from "@/lib/identity/resolve-or-create-unit";
 import { appendOutboxEvent } from "@/lib/outbox/append";
 import { handleTombstone } from "@/lib/projections/tombstone";
+import { rebuildInventorySearchProjection } from "@/lib/projections/inventory-projection";
+import { rebuildUnitPublicProjection } from "@/lib/projections/unit-projection";
 
 const mockResolveOrCreateUnit = resolveOrCreateUnit as jest.Mock;
 const mockAppendOutboxEvent = appendOutboxEvent as jest.Mock;
 const mockHandleTombstone = handleTombstone as jest.Mock;
+const mockRebuildInventorySearchProjection =
+  rebuildInventorySearchProjection as jest.Mock;
+const mockRebuildUnitPublicProjection = rebuildUnitPublicProjection as jest.Mock;
 
 describe("resolveCanonicalPublishStatus", () => {
   beforeEach(() => {
@@ -137,5 +159,79 @@ describe("resolveCanonicalPublishStatus", () => {
         reason: "SUPPRESSION",
       })
     );
+  });
+
+  it("passes trusted coordinates and synchronously publishes visible projection rows", async () => {
+    const tx = {
+      $queryRaw: jest
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            id: "listing-1",
+            unit_id: "unit-1",
+            unit_identity_epoch_written_at: 1,
+            publish_status: "PENDING_PROJECTION",
+            source_version: 7,
+          },
+        ]),
+      listing: {
+        update: jest.fn().mockResolvedValue(undefined),
+      },
+    };
+
+    await expect(
+      syncCanonicalListingInventory(tx as never, {
+        listing: {
+          id: "listing-1",
+          physicalUnitId: null,
+          price: 700,
+          roomType: "Shared Room",
+          totalSlots: 1,
+          openSlots: 1,
+          moveInDate: new Date("2026-05-31T00:00:00.000Z"),
+          status: "ACTIVE",
+          version: 7,
+        },
+        address: {
+          address: "1121 Hidden Rdg",
+          city: "Irving",
+          state: "TX",
+          zip: "75038",
+        },
+        actor: { role: "host", id: "user-1" },
+        trustedCoordinates: { lat: 32.87742, lng: -96.96477 },
+      })
+    ).resolves.toMatchObject({
+      inventoryId: "listing-1",
+      publishStatus: "PENDING_PROJECTION",
+    });
+
+    expect(mockResolveOrCreateUnit).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        trustedCoordinates: { lat: 32.87742, lng: -96.96477 },
+      })
+    );
+    expect(mockAppendOutboxEvent).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        kind: "INVENTORY_UPSERTED",
+        aggregateId: "listing-1",
+        sourceVersion: BigInt(7),
+      })
+    );
+    expect(mockRebuildInventorySearchProjection).toHaveBeenCalledWith(tx, {
+      unitId: "unit-1",
+      inventoryId: "listing-1",
+      sourceVersion: BigInt(7),
+      unitIdentityEpoch: 1,
+    });
+    expect(mockRebuildUnitPublicProjection).toHaveBeenCalledWith(
+      tx,
+      "unit-1",
+      1
+    );
+    expect(mockHandleTombstone).not.toHaveBeenCalled();
   });
 });

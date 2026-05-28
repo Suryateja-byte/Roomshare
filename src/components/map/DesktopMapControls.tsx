@@ -47,13 +47,13 @@ interface DesktopMapControlsProps {
 }
 
 const controlButtonClassName =
-  "relative flex h-11 w-11 items-center justify-center rounded-2xl border border-outline-variant/30 bg-surface-container-lowest/95 text-on-surface-variant shadow-[0_12px_32px_-18px_rgba(27,28,25,0.42),0_4px_16px_rgba(27,28,25,0.08)] backdrop-blur-md transition-all hover:border-on-surface-variant/35 hover:bg-surface-container-lowest hover:text-on-surface active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2";
+  "relative flex h-11 w-11 items-center justify-center rounded-[1rem] border border-outline-variant/20 bg-surface-container-lowest/95 text-on-surface-variant shadow-ghost backdrop-blur-md transition-all hover:border-primary/30 hover:bg-surface-container-lowest hover:text-on-surface active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2";
 
 const sectionLabelClassName =
-  "px-3 pb-1 pt-2 text-[11px] uppercase tracking-[0.16em] text-on-surface-variant";
+  "px-3 pb-1 pt-2 text-[11px] uppercase tracking-normal text-on-surface-variant";
 
 const dropdownBaseClassName =
-  "z-[1205] w-72 overflow-y-auto rounded-[1.25rem] border border-outline-variant/25 bg-surface-container-lowest/98 p-2 text-on-surface shadow-[0_24px_64px_-30px_rgba(27,28,25,0.46),0_8px_24px_rgba(27,28,25,0.1)] backdrop-blur-[20px] outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2";
+  "z-[1205] w-72 overflow-y-auto rounded-[1.25rem] border border-outline-variant/20 bg-surface-container-lowest/98 p-2 text-on-surface shadow-ghost backdrop-blur-[20px] outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2";
 
 const MAP_TOOLS_DROPDOWN_MIN_WIDTH = 540;
 const MAP_TOOLS_DROPDOWN_MIN_HEIGHT = 560;
@@ -145,7 +145,7 @@ function MapToolsPanelContent({
 
         <DropdownMenuSeparator className="mx-1 my-2" />
 
-        <DropdownMenuLabel className="px-3 pb-1 pt-1 text-[11px] uppercase tracking-[0.16em] text-on-surface-variant">
+        <DropdownMenuLabel className="px-3 pb-1 pt-1 text-[11px] uppercase tracking-normal text-on-surface-variant">
           Map Actions
         </DropdownMenuLabel>
         <DropdownMenuItem
@@ -261,7 +261,7 @@ export default function DesktopMapControls({
   return (
     <>
       <div
-        className="absolute right-4 top-20 z-[50] flex flex-col gap-2"
+        className="absolute right-4 top-4 z-[50] flex flex-col gap-2"
         data-map-avoid
       >
         {canFullscreen && (
@@ -294,7 +294,7 @@ export default function DesktopMapControls({
                 className={cn(
                   controlButtonClassName,
                   activeToolCount > 0 &&
-                    "border-on-surface/20 bg-on-surface text-surface-container-lowest hover:bg-on-surface hover:text-surface-container-lowest"
+                    "border-primary/20 bg-gradient-to-br from-primary to-primary-container text-on-primary hover:text-on-primary"
                 )}
                 data-testid="map-tools-trigger"
                 aria-label={toolsLabel}
@@ -340,7 +340,7 @@ export default function DesktopMapControls({
                 className={cn(
                   controlButtonClassName,
                   activeToolCount > 0 &&
-                    "border-on-surface/20 bg-on-surface text-surface-container-lowest hover:bg-on-surface hover:text-surface-container-lowest"
+                    "border-primary/20 bg-gradient-to-br from-primary to-primary-container text-on-primary hover:text-on-primary"
                 )}
                 data-testid="map-tools-trigger"
                 aria-label={toolsLabel}
@@ -361,7 +361,7 @@ export default function DesktopMapControls({
                 style={{ top: `${headerOffset}px` }}
               />
               <DialogPrimitive.Content
-                className="fixed right-3 z-[1205] flex w-[min(360px,calc(100vw-24px))] flex-col overflow-hidden rounded-[1.5rem] border border-outline-variant/25 bg-surface-container-lowest/98 shadow-[0_24px_64px_-30px_rgba(27,28,25,0.46),0_8px_24px_rgba(27,28,25,0.1)] outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-out-to-right-4 data-[state=open]:slide-in-from-right-4"
+                className="fixed right-3 z-[1205] flex w-[min(360px,calc(100vw-24px))] flex-col overflow-hidden rounded-[1.5rem] border border-outline-variant/20 bg-surface-container-lowest/98 shadow-ghost outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-out-to-right-4 data-[state=open]:slide-in-from-right-4"
                 style={{
                   top: `${headerOffset + MAP_TOOLS_VIEWPORT_GUTTER}px`,
                   maxHeight: maxPanelHeight,

@@ -4,7 +4,6 @@ import React, { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import {
   MapPin,
-  ShieldCheck,
   Maximize2,
   Bed,
   ChevronRight,
@@ -23,6 +22,7 @@ import { getLanguageName } from "@/lib/languages";
 import { formatPrice } from "@/lib/format";
 import ListingCard from "@/components/listings/ListingCard";
 import type { Listing } from "@/components/listings/ListingCard";
+import HostIdentityBadge from "@/components/HostIdentityBadge";
 
 // Import existing functional components
 import ImageGallery from "@/components/ImageGallery";
@@ -1325,7 +1325,7 @@ export default function ListingPageClient({
                       className="hover:underline"
                     >
                       <h3 className="text-lg font-bold font-display text-on-surface">
-                        Hosted by {listing.owner.name || "User"}
+                        Hosted by {listing.owner.name || "Host"}
                       </h3>
                     </Link>
                     <p className="text-on-surface-variant text-sm mb-2">
@@ -1335,12 +1335,12 @@ export default function ListingPageClient({
                         ` • ${listing.owner.bio.slice(0, 50)}${listing.owner.bio.length > 50 ? "..." : ""}`}
                     </p>
                     <div className="flex gap-2 flex-wrap">
-                      {listing.owner.isVerified && (
-                        <div className="flex items-center gap-1 text-xs font-medium text-on-surface-variant">
-                          <ShieldCheck className="w-3.5 h-3.5 text-primary" />
-                          Identity verified
-                        </div>
-                      )}
+                      <HostIdentityBadge
+                        status={
+                          listing.owner.isVerified ? "verified" : "unverified"
+                        }
+                        compact
+                      />
                       {listing.owner.isVerified && reviews.length >= 5 && (
                         <>
                           <span className="text-outline-variant/20">•</span>

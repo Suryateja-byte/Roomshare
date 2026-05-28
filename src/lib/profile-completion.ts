@@ -1,7 +1,6 @@
 export interface ProfileCompletion {
   percentage: number;
   missing: string[];
-  canCreateListing: boolean;
   canSendMessages: boolean;
   canBookRooms: boolean;
 }
@@ -30,7 +29,6 @@ const WEIGHTS = {
 
 // Minimum requirements for actions
 export const PROFILE_REQUIREMENTS = {
-  createListing: 60,
   sendMessages: 40,
   bookRooms: 80,
 };
@@ -87,7 +85,6 @@ export function calculateProfileCompletion(
   return {
     percentage,
     missing,
-    canCreateListing: percentage >= PROFILE_REQUIREMENTS.createListing,
     canSendMessages: percentage >= PROFILE_REQUIREMENTS.sendMessages,
     canBookRooms: percentage >= PROFILE_REQUIREMENTS.bookRooms,
   };
@@ -95,7 +92,7 @@ export function calculateProfileCompletion(
 
 export function getMissingForAction(
   user: ProfileUser,
-  action: "createListing" | "sendMessages" | "bookRooms"
+  action: "sendMessages" | "bookRooms"
 ): {
   allowed: boolean;
   missing: string[];

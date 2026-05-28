@@ -17,5 +17,5 @@ test("T-13: grouped results survive reload without cursor params leaking into th
   await expect(cards).toHaveCount(1);
   await expect(
     searchResultsContainer(page).locator('[data-testid="group-dates-trigger"]')
-  ).toHaveText("+3 more dates");
+  ).toHaveText("View 3 more available dates");
 });

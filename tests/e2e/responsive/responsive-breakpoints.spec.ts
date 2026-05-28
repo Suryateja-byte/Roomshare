@@ -248,6 +248,158 @@ test.describe("search page responsive layout", () => {
       expect(hasNoHScroll).toBe(true);
     });
   });
+
+  test("desktop search layout keeps controls and panes inside their lanes", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      localStorage.removeItem("roomshare-map-preference");
+    });
+
+    const desktopWidths = [768, 1024, 1280, 1440, 1920, 2560] as const;
+
+    for (const width of desktopWidths) {
+      await test.step(`${width}px`, async () => {
+        await page.setViewportSize({ width, height: 900 });
+        await page.goto(searchUrl, { waitUntil: "domcontentloaded" });
+        await page.waitForLoadState("networkidle").catch(() => {});
+
+        const results = page.locator('[data-testid="search-results-container"]');
+        await expect(results).toBeVisible({ timeout: 30_000 });
+        const headingSection = page
+          .locator('[data-testid="desktop-results-heading-section"]')
+          .first();
+        await expect(headingSection).toBeVisible({
+          timeout: 30_000,
+        });
+
+        const layoutState = await page.evaluate(() => {
+          const viewportWidth = document.documentElement.clientWidth;
+          const header = document.querySelector("header");
+          const logo = document.querySelector(
+            'a[aria-label="RoomShare Home"]'
+          );
+          const searchForm = document.querySelector(
+            '[data-testid="desktop-header-search-form"], [data-testid="desktop-header-search-summary"]'
+          );
+          const authCluster = Array.from(
+            document.querySelectorAll("header a, header button")
+          ).find((element) =>
+            /^(Log in|Join|User menu|List a room|Shortlist|Messages)$/i.test(
+              element.textContent?.trim() ||
+                element.getAttribute("aria-label") ||
+                ""
+            )
+          ) ?? null;
+          const listPane = document.querySelector(
+            '[data-testid="search-results-container"]'
+          );
+          const mapPane = document.querySelector(
+            '[data-testid="desktop-search-map-panel"]'
+          );
+          const heading = document.querySelector(
+            '[data-testid="desktop-results-heading-section"] h1'
+          );
+          const toolbar = document.querySelector(
+            '[data-testid="desktop-toolbar-cluster"]'
+          );
+          const filterStrip = document.querySelector(
+            '[data-testid="quick-filter-more-filters"]'
+          )?.parentElement ?? null;
+          const cards = Array.from(
+            document.querySelectorAll('[data-testid="listing-card"]')
+          ).slice(0, 4);
+
+          const rect = (element: Element | null) => {
+            if (!element) return null;
+            const r = element.getBoundingClientRect();
+            const style = window.getComputedStyle(element);
+            if (
+              style.display === "none" ||
+              style.visibility === "hidden" ||
+              r.width === 0 ||
+              r.height === 0
+            ) {
+              return null;
+            }
+            return {
+              left: r.left,
+              right: r.right,
+              top: r.top,
+              bottom: r.bottom,
+              width: r.width,
+            };
+          };
+
+          const overlaps = (
+            first: ReturnType<typeof rect>,
+            second: ReturnType<typeof rect>
+          ) => {
+            if (!first || !second) return false;
+            return !(
+              first.right <= second.left + 1 ||
+              second.right <= first.left + 1 ||
+              first.bottom <= second.top + 1 ||
+              second.bottom <= first.top + 1
+            );
+          };
+
+          const listRect = rect(listPane);
+          const mapRect = rect(mapPane);
+          const toolbarRect = rect(toolbar);
+          const filterRect = rect(filterStrip);
+          const headingElement = heading as HTMLElement | null;
+          const cardWidths = cards
+            .map((card) => rect(card)?.width ?? 0)
+            .filter((cardWidth) => cardWidth > 0);
+
+          return {
+            hasHorizontalScroll:
+              document.documentElement.scrollWidth > viewportWidth + 1,
+            headerOverlaps:
+              overlaps(rect(logo), rect(searchForm)) ||
+              overlaps(rect(searchForm), rect(authCluster)),
+            mapVisible: mapRect !== null,
+            listMapOverlap:
+              Boolean(listRect && mapRect && listRect.right > mapRect.left + 1),
+            toolbarEscapesList:
+              Boolean(
+                listRect &&
+                  toolbarRect &&
+                  (toolbarRect.left < listRect.left - 1 ||
+                    toolbarRect.right > listRect.right + 1)
+              ),
+            filtersEscapeList:
+              Boolean(
+                listRect &&
+                  filterRect &&
+                  (filterRect.left < listRect.left - 1 ||
+                    filterRect.right > listRect.right + 1)
+              ),
+            headingClipped: headingElement
+              ? headingElement.scrollWidth > headingElement.clientWidth + 1
+              : true,
+            minCardWidth:
+              cardWidths.length > 0 ? Math.min(...cardWidths) : null,
+          };
+        });
+
+        expect(layoutState.hasHorizontalScroll).toBe(false);
+        expect(layoutState.headerOverlaps).toBe(false);
+        expect(layoutState.toolbarEscapesList).toBe(false);
+        expect(layoutState.filtersEscapeList).toBe(false);
+        expect(layoutState.headingClipped).toBe(false);
+        expect(layoutState.minCardWidth).toBeGreaterThanOrEqual(280);
+
+        if (width < 1280) {
+          expect(layoutState.mapVisible).toBe(false);
+        } else {
+          expect(layoutState.mapVisible).toBe(true);
+          expect(layoutState.listMapOverlap).toBe(false);
+        }
+      });
+    }
+  });
 });
 
 // Listing detail responsive tests

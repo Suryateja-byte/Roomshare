@@ -32,22 +32,16 @@ import React, {
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  Home,
-  Loader2,
-  MapPin,
-  Minus,
-  Plus,
-  Star,
-  X,
-} from "lucide-react";
+import { Home, MapPin, Minus, Plus, Star, X } from "lucide-react";
 import { triggerHaptic } from "@/lib/haptics";
 import { formatPrice } from "@/lib/format";
-import { Button } from "./ui/button";
 import { MAP_FLY_TO_EVENT, MapFlyToEventDetail } from "./SearchForm";
 import { useListingFocus } from "@/contexts/ListingFocusContext";
 import { useMobileSearch } from "@/contexts/MobileSearchContext";
-import { useSearchMapUI } from "@/contexts/SearchMapUIContext";
+import {
+  usePendingMapFocus,
+  useSearchMapUI,
+} from "@/contexts/SearchMapUIContext";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
 import { useMapBounds } from "@/contexts/MapBoundsContext";
 import { useActivePanBoundsSetter } from "@/contexts/ActivePanBoundsContext";
@@ -64,6 +58,7 @@ import { BoundaryLayer } from "./map/BoundaryLayer";
 import { UserMarker, useUserPin } from "./map/UserMarker";
 import DesktopMapControls from "./map/DesktopMapControls";
 import DesktopListingPreviewCard from "./map/DesktopListingPreviewCard";
+import HostIdentityBadge from "./HostIdentityBadge";
 import MobileMapToolsSheet from "./map/MobileMapToolsSheet";
 import { POILayer, usePOILayerState } from "./map/POILayer";
 import {
@@ -89,7 +84,10 @@ import {
   type AvailabilityPublicAvailability,
 } from "@/lib/search/availability-presentation";
 import { buildListingDetailHref } from "@/lib/search/listing-detail-link";
-import type { GroupContextPresentation } from "@/lib/search-types";
+import type {
+  GroupContextPresentation,
+  HostIdentityStatus,
+} from "@/lib/search-types";
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import {
@@ -145,6 +143,7 @@ interface Listing {
   roomType?: string;
   publicAvailability?: AvailabilityPublicAvailability;
   groupContext?: GroupContextPresentation | null;
+  hostIdentityStatus?: HostIdentityStatus;
   location: {
     city?: string;
     state?: string;
@@ -174,6 +173,8 @@ interface MarkerPosition {
   lng: number;
 }
 
+type PinDisplayMode = "dots" | "tiered" | "all";
+
 interface ClusterFeatureProperties {
   id: string;
   title: string;
@@ -181,6 +182,7 @@ interface ClusterFeatureProperties {
   availableSlots: number;
   publicAvailabilityJson?: string;
   groupContextJson?: string;
+  hostIdentityStatus?: HostIdentityStatus;
   images?: string;
   lat: number;
   lng: number;
@@ -233,6 +235,24 @@ function parseFeatureGroupContext(
   } catch {
     return null;
   }
+}
+
+function areMarkerListingSetsEqual(a: Listing[], b: Listing[]): boolean {
+  if (a.length !== b.length) return false;
+
+  return a.every((listing, index) => {
+    const next = b[index];
+    return (
+      listing.id === next.id &&
+      listing.title === next.title &&
+      listing.price === next.price &&
+      listing.availableSlots === next.availableSlots &&
+      listing.totalSlots === next.totalSlots &&
+      listing.tier === next.tier &&
+      listing.location.lat === next.location.lat &&
+      listing.location.lng === next.location.lng
+    );
+  });
 }
 
 /**
@@ -647,11 +667,11 @@ function getPopupAdjustmentDelta(
   return { deltaX, deltaY };
 }
 
-// Price bucket colors for cluster rings (green = affordable, yellow = mid, red = expensive)
+// Price bucket colors for cluster rings, tuned to the warm RoomShare palette.
 const CLUSTER_RING_COLORS = {
-  green: "#22c55e", // < $800/mo avg
-  yellow: "#eab308", // $800-$1500/mo avg
-  red: "#ef4444", // > $1500/mo avg
+  affordable: "#6f7f46", // < $800/mo avg
+  mid: "#c08a2f", // $800-$1500/mo avg
+  premium: "#9a4027", // > $1500/mo avg
 };
 
 // Shared cluster radius expression
@@ -689,13 +709,13 @@ const clusterRingLayer: LayerProps = {
     "circle-stroke-color": [
       "step",
       ["/", ["get", "priceSum"], ["get", "point_count"]],
-      CLUSTER_RING_COLORS.green,
+      CLUSTER_RING_COLORS.affordable,
       800,
-      CLUSTER_RING_COLORS.yellow,
+      CLUSTER_RING_COLORS.mid,
       1500,
-      CLUSTER_RING_COLORS.red,
+      CLUSTER_RING_COLORS.premium,
     ],
-    "circle-stroke-opacity": 0.7,
+    "circle-stroke-opacity": 0.82,
   },
 };
 
@@ -706,7 +726,7 @@ const clusterLayer: LayerProps = {
   type: "circle",
   filter: ["has", "point_count"],
   paint: {
-    "circle-color": MAP_COLORS.zinc900,
+    "circle-color": "#1b1c19",
     "circle-radius": clusterRadiusExpr as unknown as number,
     "circle-stroke-width": 3,
     "circle-stroke-color": MAP_COLORS.white,
@@ -773,6 +793,12 @@ function getClusterCountLayerDark(textScale: number): LayerProps {
 const ZOOM_DOTS_ONLY = 10; // Below: all pins are gray dots (no price)
 const ZOOM_TOP_N_PINS = 14; // 12-14: primary = price pins, mini = dots. 14+: all price pins
 
+function getPinDisplayMode(zoom: number): PinDisplayMode {
+  if (zoom < ZOOM_DOTS_ONLY) return "dots";
+  if (zoom < ZOOM_TOP_N_PINS) return "tiered";
+  return "all";
+}
+
 // Module-level constant: prevent double-click zoom on markers
 const preventDoubleClickZoom = (e: React.MouseEvent) => {
   e.stopPropagation();
@@ -792,7 +818,7 @@ const preventDoubleClickZoom = (e: React.MouseEvent) => {
 interface MarkerPinContentProps {
   price: number;
   tier: "primary" | "mini" | undefined;
-  currentZoom: number;
+  pinDisplayMode: PinDisplayMode;
   isHovered: boolean;
   isActive: boolean;
   isViewed: boolean;
@@ -801,24 +827,24 @@ interface MarkerPinContentProps {
 const MarkerPinContent = React.memo(function MarkerPinContent({
   price,
   tier,
-  currentZoom,
+  pinDisplayMode,
   isHovered,
   isActive,
   isViewed,
 }: MarkerPinContentProps) {
   const isMini = tier === "mini";
   const showAsDot =
-    currentZoom < ZOOM_DOTS_ONLY || (currentZoom < ZOOM_TOP_N_PINS && isMini);
+    pinDisplayMode === "dots" || (pinDisplayMode === "tiered" && isMini);
 
   if (showAsDot && !isHovered && !isActive) {
     return (
       <m.div layout>
         <div
           className={cn(
-            "w-3 h-3 rounded-full shadow-ambient transition-transform duration-200",
+            "h-3 w-3 rounded-full shadow-ambient transition-transform duration-200",
             isViewed
-              ? "bg-surface-container-highest ring-2 ring-outline-variant/50"
-              : "bg-on-surface ring-2 ring-white shadow-ambient",
+              ? "bg-surface-container-highest ring-2 ring-primary/25"
+              : "bg-on-surface ring-2 ring-surface-container-lowest shadow-ambient",
             "group-hover/marker:scale-125"
           )}
         />
@@ -831,13 +857,13 @@ const MarkerPinContent = React.memo(function MarkerPinContent({
     <m.div layout className="relative">
       <div
         className={cn(
-          "flex items-center justify-center bg-surface-container-lowest text-on-surface px-4 py-2 rounded-full font-display font-semibold text-sm transition-all duration-300 shadow-[0_10px_40px_0px_rgba(27,28,25,0.06)] border border-outline-variant/20 group-hover/marker:bg-on-surface group-hover/marker:text-surface-canvas group-hover/marker:scale-110 group-hover/marker:z-10",
+          "flex items-center justify-center rounded-full border border-primary/25 bg-surface-container-lowest/96 px-4 py-2 font-display text-sm font-semibold text-on-surface shadow-[0_14px_34px_-12px_rgba(27,28,25,0.36),0_0_0_3px_rgba(255,250,247,0.9)] transition-all duration-300 group-hover/marker:z-10 group-hover/marker:scale-110 group-hover/marker:border-primary/30 group-hover/marker:bg-gradient-to-br group-hover/marker:from-primary group-hover/marker:to-primary-container group-hover/marker:text-on-primary",
           (isHovered || isActive) &&
-            "bg-on-surface text-surface-canvas scale-[1.15] shadow-[0_14px_32px_rgba(27,28,25,0.16)] z-20",
+            "z-20 scale-[1.15] border-primary/30 bg-gradient-to-br from-primary to-primary-container text-on-primary shadow-[0_16px_36px_-10px_rgba(154,64,39,0.5),0_0_0_4px_rgba(255,250,247,0.88)]",
           isViewed &&
             !isHovered &&
             !isActive &&
-            "bg-surface-container-high text-on-surface-variant border-outline-variant/10"
+            "border-outline-variant/20 bg-surface-container-high text-on-surface shadow-[0_10px_26px_-14px_rgba(27,28,25,0.3),0_0_0_3px_rgba(255,250,247,0.82)]"
         )}
       >
         {formatPrice(price)}
@@ -863,7 +889,7 @@ interface MapMarkerItemProps {
   title: string;
   availabilityAriaLabel: string;
   tier: "primary" | "mini" | undefined;
-  currentZoom: number;
+  pinDisplayMode: PinDisplayMode;
   isHovered: boolean;
   isActive: boolean;
   isDimmed: boolean;
@@ -885,7 +911,7 @@ const MapMarkerItem = React.memo(function MapMarkerItem({
   title,
   availabilityAriaLabel,
   tier,
-  currentZoom,
+  pinDisplayMode,
   isHovered,
   isActive,
   isDimmed,
@@ -964,7 +990,7 @@ const MapMarkerItem = React.memo(function MapMarkerItem({
           "transition-all duration-200 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)]",
           isHovered && "scale-[1.15] z-50",
           isActive && !isHovered && "z-40",
-          isDimmed && "opacity-60",
+          isDimmed && "z-0 opacity-85",
           isKeyboardFocused && "z-50"
         )}
         data-listing-id={listingId}
@@ -992,7 +1018,7 @@ const MapMarkerItem = React.memo(function MapMarkerItem({
         <MarkerPinContent
           price={price}
           tier={tier}
-          currentZoom={currentZoom}
+          pinDisplayMode={pinDisplayMode}
           isHovered={isHovered}
           isActive={isActive}
           isViewed={isViewed}
@@ -1215,10 +1241,11 @@ export default function MapComponent({
   const usesPopupSelection = selectionPresentation === "popup";
   const usesPreviewSelection = selectionPresentation === "preview";
   const usesOverlaySelection = usesPopupSelection || usesPreviewSelection;
-  const [internalSelectedListingId, setInternalSelectedListingId] =
-    useState<string | null>(null);
+  const [internalSelectedListingId, setInternalSelectedListingId] = useState<
+    string | null
+  >(null);
   const selectedListingId = isControlledSelection
-    ? controlledSelectedId ?? null
+    ? (controlledSelectedId ?? null)
     : internalSelectedListingId;
 
   // Computed selected listing - use controlled ID or internal state
@@ -1266,6 +1293,8 @@ export default function MapComponent({
     [isControlledSelection, onSelectedListingChange]
   );
   const [unclusteredListings, setUnclusteredListings] = useState<Listing[]>([]);
+  const unclusteredListingsRef = useRef<Listing[]>([]);
+  unclusteredListingsRef.current = unclusteredListings;
   const [isDarkMode, setIsDarkMode] = useState(false);
   // Scale map label text with OS/browser font-size (Dynamic Type support)
   const [textScale, setTextScale] = useState(1);
@@ -1274,7 +1303,9 @@ export default function MapComponent({
   const [isMapInitialized, setIsMapInitialized] = useState(false);
   const [isWebglContextLost, setIsWebglContextLost] = useState(false);
   const [mapRemountKey, setMapRemountKey] = useState(0);
-  const [currentZoom, setCurrentZoom] = useState(12);
+  const [pinDisplayMode, setPinDisplayMode] = useState<PinDisplayMode>(() =>
+    getPinDisplayMode(12)
+  );
   const [areTilesLoading, setAreTilesLoading] = useState(false);
   // M3-MAP FIX: Debounce tile loading state to avoid visual flash on brief pans
   const tileLoadingTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -1290,6 +1321,9 @@ export default function MapComponent({
   const { hoveredId, activeId, setHovered, setActive, requestScrollTo } =
     useListingFocus();
   const { hideMap } = useSearchMapUI();
+  const { pendingFocus, acknowledgeFocus } = usePendingMapFocus();
+  const pendingFocusListingIdRef = useRef<string | null>(null);
+  pendingFocusListingIdRef.current = pendingFocus?.listingId ?? null;
   // Keyboard navigation state for arrow key navigation between markers
   const [keyboardFocusedId, setKeyboardFocusedId] = useState<string | null>(
     null
@@ -1420,7 +1454,9 @@ export default function MapComponent({
     }
 
     const activeElement =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
     const trigger = activeElement?.closest(
       `[data-show-on-map-id="${listingId}"]`
     );
@@ -1479,13 +1515,20 @@ export default function MapComponent({
       restoreDesktopPopupOriginFocus,
     ]
   );
-  const handleSelectedListingClose = useCallback((restoreFocus = true) => {
-    if (usesPreviewSelection) {
-      dismissPreviewSelection();
-      return;
-    }
-    dismissDesktopPopupSelection({ restoreFocus });
-  }, [usesPreviewSelection, dismissPreviewSelection, dismissDesktopPopupSelection]);
+  const handleSelectedListingClose = useCallback(
+    (restoreFocus = true) => {
+      if (usesPreviewSelection) {
+        dismissPreviewSelection();
+        return;
+      }
+      dismissDesktopPopupSelection({ restoreFocus });
+    },
+    [
+      usesPreviewSelection,
+      dismissPreviewSelection,
+      dismissDesktopPopupSelection,
+    ]
+  );
   // Safety timeout: clear programmatic move flag if moveEnd doesn't fire
   const programmaticClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // Auto-zoom: fire once per search context when results are empty and no filters active
@@ -1615,6 +1658,7 @@ export default function MapComponent({
           groupContextJson: listing.groupContext
             ? JSON.stringify(listing.groupContext)
             : undefined,
+          hostIdentityStatus: listing.hostIdentityStatus,
           images: JSON.stringify(listing.images || []),
           lat: normalizeMapNumber(listing.location.lat),
           lng: normalizeMapNumber(listing.location.lng),
@@ -1700,6 +1744,13 @@ export default function MapComponent({
 
     const map = mapRef.current.getMap();
     if (!map || !map.getSource("listings")) return 0;
+    const isListingsSourceLoaded = (() => {
+      try {
+        return map.isSourceLoaded("listings");
+      } catch {
+        return false;
+      }
+    })();
 
     // Query for unclustered points (points without cluster)
     const features = map.querySourceFeatures("listings", {
@@ -1723,8 +1774,14 @@ export default function MapComponent({
             properties.publicAvailabilityJson
           ),
           groupContext: parseFeatureGroupContext(properties.groupContextJson),
-          totalSlots: parseFeatureAvailability(properties.publicAvailabilityJson)
-            ?.totalSlots,
+          hostIdentityStatus:
+            properties.hostIdentityStatus === "verified" ||
+            properties.hostIdentityStatus === "unverified"
+              ? properties.hostIdentityStatus
+              : "unknown",
+          totalSlots: parseFeatureAvailability(
+            properties.publicAvailabilityJson
+          )?.totalSlots,
           images,
           location: {
             lat: Number(properties.lat) || 0,
@@ -1742,20 +1799,35 @@ export default function MapComponent({
       seen.add(l.id);
       return true;
     });
+    const hasRenderedClusterFeatures =
+      unique.length === 0
+        ? map.querySourceFeatures("listings", {
+            filter: ["has", "point_count"],
+          }).length > 0
+        : false;
 
     // P0 Issue #25: Guard against state update after unmount
     if (!isMountedRef.current) return 0;
 
-    // CLUSTER FIX: Skip setting empty state during cluster expansion
-    // querySourceFeatures returns [] before tiles load after flyTo
-    // Only allow empty state if NOT expanding (normal pan/zoom to empty area)
-    if (unique.length === 0 && isClusterExpandingRef.current) {
-      return 0; // Tiles not loaded yet, retry will happen on onIdle
+    // MapLibre can briefly return no rendered source features while the GeoJSON
+    // source is rebuilding after pan/zoom or data changes. Keep the last marker
+    // set until either clusters or unclustered points are queryable again.
+    if (
+      unique.length === 0 &&
+      listings.length > 0 &&
+      unclusteredListingsRef.current.length > 0 &&
+      (!isListingsSourceLoaded ||
+        isClusterExpandingRef.current ||
+        !hasRenderedClusterFeatures)
+    ) {
+      return 0; // Source not settled yet, retry will happen on sourcedata/onIdle.
     }
 
-    setUnclusteredListings(unique);
+    setUnclusteredListings((current) =>
+      areMarkerListingSetsEqual(current, unique) ? current : unique
+    );
     return unique.length;
-  }, [imagesByListingId, useClustering]);
+  }, [imagesByListingId, listings.length, useClustering]);
 
   // Defense-in-depth: retry updateUnclusteredListings when listings exist
   // but unclustered is empty (source tiles may not be ready yet)
@@ -2208,10 +2280,7 @@ export default function MapComponent({
       setDesktopPopupSize((current) => {
         const nextWidth = Math.round(rect.width);
         const nextHeight = Math.round(rect.height);
-        if (
-          current.width === nextWidth &&
-          current.height === nextHeight
-        ) {
+        if (current.width === nextWidth && current.height === nextHeight) {
           return current;
         }
 
@@ -2303,7 +2372,10 @@ export default function MapComponent({
 
       let bestPlacement: DesktopPopupPlacement | null = null;
 
-      for (const [priorityIndex, anchor] of DESKTOP_POPUP_ANCHOR_PRIORITY.entries()) {
+      for (const [
+        priorityIndex,
+        anchor,
+      ] of DESKTOP_POPUP_ANCHOR_PRIORITY.entries()) {
         const popupRect = getDesktopPopupRectForAnchor(
           anchor,
           point,
@@ -2311,7 +2383,8 @@ export default function MapComponent({
         );
         const overflowScore = getRectOverflowScore(popupRect, safeRect);
         const overlapScore = avoidRects.reduce(
-          (total, avoidRect) => total + getRectIntersectionArea(popupRect, avoidRect),
+          (total, avoidRect) =>
+            total + getRectIntersectionArea(popupRect, avoidRect),
           0
         );
         const { deltaX, deltaY } = getPopupAdjustmentDelta(
@@ -2558,12 +2631,7 @@ export default function MapComponent({
       ],
       { padding: fitBoundsPadding, duration: 1000 }
     );
-  }, [
-    fitBoundsPadding,
-    isProgrammaticMoveRef,
-    listings,
-    setProgrammaticMove,
-  ]);
+  }, [fitBoundsPadding, isProgrammaticMoveRef, listings, setProgrammaticMove]);
 
   useEffect(() => {
     if (isPhoneViewport !== true || !isMapLoaded || listings.length === 0) {
@@ -2789,7 +2857,10 @@ export default function MapComponent({
 
     // P1-FIX (#106): Clear selectedListing popup if the listing no longer exists.
     // Prevents showing stale popup data after search results update.
-    if (selectedListingId && !listings.find((l) => l.id === selectedListingId)) {
+    if (
+      selectedListingId &&
+      !listings.find((l) => l.id === selectedListingId)
+    ) {
       lastMapActiveRef.current = null;
       popupFocusOriginRef.current = null;
       setSelectedListing(null);
@@ -3039,105 +3110,162 @@ export default function MapComponent({
     executeMapSearchRef.current = executeMapSearch;
   }, [executeMapSearch]);
 
-  // When a card's "Show on Map" button sets activeId, reveal the active selection
+  const showListingOutsideMapMessage = useCallback(() => {
+    setViewportInfoMessage("This listing is outside the current map view");
+    const timeout = setTimeout(() => {
+      if (isMountedRef.current) setViewportInfoMessage(null);
+    }, 3000);
+    return () => clearTimeout(timeout);
+  }, []);
+
+  const focusListingFromListOnMap = useCallback(
+    (listing: Listing): (() => void) | undefined => {
+      if (usesOverlaySelection) {
+        if (usesPopupSelection) {
+          captureDesktopPopupListOrigin(listing.id);
+        }
+        setSelectedListing(listing);
+      }
+
+      const map = mapRef.current;
+      if (!map) return undefined;
+
+      setProgrammaticMove(true);
+      // Safety: clear programmatic flag if moveEnd doesn't fire
+      if (programmaticClearTimeoutRef.current)
+        clearTimeout(programmaticClearTimeoutRef.current);
+      programmaticClearTimeoutRef.current = setTimeout(() => {
+        if (isProgrammaticMoveRef.current) setProgrammaticMove(false);
+      }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
+
+      const mapInstance = map.getMap();
+      const currentZoom = map.getZoom() ?? 12;
+      // clusterMaxZoom is 14 — zoom to at least 15 to guarantee the pin is unclustered
+      const minZoomToBreakCluster = 15;
+      const targetZoom = Math.max(currentZoom, minZoomToBreakCluster);
+      let targetCenter: [number, number] = [
+        listing.location.lng,
+        listing.location.lat,
+      ];
+
+      if (
+        usesPopupSelection &&
+        isPhoneViewport !== true &&
+        mapInstance &&
+        mapContainerRef.current
+      ) {
+        const placement = getDesktopPopupPlacementForListing(listing);
+        if (placement?.requiresCameraShift) {
+          const container = mapContainerRef.current;
+          const containerWidth =
+            container.clientWidth || container.getBoundingClientRect().width;
+          const containerHeight =
+            container.clientHeight || container.getBoundingClientRect().height;
+          const adjustedCenter = mapInstance.unproject([
+            containerWidth / 2 - placement.deltaX,
+            containerHeight / 2 - placement.deltaY,
+          ]);
+
+          targetCenter = [adjustedCenter.lng, adjustedCenter.lat];
+        }
+      }
+
+      map.easeTo({
+        center: targetCenter,
+        zoom: targetZoom,
+        duration: reducedMotion ? 0 : DESKTOP_POPUP_FOCUS_ANIMATION_MS,
+      });
+
+      if (
+        usesPopupSelection &&
+        isPhoneViewport !== true &&
+        typeof window !== "undefined"
+      ) {
+        const revisionTimers = [
+          window.setTimeout(() => {
+            setPopupPlacementRevision((current) => current + 1);
+          }, 0),
+          window.setTimeout(
+            () => {
+              setPopupPlacementRevision((current) => current + 1);
+            },
+            Math.max(Math.round(DESKTOP_POPUP_FOCUS_ANIMATION_MS / 2), 120)
+          ),
+          window.setTimeout(() => {
+            setPopupPlacementRevision((current) => current + 1);
+          }, DESKTOP_POPUP_FOCUS_ANIMATION_MS + 40),
+        ];
+
+        return () => {
+          revisionTimers.forEach((timerId) => window.clearTimeout(timerId));
+        };
+      }
+
+      return undefined;
+    },
+    [
+      usesOverlaySelection,
+      usesPopupSelection,
+      isPhoneViewport,
+      captureDesktopPopupListOrigin,
+      getDesktopPopupPlacementForListing,
+      setProgrammaticMove,
+      isProgrammaticMoveRef,
+      setSelectedListing,
+      reducedMotion,
+    ]
+  );
+
+  // Card-driven "Show on map" requests carry a nonce so selecting the same
+  // listing again can still reopen/recenter the map. Keep pending requests
+  // alive until the map has mounted and has a dataset to resolve against.
+  useEffect(() => {
+    if (!pendingFocus || !isMapLoaded) return;
+
+    const listing = listings.find((l) => l.id === pendingFocus.listingId);
+    if (!listing) {
+      if (listings.length === 0) return;
+      setActive(pendingFocus.listingId);
+      acknowledgeFocus(pendingFocus.nonce);
+      return showListingOutsideMapMessage();
+    }
+
+    lastMapActiveRef.current = null;
+    setActive(listing.id);
+    const cleanup = focusListingFromListOnMap(listing);
+    acknowledgeFocus(pendingFocus.nonce);
+    return cleanup;
+  }, [
+    pendingFocus,
+    isMapLoaded,
+    listings,
+    setActive,
+    acknowledgeFocus,
+    focusListingFromListOnMap,
+    showListingOutsideMapMessage,
+  ]);
+
+  // Legacy path: when a card directly sets activeId, reveal the active selection
   // presentation and center the map on the listing.
-  // Zoom in past clusterMaxZoom (14) to ensure the individual pin is visible
-  // and not absorbed into a cluster circle.
   useEffect(() => {
     if (!activeId || activeId === lastMapActiveRef.current) return;
+    if (pendingFocusListingIdRef.current === activeId) return;
+
     const listing = listings.find((l) => l.id === activeId);
     if (!listing) {
       // UX-12 FIX: Show info message when listing isn't in the map's dataset.
       // This happens when "Show on Map" is clicked for a listing loaded via
       // "Load more" that's beyond the map's 200-marker cap or outside the
       // current padded viewport.
-      setViewportInfoMessage("This listing is outside the current map view");
-      setTimeout(() => {
-        if (isMountedRef.current) setViewportInfoMessage(null);
-      }, 3000);
-      return;
-    }
-    if (usesOverlaySelection) {
-      if (usesPopupSelection) {
-        captureDesktopPopupListOrigin(listing.id);
-      }
-      setSelectedListing(listing);
+      return showListingOutsideMapMessage();
     }
 
-    setProgrammaticMove(true);
-    // Safety: clear programmatic flag if moveEnd doesn't fire
-    if (programmaticClearTimeoutRef.current)
-      clearTimeout(programmaticClearTimeoutRef.current);
-    programmaticClearTimeoutRef.current = setTimeout(() => {
-      if (isProgrammaticMoveRef.current) setProgrammaticMove(false);
-    }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
-    const map = mapRef.current;
-    const mapInstance = map?.getMap();
-    const currentZoom = map?.getZoom() ?? 12;
-    // clusterMaxZoom is 14 — zoom to at least 15 to guarantee the pin is unclustered
-    const minZoomToBreakCluster = 15;
-    const targetZoom = Math.max(currentZoom, minZoomToBreakCluster);
-    let targetCenter: [number, number] = [
-      listing.location.lng,
-      listing.location.lat,
-    ];
-
-    if (
-      usesPopupSelection &&
-      isPhoneViewport !== true &&
-      mapInstance &&
-      mapContainerRef.current
-    ) {
-      const placement = getDesktopPopupPlacementForListing(listing);
-      if (placement?.requiresCameraShift) {
-        const container = mapContainerRef.current;
-        const containerWidth =
-          container.clientWidth || container.getBoundingClientRect().width;
-        const containerHeight =
-          container.clientHeight || container.getBoundingClientRect().height;
-        const adjustedCenter = mapInstance.unproject([
-          containerWidth / 2 - placement.deltaX,
-          containerHeight / 2 - placement.deltaY,
-        ]);
-
-        targetCenter = [adjustedCenter.lng, adjustedCenter.lat];
-      }
-    }
-    map?.easeTo({
-      center: targetCenter,
-      zoom: targetZoom,
-      duration: reducedMotion ? 0 : DESKTOP_POPUP_FOCUS_ANIMATION_MS,
-    });
-
-    if (usesPopupSelection && isPhoneViewport !== true && typeof window !== "undefined") {
-      const revisionTimers = [
-        window.setTimeout(() => {
-          setPopupPlacementRevision((current) => current + 1);
-        }, 0),
-        window.setTimeout(() => {
-          setPopupPlacementRevision((current) => current + 1);
-        }, Math.max(Math.round(DESKTOP_POPUP_FOCUS_ANIMATION_MS / 2), 120)),
-        window.setTimeout(() => {
-          setPopupPlacementRevision((current) => current + 1);
-        }, DESKTOP_POPUP_FOCUS_ANIMATION_MS + 40),
-      ];
-
-      return () => {
-        revisionTimers.forEach((timerId) => window.clearTimeout(timerId));
-      };
-    }
+    return focusListingFromListOnMap(listing);
   }, [
     activeId,
     listings,
-    usesOverlaySelection,
-    usesPopupSelection,
-    isPhoneViewport,
-    captureDesktopPopupListOrigin,
-    getDesktopPopupPlacementForListing,
-    setProgrammaticMove,
-    isProgrammaticMoveRef,
-    setSelectedListing,
-    reducedMotion,
+    focusListingFromListOnMap,
+    showListingOutsideMapMessage,
   ]);
 
   // P1-FIX (#77): Wrap handleMoveEnd in useCallback to prevent stale closures.
@@ -3152,8 +3280,12 @@ export default function MapComponent({
       if (hasOriginalEvent) {
         suppressNextSyntheticMoveEndRef.current = false;
       }
-      // Track zoom for two-tier pin display
-      setCurrentZoom(e.viewState.zoom);
+      // Track only the display bucket so ordinary zoom changes do not rerender
+      // every marker unless the dot/price presentation threshold changes.
+      const nextPinDisplayMode = getPinDisplayMode(e.viewState.zoom);
+      setPinDisplayMode((current) =>
+        current === nextPinDisplayMode ? current : nextPinDisplayMode
+      );
       // Debounce updateUnclusteredListings to batch rapid moveEnd events (100ms)
       if (updateUnclusteredDebounceRef.current) {
         clearTimeout(updateUnclusteredDebounceRef.current);
@@ -3570,11 +3702,7 @@ export default function MapComponent({
       // Fire controlled view state if provided
       handleControlledMove(e);
 
-      if (
-        usesPopupSelection &&
-        isPhoneViewport !== true &&
-        selectedListing
-      ) {
+      if (usesPopupSelection && isPhoneViewport !== true && selectedListing) {
         setPopupPlacementRevision((current) => current + 1);
       }
 
@@ -3750,21 +3878,15 @@ export default function MapComponent({
         </div>
       )}
 
-      {/* Search-as-move loading indicator */}
+      {/* Screen-reader map search announcement. Visual transition chrome stays quiet. */}
       {showSearchStatus && isMapLoaded && (
         <div
-          className="absolute top-16 left-1/2 -translate-x-1/2 bg-surface-container-lowest/90 px-3 py-2 rounded-lg shadow-ambient-sm flex items-center gap-2 z-10 pointer-events-none"
+          className="sr-only"
           role="status"
           aria-label="Searching this area"
           aria-live="polite"
         >
-          <Loader2
-            className="w-4 h-4 animate-spin text-on-surface-variant"
-            aria-hidden="true"
-          />
-          <span className="text-sm text-on-surface-variant">
-            Searching this area...
-          </span>
+          Searching this area...
         </div>
       )}
 
@@ -4194,7 +4316,7 @@ export default function MapComponent({
             Each MapMarkerItem receives only primitive/boolean/stable-callback props, so React.memo
             can bail out when non-marker state changes (isSearching, areTilesLoading, etc.).
             MarkerPinContent inside each item only re-renders when its 4 primitive props change. */}
-        {markerPositions.map((position) => (
+        {markerPositions.map((position) =>
           (() => {
             const availabilityPresentation = getAvailabilityPresentation({
               availableSlots: position.listing.availableSlots,
@@ -4204,37 +4326,41 @@ export default function MapComponent({
             });
 
             return (
-          <MapMarkerItem
-            key={position.listing.id}
-            listingId={position.listing.id}
-            lng={position.lng}
-            lat={position.lat}
-            price={position.listing.price}
-            title={position.listing.title}
-            availabilityAriaLabel={availabilityPresentation.ariaLabel}
-            tier={position.listing.tier}
-            currentZoom={currentZoom}
-            isHovered={
-              hoveredId ? position.memberIds.includes(hoveredId) : false
-            }
-            isActive={activeId ? position.memberIds.includes(activeId) : false}
-            isDimmed={!!hoveredId && !position.memberIds.includes(hoveredId)}
-            isKeyboardFocused={
-              keyboardFocusedId
-                ? position.memberIds.includes(keyboardFocusedId)
-                : false
-            }
-            isViewed={viewedIds.has(position.listing.id)}
-            onClickById={handleMarkerClickById}
-            onPointerEnter={handleMarkerPointerEnter}
-            onPointerLeave={handleMarkerPointerLeave}
-            onKeyboardNav={handleMarkerKeyboardNavigation}
-            onFocusChange={setKeyboardFocusedId}
-            markerRefsMap={markerRefs}
-          />
+              <MapMarkerItem
+                key={position.listing.id}
+                listingId={position.listing.id}
+                lng={position.lng}
+                lat={position.lat}
+                price={position.listing.price}
+                title={position.listing.title}
+                availabilityAriaLabel={availabilityPresentation.ariaLabel}
+                tier={position.listing.tier}
+                pinDisplayMode={pinDisplayMode}
+                isHovered={
+                  hoveredId ? position.memberIds.includes(hoveredId) : false
+                }
+                isActive={
+                  activeId ? position.memberIds.includes(activeId) : false
+                }
+                isDimmed={
+                  !!hoveredId && !position.memberIds.includes(hoveredId)
+                }
+                isKeyboardFocused={
+                  keyboardFocusedId
+                    ? position.memberIds.includes(keyboardFocusedId)
+                    : false
+                }
+                isViewed={viewedIds.has(position.listing.id)}
+                onClickById={handleMarkerClickById}
+                onPointerEnter={handleMarkerPointerEnter}
+                onPointerLeave={handleMarkerPointerLeave}
+                onKeyboardNav={handleMarkerKeyboardNavigation}
+                onFocusChange={setKeyboardFocusedId}
+                markerRefsMap={markerRefs}
+              />
             );
           })()
-        ))}
+        )}
 
         {/* Cluster highlight: when a card is hovered/active but its marker is inside
             a cluster (not in markerPositions), render a highlight dot at the listing's
@@ -4322,7 +4448,9 @@ export default function MapComponent({
                 </button>
 
                 <Link
-                  href={selectedListingHref ?? `/listings/${selectedListing.id}`}
+                  href={
+                    selectedListingHref ?? `/listings/${selectedListing.id}`
+                  }
                   className="flex items-stretch gap-3 p-3 pr-12"
                 >
                   <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-surface-container-high">
@@ -4358,8 +4486,14 @@ export default function MapComponent({
                       data-testid="map-popup-availability"
                       className="mt-2 inline-flex items-center rounded-full bg-surface-container-high px-2.5 py-1 text-[11px] font-medium text-on-surface-variant"
                     >
-                      {selectedAvailabilityPresentation?.primaryLabel ?? "Filled"}
+                      {selectedAvailabilityPresentation?.primaryLabel ??
+                        "Filled"}
                     </div>
+                    <HostIdentityBadge
+                      status={selectedListing.hostIdentityStatus}
+                      compact
+                      className="mt-2"
+                    />
                     {selectedAvailabilityPresentation?.secondaryGroupLabel ? (
                       <p className="mt-2 text-xs font-medium text-on-surface-variant">
                         {selectedAvailabilityPresentation.secondaryGroupLabel}
@@ -4457,6 +4591,30 @@ export default function MapComponent({
         />
       )}
 
+      {isDesktopViewport && (
+        <div
+          className="absolute right-4 top-[8rem] z-[50] flex flex-col overflow-hidden rounded-[1rem] border border-outline-variant/20 bg-surface-container-lowest/95 text-on-surface-variant shadow-ghost backdrop-blur-md"
+          data-map-avoid
+        >
+          <button
+            type="button"
+            onClick={handleZoomIn}
+            className="flex h-11 w-11 items-center justify-center shadow-[inset_0_-1px_0_rgba(220,193,185,0.22)] transition-colors hover:bg-surface-container-high hover:text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-inset"
+            aria-label="Zoom in on map"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={handleZoomOut}
+            className="flex h-11 w-11 items-center justify-center transition-colors hover:bg-surface-container-high hover:text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-inset"
+            aria-label="Zoom out on map"
+          >
+            <Minus className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {/* Apply POI visibility to the map; POI controls live in the map tools UI. */}
       <POILayer
         mapRef={mapRef}
@@ -4481,9 +4639,7 @@ export default function MapComponent({
       {isMapLoaded &&
         !showMobileToolsSheet &&
         !shouldShowMobileStatusCard &&
-        !hasPhonePreviewCard && (
-        <MapGestureHint />
-      )}
+        !hasPhonePreviewCard && <MapGestureHint />}
 
       {shouldShowMobileStatusCard && mobileMapStatus && (
         <MobileMapStatusCard

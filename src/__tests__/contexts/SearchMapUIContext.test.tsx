@@ -23,13 +23,15 @@ import {
 const createWrapper = (
   showMap: () => void,
   shouldShowMap: boolean,
-  hideMap: () => void = jest.fn()
+  hideMap: () => void = jest.fn(),
+  canShowMap = true
 ) => {
   return ({ children }: { children: React.ReactNode }) => (
     <SearchMapUIProvider
       showMap={showMap}
       hideMap={hideMap}
       shouldShowMap={shouldShowMap}
+      canShowMap={canShowMap}
     >
       {children}
     </SearchMapUIProvider>
@@ -141,6 +143,20 @@ describe("SearchMapUIContext", () => {
 
       // Only the latest focus should be pending
       expect(result.current.pendingFocus?.listingId).toBe("listing-new");
+    });
+
+    it("should ignore focus requests when no inline map can be shown", () => {
+      const showMap = jest.fn();
+      const wrapper = createWrapper(showMap, false, jest.fn(), false);
+
+      const { result } = renderHook(() => useSearchMapUI(), { wrapper });
+
+      act(() => {
+        result.current.focusListingOnMap("listing-123");
+      });
+
+      expect(result.current.pendingFocus).toBeNull();
+      expect(showMap).not.toHaveBeenCalled();
     });
   });
 

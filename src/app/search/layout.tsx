@@ -61,10 +61,8 @@ export default async function SearchLayout({
               <SearchUrlCanonicalizer />
               <SkipLink href="#search-results">Skip to search results</SkipLink>
               {/* Search Header - Persistent across navigations, fixed position */}
-              <header className="fixed top-0 left-0 right-0 z-[1100] w-full bg-surface-container-lowest/95 shadow-ambient-sm backdrop-blur-xl pointer-events-auto">
-                <nav
-                  aria-label="Search navigation"
-                >
+              <header className="fixed top-0 left-0 right-0 z-[1100] w-full bg-surface-container-lowest/92 shadow-ghost backdrop-blur-[20px] pointer-events-auto">
+                <nav aria-label="Search navigation">
                   <SearchHeaderWrapper />
                 </nav>
                 <AccountNoticeHost placement="search" />

@@ -33,10 +33,17 @@ const mockGetCachedResults = jest.fn();
 const mockSetCachedResults = jest.fn();
 const mockWithRateLimit = jest.fn();
 const mockGetPublicCacheStatePayload = jest.fn();
+const mockSuggestDestinations = jest.fn();
+const mockSearchLocalDestinationIndex = jest.fn();
+const mockSearchMapboxDestinations = jest.fn();
+const mockIsProviderMonthlyCapReached = jest.fn();
+const mockRecordGeocodingProviderSkipped = jest.fn();
 
 jest.mock("@/lib/env", () => ({
   features: {
     publicAutocompleteContract: false,
+    googlePlacesPublic: false,
+    mapboxGeocoding: false,
   },
 }));
 
@@ -44,14 +51,64 @@ jest.mock("@/lib/geocoding/photon", () => ({
   searchPhoton: (...args: unknown[]) => mockSearchPhoton(...args),
 }));
 
-jest.mock("@/lib/geocoding/public-autocomplete", () => ({
-  searchPublicAutocomplete: (...args: unknown[]) =>
-    mockSearchPublicAutocomplete(...args),
+jest.mock("@/lib/geocoding/public-autocomplete", () => {
+  const actual = jest.requireActual("@/lib/geocoding/public-autocomplete");
+  return {
+    ...actual,
+    searchPublicAutocomplete: (...args: unknown[]) =>
+      mockSearchPublicAutocomplete(...args),
+  };
+});
+
+jest.mock("@/lib/geocoding/local-destination-index", () => ({
+  searchLocalDestinationIndex: (...args: unknown[]) =>
+    mockSearchLocalDestinationIndex(...args),
 }));
+
+jest.mock("@/lib/geocoding/mapbox", () => {
+  class MapboxGeocodingUnavailableError extends Error {
+    constructor(
+      message: string,
+      public readonly code: "MISSING_KEY" | "TIMEOUT" | "UPSTREAM"
+    ) {
+      super(message);
+    }
+  }
+
+  return {
+    MapboxGeocodingUnavailableError,
+    searchMapboxDestinations: (...args: unknown[]) =>
+      mockSearchMapboxDestinations(...args),
+  };
+});
+
+jest.mock("@/lib/geocoding/google-places", () => {
+  class GooglePlacesUnavailableError extends Error {
+    constructor(
+      message: string,
+      public readonly code: "MISSING_KEY" | "TIMEOUT" | "UPSTREAM"
+    ) {
+      super(message);
+    }
+  }
+
+  return {
+    GooglePlacesUnavailableError,
+    suggestDestinations: (...args: unknown[]) =>
+      mockSuggestDestinations(...args),
+  };
+});
 
 jest.mock("@/lib/geocoding-cache", () => ({
   getCachedResults: (...args: unknown[]) => mockGetCachedResults(...args),
   setCachedResults: (...args: unknown[]) => mockSetCachedResults(...args),
+}));
+
+jest.mock("@/lib/geocoding/provider-cost-controls", () => ({
+  isProviderMonthlyCapReached: (...args: unknown[]) =>
+    mockIsProviderMonthlyCapReached(...args),
+  recordGeocodingProviderSkipped: (...args: unknown[]) =>
+    mockRecordGeocodingProviderSkipped(...args),
 }));
 
 jest.mock("@/lib/with-rate-limit", () => ({
@@ -65,6 +122,7 @@ jest.mock("@/lib/public-cache/state", () => ({
 
 jest.mock("@/lib/geocoding/public-autocomplete-telemetry", () => ({
   recordPublicAutocompleteRequest: jest.fn(),
+  recordPublicAutocompleteFallbackUsed: jest.fn(),
 }));
 
 import { GET } from "@/app/api/geocoding/autocomplete/route";
@@ -73,15 +131,30 @@ import { features } from "@/lib/env";
 
 const mockedFeatures = features as {
   publicAutocompleteContract: boolean;
+  googlePlacesPublic: boolean;
+  mapboxGeocoding: boolean;
 };
 
 describe("/api/geocoding/autocomplete", () => {
   const requestFor = (queryString: string) =>
     new Request(`http://localhost/api/geocoding/autocomplete?${queryString}`);
+  const originalPublicLocationProvider = process.env.PUBLIC_LOCATION_PROVIDER;
+  const originalMapboxMonthlyCap =
+    process.env.MAPBOX_PUBLIC_AUTOCOMPLETE_MONTHLY_CAP;
+  const originalGoogleMonthlyCap =
+    process.env.GOOGLE_PUBLIC_AUTOCOMPLETE_MONTHLY_CAP;
 
   beforeEach(() => {
     jest.clearAllMocks();
     mockedFeatures.publicAutocompleteContract = false;
+    mockedFeatures.googlePlacesPublic = false;
+    mockedFeatures.mapboxGeocoding = false;
+    delete process.env.PUBLIC_LOCATION_PROVIDER;
+    delete process.env.MAPBOX_PUBLIC_AUTOCOMPLETE_MONTHLY_CAP;
+    delete process.env.GOOGLE_PUBLIC_AUTOCOMPLETE_MONTHLY_CAP;
+    mockSearchLocalDestinationIndex.mockReturnValue([]);
+    mockSearchMapboxDestinations.mockResolvedValue([]);
+    mockIsProviderMonthlyCapReached.mockReturnValue(false);
     mockGetCachedResults.mockResolvedValue(null);
     mockSetCachedResults.mockResolvedValue(undefined);
     mockWithRateLimit.mockResolvedValue(null);
@@ -91,32 +164,51 @@ describe("/api/geocoding/autocomplete", () => {
     });
   });
 
-  it("returns cached results without calling Photon on the legacy path", async () => {
-    mockGetCachedResults.mockResolvedValueOnce([
-      {
-        id: "cached:1",
-        place_name: "Chicago, IL",
-        center: [-87.6298, 41.8781],
-        place_type: ["place"],
-      },
-    ]);
+  afterEach(() => {
+    if (originalPublicLocationProvider === undefined) {
+      delete process.env.PUBLIC_LOCATION_PROVIDER;
+    } else {
+      process.env.PUBLIC_LOCATION_PROVIDER = originalPublicLocationProvider;
+    }
+    if (originalMapboxMonthlyCap === undefined) {
+      delete process.env.MAPBOX_PUBLIC_AUTOCOMPLETE_MONTHLY_CAP;
+    } else {
+      process.env.MAPBOX_PUBLIC_AUTOCOMPLETE_MONTHLY_CAP =
+        originalMapboxMonthlyCap;
+    }
+    if (originalGoogleMonthlyCap === undefined) {
+      delete process.env.GOOGLE_PUBLIC_AUTOCOMPLETE_MONTHLY_CAP;
+    } else {
+      process.env.GOOGLE_PUBLIC_AUTOCOMPLETE_MONTHLY_CAP =
+        originalGoogleMonthlyCap;
+    }
+  });
 
-    const response = await GET(requestFor("q=Chicago"));
+  it("returns local destination results before cache or paid providers", async () => {
+    const results = [
+      {
+        id: "local:place:irving-tx",
+        provider: "local",
+        place_name: "Irving, TX",
+        center: [-96.9489, 32.814],
+        place_type: ["place"],
+        requires_resolution: false,
+      },
+    ];
+    mockSearchLocalDestinationIndex.mockReturnValueOnce(results);
+
+    const response = await GET(requestFor("q=irving"));
     const payload = await response.json();
 
     expect(response.status).toBe(200);
-    expect(payload).toEqual({
-      results: [
-        {
-          id: "cached:1",
-          place_name: "Chicago, IL",
-          center: [-87.6298, 41.8781],
-          place_type: ["place"],
-        },
-      ],
+    expect(payload).toEqual({ results });
+    expect(mockSearchLocalDestinationIndex).toHaveBeenCalledWith("irving", {
+      limit: 5,
     });
+    expect(mockGetCachedResults).not.toHaveBeenCalled();
+    expect(mockSearchMapboxDestinations).not.toHaveBeenCalled();
+    expect(mockSuggestDestinations).not.toHaveBeenCalled();
     expect(mockSearchPhoton).not.toHaveBeenCalled();
-    expect(mockSearchPublicAutocomplete).not.toHaveBeenCalled();
     expect(response.headers.get("Cache-Control")).toBe("no-store");
   });
 
@@ -129,24 +221,74 @@ describe("/api/geocoding/autocomplete", () => {
     expect(mockSearchPhoton).not.toHaveBeenCalled();
   });
 
-  it("calls Photon with the sanitized query and caches the result on the legacy path", async () => {
+  it("calls Mapbox fallback with the sanitized query and does not cache temporary results", async () => {
+    mockedFeatures.mapboxGeocoding = true;
     const results = [
       {
-        id: "photon:1",
+        id: "mapbox:place.123",
+        provider: "mapbox",
         place_name: "Austin, TX",
         center: [-97.7431, 30.2672],
         place_type: ["place"],
       },
     ];
-    mockSearchPhoton.mockResolvedValueOnce(results);
+    mockSearchMapboxDestinations.mockResolvedValueOnce(results);
 
     const response = await GET(requestFor("q=%20Austin%20&limit=20"));
     const payload = await response.json();
 
     expect(response.status).toBe(200);
     expect(payload).toEqual({ results });
-    expect(mockSearchPhoton).toHaveBeenCalledWith("Austin", { limit: 10 });
-    expect(mockSetCachedResults).toHaveBeenCalledWith("Austin", results, undefined);
+    expect(mockSearchMapboxDestinations).toHaveBeenCalledWith("Austin", {
+      limit: 10,
+    });
+    expect(mockSetCachedResults).not.toHaveBeenCalled();
+    expect(mockSearchPhoton).not.toHaveBeenCalled();
+    expect(mockSearchPublicAutocomplete).not.toHaveBeenCalled();
+  });
+
+  it("blocks address-like public queries from external fallback providers", async () => {
+    process.env.PUBLIC_LOCATION_PROVIDER = "photon";
+
+    const response = await GET(requestFor("q=123%20Main%20St"));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload).toEqual({ results: [] });
+    expect(mockSearchPhoton).not.toHaveBeenCalled();
+    expect(mockSearchMapboxDestinations).not.toHaveBeenCalled();
+    expect(mockSuggestDestinations).not.toHaveBeenCalled();
+    expect(JSON.stringify(payload)).not.toContain("123 Main St");
+  });
+
+  it("uses Google only when explicitly configured as a public fallback", async () => {
+    process.env.PUBLIC_LOCATION_PROVIDER = "google";
+    mockedFeatures.googlePlacesPublic = true;
+    const results = [
+      {
+        id: "google:ChIJIrving",
+        place_id: "ChIJIrving",
+        provider: "google",
+        place_name: "Irving, TX, USA",
+        primary_text: "Irving",
+        secondary_text: "TX, USA",
+        place_type: ["place"],
+        requires_resolution: true,
+      },
+    ];
+    mockSuggestDestinations.mockResolvedValueOnce(results);
+
+    const response = await GET(requestFor("q=irving&sessionToken=session_123"));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload).toEqual({ results });
+    expect(mockSuggestDestinations).toHaveBeenCalledWith("irving", {
+      limit: 5,
+      sessionToken: "session_123",
+    });
+    expect(mockGetCachedResults).not.toHaveBeenCalled();
+    expect(mockSearchPhoton).not.toHaveBeenCalled();
     expect(mockSearchPublicAutocomplete).not.toHaveBeenCalled();
   });
 
@@ -184,6 +326,7 @@ describe("/api/geocoding/autocomplete", () => {
   });
 
   it("maps upstream timeouts to 504 without exposing raw details on the legacy path", async () => {
+    process.env.PUBLIC_LOCATION_PROVIDER = "photon";
     mockSearchPhoton.mockRejectedValueOnce(
       new FetchTimeoutError("https://photon.example?q=Irving", 8000)
     );
@@ -196,15 +339,15 @@ describe("/api/geocoding/autocomplete", () => {
     expect(JSON.stringify(payload)).not.toContain("photon.example");
   });
 
-  it("maps public-reader failures to 503 without calling Photon", async () => {
+  it("degrades public-reader failures to an empty response without calling Photon", async () => {
     mockedFeatures.publicAutocompleteContract = true;
     mockSearchPublicAutocomplete.mockRejectedValueOnce(new Error("db down"));
 
     const response = await GET(requestFor("q=Irving"));
     const payload = await response.json();
 
-    expect(response.status).toBe(503);
-    expect(payload).toEqual({ code: "UNAVAILABLE" });
+    expect(response.status).toBe(200);
+    expect(payload).toEqual({ results: [] });
     expect(mockSearchPhoton).not.toHaveBeenCalled();
   });
 });

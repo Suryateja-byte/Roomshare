@@ -3,10 +3,12 @@ import SearchResultsToolbar from "@/components/search/SearchResultsToolbar";
 
 const mockToggleMap = jest.fn();
 let mockShouldShowMap = false;
+let mockCanShowMap = true;
 
 jest.mock("@/contexts/SearchMapUIContext", () => ({
   useSearchMapUI: () => ({
     shouldShowMap: mockShouldShowMap,
+    canShowMap: mockCanShowMap,
     toggleMap: mockToggleMap,
   }),
 }));
@@ -31,6 +33,7 @@ describe("SearchResultsToolbar", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockShouldShowMap = false;
+    mockCanShowMap = true;
   });
 
   it("renders the desktop map toggle with sort and save actions when results exist", async () => {
@@ -103,5 +106,19 @@ describe("SearchResultsToolbar", () => {
     expect(screen.getByTestId("desktop-search-toolbar").children).toHaveLength(
       1
     );
+  });
+
+  it("hides the map toggle when the viewport cannot show an inline map", () => {
+    mockCanShowMap = false;
+
+    render(
+      <SearchResultsToolbar currentSort="recommended" hasResults={true} />
+    );
+
+    expect(
+      screen.queryByTestId("desktop-toolbar-map-toggle")
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("toolbar-sort-select")).toBeInTheDocument();
+    expect(screen.getByTestId("toolbar-save-search")).toBeInTheDocument();
   });
 });

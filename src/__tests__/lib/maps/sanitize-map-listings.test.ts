@@ -41,6 +41,7 @@ describe("sanitize-map-listings", () => {
       images: ["one.jpg", 42, "two.jpg"],
       location: { lat: "30.2672", lng: "-97.7431" },
       tier: "primary",
+      hostIdentityStatus: "verified",
     });
 
     expect(listing).toEqual(
@@ -59,8 +60,27 @@ describe("sanitize-map-listings", () => {
         createdAt: null,
         groupContext: null,
         groupSummary: null,
+        hostIdentityStatus: "verified",
       })
     );
+  });
+
+  it("defaults invalid or missing host identity status to unknown", () => {
+    expect(
+      sanitizeMapListing({
+        id: "listing-unknown-map",
+        availableSlots: 1,
+        location: { lat: 30.2672, lng: -97.7431 },
+      })?.hostIdentityStatus
+    ).toBe("unknown");
+    expect(
+      sanitizeMapListing({
+        id: "listing-invalid-map",
+        availableSlots: 1,
+        location: { lat: 30.2672, lng: -97.7431 },
+        hostIdentityStatus: "emailVerified",
+      })?.hostIdentityStatus
+    ).toBe("unknown");
   });
 
   it("replaces raw group identifiers and drops private status reasons", () => {

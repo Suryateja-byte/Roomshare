@@ -12,6 +12,8 @@ import {
   CreateListingData,
 } from "../page-objects/create-listing.page";
 
+const INCOMPLETE_HOST_EMAIL = "e2e-incomplete-host@roomshare.dev";
+
 test.describe("Create Listing — Functional Tests", () => {
   test.use({ storageState: "playwright/.auth/user.json" });
   test.beforeEach(async () => {
@@ -216,6 +218,53 @@ test.describe("Create Listing — Functional Tests", () => {
 
       await clp.expectOnCreatePage();
       await clp.expectErrorBanner(/photo|image/i);
+    });
+  });
+
+  test.describe("P1: Incomplete identity-unverified host", () => {
+    test.use({ storageState: "playwright/.auth/incomplete-host.json" });
+
+    test(`F-019: Email-verified incomplete host can publish with trust guidance ${tags.auth} ${tags.core}`, async ({
+      page,
+    }) => {
+      const clp = new CreateListingPage(page);
+      const data = validData({
+        title: `Incomplete Host Listing ${Date.now()}`,
+        description:
+          "A complete listing form from a sparse, identity-unverified host profile.",
+      });
+
+      await clp.goto();
+      await expect(page.getByText(/you can publish now/i)).toBeVisible();
+      await expect(
+        page.getByText(/profile must be at least/i)
+      ).toHaveCount(0);
+      await expect(
+        page.getByText(/complete id verification/i)
+      ).toHaveCount(0);
+
+      await page.evaluate(() => {
+        localStorage.setItem(
+          "listing-draft",
+          JSON.stringify({ data: { title: "stale draft" }, savedAt: Date.now() })
+        );
+      });
+
+      await clp.fillRequiredFields(data);
+      await clp.mockImageUpload({ ownerEmail: INCOMPLETE_HOST_EMAIL });
+      await clp.uploadTestImage();
+      await clp.waitForUploadComplete();
+      await clp.mockListingApiSuccess("mock-incomplete-host-listing");
+
+      const response = await clp.submitAndWaitForResponse();
+      expect(response.status()).toBe(201);
+
+      await clp.expectSuccessToast();
+      await clp.expectSuccess();
+      await expect
+        .poll(() => page.evaluate(() => localStorage.getItem("listing-draft")))
+        .toBeNull();
+      expect(page.url()).toContain("/listings/mock-incomplete-host-listing");
     });
   });
 
@@ -433,26 +482,25 @@ test.describe("Create Listing — Functional Tests", () => {
       }
     });
 
-    test(`F-018: Profile warning banner — visible state or dismissible ${tags.auth}`, async ({
+    test(`F-018: Profile trust guidance banner — visible state or dismissible ${tags.auth}`, async ({
       page,
     }) => {
-      // The banner visibility depends on the test user's profile completion
-      // (< 60% → shown). Rather than assuming a specific profile state, we
-      // handle both cases: if the banner appears we verify it can be dismissed;
-      // if it doesn't appear, the profile is sufficiently complete — also fine.
+      // The banner is optional guidance now; it must never describe profile
+      // completion as required for publishing.
       const clp = new CreateListingPage(page);
       await clp.goto();
 
-      const profileWarning = page.getByText(/complete your profile/i).first();
-      const isVisible = await profileWarning.isVisible().catch(() => false);
+      await expect(
+        page.getByText(/profile must be at least/i)
+      ).toHaveCount(0);
+      const profileGuidance = page.getByText(/you can publish now/i).first();
+      const isVisible = await profileGuidance.isVisible().catch(() => false);
 
       if (isVisible) {
-        // Banner is shown — verify it can be dismissed
         const dismissBtn = page.getByRole("button", { name: /dismiss/i });
         await dismissBtn.click();
-        await expect(profileWarning).not.toBeVisible({ timeout: 3000 });
+        await expect(profileGuidance).not.toBeVisible({ timeout: 3000 });
       }
-      // If not visible, profile is >= 60% complete — nothing to assert
     });
   });
 });

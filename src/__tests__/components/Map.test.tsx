@@ -573,6 +573,23 @@ function setDesktopAvoidRects(
   });
 }
 
+async function renderMapAndPopulateMarkers(listings = mockListings) {
+  render(<MapComponent listings={listings} />);
+
+  await act(async () => {
+    jest.advanceTimersByTime(100);
+  });
+
+  const handlers = (
+    window as unknown as Record<string, { onIdle?: () => void }>
+  ).__mapHandlers;
+  await act(async () => {
+    handlers?.onIdle?.();
+  });
+
+  return screen.getAllByTestId("map-marker");
+}
+
 // --------------------------------------------------------------------------
 // Test Suite
 // --------------------------------------------------------------------------
@@ -845,14 +862,18 @@ describe("Map Component", () => {
         name: /more map tools/i,
       });
       expect(moreToolsButton).toBeInTheDocument();
-      expect(screen.queryByTestId("mobile-map-tools-sheet")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("mobile-map-tools-sheet")
+      ).not.toBeInTheDocument();
 
       await act(async () => {
         fireEvent.click(moreToolsButton);
       });
 
       expect(screen.getByTestId("mobile-map-tools-sheet")).toBeInTheDocument();
-      expect(screen.getByTestId("mobile-map-tools-overlay")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("mobile-map-tools-overlay")
+      ).toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: /zoom in on map/i })
       ).not.toBeInTheDocument();
@@ -880,7 +901,9 @@ describe("Map Component", () => {
       });
 
       await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: /more map tools/i }));
+        fireEvent.click(
+          screen.getByRole("button", { name: /more map tools/i })
+        );
       });
       expect(screen.getByTestId("mobile-map-tools-sheet")).toBeInTheDocument();
 
@@ -1231,6 +1254,71 @@ describe("Map Component", () => {
   });
 
   describe("marker interactions", () => {
+    it("renders readable price marker pills over map tiles", async () => {
+      await renderMapAndPopulateMarkers();
+
+      const markerPin = screen.getByTestId("map-pin-primary-listing-1");
+      const pricePill = within(markerPin).getByText("$1,200");
+
+      expect(pricePill).toHaveClass(
+        "bg-surface-container-lowest/96",
+        "text-on-surface",
+        "border-primary/25",
+        "shadow-[0_14px_34px_-12px_rgba(27,28,25,0.36),0_0_0_3px_rgba(255,250,247,0.9)]"
+      );
+    });
+
+    it("keeps viewed price marker pills readable", async () => {
+      const markers = await renderMapAndPopulateMarkers();
+
+      await act(async () => {
+        fireEvent.click(markers[0]);
+      });
+
+      const markerPin = screen.getByTestId("map-pin-primary-listing-1");
+      const pricePill = within(markerPin).getByText("$1,200");
+
+      expect(pricePill).toHaveClass(
+        "bg-surface-container-high",
+        "text-on-surface",
+        "border-outline-variant/20",
+        "shadow-[0_10px_26px_-14px_rgba(27,28,25,0.3),0_0_0_3px_rgba(255,250,247,0.82)]"
+      );
+      expect(pricePill).not.toHaveClass("text-on-surface-variant");
+    });
+
+    it("uses strong contrast for active price marker pills", async () => {
+      mockActiveId = "listing-1";
+      await renderMapAndPopulateMarkers();
+
+      const markerPin = screen.getByTestId("map-pin-primary-listing-1");
+      const pricePill = within(markerPin).getByText("$1,200");
+
+      expect(pricePill).toHaveClass(
+        "bg-gradient-to-br",
+        "from-primary",
+        "to-primary-container",
+        "text-on-primary",
+        "border-primary/30",
+        "scale-[1.15]",
+        "z-20"
+      );
+    });
+
+    it("dims non-hovered marker pills without making them low contrast", async () => {
+      mockHoveredId = "listing-1";
+      await renderMapAndPopulateMarkers();
+
+      const dimmedPin = screen.getByTestId("map-pin-primary-listing-3");
+
+      expect(dimmedPin).toHaveAttribute("data-focus-state", "dimmed");
+      expect(dimmedPin).toHaveClass("opacity-85", "z-0");
+      expect(dimmedPin).not.toHaveClass("opacity-60");
+      expect(within(dimmedPin).getByText("$900")).toHaveClass(
+        "text-on-surface"
+      );
+    });
+
     it("opens the desktop popup in place when a marker is clicked", async () => {
       render(<MapComponent listings={mockListings} />);
 
@@ -1397,7 +1485,10 @@ describe("Map Component", () => {
         fireEvent.click(markers[0]);
       });
 
-      expect(screen.getByTestId("map-popup")).toHaveAttribute("anchor", "bottom");
+      expect(screen.getByTestId("map-popup")).toHaveAttribute(
+        "anchor",
+        "bottom"
+      );
       expect(mockMapInstance.unproject).not.toHaveBeenCalled();
       expect(mockMapInstance.easeTo).not.toHaveBeenCalled();
     });
@@ -1425,7 +1516,10 @@ describe("Map Component", () => {
         fireEvent.click(markers[0]);
       });
 
-      expect(screen.getByTestId("map-popup")).toHaveAttribute("anchor", "right");
+      expect(screen.getByTestId("map-popup")).toHaveAttribute(
+        "anchor",
+        "right"
+      );
       expect(mockMapInstance.easeTo).not.toHaveBeenCalled();
       expect(mockMapInstance.unproject).not.toHaveBeenCalled();
     });
@@ -1501,6 +1595,7 @@ describe("Map Component", () => {
       setDesktopMapPaneRect();
       setDesktopAvoidRects([
         { left: 560, top: 20, width: 200, height: 240 },
+        { left: 740, top: 128, width: 44, height: 88 },
       ]);
       mockMapInstance.project.mockReturnValue({ x: 500, y: 340 });
 
@@ -1509,7 +1604,10 @@ describe("Map Component", () => {
         fireEvent.click(markers[0]);
       });
 
-      expect(screen.getByTestId("map-popup")).toHaveAttribute("anchor", "right");
+      expect(screen.getByTestId("map-popup")).toHaveAttribute(
+        "anchor",
+        "right"
+      );
       expect(mockMapInstance.easeTo).not.toHaveBeenCalled();
       expect(mockMapInstance.unproject).not.toHaveBeenCalled();
     });
@@ -1578,9 +1676,14 @@ describe("Map Component", () => {
         zoom: 15,
         duration: 280,
       });
-      expect(mockMapInstance.easeTo.mock.calls[0][0]).not.toHaveProperty("offset");
+      expect(mockMapInstance.easeTo.mock.calls[0][0]).not.toHaveProperty(
+        "offset"
+      );
       await waitFor(() => {
-        expect(screen.getByTestId("map-popup")).toHaveAttribute("anchor", "right");
+        expect(screen.getByTestId("map-popup")).toHaveAttribute(
+          "anchor",
+          "right"
+        );
       });
     });
 
@@ -2320,7 +2423,7 @@ describe("Map Component", () => {
       });
 
       expect(
-        screen.getByRole("button", { name: /zoom out/i })
+        screen.getByRole("button", { name: /^zoom out$/i })
       ).toBeInTheDocument();
     });
   });

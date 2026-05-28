@@ -35,6 +35,32 @@ jest.mock("@/lib/geocoding", () => ({
   geocodeAddress: jest.fn(),
 }));
 
+jest.mock("@/lib/geocoding/address-suggestion-token", () => ({
+  verifyAddressSuggestionToken: jest.fn().mockReturnValue({
+    valid: false,
+    reason: "malformed",
+  }),
+}));
+
+const mockValidateAddressForPublish = jest.fn();
+
+jest.mock("@/lib/geocoding/google-places", () => {
+  class GooglePlacesUnavailableError extends Error {
+    constructor(
+      message: string,
+      public readonly code: "MISSING_KEY" | "TIMEOUT" | "UPSTREAM"
+    ) {
+      super(message);
+    }
+  }
+
+  return {
+    GooglePlacesUnavailableError,
+    validateAddressForPublish: (...args: unknown[]) =>
+      mockValidateAddressForPublish(...args),
+  };
+});
+
 jest.mock("@/lib/data", () => ({}));
 
 jest.mock("@/lib/with-rate-limit", () => ({
@@ -104,12 +130,10 @@ jest.mock("@/lib/profile-completion", () => ({
   calculateProfileCompletion: jest.fn().mockReturnValue({
     percentage: 100,
     missing: [],
-    canCreateListing: true,
     canSendMessages: true,
     canBookRooms: true,
   }),
   PROFILE_REQUIREMENTS: {
-    createListing: 60,
     sendMessages: 40,
     bookRooms: 80,
   },
@@ -118,6 +142,7 @@ jest.mock("@/lib/profile-completion", () => ({
 jest.mock("@/lib/env", () => ({
   features: {
     listingCreateCollisionWarn: false,
+    googleAddressValidation: true,
     semanticSearch: false,
     wholeUnitMode: false,
   },
@@ -221,6 +246,16 @@ describe("POST /api/listings — XSS / injection / boundary tests", () => {
     (checkEmailVerified as jest.Mock).mockResolvedValue({ verified: true });
     (prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: "user-123" });
     (prisma.listing.count as jest.Mock).mockResolvedValue(0);
+    mockValidateAddressForPublish.mockReset();
+    mockValidateAddressForPublish.mockResolvedValue({
+      address: "123 Main St",
+      city: "San Francisco",
+      state: "CA",
+      zip: "94102",
+      lat: 37.7749,
+      lng: -122.4194,
+      precision: "PREMISE",
+    });
     (geocodeAddress as jest.Mock).mockResolvedValue({
       status: "success",
       lat: 37.7749,

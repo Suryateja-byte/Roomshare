@@ -10,7 +10,11 @@ import {
   getAvailabilityPresentation,
   type AvailabilityPublicAvailability,
 } from "@/lib/search/availability-presentation";
-import type { GroupContextPresentation } from "@/lib/search-types";
+import type {
+  GroupContextPresentation,
+  HostIdentityStatus,
+} from "@/lib/search-types";
+import HostIdentityBadge from "@/components/HostIdentityBadge";
 
 type PreviewListing = {
   id: string;
@@ -24,6 +28,7 @@ type PreviewListing = {
   roomType?: string;
   publicAvailability?: AvailabilityPublicAvailability;
   groupContext?: GroupContextPresentation | null;
+  hostIdentityStatus?: HostIdentityStatus;
   location: {
     city?: string;
     state?: string;
@@ -56,7 +61,9 @@ function formatRoomType(roomType?: string): string | null {
   return ROOM_TYPE_LABELS[roomType] || roomType;
 }
 
-function formatLocationLine(location: PreviewListing["location"]): string | null {
+function formatLocationLine(
+  location: PreviewListing["location"]
+): string | null {
   const city = location.city?.trim();
   const state = location.state?.trim();
   if (city && state) return `${city}, ${state}`;
@@ -89,10 +96,10 @@ export default function DesktopListingPreviewCard({
       key={listing.id}
       ref={cardRef}
       data-testid="map-popup-card"
-      className={`w-[304px] overflow-hidden rounded-2xl border animate-in fade-in slide-in-from-bottom-2 duration-200 ${
+      className={`w-[320px] overflow-hidden rounded-[1.25rem] border animate-in fade-in slide-in-from-bottom-2 duration-200 ${
         isDarkMode
-          ? "border-outline-variant/10 bg-on-surface shadow-[0_18px_48px_-22px_rgba(0,0,0,0.75)]"
-          : "border-outline-variant/20 bg-surface-container-lowest shadow-[0_20px_50px_-24px_rgba(15,23,42,0.28)]"
+          ? "border-outline-variant/10 bg-on-surface shadow-[0_22px_54px_-24px_rgba(0,0,0,0.78)]"
+          : "border-outline-variant/20 bg-surface-container-lowest shadow-ghost"
       }`}
     >
       <div
@@ -105,7 +112,7 @@ export default function DesktopListingPreviewCard({
             src={listing.images[0]}
             alt={listing.title}
             fill
-            sizes="304px"
+            sizes="320px"
             className="object-cover"
           />
         ) : (
@@ -121,7 +128,7 @@ export default function DesktopListingPreviewCard({
           type="button"
           onClick={onClose}
           data-testid="map-popup-close"
-          className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-on-surface/60 text-white backdrop-blur-sm transition-colors hover:bg-on-surface/75 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-container-lowest/92 text-on-surface shadow-ghost backdrop-blur-sm transition-colors hover:bg-surface-container-lowest focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           aria-label="Close listing preview"
         >
           <X className="h-4 w-4" />
@@ -137,7 +144,7 @@ export default function DesktopListingPreviewCard({
             className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold shadow-ambient-sm ${
               availabilityPresentation.state === "available" ||
               availabilityPresentation.state === "partial"
-                ? "bg-emerald-500 text-white"
+                ? "bg-[#6f7f46] text-white"
                 : "bg-on-surface text-white"
             }`}
           >
@@ -146,7 +153,7 @@ export default function DesktopListingPreviewCard({
         </div>
       </div>
 
-        <div className="space-y-3 p-4">
+      <div className="space-y-3 p-4">
         <div className="space-y-1.5">
           {hasRating ? (
             <div className="flex items-center gap-1.5 text-xs font-medium text-on-surface-variant">
@@ -172,6 +179,11 @@ export default function DesktopListingPreviewCard({
               <span className="line-clamp-1">{locationLine}</span>
             </p>
           ) : null}
+          <HostIdentityBadge
+            status={listing.hostIdentityStatus}
+            compact
+            className="mt-2"
+          />
           {availabilityPresentation.secondaryGroupLabel ? (
             <p className="text-xs font-medium text-on-surface-variant">
               {availabilityPresentation.secondaryGroupLabel}
@@ -181,7 +193,7 @@ export default function DesktopListingPreviewCard({
 
         <div className="flex items-baseline gap-1.5">
           <span
-            className={`text-xl font-bold ${
+            className={`font-display text-[1.45rem] font-semibold italic leading-none ${
               isDarkMode ? "text-white" : "text-on-surface"
             }`}
           >
@@ -194,10 +206,10 @@ export default function DesktopListingPreviewCard({
           <Button
             size="sm"
             data-testid="map-popup-view-details"
-            className={`h-10 w-full rounded-xl text-sm font-medium ${
+            className={`h-10 w-full rounded-full text-sm font-semibold shadow-ghost ${
               isDarkMode
                 ? "bg-surface-container-lowest text-on-surface hover:bg-surface-container-high"
-                : "bg-on-surface text-white hover:bg-on-surface"
+                : "bg-gradient-to-br from-primary to-primary-container text-on-primary hover:from-primary-container hover:to-primary"
             }`}
           >
             View details

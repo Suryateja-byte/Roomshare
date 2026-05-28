@@ -32,6 +32,10 @@ function isPresent<T>(value: T | null | undefined): value is T {
   return value != null;
 }
 
+function normalizeHostIdentityStatus(value: unknown): HostIdentityStatus {
+  return value === "verified" || value === "unverified" ? value : "unknown";
+}
+
 // Re-export types and utilities from search-types for backward compatibility.
 // These were extracted to break the circular dependency: data.ts <-> search-doc-queries.ts.
 export {
@@ -52,6 +56,7 @@ export {
 import type {
   FilterParams,
   FilterSuggestion,
+  HostIdentityStatus,
   ListingWithMetadata,
   ListingData,
   PaginatedResult,
@@ -509,6 +514,7 @@ export async function getMapListingsResult(
   const conditions: string[] = [
     slotConditionSql,
     "l.status = 'ACTIVE'",
+    `owner_user."isSuspended" = FALSE`,
     `COALESCE(FALSE, FALSE) = FALSE`,
     `COALESCE(l."statusReason", '') NOT IN ('MIGRATION_REVIEW', 'ADMIN_PAUSED', 'SUPPRESSED')`,
     "ST_X(loc.coords::geometry) IS NOT NULL",
@@ -658,6 +664,7 @@ export async function getMapListingsResult(
         SELECT
             l.id,
             l."ownerId" as "ownerId",
+            CASE WHEN owner_user."isVerified" THEN 'verified' ELSE 'unverified' END as "hostIdentityStatus",
             l.title,
             l.price,
             ${effectiveAvailableSql} as "availableSlots",
@@ -682,6 +689,7 @@ export async function getMapListingsResult(
             COALESCE(r.avg_rating, 0) as "avgRating",
             COALESCE(r.review_count, 0) as "reviewCount"
         FROM "Listing" l
+        JOIN "User" owner_user ON owner_user.id = l."ownerId"
         JOIN "Location" loc ON l.id = loc."listingId"
         LEFT JOIN (
             SELECT "listingId", AVG(rating)::float8 as avg_rating, COUNT(*)::int as review_count
@@ -748,6 +756,9 @@ export async function getMapListingsResult(
           lastConfirmedAt,
           status: l.status,
           statusReason: l.statusReason,
+          hostIdentityStatus: normalizeHostIdentityStatus(
+            l.hostIdentityStatus
+          ),
           images: l.images || [],
           roomType: l.roomType ?? undefined,
           moveInDate,
@@ -885,6 +896,7 @@ export async function getListingsPaginated(
     const conditions: string[] = [
       slotConditionSql,
       "l.status = 'ACTIVE'",
+      `owner_user."isSuspended" = FALSE`,
       `COALESCE(FALSE, FALSE) = FALSE`,
       `COALESCE(l."statusReason", '') NOT IN ('MIGRATION_REVIEW', 'ADMIN_PAUSED', 'SUPPRESSED')`,
       // Exclude listings with invalid coordinates (null, zero, or out of range)
@@ -1063,6 +1075,7 @@ export async function getListingsPaginated(
     const countQuery = `
         SELECT COUNT(DISTINCT l.id) as total
         FROM "Listing" l
+        JOIN "User" owner_user ON owner_user.id = l."ownerId"
         JOIN "Location" loc ON l.id = loc."listingId"
         WHERE ${whereClause}
     `;
@@ -1095,6 +1108,7 @@ export async function getListingsPaginated(
             l."lastConfirmedAt",
             l."statusReason",
             FALSE,
+            CASE WHEN owner_user."isVerified" THEN 'verified' ELSE 'unverified' END as "hostIdentityStatus",
             l.status,
             l."createdAt",
             l."viewCount",
@@ -1105,10 +1119,11 @@ export async function getListingsPaginated(
             COALESCE(AVG(r.rating), 0) as avg_rating,
             COUNT(r.id) as review_count
         FROM "Listing" l
+        JOIN "User" owner_user ON owner_user.id = l."ownerId"
         JOIN "Location" loc ON l.id = loc."listingId"
         LEFT JOIN "Review" r ON l.id = r."listingId"
         WHERE ${whereClause}
-        GROUP BY l.id, loc.id
+        GROUP BY l.id, loc.id, owner_user."isVerified"
         ORDER BY ${orderByClause}
         LIMIT $${limitParamIdx} OFFSET $${limitParamIdx + 1}
     `;
@@ -1185,6 +1200,9 @@ export async function getListingsPaginated(
           lastConfirmedAt,
           status: l.status,
           statusReason: l.statusReason,
+          hostIdentityStatus: normalizeHostIdentityStatus(
+            l.hostIdentityStatus
+          ),
           amenities: l.amenities || [],
           houseRules: l.houseRules || [],
           householdLanguages: l.household_languages || [],
@@ -1278,6 +1296,7 @@ async function getListingsCountEfficient(
   const conditions: string[] = [
     slotConditionSql,
     "l.status = 'ACTIVE'",
+    `owner_user."isSuspended" = FALSE`,
     `COALESCE(FALSE, FALSE) = FALSE`,
     `COALESCE(l."statusReason", '') NOT IN ('MIGRATION_REVIEW', 'ADMIN_PAUSED', 'SUPPRESSED')`,
     // Exclude listings with invalid coordinates
@@ -1418,6 +1437,7 @@ async function getListingsCountEfficient(
   const countQuery = `
         SELECT COUNT(DISTINCT l.id) as total
         FROM "Listing" l
+        JOIN "User" owner_user ON owner_user.id = l."ownerId"
         JOIN "Location" loc ON l.id = loc."listingId"
         WHERE ${whereClause}
     `;

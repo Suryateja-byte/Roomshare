@@ -1,7 +1,10 @@
 import type { MapListingData } from "@/lib/data";
 import { buildPublicAvailability } from "./public-availability";
 import type { SearchV2FeatureProperties, SearchV2Map } from "./types";
-import type { GroupContextPresentation } from "@/lib/search-types";
+import type {
+  GroupContextPresentation,
+  HostIdentityStatus,
+} from "@/lib/search-types";
 import { toPublicCoordinates } from "./public-coordinates";
 
 const PUBLIC_GROUP_KEY_PREFIX = "pg1_";
@@ -42,6 +45,10 @@ function toSafeDate(value: unknown): Date | null {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
   return null;
+}
+
+function toHostIdentityStatus(value: unknown): HostIdentityStatus {
+  return value === "verified" || value === "unverified" ? value : "unknown";
 }
 
 function hasValidCoordinateRange(lat: number, lng: number): boolean {
@@ -162,6 +169,9 @@ export function searchV2MapToListings(mapData: SearchV2Map): MapListingData[] {
         groupContext: isPublicGroupContext(properties.groupContext)
           ? properties.groupContext
           : null,
+        hostIdentityStatus: toHostIdentityStatus(
+          properties.hostIdentityStatus
+        ),
         tier: pinTierMap.get(properties.id),
         avgRating: toFiniteNumber(properties.avgRating, 0),
         reviewCount: toSafeSlotCount(properties.reviewCount),

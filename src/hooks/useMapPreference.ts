@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { SEARCH_SPLIT_VIEW_MEDIA_QUERY } from "@/lib/search-layout";
 
 /**
  * Map visibility preference hook with localStorage persistence.
@@ -75,6 +76,7 @@ export function useMapPreference() {
   const [preference, setPreference] =
     useState<MapPreference>(DEFAULT_PREFERENCE);
   const [isMobile, setIsMobile] = useState(false);
+  const [isSplitViewCapable, setIsSplitViewCapable] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
 
   // Hydrate from localStorage on mount
@@ -84,23 +86,36 @@ export function useMapPreference() {
       setPreference(stored);
     }
 
-    // Detect mobile (matches md: breakpoint at 768px)
-    const mql = window.matchMedia("(max-width: 767px)");
-    setIsMobile(mql.matches);
+    // Detect mobile and wide desktop separately. Tablet/narrow desktop keeps
+    // desktop controls but stays list-first so the results panel never cramps.
+    const mobileMql = window.matchMedia("(max-width: 767px)");
+    const splitViewMql = window.matchMedia(SEARCH_SPLIT_VIEW_MEDIA_QUERY);
+    setIsMobile(mobileMql.matches);
+    setIsSplitViewCapable(splitViewMql.matches);
 
-    const handleChange = (e: MediaQueryListEvent) => {
+    const handleMobileChange = (e: MediaQueryListEvent) => {
       setIsMobile(e.matches);
     };
-    mql.addEventListener("change", handleChange);
+    const handleSplitViewChange = (e: MediaQueryListEvent) => {
+      setIsSplitViewCapable(e.matches);
+    };
+    mobileMql.addEventListener("change", handleMobileChange);
+    splitViewMql.addEventListener("change", handleSplitViewChange);
 
     setIsHydrated(true);
 
-    return () => mql.removeEventListener("change", handleChange);
+    return () => {
+      mobileMql.removeEventListener("change", handleMobileChange);
+      splitViewMql.removeEventListener("change", handleSplitViewChange);
+    };
   }, []);
 
   // Compute current visibility based on device type
   // Mobile: map is always visible (bottom sheet overlays it)
-  const shouldShowMap = isMobile ? true : preference.desktop === "split";
+  const canShowMap = isMobile || isSplitViewCapable;
+  const shouldShowMap = isMobile
+    ? true
+    : isSplitViewCapable && preference.desktop === "split";
 
   // Map should only render if user wants to see it AND we've hydrated
   // This is the key for cost savings - don't mount MapGL until needed
@@ -109,6 +124,8 @@ export function useMapPreference() {
   const shouldRenderMap = isHydrated && shouldShowMap;
 
   const toggleMap = useCallback(() => {
+    if (!isMobile && !isSplitViewCapable) return;
+
     setPreference((prev) => {
       const next = { ...prev };
       if (isMobile) {
@@ -119,10 +136,12 @@ export function useMapPreference() {
       setStoredPreference(next);
       return next;
     });
-  }, [isMobile]);
+  }, [isMobile, isSplitViewCapable]);
 
   // For explicit show/hide (desktop "Hide map" button)
   const showMap = useCallback(() => {
+    if (!isMobile && !isSplitViewCapable) return;
+
     setPreference((prev) => {
       const next = { ...prev };
       if (isMobile) {
@@ -133,9 +152,11 @@ export function useMapPreference() {
       setStoredPreference(next);
       return next;
     });
-  }, [isMobile]);
+  }, [isMobile, isSplitViewCapable]);
 
   const hideMap = useCallback(() => {
+    if (!isMobile && !isSplitViewCapable) return;
+
     setPreference((prev) => {
       const next = { ...prev };
       if (isMobile) {
@@ -146,7 +167,7 @@ export function useMapPreference() {
       setStoredPreference(next);
       return next;
     });
-  }, [isMobile]);
+  }, [isMobile, isSplitViewCapable]);
 
   return {
     shouldShowMap,
@@ -154,6 +175,7 @@ export function useMapPreference() {
     toggleMap,
     showMap,
     hideMap,
+    canShowMap,
     isMobile,
     isLoading: !isHydrated,
   };

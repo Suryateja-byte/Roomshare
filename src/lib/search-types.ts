@@ -53,6 +53,8 @@ export interface GroupContextPresentation {
   contextKey: string;
 }
 
+export type HostIdentityStatus = "verified" | "unverified" | "unknown";
+
 export interface ListingData {
   id: string;
   title: string;
@@ -90,6 +92,7 @@ export interface ListingData {
   groupKey?: string | null;
   groupSummary?: GroupSummary | null;
   groupContext?: GroupContextPresentation | null;
+  hostIdentityStatus?: HostIdentityStatus;
   // Near-match indicator for search results that partially match filters
   isNearMatch?: boolean;
 }
@@ -208,6 +211,7 @@ export interface MapListingData {
   groupKey?: string | null;
   groupSummary?: GroupSummary | null;
   groupContext?: GroupContextPresentation | null;
+  hostIdentityStatus?: HostIdentityStatus;
   /** Pin tier for V2 mode: primary = larger pin, mini = smaller pin */
   tier?: "primary" | "mini";
   /** Average rating for ranking pins (optional — not all query paths populate this) */

@@ -173,6 +173,7 @@ export function toPublicSearchListing(
     groupKey: publicGroupMetadata.groupKey,
     groupSummary: publicGroupMetadata.groupSummary,
     groupContext: publicGroupMetadata.groupContext,
+    hostIdentityStatus: listing.hostIdentityStatus ?? "unknown",
     isNearMatch: listing.isNearMatch,
   };
 }
@@ -197,6 +198,7 @@ export function toPublicMapListing(listing: MapListingData): MapListingData {
     groupKey: publicGroupMetadata.groupKey,
     groupSummary: publicGroupMetadata.groupSummary,
     groupContext: publicGroupMetadata.groupContext,
+    hostIdentityStatus: listing.hostIdentityStatus ?? "unknown",
     statusReason: null,
   };
 }

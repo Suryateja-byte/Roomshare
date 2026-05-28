@@ -10,11 +10,16 @@ import {
   canonicalizeAddress,
   type RawAddressInput,
 } from "@/lib/identity/canonical-address";
+import {
+  buildPublicGeocodeFields,
+  type ProjectionCoordinates,
+} from "@/lib/projections/public-geocode";
 
 export interface ResolveOrCreateUnitInput {
   address: RawAddressInput;
   actor: { role: "host" | "moderator" | "system"; id: string | null };
   requestId?: string;
+  trustedCoordinates?: ProjectionCoordinates;
 }
 
 export interface ResolveOrCreateUnitResult {
@@ -144,28 +149,63 @@ export async function resolveOrCreateUnit(
   // increments it before returning.
   const created = unit.sourceVersion === BigInt(1);
 
+  let effectiveUnit = unit;
+  if (input.trustedCoordinates && unit.geocodeStatus !== "COMPLETE") {
+    const publicGeocode = buildPublicGeocodeFields(input.trustedCoordinates);
+    const updatedRows = await tx.$queryRaw<
+      {
+        id: string;
+        unitIdentityEpoch: number;
+        canonicalUnit: string;
+        canonicalizerVersion: string;
+        geocodeStatus: string;
+        sourceVersion: bigint;
+      }[]
+    >`
+      UPDATE physical_units
+      SET geocode_status  = 'COMPLETE',
+          exact_point     = ${publicGeocode.exactPointWkt},
+          public_point    = ${publicGeocode.publicPointWkt},
+          public_cell_id  = ${publicGeocode.publicCellId},
+          source_version  = source_version + 1,
+          row_version     = row_version + 1,
+          updated_at      = NOW()
+      WHERE id = ${unit.id}
+        AND geocode_status <> 'COMPLETE'
+      RETURNING
+        id,
+        unit_identity_epoch AS "unitIdentityEpoch",
+        canonical_unit AS "canonicalUnit",
+        canonicalizer_version AS "canonicalizerVersion",
+        geocode_status AS "geocodeStatus",
+        source_version AS "sourceVersion"
+    `;
+    effectiveUnit = updatedRows[0] ?? unit;
+  }
+
   await appendOutboxEvent(tx, {
     aggregateType: "PHYSICAL_UNIT",
-    aggregateId: unit.id,
+    aggregateId: effectiveUnit.id,
     kind: "UNIT_UPSERTED",
     payload: {
       canonicalAddressHash: canonical.canonicalAddressHash,
       canonicalUnit: canonical.canonicalUnit,
       created,
+      trustedCoordinates: Boolean(input.trustedCoordinates),
       requestId: input.requestId ?? null,
     },
-    sourceVersion: unit.sourceVersion,
-    unitIdentityEpoch: unit.unitIdentityEpoch,
+    sourceVersion: effectiveUnit.sourceVersion,
+    unitIdentityEpoch: effectiveUnit.unitIdentityEpoch,
   });
 
   const geocodeAddress = formatGeocodeAddress(input.address);
-  if (unit.geocodeStatus !== "COMPLETE") {
+  if (effectiveUnit.geocodeStatus !== "COMPLETE") {
     await enqueueGeocodeNeededIfAbsent(tx, {
-      unitId: unit.id,
+      unitId: effectiveUnit.id,
       address: geocodeAddress,
       canonicalAddressHash: canonical.canonicalAddressHash,
-      sourceVersion: unit.sourceVersion,
-      unitIdentityEpoch: unit.unitIdentityEpoch,
+      sourceVersion: effectiveUnit.sourceVersion,
+      unitIdentityEpoch: effectiveUnit.unitIdentityEpoch,
       requestId: input.requestId,
     });
   }
@@ -174,9 +214,9 @@ export async function resolveOrCreateUnit(
     kind: created ? "CANONICAL_UNIT_CREATED" : "CANONICAL_UNIT_RESOLVED",
     actor: input.actor,
     aggregateType: "physical_units",
-    aggregateId: unit.id,
+    aggregateId: effectiveUnit.id,
     requestId: input.requestId,
-    unitIdentityEpoch: unit.unitIdentityEpoch,
+    unitIdentityEpoch: effectiveUnit.unitIdentityEpoch,
     details: {
       created,
       canonicalizerVersion: canonical.canonicalizerVersion,
@@ -184,13 +224,13 @@ export async function resolveOrCreateUnit(
   });
 
   return {
-    unitId: unit.id,
-    unitIdentityEpoch: unit.unitIdentityEpoch,
+    unitId: effectiveUnit.id,
+    unitIdentityEpoch: effectiveUnit.unitIdentityEpoch,
     created,
     canonicalAddressHash: canonical.canonicalAddressHash,
-    canonicalUnit: unit.canonicalUnit,
-    canonicalizerVersion: unit.canonicalizerVersion,
-    geocodeStatus: unit.geocodeStatus,
-    sourceVersion: unit.sourceVersion,
+    canonicalUnit: effectiveUnit.canonicalUnit,
+    canonicalizerVersion: effectiveUnit.canonicalizerVersion,
+    geocodeStatus: effectiveUnit.geocodeStatus,
+    sourceVersion: effectiveUnit.sourceVersion,
   };
 }

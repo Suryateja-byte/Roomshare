@@ -10,7 +10,7 @@ import {
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { safeMark, safeMeasure } from "@/lib/perf";
-import { Search, Loader2 } from "lucide-react";
+import { Bell, Search, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 import ListingCard from "@/components/listings/ListingCard";
@@ -618,7 +618,7 @@ export function SearchResultsClient({
     () => dedupeListingsForDisplay([...effectiveListings, ...extraListings]),
     [effectiveListings, extraListings]
   );
-  const useHorizontalDesktopCards = shouldShowMap;
+  const useMapVisibleDesktopGrid = shouldShowMap;
   const effectiveListingsRef = useRef(effectiveListings);
   useEffect(() => {
     effectiveListingsRef.current = effectiveListings;
@@ -858,13 +858,7 @@ export function SearchResultsClient({
       setIsLoadingMore(false);
     }
     // F2 FIX: Removed allListings dep — count read from totalCountRef instead
-  }, [
-    nextCursor,
-    rawParams,
-    effectiveTotal,
-    router,
-    testScenario,
-  ]);
+  }, [nextCursor, rawParams, effectiveTotal, router, testScenario]);
 
   const total = effectiveTotal;
   const effectiveLocationRequired = searchStateKind === "location-required";
@@ -1008,10 +1002,10 @@ export function SearchResultsClient({
         {effectiveLocationRequired
           ? "Select a location or move the map to search this area"
           : effectiveZeroResults
-          ? `No listings found${query ? ` for "${query}"` : ""}`
-          : total === null
-            ? `Found more than 100 listings${query ? ` for "${query}"` : ""}`
-            : `Found ${total} ${total === 1 ? "listing" : "listings"}${query ? ` for "${query}"` : ""}`}
+            ? `No listings found${query ? ` for "${query}"` : ""}`
+            : total === null
+              ? `Found more than 100 listings${query ? ` for "${query}"` : ""}`
+              : `Found ${total} ${total === 1 ? "listing" : "listings"}${query ? ` for "${query}"` : ""}`}
       </div>
 
       {/* Load-more announcement — separate from initial status to avoid re-announcing on mount */}
@@ -1086,7 +1080,7 @@ export function SearchResultsClient({
           {allListings.length > 0 && (
             <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
-                <p className="hidden text-sm font-medium text-on-surface-variant md:block">
+                <p className="sr-only">
                   {isClientFetching
                     ? "Updating..."
                     : total !== null
@@ -1133,9 +1127,9 @@ export function SearchResultsClient({
             data-hydrated={isHydrated || undefined}
             className={cn(
               "grid grid-cols-1 transition-opacity duration-200 ease-out motion-reduce:transition-none",
-              useHorizontalDesktopCards
-                ? "gap-2 sm:gap-3"
-                : "gap-5 sm:grid-cols-2 sm:gap-x-6 sm:gap-y-9"
+              useMapVisibleDesktopGrid
+                ? "gap-4 sm:grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] xl:gap-5"
+                : "gap-5 sm:grid-cols-[repeat(auto-fit,minmax(min(100%,19rem),1fr))] sm:gap-x-6 sm:gap-y-9"
             )}
             style={isClientFetching ? { opacity: 0.6 } : undefined}
           >
@@ -1177,9 +1171,7 @@ export function SearchResultsClient({
                         showTotalPrice={effectiveShowTotalPrice}
                         estimatedMonths={estimatedMonths}
                         queryHashPrefix8={responseMeta.queryHash?.slice(0, 8)}
-                        desktopVariant={
-                          useHorizontalDesktopCards ? "row" : "grid"
-                        }
+                        desktopVariant="grid"
                       />
                     </div>
                   </ListingCardErrorBoundary>
@@ -1297,18 +1289,22 @@ export function SearchResultsClient({
             !isLoadingMore && (
               <section
                 aria-label="Save search"
-                className="relative mb-4 mt-12 hidden flex-col items-center justify-between gap-6 overflow-hidden rounded-[1.5rem] border border-outline-variant/25 bg-surface-container-high/35 p-8 md:flex sm:flex-row"
+                className="relative mb-4 mt-10 hidden flex-col items-center justify-between gap-5 overflow-hidden rounded-[1.25rem] bg-surface-container-high/45 p-5 shadow-[inset_0_0_0_1px_rgba(220,193,185,0.18)] md:flex sm:flex-row"
               >
-                <div>
-                  <h3 className="text-lg font-display font-semibold text-on-surface mb-1">
-                    Don&apos;t miss out
-                  </h3>
-                  <p className="text-sm text-on-surface-variant">
-                    We add new spaces daily. Save this search to get notified
-                    first.
-                  </p>
+                <div className="flex min-w-0 items-center gap-4">
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-surface-container-lowest text-on-surface shadow-ghost">
+                    <Bell className="h-5 w-5" aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="mb-1 text-base font-bold text-on-surface">
+                      New places, straight to you
+                    </h3>
+                    <p className="text-sm text-on-surface-variant">
+                      Save your search and get notified when new places match.
+                    </p>
+                  </div>
                 </div>
-                <SaveSearchButton />
+                <SaveSearchButton className="shrink-0 rounded-full bg-[linear-gradient(135deg,var(--color-primary),var(--color-primary-container))] px-5 !text-white shadow-[0_16px_34px_-18px_rgba(154,64,39,0.72)] hover:!text-white hover:brightness-105" />
               </section>
             )}
         </>

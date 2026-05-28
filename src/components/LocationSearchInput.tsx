@@ -36,9 +36,18 @@ const AUTOCOMPLETE_TIMEOUT_MS = 9000;
 interface LocationSuggestion {
   id: string;
   place_name: string;
-  center: [number, number];
+  center?: [number, number];
   place_type: string[];
   bbox?: [number, number, number, number];
+  place_id?: string;
+  provider?: "google" | "photon" | "public";
+  requires_resolution?: boolean;
+  primary_text?: string;
+  secondary_text?: string;
+}
+
+interface PlaceDetailsSuccessResponse {
+  result?: LocationSuggestion;
 }
 
 export interface LocationSearchFallbackItem {
@@ -165,13 +174,43 @@ function normalizeAutocompleteResults(
   return normalizeLegacyPhotonResponse(payload as PhotonLikeResponse);
 }
 
+function createAutocompleteSessionToken(): string {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now().toString(36)}${Math.random()
+    .toString(36)
+    .slice(2)}`.slice(0, 36);
+}
+
+function getSuggestionDisplayText(suggestion: LocationSuggestion): {
+  primaryText: string;
+  secondaryText: string;
+} {
+  const [primaryFallback = suggestion.place_name, ...secondaryFallback] =
+    suggestion.place_name.split(",");
+
+  return {
+    primaryText:
+      suggestion.primary_text || primaryFallback.trim() || suggestion.place_name,
+    secondaryText:
+      suggestion.secondary_text || secondaryFallback.join(",").trim(),
+  };
+}
+
 async function fetchAutocompleteSuggestions(
   query: string,
-  signal: AbortSignal
+  signal: AbortSignal,
+  sessionToken: string
 ): Promise<LocationSuggestion[]> {
   const params = new URLSearchParams({
     q: query,
     limit: String(LOCATION_AUTOCOMPLETE_DEFAULT_LIMIT),
+    sessionToken,
   });
   const url = `/api/geocoding/autocomplete?${params.toString()}`;
 
@@ -213,6 +252,51 @@ async function fetchAutocompleteSuggestions(
   return normalizeAutocompleteResults(data);
 }
 
+async function resolveLocationSuggestion(
+  suggestion: LocationSuggestion,
+  signal: AbortSignal,
+  sessionToken: string
+): Promise<LocationSuggestion> {
+  if (suggestion.center && !suggestion.requires_resolution) {
+    return suggestion;
+  }
+
+  const placeId = suggestion.place_id || suggestion.id.replace(/^google:/, "");
+  if (!placeId) {
+    throw new AutocompleteUnavailableError("UNAVAILABLE");
+  }
+
+  const params = new URLSearchParams({
+    placeId,
+    sessionToken,
+  });
+  const response = await fetchWithTimeout(
+    `/api/geocoding/place-details?${params.toString()}`,
+    {
+      signal,
+      timeout: AUTOCOMPLETE_TIMEOUT_MS,
+    }
+  );
+
+  if (!response.ok) {
+    const payload =
+      (await response
+        .json()
+        .catch(() => null)) as LocationAutocompleteErrorResponse | null;
+    if (payload?.code === "TIMEOUT" || payload?.code === "UNAVAILABLE") {
+      throw new AutocompleteUnavailableError(payload.code);
+    }
+    throw new AutocompleteUnavailableError("UNAVAILABLE");
+  }
+
+  const payload = (await response.json()) as PlaceDetailsSuccessResponse;
+  if (!payload.result?.center) {
+    throw new AutocompleteUnavailableError("UNAVAILABLE");
+  }
+
+  return payload.result;
+}
+
 export default function LocationSearchInput({
   value,
   onChange,
@@ -241,6 +325,7 @@ export default function LocationSearchInput({
   const showSuggestionsRef = useRef(false);
   const requestIdRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
+  const sessionTokenRef = useRef<string | null>(null);
   const pendingQueryRef = useRef<string | null>(null);
   const isComposingRef = useRef(false);
   const justSelectedRef = useRef(false);
@@ -315,6 +400,18 @@ export default function LocationSearchInput({
     setServiceUnavailable(false);
   }, []);
 
+  const getSessionToken = useCallback(() => {
+    if (!sessionTokenRef.current) {
+      sessionTokenRef.current = createAutocompleteSessionToken();
+    }
+
+    return sessionTokenRef.current;
+  }, []);
+
+  const resetSessionToken = useCallback(() => {
+    sessionTokenRef.current = null;
+  }, []);
+
   const fetchSuggestions = useCallback(
     async (query: string) => {
       const sanitized = sanitizeAutocompleteQuery(query);
@@ -346,7 +443,8 @@ export default function LocationSearchInput({
       try {
         const results = await fetchAutocompleteSuggestions(
           sanitized,
-          controller.signal
+          controller.signal,
+          getSessionToken()
         );
         const shouldRevealSuggestions =
           showSuggestionsRef.current || document.activeElement === inputRef.current;
@@ -408,7 +506,7 @@ export default function LocationSearchInput({
         }
       }
     },
-    [clearTransientState]
+    [clearTransientState, getSessionToken]
   );
 
   useEffect(() => {
@@ -452,28 +550,74 @@ export default function LocationSearchInput({
   );
 
   const handleSelectSuggestion = useCallback(
-    (suggestion: LocationSuggestion) => {
-      justSelectedRef.current = true;
-      lastSelectedValueRef.current = suggestion.place_name;
-      const [lng, lat] = suggestion.center;
-      onChange(suggestion.place_name);
-      setShowSuggestions(false);
-      setSuggestions([]);
-      setSelectedIndex(-1);
-      clearTransientState();
+    async (suggestion: LocationSuggestion) => {
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      const requestId = ++requestIdRef.current;
+      setIsLoading(true);
 
-      requestAnimationFrame(() => {
-        justSelectedRef.current = false;
-      });
+      try {
+        const resolvedSuggestion = await resolveLocationSuggestion(
+          suggestion,
+          controller.signal,
+          getSessionToken()
+        );
+        if (requestId !== requestIdRef.current) {
+          return;
+        }
+        if (!resolvedSuggestion.center) {
+          throw new AutocompleteUnavailableError("UNAVAILABLE");
+        }
 
-      onLocationSelect?.({
-        name: suggestion.place_name,
-        lat,
-        lng,
-        bbox: suggestion.bbox,
-      });
+        const [lng, lat] = resolvedSuggestion.center;
+        justSelectedRef.current = true;
+        lastSelectedValueRef.current = resolvedSuggestion.place_name;
+        onChange(resolvedSuggestion.place_name);
+        setShowSuggestions(false);
+        setSuggestions([]);
+        setSelectedIndex(-1);
+        clearTransientState();
+        resetSessionToken();
+
+        requestAnimationFrame(() => {
+          justSelectedRef.current = false;
+        });
+
+        onLocationSelect?.({
+          name: resolvedSuggestion.place_name,
+          lat,
+          lng,
+          bbox: resolvedSuggestion.bbox,
+        });
+      } catch (error) {
+        if (
+          (error instanceof DOMException && error.name === "AbortError") ||
+          (error instanceof Error && error.name === "AbortError")
+        ) {
+          return;
+        }
+        if (requestId !== requestIdRef.current) {
+          return;
+        }
+
+        setServiceUnavailable(true);
+        setNoResults(false);
+        setShowSuggestions(true);
+        setSelectedIndex(-1);
+      } finally {
+        if (requestId === requestIdRef.current) {
+          setIsLoading(false);
+        }
+      }
     },
-    [clearTransientState, onChange, onLocationSelect]
+    [
+      clearTransientState,
+      getSessionToken,
+      onChange,
+      onLocationSelect,
+      resetSessionToken,
+    ]
   );
 
   const handleSelectFallback = useCallback(
@@ -528,7 +672,7 @@ export default function LocationSearchInput({
             if (showFallbackOptions) {
               handleSelectFallback(visibleFallbackItems[selectedIndex]);
             } else {
-              handleSelectSuggestion(suggestions[selectedIndex]);
+              void handleSelectSuggestion(suggestions[selectedIndex]);
             }
           }
           break;
@@ -542,7 +686,7 @@ export default function LocationSearchInput({
             if (showFallbackOptions) {
               handleSelectFallback(visibleFallbackItems[selectedIndex]);
             } else {
-              handleSelectSuggestion(suggestions[selectedIndex]);
+              void handleSelectSuggestion(suggestions[selectedIndex]);
             }
           }
           setShowSuggestions(false);
@@ -573,12 +717,15 @@ export default function LocationSearchInput({
       const newValue = event.target.value;
       clearTransientState();
       onChange(newValue);
+      if (lastSelectedValueRef.current) {
+        resetSessionToken();
+      }
       lastSelectedValueRef.current = null;
       if (!justSelectedRef.current) {
         setShowSuggestions(true);
       }
     },
-    [clearTransientState, onChange]
+    [clearTransientState, onChange, resetSessionToken]
   );
 
   const handleClear = useCallback(() => {
@@ -587,9 +734,10 @@ export default function LocationSearchInput({
     setShowSuggestions(false);
     setSelectedIndex(-1);
     clearTransientState();
+    resetSessionToken();
     lastSelectedValueRef.current = null;
     inputRef.current?.focus();
-  }, [clearTransientState, onChange]);
+  }, [clearTransientState, onChange, resetSessionToken]);
 
   const handleInputFocus = useCallback(() => {
     if (
@@ -752,45 +900,48 @@ export default function LocationSearchInput({
                   id={`${listboxId}-listbox`}
                   aria-label="Location suggestions"
                 >
-                  {suggestions.map((suggestion, index) => (
-                    <li
-                      key={suggestion.id}
-                      role="option"
-                      id={`${listboxId}-option-${index}`}
-                      aria-selected={index === selectedIndex}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => handleSelectSuggestion(suggestion)}
-                        className={cn(
-                          "flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors duration-150",
-                          index === selectedIndex
-                            ? "bg-surface-container-high"
-                            : "hover:bg-surface-container-high/80"
-                        )}
-                        tabIndex={-1}
+                  {suggestions.map((suggestion, index) => {
+                    const { primaryText, secondaryText } =
+                      getSuggestionDisplayText(suggestion);
+
+                    return (
+                      <li
+                        key={suggestion.id}
+                        role="option"
+                        id={`${listboxId}-option-${index}`}
+                        aria-selected={index === selectedIndex}
                       >
-                        <MapPin
+                        <button
+                          type="button"
+                          onClick={() => void handleSelectSuggestion(suggestion)}
                           className={cn(
-                            "mt-0.5 h-5 w-5 flex-shrink-0",
-                            getPlaceTypeIcon(suggestion.place_type)
+                            "flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors duration-150",
+                            index === selectedIndex
+                              ? "bg-surface-container-high"
+                              : "hover:bg-surface-container-high/80"
                           )}
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-on-surface">
-                            {suggestion.place_name.split(",")[0]}
-                          </p>
-                          <p className="truncate text-xs text-on-surface-variant">
-                            {suggestion.place_name
-                              .split(",")
-                              .slice(1)
-                              .join(",")
-                              .trim()}
-                          </p>
-                        </div>
-                      </button>
-                    </li>
-                  ))}
+                          tabIndex={-1}
+                        >
+                          <MapPin
+                            className={cn(
+                              "mt-0.5 h-5 w-5 flex-shrink-0",
+                              getPlaceTypeIcon(suggestion.place_type)
+                            )}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-on-surface">
+                              {primaryText}
+                            </p>
+                            {secondaryText ? (
+                              <p className="truncate text-xs text-on-surface-variant">
+                                {secondaryText}
+                              </p>
+                            ) : null}
+                          </div>
+                        </button>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             )}

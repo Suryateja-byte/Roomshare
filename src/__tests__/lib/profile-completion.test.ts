@@ -225,8 +225,8 @@ describe("Profile Completion", () => {
       expect(result.missing).toContain("Complete ID verification");
     });
 
-    it("determines canCreateListing correctly (60% required)", () => {
-      const lowPercentage = {
+    it("does not expose create-listing permission state", () => {
+      const user = {
         name: "Jo",
         email: "test@example.com",
         emailVerified: new Date(),
@@ -235,24 +235,10 @@ describe("Profile Completion", () => {
         countryOfOrigin: null,
         languages: [],
         isVerified: false,
-      }; // 30%
+      };
 
-      const highPercentage = {
-        name: "Jo",
-        email: "test@example.com",
-        emailVerified: new Date(),
-        bio: "This is a bio that is at least 20 characters long",
-        image: "https://example.com/avatar.jpg",
-        countryOfOrigin: null,
-        languages: [],
-        isVerified: false,
-      }; // 65%
-
-      expect(calculateProfileCompletion(lowPercentage).canCreateListing).toBe(
+      expect("canCreateListing" in calculateProfileCompletion(user)).toBe(
         false
-      );
-      expect(calculateProfileCompletion(highPercentage).canCreateListing).toBe(
-        true
       );
     });
 
@@ -342,20 +328,20 @@ describe("Profile Completion", () => {
       isVerified: false,
     };
 
-    it("returns allowed true when percentage meets requirement", () => {
-      const result = getMissingForAction(completeUser, "createListing");
+    it("returns allowed true when percentage meets message requirement", () => {
+      const result = getMissingForAction(completeUser, "sendMessages");
 
       expect(result.allowed).toBe(true);
       expect(result.percentage).toBe(100);
-      expect(result.required).toBe(PROFILE_REQUIREMENTS.createListing);
+      expect(result.required).toBe(PROFILE_REQUIREMENTS.sendMessages);
     });
 
-    it("returns allowed false when percentage below requirement", () => {
-      const result = getMissingForAction(incompleteUser, "createListing");
+    it("returns allowed false when percentage below message requirement", () => {
+      const result = getMissingForAction(incompleteUser, "sendMessages");
 
       expect(result.allowed).toBe(false);
       expect(result.percentage).toBe(0);
-      expect(result.required).toBe(60);
+      expect(result.required).toBe(40);
     });
 
     it("provides correct requirements for sendMessages", () => {
@@ -371,7 +357,7 @@ describe("Profile Completion", () => {
     });
 
     it("includes missing fields in response", () => {
-      const result = getMissingForAction(incompleteUser, "createListing");
+      const result = getMissingForAction(incompleteUser, "sendMessages");
 
       expect(result.missing.length).toBe(7);
     });
@@ -379,7 +365,6 @@ describe("Profile Completion", () => {
 
   describe("PROFILE_REQUIREMENTS", () => {
     it("has correct thresholds", () => {
-      expect(PROFILE_REQUIREMENTS.createListing).toBe(60);
       expect(PROFILE_REQUIREMENTS.sendMessages).toBe(40);
       expect(PROFILE_REQUIREMENTS.bookRooms).toBe(80);
     });

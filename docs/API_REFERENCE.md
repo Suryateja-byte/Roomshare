@@ -1172,14 +1172,19 @@ Upload an image file to Supabase storage. Validates file type using magic bytes.
 
 **Error Responses:**
 
-| Status | Error | Condition |
-|--------|-------|-----------|
-| 400 | `"No file provided"` | Missing file |
-| 400 | `"File too large..."` | >5MB |
-| 400 | `"Invalid file type..."` | Not an allowed image type |
-| 400 | `"File content does not match declared type..."` | Magic bytes mismatch |
-| 401 | `"Unauthorized"` | Not authenticated |
-| 500 | `"Storage not configured"` | Supabase not configured |
+| Status | Error                                                       | Condition                            |
+| ------ | ----------------------------------------------------------- | ------------------------------------ |
+| 400    | `"No file provided"`                                        | Missing file                         |
+| 400    | `"File too large..."`                                       | >5MB                                 |
+| 400    | `"Invalid file type..."`                                    | Not an allowed image type            |
+| 400    | `"File content does not match declared type..."`            | Magic bytes mismatch                 |
+| 400    | `"Image processing failed..."`                              | Image cannot be processed            |
+| 401    | `"Unauthorized"`                                            | Not authenticated                    |
+| 502    | `"Unable to upload image. Please try again."`               | Storage API upload failure           |
+| 503    | `"Unable to connect to storage service. Please try again."` | Storage network/connectivity failure |
+| 503    | `"Storage service temporarily unavailable"`                 | Storage circuit breaker open         |
+| 504    | `"Upload timed out. Please try again."`                     | Storage upload timeout               |
+| 500    | `"Storage not configured"`                                  | Supabase not configured              |
 
 ---
 
