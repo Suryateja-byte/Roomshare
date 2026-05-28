@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { geocodeAddress } from "@/lib/geocoding";
 import { auth } from "@/auth";
 import { getListingsPaginated } from "@/lib/data";
 import {
@@ -20,15 +19,15 @@ import { withIdempotency } from "@/lib/idempotency";
 import { upsertSearchDocSync } from "@/lib/search/search-doc-sync";
 import { triggerInstantAlerts } from "@/lib/search-alerts";
 import { captureApiError } from "@/lib/api-error-handler";
-import { isCircuitOpenError } from "@/lib/circuit-breaker";
 import { validateCsrf } from "@/lib/csrf";
-import {
-  calculateProfileCompletion,
-  PROFILE_REQUIREMENTS,
-} from "@/lib/profile-completion";
 import { features } from "@/lib/env";
 import { syncListingEmbedding } from "@/lib/embeddings/sync";
 import { normalizeAddress } from "@/lib/search/normalize-address";
+import { verifyAddressSuggestionToken } from "@/lib/geocoding/address-suggestion-token";
+import {
+  GooglePlacesUnavailableError,
+  validateAddressForPublish,
+} from "@/lib/geocoding/google-places";
 import { toPublicSearchListings } from "@/lib/search/public-listing-payload";
 import {
   checkCollisionRateLimit,
@@ -218,40 +217,12 @@ export async function POST(request: Request) {
     // 6. User existence check (1C)
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        emailVerified: true,
-        bio: true,
-        image: true,
-        countryOfOrigin: true,
-        languages: true,
-        isVerified: true,
-      },
+      select: { id: true },
     });
     if (!user) {
       return NextResponse.json(
         { error: "User account not found. Please sign out and sign in again." },
         { status: 401 }
-      );
-    }
-
-    // 6b. Profile completion check (BE-M2)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma select subset doesn't match full User type expected by calculateProfileCompletion
-    const completion = calculateProfileCompletion(user as any);
-    if (completion.percentage < PROFILE_REQUIREMENTS.createListing) {
-      await logger.warn("Listing create blocked: incomplete profile", {
-        route: "/api/listings",
-        method: "POST",
-        userId: userId.slice(0, 8) + "...",
-        completionPct: completion.percentage,
-      });
-      return NextResponse.json(
-        {
-          error: `Profile must be at least ${PROFILE_REQUIREMENTS.createListing}% complete to create a listing. Current: ${completion.percentage}%. Missing: ${completion.missing.join(", ")}.`,
-        },
-        { status: 403 }
       );
     }
 
@@ -309,6 +280,7 @@ export async function POST(request: Request) {
       primaryHomeLanguage,
       moveInDate,
       bookingMode,
+      addressSuggestionToken,
     } = validatedFields.data;
 
     // 8. Language compliance check on title AND description (2G)
@@ -349,44 +321,73 @@ export async function POST(request: Request) {
 
     // 9. householdLanguages already validated by createListingApiSchema (includes householdLanguagesSchema)
 
-    // Geocode address (log only city/state, not full address)
-    const fullAddress = `${address}, ${city}, ${state} ${zip}`;
+    // Resolve coordinates from a server-signed selected suggestion when it
+    // still matches the submitted fields. Google Address Validation paths verify
+    // manual entries before accepting coordinates.
     let coords: { lat: number; lng: number };
-    try {
-      const geoResult = await geocodeAddress(fullAddress);
-      if (geoResult.status === "not_found") {
-        await logger.warn("Geocoding failed for listing", {
-          route: "/api/listings",
-          method: "POST",
+    const verifiedAddressSuggestion = verifyAddressSuggestionToken(
+      addressSuggestionToken,
+      {
+        userId,
+        address,
+        city,
+        state,
+        zip,
+      }
+    );
+
+    if (verifiedAddressSuggestion.valid) {
+      coords = verifiedAddressSuggestion.coords;
+    } else if (features.googleAddressValidation) {
+      try {
+        const validatedAddress = await validateAddressForPublish({
+          address,
           city,
           state,
+          zip,
         });
-        return NextResponse.json(
-          { error: "Could not find this address. Please check and try again." },
-          { status: 400 }
-        );
+
+        if (!validatedAddress) {
+          const message =
+            "Could not verify this exact address. Please choose a suggested address or check the details and try again.";
+          return NextResponse.json(
+            {
+              error: message,
+              field: "address",
+              fields: { address: message },
+            },
+            { status: 400 }
+          );
+        }
+
+        coords = { lat: validatedAddress.lat, lng: validatedAddress.lng };
+      } catch (validationError) {
+        if (validationError instanceof GooglePlacesUnavailableError) {
+          return NextResponse.json(
+            {
+              error:
+                "Address verification temporarily unavailable. Please try again.",
+            },
+            { status: 503, headers: { "Retry-After": "10" } }
+          );
+        }
+
+        throw validationError;
       }
-      if (geoResult.status === "error") {
-        return NextResponse.json(
-          {
-            error:
-              "Address verification temporarily unavailable. Please try again.",
-          },
-          { status: 503, headers: { "Retry-After": "10" } }
-        );
-      }
-      coords = { lat: geoResult.lat, lng: geoResult.lng };
-    } catch (geoError) {
-      if (isCircuitOpenError(geoError)) {
-        return NextResponse.json(
-          {
-            error:
-              "Address verification service temporarily unavailable. Please try again shortly.",
-          },
-          { status: 503, headers: { "Retry-After": "30" } }
-        );
-      }
-      throw geoError;
+    } else {
+      await logger.warn("Listing create blocked: address validation disabled", {
+        route: "/api/listings",
+        method: "POST",
+        city,
+        state,
+      });
+      return NextResponse.json(
+        {
+          error:
+            "Address verification temporarily unavailable. Please try again.",
+        },
+        { status: 503, headers: { "Retry-After": "10" } }
+      );
     }
 
     // Validate image URL ownership (prevent cross-user URL injection)
@@ -530,6 +531,7 @@ export async function POST(request: Request) {
         listing: { ...listing, bookingMode },
         address: { address, city, state, zip },
         actor: { role: "host", id: userId },
+        trustedCoordinates: coords,
       });
 
       await markListingDirtyInTx(tx, listing.id, "listing_created");

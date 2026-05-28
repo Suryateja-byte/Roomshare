@@ -80,8 +80,39 @@ const serverEnvSchema = z
       .min(32, "LOG_HMAC_SECRET must be at least 32 characters")
       .optional(),
 
+    // Public destination autocomplete provider order. Comma-separated values:
+    // local,mapbox,google. Google public use also requires GOOGLE_PLACES_PUBLIC_ENABLED=true.
+    PUBLIC_LOCATION_PROVIDER: z.string().optional(),
+    MAPBOX_ACCESS_TOKEN: z.string().optional(),
+    MAPBOX_PUBLIC_AUTOCOMPLETE_MONTHLY_CAP: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional(),
+    GOOGLE_PUBLIC_AUTOCOMPLETE_MONTHLY_CAP: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional(),
+
     // Google Places (server-side, IP-restricted key)
     GOOGLE_PLACES_API_KEY: z.string().optional(),
+    GOOGLE_PLACES_PUBLIC_ENABLED: z.enum(["true", "false"]).optional(),
+    GOOGLE_ADDRESS_VALIDATION_ENABLED: z.enum(["true", "false"]).optional(),
+    GOOGLE_ADDRESS_VALIDATION_MONTHLY_CAP: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional(),
+    SMARTY_ADDRESS_AUTOCOMPLETE_ENABLED: z.enum(["true", "false"]).optional(),
+    SMARTY_AUTH_ID: z.string().optional(),
+    SMARTY_AUTH_TOKEN: z.string().optional(),
+    SMARTY_ADDRESS_AUTOCOMPLETE_MONTHLY_CAP: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional(),
+    PHOTON_FALLBACK_ENABLED: z.enum(["true", "false"]).optional(),
 
     // Stripe payments (optional until contact paywall is enabled)
     STRIPE_SECRET_KEY: z.string().optional(),
@@ -123,9 +154,7 @@ const serverEnvSchema = z
     ENABLE_CONTACT_FIRST_LISTINGS: z.enum(["true", "false"]).optional(),
     FEATURE_MODERATION_WRITE_LOCKS: z.enum(["true", "false"]).optional(),
     FEATURE_PUBLIC_CACHE_COHERENCE: z.enum(["true", "false"]).optional(),
-    KILL_SWITCH_DISABLE_PUBLIC_CACHE_PUSH: z
-      .enum(["true", "false"])
-      .optional(),
+    KILL_SWITCH_DISABLE_PUBLIC_CACHE_PUSH: z.enum(["true", "false"]).optional(),
     PUBLIC_CACHE_CURSOR_SECRET: z.string().optional(),
     PUBLIC_CACHE_KEY_SECRET: z.string().optional(),
     PUBLIC_CACHE_PUSH_ENCRYPTION_KEY: z.string().optional(),
@@ -133,17 +162,13 @@ const serverEnvSchema = z
     PUBLIC_CACHE_VAPID_PRIVATE_KEY: z.string().optional(),
     PUBLIC_CACHE_VAPID_SUBJECT: z.string().optional(),
     NEXT_PUBLIC_PUBLIC_CACHE_VAPID_KEY: z.string().optional(),
-    FEATURE_PUBLIC_AUTOCOMPLETE_CONTRACT: z
-      .enum(["true", "false"])
-      .optional(),
+    FEATURE_PUBLIC_AUTOCOMPLETE_CONTRACT: z.enum(["true", "false"]).optional(),
     ENABLE_BOOKING_RETIREMENT_FREEZE: z.enum(["true", "false"]).optional(),
     ENABLE_CONTACT_PAYWALL: z.enum(["true", "false"]).optional(),
     ENABLE_CONTACT_PAYWALL_ENFORCEMENT: z.enum(["true", "false"]).optional(),
     ENABLE_SEARCH_ALERT_PAYWALL: z.enum(["true", "false"]).optional(),
     ENABLE_ENTITLEMENT_STATE: z.enum(["true", "false"]).optional(),
-    ENABLE_CONTACT_RESTORATION_AUTOMATION: z
-      .enum(["true", "false"])
-      .optional(),
+    ENABLE_CONTACT_RESTORATION_AUTOMATION: z.enum(["true", "false"]).optional(),
     KILL_SWITCH_DISABLE_PHONE_REVEAL: z.enum(["true", "false"]).optional(),
     KILL_SWITCH_DISABLE_PAYMENTS: z.enum(["true", "false"]).optional(),
     KILL_SWITCH_FREEZE_NEW_GRANTS: z.enum(["true", "false"]).optional(),
@@ -155,9 +180,7 @@ const serverEnvSchema = z
     ENABLE_FRESHNESS_NOTIFICATIONS: z.enum(["on", "off"]).optional(),
     ENABLE_STALE_AUTO_PAUSE: z.enum(["on", "off"]).optional(),
     FEATURE_SEARCH_LISTING_DEDUP: z.enum(["true", "false"]).optional(),
-    FEATURE_LISTING_CREATE_COLLISION_WARN: z
-      .enum(["true", "false"])
-      .optional(),
+    FEATURE_LISTING_CREATE_COLLISION_WARN: z.enum(["true", "false"]).optional(),
 
     // AI / Embeddings
     GEMINI_API_KEY: z.string().min(1).optional(),
@@ -168,22 +191,20 @@ const serverEnvSchema = z
     KILL_SWITCH_FORCE_LIST_ONLY: z.enum(["true", "false"]).optional(),
     KILL_SWITCH_FORCE_CLUSTERS_ONLY: z.enum(["true", "false"]).optional(),
     KILL_SWITCH_DISABLE_SEMANTIC_SEARCH: z.enum(["true", "false"]).optional(),
-    KILL_SWITCH_DISABLE_NEW_PUBLICATION: z
-      .enum(["true", "false"])
-      .optional(),
-    KILL_SWITCH_PAUSE_GEOCODE_PUBLISH: z
-      .enum(["true", "false"])
-      .optional(),
+    KILL_SWITCH_DISABLE_NEW_PUBLICATION: z.enum(["true", "false"]).optional(),
+    KILL_SWITCH_PAUSE_GEOCODE_PUBLISH: z.enum(["true", "false"]).optional(),
     KILL_SWITCH_PAUSE_BACKFILLS_AND_REPAIRS: z
       .enum(["true", "false"])
       .optional(),
-    KILL_SWITCH_PAUSE_IDENTITY_RECONCILE: z
-      .enum(["true", "false"])
-      .optional(),
+    KILL_SWITCH_PAUSE_IDENTITY_RECONCILE: z.enum(["true", "false"]).optional(),
     KILL_SWITCH_PAUSE_EMBED_PUBLISH: z.enum(["true", "false"]).optional(),
     KILL_SWITCH_ROLLBACK_EMBEDDING_VERSION: z.string().optional(),
     KILL_SWITCH_ROLLBACK_RANKER_PROFILE: z.enum(["off"]).optional(),
-    EMBEDDING_TOKEN_BUDGET_PER_MINUTE: z.coerce.number().int().positive().optional(),
+    EMBEDDING_TOKEN_BUDGET_PER_MINUTE: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional(),
     SEMANTIC_WEIGHT: z.coerce.number().min(0).max(1).optional(),
 
     // Node environment
@@ -616,6 +637,33 @@ export const features = {
   get googlePlaces() {
     return hasValue(process.env.GOOGLE_PLACES_API_KEY);
   },
+  get googlePlacesPublic() {
+    return (
+      process.env.GOOGLE_PLACES_PUBLIC_ENABLED === "true" &&
+      hasValue(process.env.GOOGLE_PLACES_API_KEY)
+    );
+  },
+  get googleAddressValidation() {
+    return (
+      process.env.GOOGLE_ADDRESS_VALIDATION_ENABLED !== "false" &&
+      hasValue(process.env.GOOGLE_PLACES_API_KEY)
+    );
+  },
+  get smartyAddressAutocomplete() {
+    return (
+      process.env.SMARTY_ADDRESS_AUTOCOMPLETE_ENABLED === "true" &&
+      hasValue(process.env.SMARTY_AUTH_ID) &&
+      hasValue(process.env.SMARTY_AUTH_TOKEN)
+    );
+  },
+  get photonFallback() {
+    if (process.env.PHOTON_FALLBACK_ENABLED === "true") return true;
+    if (process.env.PHOTON_FALLBACK_ENABLED === "false") return false;
+    return process.env.NODE_ENV !== "production";
+  },
+  get mapboxGeocoding() {
+    return hasValue(process.env.MAPBOX_ACCESS_TOKEN);
+  },
   get supabaseStorage() {
     return hasValue(process.env.SUPABASE_SERVICE_ROLE_KEY);
   },
@@ -686,7 +734,9 @@ export const features = {
     return process.env.KILL_SWITCH_DISABLE_PUBLIC_CACHE_PUSH === "true";
   },
   get publicAutocompleteContract() {
-    return phaseCutoverDefault(process.env.FEATURE_PUBLIC_AUTOCOMPLETE_CONTRACT);
+    return phaseCutoverDefault(
+      process.env.FEATURE_PUBLIC_AUTOCOMPLETE_CONTRACT
+    );
   },
   get bookingRetirementFreeze() {
     return false;
@@ -742,7 +792,9 @@ export const features = {
     return phaseCutoverDefault(process.env.FEATURE_SEARCH_LISTING_DEDUP);
   },
   get listingCreateCollisionWarn() {
-    return phaseCutoverDefault(process.env.FEATURE_LISTING_CREATE_COLLISION_WARN);
+    return phaseCutoverDefault(
+      process.env.FEATURE_LISTING_CREATE_COLLISION_WARN
+    );
   },
   get phase01CanonicalWrites() {
     return phaseCutoverDefault(process.env.FEATURE_PHASE01_CANONICAL_WRITES);

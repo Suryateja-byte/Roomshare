@@ -37,6 +37,7 @@ export const publicListingDetailSelect = {
       image: true,
       bio: true,
       isVerified: true,
+      isSuspended: true,
       createdAt: true,
     },
   },
@@ -89,6 +90,10 @@ const getPublicListingDetailCached = cache(
 
     const isOwner = viewerUserId === listing.ownerId;
     const visibility = resolvePublicListingVisibilityState(listing);
+
+    if (listing.owner.isSuspended && !isOwner && !isAdmin) {
+      return null;
+    }
 
     if (!visibility.isPubliclyVisible && !isOwner && !isAdmin) {
       return null;

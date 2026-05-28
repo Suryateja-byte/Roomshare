@@ -125,6 +125,23 @@ function getCurrentQueryHash() {
   );
 }
 
+function setMockV2FeatureIds(ids: string[]) {
+  (mockV2MapData.geojson as any).features = ids.map((id, index) => ({
+    type: "Feature",
+    geometry: {
+      type: "Point",
+      coordinates: [-122.4 - index * 0.01, 37.7 + index * 0.01],
+    },
+    properties: {
+      id,
+      title: `V2 listing ${id}`,
+      price: 1000 + index * 100,
+      image: null,
+      availableSlots: 1,
+    },
+  }));
+}
+
 describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -147,6 +164,7 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
     mockSearchParams.set("minLat", "37.5");
     mockSearchParams.set("maxLat", "38.0");
     mockV2MapData.queryHash = getCurrentQueryHash();
+    setMockV2FeatureIds([]);
 
     // Default successful response
     mockFetch.mockImplementation(
@@ -444,6 +462,94 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
       // Map should render with 0 listings (empty v2 features)
       const map = getByTestId("dynamic-map");
       expect(map).toHaveAttribute("data-listings-count", "0");
+    });
+
+    it("uses stale v2 markers only while the current v2 query is pending", async () => {
+      mockIsV2Enabled = true;
+      mockHasV2Data = true;
+      mockV2MapData.queryHash = getCurrentQueryHash();
+      setMockV2FeatureIds(["old-v2-marker"]);
+
+      const { rerender, getByTestId, queryByTestId } = render(
+        <PersistentMapWrapper shouldRenderMap={true} />
+      );
+
+      expect(getByTestId("dynamic-map")).toHaveAttribute(
+        "data-listings-count",
+        "1"
+      );
+
+      mockSearchParams.set("maxPrice", "1");
+      const nextQueryHash = getCurrentQueryHash();
+      mockHasV2Data = false;
+      mockPendingV2QueryHash = nextQueryHash;
+      rerender(<PersistentMapWrapper shouldRenderMap={true} />);
+
+      expect(getByTestId("dynamic-map")).toHaveAttribute(
+        "data-listings-count",
+        "1"
+      );
+
+      mockPendingV2QueryHash = null;
+      rerender(<PersistentMapWrapper shouldRenderMap={true} />);
+
+      await waitFor(() => {
+        expect(queryByTestId("dynamic-map")).not.toBeInTheDocument();
+        expect(getByTestId("map-loading-placeholder")).toBeInTheDocument();
+      });
+    });
+
+    it("does not let an in-flight v1 map response overwrite active v2 data", async () => {
+      let resolveFetch: (() => void) | null = null;
+      mockFetch.mockImplementation(
+        (_url: string, options?: { headers?: Record<string, string> }) =>
+          new Promise((resolve) => {
+            resolveFetch = () =>
+              resolve(
+                createOkMapResponse(
+                  [
+                    {
+                      id: "v1-late",
+                      title: "Late V1 Listing",
+                      price: 700,
+                      location: { lat: 37.7, lng: -122.4 },
+                    },
+                  ],
+                  options
+                )
+              );
+          })
+      );
+
+      const { rerender, getByTestId } = render(
+        <PersistentMapWrapper shouldRenderMap={true} />
+      );
+
+      await act(async () => {
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
+      });
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      mockIsV2Enabled = true;
+      mockHasV2Data = true;
+      mockV2MapData.queryHash = getCurrentQueryHash();
+      rerender(<PersistentMapWrapper shouldRenderMap={true} />);
+
+      expect(getByTestId("dynamic-map")).toHaveAttribute(
+        "data-listings-count",
+        "0"
+      );
+
+      await act(async () => {
+        resolveFetch?.();
+      });
+
+      await waitFor(() => {
+        expect(getByTestId("dynamic-map")).toHaveAttribute(
+          "data-listings-count",
+          "0"
+        );
+      });
     });
 
     it("clears stale cached v2 data when switching to v1 mode", async () => {

@@ -27,6 +27,32 @@ jest.mock("@/lib/geocoding", () => ({
   geocodeAddress: jest.fn(),
 }));
 
+jest.mock("@/lib/geocoding/address-suggestion-token", () => ({
+  verifyAddressSuggestionToken: jest.fn().mockReturnValue({
+    valid: false,
+    reason: "malformed",
+  }),
+}));
+
+const mockValidateAddressForPublish = jest.fn();
+
+jest.mock("@/lib/geocoding/google-places", () => {
+  class GooglePlacesUnavailableError extends Error {
+    constructor(
+      message: string,
+      public readonly code: "MISSING_KEY" | "TIMEOUT" | "UPSTREAM"
+    ) {
+      super(message);
+    }
+  }
+
+  return {
+    GooglePlacesUnavailableError,
+    validateAddressForPublish: (...args: unknown[]) =>
+      mockValidateAddressForPublish(...args),
+  };
+});
+
 jest.mock("@/lib/data", () => ({
   getListingsPaginated: jest.fn(),
 }));
@@ -109,6 +135,7 @@ jest.mock("@/lib/search/search-doc-dirty", () => ({
 jest.mock("@/lib/env", () => ({
   features: {
     listingCreateCollisionWarn: false,
+    googleAddressValidation: true,
     semanticSearch: false,
     wholeUnitMode: false,
   },
@@ -127,7 +154,7 @@ jest.mock("@/lib/profile-completion", () => ({
   calculateProfileCompletion: jest
     .fn()
     .mockReturnValue({ percentage: 100, missing: [] }),
-  PROFILE_REQUIREMENTS: { createListing: 50 },
+  PROFILE_REQUIREMENTS: { sendMessages: 40, bookRooms: 80 },
 }));
 
 jest.mock("next/server", () => ({
@@ -198,6 +225,16 @@ describe("Listings API", () => {
     (checkEmailVerified as jest.Mock).mockResolvedValue({ verified: true });
     (prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: "user-123" });
     (prisma.listing.count as jest.Mock).mockResolvedValue(0);
+    mockValidateAddressForPublish.mockReset();
+    mockValidateAddressForPublish.mockResolvedValue({
+      address: "123 Main St",
+      city: "San Francisco",
+      state: "CA",
+      zip: "94102",
+      lat: 37.7749,
+      lng: -122.4194,
+      precision: "PREMISE",
+    });
   });
 
   describe("GET", () => {
@@ -360,8 +397,8 @@ describe("Listings API", () => {
       expect(response.status).toBe(400);
     });
 
-    it("returns 400 when geocoding finds no results", async () => {
-      (geocodeAddress as jest.Mock).mockResolvedValue({ status: "not_found" });
+    it("returns 400 when address validation rejects the address", async () => {
+      mockValidateAddressForPublish.mockResolvedValue(null);
 
       const request = new Request("http://localhost/api/listings", {
         method: "POST",

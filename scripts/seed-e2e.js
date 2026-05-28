@@ -15,6 +15,7 @@ const prisma = new PrismaClient();
 
 const E2E_USER_EMAIL = process.env.E2E_TEST_EMAIL || 'e2e-test@roomshare.dev';
 const E2E_USER_PASSWORD = process.env.E2E_TEST_PASSWORD || 'TestPassword123!';
+const E2E_INCOMPLETE_HOST_EMAIL = 'e2e-incomplete-host@roomshare.dev';
 const DEFAULT_IMAGES = [
   'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=600',
   'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=600',
@@ -789,9 +790,11 @@ async function main() {
   const user = await prisma.user.upsert({
     where: { email: E2E_USER_EMAIL },
     update: {
+      name: 'E2E Test User',
       password: hashedPassword,
       emailVerified: new Date(),
       isVerified: true,
+      isSuspended: false,
       bio: DEFAULT_PROFILE_BIO,
       image: DEFAULT_PROFILE_IMAGE,
       countryOfOrigin: 'United States',
@@ -803,6 +806,7 @@ async function main() {
       password: hashedPassword,
       emailVerified: new Date(),
       isVerified: true,
+      isSuspended: false,
       bio: DEFAULT_PROFILE_BIO,
       image: DEFAULT_PROFILE_IMAGE,
       countryOfOrigin: 'United States',
@@ -811,15 +815,47 @@ async function main() {
   });
   console.log(`  ✓ User: ${user.email} (${user.id})`);
 
+  const incompleteHost = await prisma.user.upsert({
+    where: { email: E2E_INCOMPLETE_HOST_EMAIL },
+    update: {
+      name: null,
+      password: hashedPassword,
+      emailVerified: new Date(),
+      isVerified: false,
+      isSuspended: false,
+      bio: null,
+      image: null,
+      countryOfOrigin: null,
+      languages: [],
+    },
+    create: {
+      email: E2E_INCOMPLETE_HOST_EMAIL,
+      name: null,
+      password: hashedPassword,
+      emailVerified: new Date(),
+      isVerified: false,
+      isSuspended: false,
+      bio: null,
+      image: null,
+      countryOfOrigin: null,
+      languages: [],
+    },
+  });
+  console.log(`  ✓ Incomplete unverified host: ${incompleteHost.email} (${incompleteHost.id})`);
+
   // 2. Create a second user for reviews
   const reviewer = await prisma.user.upsert({
     where: { email: 'e2e-reviewer@roomshare.dev' },
     update: {
+      name: 'E2E Reviewer',
+      password: hashedPassword,
+      emailVerified: new Date(),
       bio: DEFAULT_PROFILE_BIO,
       image: DEFAULT_PROFILE_IMAGE,
       countryOfOrigin: 'United States',
       languages: ['en'],
       isVerified: true,
+      isSuspended: false,
     },
     create: {
       email: 'e2e-reviewer@roomshare.dev',
@@ -827,6 +863,7 @@ async function main() {
       password: hashedPassword,
       emailVerified: new Date(),
       isVerified: true,
+      isSuspended: false,
       bio: DEFAULT_PROFILE_BIO,
       image: DEFAULT_PROFILE_IMAGE,
       countryOfOrigin: 'United States',
@@ -976,12 +1013,16 @@ async function main() {
   const admin = await prisma.user.upsert({
     where: { email: 'e2e-admin@roomshare.dev' },
     update: {
+      name: 'E2E Admin',
+      password: hashedPassword,
+      emailVerified: new Date(),
       isAdmin: true,
       bio: DEFAULT_PROFILE_BIO,
       image: DEFAULT_PROFILE_IMAGE,
       countryOfOrigin: 'United States',
       languages: ['en'],
       isVerified: true,
+      isSuspended: false,
     },
     create: {
       email: 'e2e-admin@roomshare.dev',
@@ -990,6 +1031,7 @@ async function main() {
       emailVerified: new Date(),
       isVerified: true,
       isAdmin: true,
+      isSuspended: false,
       bio: DEFAULT_PROFILE_BIO,
       image: DEFAULT_PROFILE_IMAGE,
       countryOfOrigin: 'United States',
@@ -1002,11 +1044,15 @@ async function main() {
   const thirdUser = await prisma.user.upsert({
     where: { email: 'e2e-other@roomshare.dev' },
     update: {
+      name: 'E2E Other User',
+      password: hashedPassword,
+      emailVerified: new Date(),
       bio: 'Another verified E2E user for messaging and safety tests.',
       image: DEFAULT_PROFILE_IMAGE,
       countryOfOrigin: 'United States',
       languages: ['en'],
       isVerified: true,
+      isSuspended: false,
     },
     create: {
       email: 'e2e-other@roomshare.dev',
@@ -1014,6 +1060,7 @@ async function main() {
       password: hashedPassword,
       emailVerified: new Date(),
       isVerified: true,
+      isSuspended: false,
       bio: 'Another test user for E2E tests.',
       image: DEFAULT_PROFILE_IMAGE,
       countryOfOrigin: 'United States',

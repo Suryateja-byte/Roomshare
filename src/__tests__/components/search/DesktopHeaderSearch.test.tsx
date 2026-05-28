@@ -1,6 +1,7 @@
 import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import DesktopHeaderSearch from "@/components/search/DesktopHeaderSearch";
+import { SearchResultsLoadingWrapper } from "@/components/search/SearchResultsLoadingWrapper";
 import { MAP_FLY_TO_EVENT } from "@/components/SearchForm";
 
 const mockPush = jest.fn();
@@ -191,5 +192,45 @@ describe("DesktopHeaderSearch", () => {
     expect(url.searchParams.get("lat")).toBe("32.814");
     expect(url.searchParams.get("lng")).toBe("-96.9489");
     expect(url.searchParams.get("minLng")).toBeTruthy();
+  });
+
+  it("does not flush synchronously when filter focus management blurs a budget input", () => {
+    const consoleErrorSpy = jest
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
+    try {
+      const renderSearchHeaderWithResults = () => (
+        <>
+          <DesktopHeaderSearch collapsed={false} />
+          <SearchResultsLoadingWrapper>
+            <h2 id="search-results-heading" tabIndex={-1}>
+              12 rooms
+            </h2>
+          </SearchResultsLoadingWrapper>
+        </>
+      );
+
+      const { rerender } = render(renderSearchHeaderWithResults());
+      const minBudgetInput = screen.getByLabelText("Minimum budget");
+
+      minBudgetInput.focus();
+      fireEvent.change(minBudgetInput, { target: { value: "900" } });
+      expect(minBudgetInput).toHaveFocus();
+
+      mockSearchParams = "minPrice=900";
+      rerender(renderSearchHeaderWithResults());
+
+      const consoleOutput = consoleErrorSpy.mock.calls
+        .flat()
+        .map(String)
+        .join("\n");
+      expect(screen.getByText("12 rooms")).toHaveFocus();
+      expect(consoleOutput).not.toContain(
+        "flushSync was called from inside a lifecycle method"
+      );
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 });

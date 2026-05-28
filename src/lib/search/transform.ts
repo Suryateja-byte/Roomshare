@@ -126,6 +126,7 @@ export function transformToListItem(listing: ListingData): SearchV2ListItem {
     publicAvailability,
     groupSummary: publicGroupMetadata.groupSummary,
     groupContext: publicGroupMetadata.groupContext,
+    hostIdentityStatus: listing.hostIdentityStatus ?? "unknown",
     // scoreHint is reserved for future relevance scoring
   };
 }
@@ -178,6 +179,7 @@ export function transformToGeoJSON(
         availableSlots: publicAvailability.openSlots,
         publicAvailability,
         groupContext: publicGroupMetadata.groupContext,
+        hostIdentityStatus: listing.hostIdentityStatus ?? "unknown",
       } satisfies SearchV2FeatureProperties,
     };
   });

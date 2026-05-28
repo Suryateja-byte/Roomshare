@@ -10,9 +10,14 @@ import { Redis } from "@upstash/redis";
 export interface GeocodingResult {
   id: string;
   place_name: string;
-  center: [number, number];
+  center?: [number, number];
   place_type: string[];
   bbox?: [number, number, number, number];
+  place_id?: string;
+  provider?: "google" | "photon" | "public" | "local" | "mapbox";
+  requires_resolution?: boolean;
+  primary_text?: string;
+  secondary_text?: string;
 }
 
 const DEFAULT_TTL_SECONDS = 24 * 60 * 60; // 24 hours (legacy geocoding results are stable)
@@ -66,7 +71,11 @@ function normalizeCacheVersion(cacheVersion?: string): string {
 
 function getTtlMs(options?: GeocodingCacheOptions): number {
   const ttlSeconds = options?.ttlSeconds;
-  if (typeof ttlSeconds !== "number" || !Number.isFinite(ttlSeconds) || ttlSeconds <= 0) {
+  if (
+    typeof ttlSeconds !== "number" ||
+    !Number.isFinite(ttlSeconds) ||
+    ttlSeconds <= 0
+  ) {
     return DEFAULT_TTL_SECONDS * 1000;
   }
 

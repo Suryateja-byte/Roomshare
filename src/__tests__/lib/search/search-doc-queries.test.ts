@@ -51,9 +51,8 @@ describe("buildSearchDocWhereConditions", () => {
     // Base conditions must filter to ACTIVE status only
     // PAUSED, DRAFT, ARCHIVED, etc. listings must never appear in search
     expect(conditions).toContain(`l.status = 'ACTIVE'`);
-    expect(conditions).toContain(
-      `COALESCE(FALSE, FALSE) = FALSE`
-    );
+    expect(conditions).toContain(`u."isSuspended" = FALSE`);
+    expect(conditions).toContain(`COALESCE(FALSE, FALSE) = FALSE`);
     expect(conditions).toContain(
       `COALESCE(l."statusReason", '') NOT IN ('MIGRATION_REVIEW', 'ADMIN_PAUSED', 'SUPPRESSED')`
     );
@@ -404,6 +403,7 @@ describe("SearchDoc projection mapping", () => {
       status: "ACTIVE",
       statusReason: null,
       needsMigrationReview: false,
+      hostIdentityStatus: "unverified" as const,
       amenities: ["WiFi"],
       houseRules: ["No Smoking"],
       householdLanguages: ["English"],
@@ -488,6 +488,7 @@ describe("SearchDoc projection mapping", () => {
       totalSlots: 4,
       status: "ACTIVE",
       statusReason: null,
+      hostIdentityStatus: "unverified",
     });
   });
 
@@ -544,8 +545,23 @@ describe("SearchDoc projection mapping", () => {
     expect(mapResult.availabilitySource).toBe(
       mapResult.publicAvailability.availabilitySource
     );
-    expect(mapResult.availableSlots).toBe(mapResult.publicAvailability.openSlots);
+    expect(mapResult.availableSlots).toBe(
+      mapResult.publicAvailability.openSlots
+    );
     expect(mapResult.totalSlots).toBe(mapResult.publicAvailability.totalSlots);
+    expect(listResult.hostIdentityStatus).toBe("unverified");
+    expect(mapResult.hostIdentityStatus).toBe("unverified");
+  });
+
+  it("defaults missing host identity status to unknown for older cached rows", () => {
+    const row = createHostManagedRaw({ hostIdentityStatus: undefined });
+
+    expect(mapRawListingsToPublic([row])[0].hostIdentityStatus).toBe(
+      "unknown"
+    );
+    expect(mapRawMapListingsToPublic([row])[0].hostIdentityStatus).toBe(
+      "unknown"
+    );
   });
 
   it("keeps map and list inclusion aligned across representative public-discovery fixtures", () => {
@@ -578,9 +594,9 @@ describe("SearchDoc projection mapping", () => {
       }),
     ];
 
-    expect(mapRawListingsToPublic(fixtures).map((listing) => listing.id)).toEqual([
-      "eligible-host-managed",
-    ]);
+    expect(
+      mapRawListingsToPublic(fixtures).map((listing) => listing.id)
+    ).toEqual(["eligible-host-managed"]);
     expect(
       mapRawMapListingsToPublic(fixtures).map((listing) => listing.id)
     ).toEqual(["eligible-host-managed"]);

@@ -120,9 +120,16 @@ export async function rebuildInventorySearchProjection(
 
   // Fetch physical unit for location fields via raw SQL to avoid type issues
   const units = await tx.$queryRaw<
-    { public_point: string | null; public_cell_id: string | null; public_area_name: string | null }[]
+    {
+      public_point: string | null;
+      public_cell_id: string | null;
+      public_area_name: string | null;
+    }[]
   >`
-    SELECT public_point, public_cell_id, public_area_name
+    SELECT
+      public_point::TEXT AS public_point,
+      public_cell_id,
+      public_area_name
     FROM physical_units
     WHERE id = ${unitId}
     LIMIT 1
@@ -221,7 +228,10 @@ export async function rebuildInventorySearchProjection(
       WHERE id = ${inventoryId}
     `;
     await enqueueEmbedNeededIfAbsent(tx, input);
-  } else if (updated && (targetStatus === "PUBLISHED" || targetStatus === "STALE_PUBLISHED")) {
+  } else if (
+    updated &&
+    (targetStatus === "PUBLISHED" || targetStatus === "STALE_PUBLISHED")
+  ) {
     // Record that this source_version was successfully published
     await tx.$executeRaw`
       UPDATE listing_inventories

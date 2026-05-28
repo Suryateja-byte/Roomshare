@@ -12,7 +12,7 @@
  * - data-snap-current attribute on the content area reflects current snap
  */
 
-import { Page } from "@playwright/test";
+import { expect, Page } from "@playwright/test";
 
 // ---------------------------------------------------------------------------
 // Selectors (matching MobileBottomSheet.tsx DOM structure)
@@ -132,27 +132,31 @@ export async function setSheetSnap(
   for (let i = 0; i < presses; i++) {
     const prevSnap = await getSheetSnapIndex(page);
     await handle.press(key);
-    if (i < presses - 1) {
-      // Wait for data-snap-current to update before next press
-      await page
-        .waitForFunction(
-          ({ sel, prev }: { sel: string; prev: number }) => {
-            const el = document.querySelector(sel);
-            if (!el) return true;
-            const curr = parseInt(
-              el.getAttribute("data-snap-current") ?? "-1",
-              10
-            );
-            return curr !== prev;
-          },
-          { sel: mobileSelectors.snapContent, prev: prevSnap },
-          { timeout: 3000 }
-        )
-        .catch(() => {});
-    }
+    const expectedSnap = prevSnap + (diff > 0 ? 1 : -1);
+    await page
+      .waitForFunction(
+        ({ sel, expected }: { sel: string; expected: number }) => {
+          const el = document.querySelector(sel);
+          if (!el) return false;
+          const curr = parseInt(
+            el.getAttribute("data-snap-current") ?? "-1",
+            10
+          );
+          return curr === expected;
+        },
+        { sel: mobileSelectors.snapContent, expected: expectedSnap },
+        { timeout: 5_000 }
+      )
+      .catch(() => {});
   }
 
   await waitForSheetAnimation(page);
+  await expect
+    .poll(() => getSheetSnapIndex(page), {
+      timeout: 10_000,
+      message: `Expected mobile sheet to reach snap ${targetSnap}`,
+    })
+    .toBe(targetSnap);
 }
 
 /**
@@ -193,6 +197,9 @@ export async function ensureMobileResultsVisible(
  */
 export async function waitForSheetAnimation(page: Page): Promise<void> {
   try {
+    await page.evaluate(() => {
+      delete (window as any).__sheetAnimH;
+    });
     await page.waitForFunction(
       () => {
         const candidates = Array.from(

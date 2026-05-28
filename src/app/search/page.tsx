@@ -52,6 +52,7 @@ import {
   recordSearchZeroResults,
 } from "@/lib/search/search-telemetry";
 import { V2MapDataSetter } from "@/components/search/V2MapDataSetter";
+import { V1PathResetSetter } from "@/components/search/V1PathResetSetter";
 import type { SearchV2Response } from "@/lib/search/types";
 import { toPublicSearchListings } from "@/lib/search/public-listing-payload";
 
@@ -328,7 +329,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     const displayLocation = locationLabel || q || "";
 
     return (
-      <div className="max-w-[840px] mx-auto pb-24 md:pb-6">
+      <div className="mx-auto w-full max-w-[1180px] pb-24 md:pb-6">
         <div className="px-4 sm:px-5 lg:px-8 pt-0">
           <InlineFilterStrip
             desktopSummary={{
@@ -590,7 +591,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   });
 
   const listContent = (
-    <div className="max-w-[840px] mx-auto pb-24 md:pb-6">
+    <div className="mx-auto w-full max-w-[1180px] pb-24 md:pb-6">
       <div className="px-4 sm:px-5 lg:px-8 pt-0">
         <InlineFilterStrip
           desktopSummary={{
@@ -624,7 +625,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                   querySnapshotId: v2Response.meta.querySnapshotId,
                 }}
               />
-            ) : null}
+            ) : (
+              <V1PathResetSetter />
+            )}
             <SearchResultsClient
               key={normalizedKeyString}
               initialListings={publicListings}

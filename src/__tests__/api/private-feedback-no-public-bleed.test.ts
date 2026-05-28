@@ -221,7 +221,7 @@ describe("private feedback no-public-bleed contract", () => {
     }));
     jest.doMock("@/lib/profile-completion", () => ({
       calculateProfileCompletion: jest.fn(),
-      PROFILE_REQUIREMENTS: { createListing: 100 },
+      PROFILE_REQUIREMENTS: { sendMessages: 40, bookRooms: 80 },
     }));
     jest.doMock("@/lib/env", () => ({
       features: { wholeUnitMode: false },

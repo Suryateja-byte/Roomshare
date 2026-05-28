@@ -90,6 +90,7 @@ jest.mock("@/lib/flags/phase04", () => ({
 
 jest.mock("@/lib/search/projection-search", () => ({
   executeProjectionSearchV2: jest.fn(),
+  hasProjectionFreshnessHoles: jest.fn(),
 }));
 
 // Mock ranking module
@@ -226,7 +227,10 @@ import {
   isPhase04ForceListOnlyActive,
   isPhase04ProjectionReadsEnabled,
 } from "@/lib/flags/phase04";
-import { executeProjectionSearchV2 } from "@/lib/search/projection-search";
+import {
+  executeProjectionSearchV2,
+  hasProjectionFreshnessHoles,
+} from "@/lib/search/projection-search";
 
 // ============================================================================
 // Cast mocks for type-safe access
@@ -342,6 +346,10 @@ const mockIsPhase04ForceClustersOnlyActive =
 const mockExecuteProjectionSearchV2 =
   executeProjectionSearchV2 as jest.MockedFunction<
     typeof executeProjectionSearchV2
+  >;
+const mockHasProjectionFreshnessHoles =
+  hasProjectionFreshnessHoles as jest.MockedFunction<
+    typeof hasProjectionFreshnessHoles
   >;
 
 // ============================================================================
@@ -561,6 +569,7 @@ describe("search-v2-service", () => {
     mockIsPhase04ProjectionReadsEnabled.mockReturnValue(false);
     mockIsPhase04ForceListOnlyActive.mockReturnValue(false);
     mockIsPhase04ForceClustersOnlyActive.mockReturnValue(false);
+    mockHasProjectionFreshnessHoles.mockResolvedValue(false);
     mockDecodeCursorAny.mockReturnValue(null);
     mockGetCurrentEmbeddingVersion.mockReturnValue(
       "gemini-embedding-2.search-result.nosensitive-v1.d768"
@@ -667,6 +676,49 @@ describe("search-v2-service", () => {
       expect(mockExecuteProjectionSearchV2).not.toHaveBeenCalled();
       expect(mockGetSearchDocListingsPaginated).toHaveBeenCalledWith(
         expect.objectContaining({ amenities: ["wifi"] })
+      );
+    });
+
+    it("falls back to SearchDoc when a supported Phase04 first page has projection freshness holes", async () => {
+      setupDefaultMocks({
+        useSearchDoc: true,
+        listItems: [makeListingData({ id: "fresh-searchdoc-listing" })],
+      });
+      mockIsPhase04ProjectionReadsEnabled.mockReturnValue(true);
+      mockHasProjectionFreshnessHoles.mockResolvedValue(true);
+      mockParseSearchParams.mockReturnValue(
+        defaultParsedSearchParams({
+          filterParams: {
+            bounds: BOUNDS,
+            minPrice: 600,
+            maxPrice: 900,
+          },
+        })
+      );
+
+      const result = await executeSearchV2({
+        rawParams: {
+          minLat: "37.7",
+          maxLat: "37.85",
+          minLng: "-122.52",
+          maxLng: "-122.35",
+          minPrice: "600",
+          maxPrice: "900",
+          searchDoc: "1",
+        },
+      });
+
+      expect(result.response?.list.fullItems?.[0]?.id).toBe(
+        "fresh-searchdoc-listing"
+      );
+      expect(mockHasProjectionFreshnessHoles).toHaveBeenCalled();
+      expect(mockExecuteProjectionSearchV2).not.toHaveBeenCalled();
+      expect(mockGetSearchDocListingsPaginated).toHaveBeenCalledWith(
+        expect.objectContaining({ minPrice: 600, maxPrice: 900 })
+      );
+      expect(logger.sync.warn).toHaveBeenCalledWith(
+        "phase04_projection_freshness_fallback",
+        expect.objectContaining({ reason: "projection_freshness_hole" })
       );
     });
 
@@ -951,6 +1003,60 @@ describe("search-v2-service", () => {
         buildPublicAvailability({
           availableSlots: 1,
           totalSlots: 2,
+        })
+      );
+    });
+
+    it("returns an empty map payload when the current list result is confirmed empty", async () => {
+      const mapItems = [makeMapListingData({ id: "map-only-stale" })];
+      setupDefaultMocks({ listItems: [], mapListings: mapItems });
+      mockTransformToMapResponse.mockImplementationOnce((items) => ({
+        geojson: {
+          type: "FeatureCollection",
+          features: items.map((item) => ({
+            type: "Feature" as const,
+            geometry: {
+              type: "Point" as const,
+              coordinates: [item.location.lng, item.location.lat],
+            },
+            properties: {
+              id: item.id,
+              title: item.title,
+              price: item.price,
+              image: item.images[0] ?? null,
+              availableSlots: item.availableSlots,
+              publicAvailability: item.publicAvailability,
+            },
+          })),
+        },
+        pins: items.map((item) => ({
+          id: item.id,
+          lat: item.location.lat,
+          lng: item.location.lng,
+          price: item.price,
+          publicAvailability: item.publicAvailability,
+        })),
+      }));
+
+      const result = await executeSearchV2({
+        rawParams: {
+          minLat: "37.7",
+          maxLat: "37.85",
+          minLng: "-122.52",
+          maxLng: "-122.35",
+        },
+      });
+
+      expect(result.response?.list.total).toBe(0);
+      expect(result.response?.list.items).toHaveLength(0);
+      expect(result.response?.map.geojson.features).toHaveLength(0);
+      expect(result.response?.map.pins).toEqual([]);
+      expect(mockDetermineMode).toHaveBeenCalledWith(0);
+      expect(mockTransformToMapResponse).toHaveBeenCalledWith(
+        [],
+        expect.objectContaining({
+          truncated: undefined,
+          totalCandidates: undefined,
         })
       );
     });

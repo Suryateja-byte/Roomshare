@@ -6,6 +6,9 @@ import type { RawAddressInput } from "@/lib/identity/canonical-address";
 import { resolveOrCreateUnit } from "@/lib/identity/resolve-or-create-unit";
 import { isPublicSearchBlockedStatusReason } from "@/lib/listings/moderation-write-lock";
 import { appendOutboxEvent } from "@/lib/outbox/append";
+import type { ProjectionCoordinates } from "@/lib/projections/public-geocode";
+import { rebuildInventorySearchProjection } from "@/lib/projections/inventory-projection";
+import { rebuildUnitPublicProjection } from "@/lib/projections/unit-projection";
 import type { TombstoneReason } from "@/lib/projections/tombstone";
 import { handleTombstone } from "@/lib/projections/tombstone";
 
@@ -49,6 +52,7 @@ export interface SyncCanonicalListingInventoryInput {
   address: RawAddressInput;
   actor: ActorContext;
   requestId?: string;
+  trustedCoordinates?: ProjectionCoordinates;
 }
 
 function toBigIntVersion(value: number | null | undefined): bigint {
@@ -273,6 +277,7 @@ export async function syncCanonicalListingInventory(
     address: input.address,
     actor: input.actor,
     requestId: input.requestId,
+    trustedCoordinates: input.trustedCoordinates,
   });
 
   const publishStatus = resolveCanonicalPublishStatus({
@@ -447,6 +452,14 @@ export async function syncCanonicalListingInventory(
       unitIdentityEpoch: eventUnitEpoch,
       priority: 100,
     });
+
+    await rebuildInventorySearchProjection(tx, {
+      unitId: unit.unitId,
+      inventoryId: listing.id,
+      sourceVersion: eventSourceVersion,
+      unitIdentityEpoch: eventUnitEpoch,
+    });
+    await rebuildUnitPublicProjection(tx, unit.unitId, eventUnitEpoch);
   } else {
     await handleTombstone(tx, {
       unitId: unit.unitId,

@@ -608,6 +608,173 @@ test.describe("2.5: Map bounds update debounced (600ms)", () => {
 // General: Map interactions don't cause crashes
 // ---------------------------------------------------------------------------
 test.describe("General: Map interaction stability", () => {
+  test("pan and zoom preserve visible markers while batching map data requests", async ({
+    page,
+  }) => {
+    const mapDataRequests: string[] = [];
+    await page.route("**/api/map-listings**", async (route) => {
+      mapDataRequests.push(route.request().url());
+      await route.continue();
+    });
+
+    await waitForSearchPage(page);
+
+    if (!(await isMapAvailable(page))) {
+      test.skip(
+        true,
+        "Map not available (WebGL may be unavailable in headless mode)"
+      );
+      return;
+    }
+
+    const preparedMarkerViewport = await page.evaluate(async () => {
+      type ListingFeature = {
+        geometry?: {
+          type?: string;
+          coordinates?: unknown;
+        };
+      };
+      type GeoJsonSourceLike = {
+        _data?: {
+          features?: ListingFeature[];
+        };
+      };
+      type E2EMapLike = {
+        getSource: (id: string) => GeoJsonSourceLike | undefined;
+        querySourceFeatures: (id: string) => ListingFeature[];
+        jumpTo: (options: { center: [number, number]; zoom: number }) => void;
+        once: (event: "idle", callback: () => void) => void;
+      };
+      const win = window as typeof window & {
+        __e2eMapRef?: E2EMapLike;
+        __e2eSetProgrammaticMove?: (isProgrammatic: boolean) => void;
+        __e2eUpdateMarkers?: () => number;
+      };
+      const map = win.__e2eMapRef;
+      if (!map) return false;
+
+      const getPointCoords = (
+        feature: ListingFeature | undefined
+      ): [number, number] | null => {
+        const coords = feature?.geometry?.coordinates;
+        if (
+          !Array.isArray(coords) ||
+          typeof coords[0] !== "number" ||
+          typeof coords[1] !== "number"
+        ) {
+          return null;
+        }
+
+        return [coords[0], coords[1]];
+      };
+
+      const source = map.getSource("listings");
+      const sourceFeatures = Array.isArray(source?._data?.features)
+        ? source._data.features
+        : [];
+      const queriedFeatures = map.querySourceFeatures("listings");
+      const listingFeature =
+        sourceFeatures.find((feature) => feature.geometry?.type === "Point") ??
+        queriedFeatures.find((feature) => feature.geometry?.type === "Point");
+      const center = getPointCoords(listingFeature);
+      if (!center) return false;
+
+      win.__e2eSetProgrammaticMove?.(true);
+      map.jumpTo({ center, zoom: 15 });
+      await new Promise<void>((resolve) => {
+        map.once("idle", resolve);
+        window.setTimeout(resolve, 3_000);
+      });
+      win.__e2eSetProgrammaticMove?.(false);
+      win.__e2eUpdateMarkers?.();
+
+      return true;
+    });
+    test.skip(
+      !preparedMarkerViewport,
+      "Could not prepare an unclustered listing marker viewport"
+    );
+
+    const markerLocator = page.locator(
+      ".maplibregl-marker [data-listing-id]"
+    );
+    await expect
+      .poll(
+        async () => {
+          await page.evaluate(() => {
+            const win = window as typeof window & {
+              __e2eUpdateMarkers?: () => number;
+            };
+            win.__e2eUpdateMarkers?.();
+          });
+          return markerLocator.count();
+        },
+        {
+          timeout: 15_000,
+          message: "Expected an unclustered marker before stability sampling",
+        }
+      )
+      .toBeGreaterThan(0);
+
+    const mapBoxRaw = await getMapBoundingBox(page);
+    test.skip(!mapBoxRaw, "Could not get map bounding box");
+    const mapBox = mapBoxRaw!;
+    const centerX = mapBox.x + mapBox.width / 2;
+    const centerY = mapBox.y + mapBox.height / 2;
+
+    await page.evaluate(() => {
+      const win = window as typeof window & {
+        __markerStabilityProbe?: {
+          recording: boolean;
+          samples: number[];
+        };
+      };
+      win.__markerStabilityProbe = {
+        recording: true,
+        samples: [],
+      };
+
+      const sample = () => {
+        const probe = win.__markerStabilityProbe;
+        if (!probe?.recording) return;
+        probe.samples.push(
+          document.querySelectorAll(".maplibregl-marker [data-listing-id]")
+            .length
+        );
+        window.requestAnimationFrame(sample);
+      };
+
+      window.requestAnimationFrame(sample);
+    });
+
+    const requestsBeforeInteraction = mapDataRequests.length;
+
+    await page.mouse.move(centerX, centerY);
+    await page.mouse.down();
+    await page.mouse.move(centerX + 220, centerY + 120, { steps: 20 });
+    await page.mouse.up();
+    await waitForMapReady(page);
+
+    await page.mouse.wheel(0, -300);
+    await waitForMapReady(page);
+
+    const markerSamples = await page.evaluate(() => {
+      const win = window as typeof window & {
+        __markerStabilityProbe?: {
+          recording: boolean;
+          samples: number[];
+        };
+      };
+      if (!win.__markerStabilityProbe) return [];
+      win.__markerStabilityProbe.recording = false;
+      return win.__markerStabilityProbe.samples;
+    });
+
+    expect(markerSamples.length).toBeGreaterThan(0);
+    expect(Math.min(...markerSamples)).toBeGreaterThan(0);
+    expect(mapDataRequests.length - requestsBeforeInteraction).toBeLessThanOrEqual(2);
+  });
+
   test("combined pan and zoom interactions work without errors", async ({
     page,
   }) => {

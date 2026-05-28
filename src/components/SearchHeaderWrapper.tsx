@@ -16,7 +16,6 @@
 import { useCallback, useState, useRef, useEffect, useId } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useSearchParams } from "next/navigation";
 import {
   Menu,
   User,
@@ -26,7 +25,6 @@ import {
   LogOut,
   Bookmark,
   MessageSquare,
-  SlidersHorizontal,
 } from "lucide-react";
 import { useScrollHeader } from "@/hooks/useScrollHeader";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -40,7 +38,6 @@ import DesktopHeaderSearch, {
 import { useSession, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import UserAvatar from "@/components/UserAvatar";
-import { countActiveFilters } from "@/components/filters/filter-chip-utils";
 
 const MenuItem = ({
   icon,
@@ -133,9 +130,6 @@ export default function SearchHeaderWrapper() {
   const profileRef = useRef<HTMLDivElement>(null);
   const menuItemsRef = useRef<HTMLElement[]>([]);
   const triggerButtonRef = useRef<HTMLButtonElement>(null);
-
-  const searchParams = useSearchParams();
-  const activeCount = countActiveFilters(searchParams);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -345,12 +339,12 @@ export default function SearchHeaderWrapper() {
     <>
       {/* Full search form - hidden on mobile always, hidden on desktop when collapsed */}
       <div className="hidden transition-all duration-300 ease-out md:block">
-        <div className="mx-auto w-full max-w-[1920px] px-4 py-3 lg:px-6">
-          <div className="grid grid-cols-[auto_minmax(420px,1fr)_auto] items-center gap-4">
+        <div className="mx-auto w-full max-w-[1920px] px-4 py-4 xl:px-8">
+          <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-4 xl:grid-cols-[auto_minmax(620px,1120px)_auto] xl:gap-6">
             {/* Logo — always visible */}
             <Link
               href="/"
-              className="group flex h-12 w-14 flex-shrink-0 items-center justify-start"
+              className="group flex h-12 w-16 flex-shrink-0 items-center justify-start xl:w-[132px]"
               aria-label="RoomShare Home"
             >
               <Image
@@ -372,12 +366,12 @@ export default function SearchHeaderWrapper() {
             </div>
 
             {/* Right Actions - User Profile / Auth */}
-            <div className="hidden min-w-max items-center justify-end gap-2 lg:flex">
+            <div className="hidden min-w-max items-center justify-end gap-3 xl:flex">
               {user ? (
                 <>
                   <Link
                     href="/listings/create"
-                    className="inline-flex h-11 items-center gap-2 rounded-full bg-on-surface px-4 text-sm font-semibold text-surface-container-lowest shadow-ambient-sm transition-all duration-200 hover:bg-on-surface/90 active:scale-[0.98]"
+                    className="inline-flex h-11 items-center gap-2 rounded-full bg-[linear-gradient(135deg,var(--color-on-surface),#3a241c)] px-4 text-sm font-semibold text-surface-container-lowest shadow-ghost transition-all duration-200 hover:brightness-105 active:scale-[0.98]"
                     aria-label="List a room"
                   >
                     <Plus size={15} aria-hidden />
@@ -385,44 +379,20 @@ export default function SearchHeaderWrapper() {
                   </Link>
                   <Link
                     href="/saved"
-                    className="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-outline-variant/30 bg-surface-container-lowest text-on-surface-variant shadow-ambient-sm transition-colors hover:border-on-surface-variant hover:bg-surface-container-high/60 hover:text-on-surface focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
+                    className="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-outline-variant/20 bg-surface-container-lowest/92 text-on-surface-variant shadow-ghost transition-colors hover:bg-surface-container-high/60 hover:text-on-surface focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
                     aria-label="Shortlist"
                   >
                     <Bookmark size={17} aria-hidden />
                   </Link>
                   <Link
                     href="/messages"
-                    className="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-outline-variant/30 bg-surface-container-lowest text-on-surface-variant shadow-ambient-sm transition-colors hover:border-on-surface-variant hover:bg-surface-container-high/60 hover:text-on-surface focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
+                    className="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-outline-variant/20 bg-surface-container-lowest/92 text-on-surface-variant shadow-ghost transition-colors hover:bg-surface-container-high/60 hover:text-on-surface focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
                     aria-label="Messages"
                   >
                     <MessageSquare size={17} aria-hidden />
                   </Link>
                 </>
               ) : null}
-              <div className="flex items-center">
-                <button
-                  type="button"
-                  onClick={openFilters}
-                  aria-label={`Filters${activeCount > 0 ? `, ${activeCount} active` : ""}`}
-                  aria-expanded="false"
-                  aria-controls="search-filters"
-                  aria-haspopup="dialog"
-                  className={`inline-flex h-11 items-center gap-2 rounded-full border px-4 text-sm font-semibold shadow-ambient-sm transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 ${
-                    activeCount > 0
-                      ? "border-on-surface bg-on-surface text-surface-container-lowest hover:bg-on-surface/90"
-                      : "border-outline-variant/30 bg-surface-container-lowest text-on-surface hover:border-on-surface-variant hover:bg-surface-container-high/60"
-                  }`}
-                >
-                  <SlidersHorizontal size={16} />
-                  Filters
-                  {activeCount > 0 ? (
-                    <span className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-on-primary text-[11px] font-bold">
-                      {activeCount}
-                    </span>
-                  ) : null}
-                </button>
-              </div>
-
               {/* Profile Dropdown / Auth Buttons */}
               {user ? (
                 <div className="relative" ref={profileRef}>
@@ -431,7 +401,7 @@ export default function SearchHeaderWrapper() {
                     id={menuButtonId}
                     onClick={() => setIsProfileOpen(!isProfileOpen)}
                     onKeyDown={handleTriggerKeyDown}
-                    className={`group flex h-11 items-center gap-2 rounded-full border border-outline-variant/30 bg-surface-container-lowest p-1 pl-2 pr-1 shadow-ambient-sm transition-all duration-300 ${
+                    className={`group flex h-11 items-center gap-2 rounded-full border border-outline-variant/20 bg-surface-container-lowest/92 p-1 pl-2 pr-1 shadow-ghost transition-all duration-300 ${
                       isProfileOpen
                         ? "border-on-surface-variant bg-surface-container-high"
                         : "hover:border-on-surface-variant hover:bg-surface-canvas"
@@ -531,14 +501,14 @@ export default function SearchHeaderWrapper() {
                 <div className="flex items-center gap-1.5">
                   <Link
                     href="/login"
-                    className="text-sm font-medium text-on-surface-variant hover:text-on-surface px-4 py-2 transition-all duration-300 rounded-full hover:bg-surface-container-high"
+                    className="rounded-full px-4 py-2 text-sm font-semibold text-on-surface transition-all duration-300 hover:bg-surface-container-high"
                   >
                     Log in
                   </Link>
                   <Link href="/signup">
                     <Button
                       size="sm"
-                      className="rounded-full px-6 h-10 shadow-ambient shadow-on-surface/10"
+                      className="h-11 rounded-full bg-[linear-gradient(135deg,var(--color-primary),var(--color-primary-container))] px-7 text-sm font-semibold shadow-[0_16px_34px_-18px_rgba(154,64,39,0.72)] hover:brightness-105"
                     >
                       Join
                     </Button>

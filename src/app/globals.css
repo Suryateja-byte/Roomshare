@@ -757,7 +757,7 @@ input:autofill {
   padding: 3px 8px !important;
   font-size: 9px !important;
   font-weight: 400 !important;
-  letter-spacing: 0.01em !important;
+  letter-spacing: 0 !important;
   color: rgb(74 73 65 / 0.6) !important;
   box-shadow: none !important;
   margin: 0 8px 8px 0 !important;

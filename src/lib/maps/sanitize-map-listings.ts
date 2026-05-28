@@ -1,6 +1,7 @@
 import type {
   GroupContextPresentation,
   GroupSummary,
+  HostIdentityStatus,
   MapListingData,
 } from "@/lib/search-types";
 import { buildPublicAvailability } from "@/lib/search/public-availability";
@@ -39,6 +40,7 @@ type MapListingInput = {
   groupKey?: unknown;
   groupSummary?: GroupSummary | null;
   groupContext?: GroupContextPresentation | null;
+  hostIdentityStatus?: unknown;
 };
 
 function toFiniteNumber(value: unknown, fallback = 0): number {
@@ -71,6 +73,10 @@ function toOptionalTrimmedString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim().length > 0
     ? value.trim()
     : undefined;
+}
+
+function toHostIdentityStatus(value: unknown): HostIdentityStatus {
+  return value === "verified" || value === "unverified" ? value : "unknown";
 }
 
 function hasValidCoordinateRange(lat: number, lng: number): boolean {
@@ -147,6 +153,7 @@ export function sanitizeMapListing(
     groupKey: publicGroupMetadata.groupKey,
     groupSummary: publicGroupMetadata.groupSummary,
     groupContext: publicGroupMetadata.groupContext,
+    hostIdentityStatus: toHostIdentityStatus(listing.hostIdentityStatus),
     location: {
       city: toOptionalTrimmedString(listing.location?.city),
       state: toOptionalTrimmedString(listing.location?.state),

@@ -172,6 +172,50 @@ describe("ListingCard", () => {
       expect(screen.getByText("2 of 3 open")).toBeInTheDocument();
     });
 
+    it("renders host identity verified trust status", () => {
+      render(
+        <ListingCard
+          listing={{ ...mockListing, hostIdentityStatus: "verified" }}
+        />
+      );
+
+      expect(screen.getByText("Identity verified host")).toBeInTheDocument();
+      expect(screen.getByTestId("listing-card")).toHaveAttribute(
+        "aria-label",
+        expect.stringContaining("identity verified host")
+      );
+    });
+
+    it("renders host not identity verified only for explicit unverified status", () => {
+      const { rerender } = render(
+        <ListingCard
+          listing={{ ...mockListing, hostIdentityStatus: "unverified" }}
+        />
+      );
+
+      expect(
+        screen.getByText("Host not identity verified")
+      ).toBeInTheDocument();
+      expect(screen.getByTestId("listing-card")).toHaveAttribute(
+        "aria-label",
+        expect.stringContaining("host not identity verified")
+      );
+
+      rerender(
+        <ListingCard
+          listing={{ ...mockListing, hostIdentityStatus: "unknown" }}
+        />
+      );
+
+      expect(
+        screen.queryByText("Host not identity verified")
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("listing-card")).not.toHaveAttribute(
+        "aria-label",
+        expect.stringContaining("host not identity verified")
+      );
+    });
+
     it("renders grouped-card slot totals across all dates", () => {
       const listing = {
         ...mockListing,
@@ -247,9 +291,87 @@ describe("ListingCard", () => {
 
       render(<ListingCard listing={listing} />);
       expect(screen.getByText("2 of 3 open")).toBeInTheDocument();
+      expect(screen.getByTestId("group-dates-trigger")).toHaveTextContent(
+        "View 3 more available dates"
+      );
+      expect(screen.getByTestId("listing-card")).toHaveAttribute(
+        "aria-label",
+        expect.stringContaining("Also available on 3 similar dates")
+      );
+    });
+
+    it("keeps desktop row trust badge compact and group trigger aligned with details", () => {
+      const listing = {
+        ...mockListing,
+        availableSlots: 2,
+        totalSlots: 3,
+        hostIdentityStatus: "verified" as const,
+        groupContext: {
+          siblingCount: 1,
+          dateCount: 2,
+          completeness: "complete" as const,
+          secondaryLabel: "Also available on 1 similar date",
+          contextKey: "siblings:1|dates:2|completeness:complete",
+        },
+        groupSummary: {
+          groupKey: "group-key-row",
+          siblingIds: ["listing-234"],
+          availableFromDates: ["2026-03-20", "2026-04-18"],
+          combinedOpenSlots: 4,
+          combinedTotalSlots: 5,
+          groupOverflow: false,
+          members: [
+            {
+              listingId: "listing-123",
+              availableFrom: "2026-03-20",
+              availableUntil: null,
+              startDate: "2026-03-20",
+              endDate: undefined,
+              openSlots: 2,
+              totalSlots: 3,
+              isCanonical: true,
+              roomType: "Private Room",
+            },
+            {
+              listingId: "listing-234",
+              availableFrom: "2026-04-18",
+              availableUntil: null,
+              startDate: "2026-04-18",
+              endDate: undefined,
+              openSlots: 2,
+              totalSlots: 2,
+              isCanonical: false,
+              roomType: "Private Room",
+            },
+          ],
+        },
+      };
+
+      render(<ListingCard listing={listing} desktopVariant="row" />);
+
+      expect(screen.getByTestId("listing-card-details")).toHaveClass(
+        "md:pr-28"
+      );
+
+      const badge = screen.getByTestId("host-identity-badge");
+      expect(badge).toHaveClass("self-start", "max-w-full", "min-w-0");
+      expect(badge).toHaveTextContent("Identity verified host");
+      expect(screen.getByTestId("listing-card")).toHaveAttribute(
+        "aria-label",
+        expect.stringContaining("identity verified host")
+      );
       expect(
-        screen.getByText("Also available on 3 similar dates")
-      ).toBeInTheDocument();
+        screen.queryByText("Also available on 1 similar date")
+      ).not.toBeInTheDocument();
+
+      const action = screen.getByTestId("group-dates-action");
+      expect(action.className).toContain("md:pl-[184px]");
+      expect(action).toHaveClass("md:pr-28");
+
+      const link = screen.getByTestId("listing-card-link");
+      const trigger = screen.getByTestId("group-dates-trigger");
+      expect(trigger).toHaveTextContent("Also available Apr 18");
+      expect(link).not.toContainElement(trigger);
     });
 
     it("renders availability badge as Filled when no slots", () => {
@@ -302,7 +424,7 @@ describe("ListingCard", () => {
     it("keeps the card article rounded on mobile", () => {
       render(<ListingCard listing={mockListing} />);
       const article = screen.getByTestId("listing-card");
-      expect(article).toHaveClass("rounded-2xl");
+      expect(article).toHaveClass("rounded-[1.25rem]");
       expect(article).not.toHaveClass("rounded-none");
     });
 
@@ -415,7 +537,11 @@ describe("ListingCard", () => {
 
       const article = screen.getByTestId("listing-card");
       expect(article).toHaveAttribute("data-focus-state", "hovered");
-      expect(article).toHaveClass("ring-2", "ring-primary/50", "shadow-ambient");
+      expect(article).toHaveClass(
+        "ring-2",
+        "ring-primary/50",
+        "shadow-ambient"
+      );
       expect(article).not.toHaveClass("ring-offset-2");
     });
 
@@ -637,9 +763,7 @@ describe("ListingCard", () => {
       render(<ListingCard listing={listing} />);
       // "Available Jun 15" derives from publicAvailability.availableFrom,
       // not from moveInDate=2025-01-01.
-      expect(
-        screen.getByText(/available jun 15/i)
-      ).toBeInTheDocument();
+      expect(screen.getByText(/available jun 15/i)).toBeInTheDocument();
     });
 
     it("aria-label slot count derives from publicAvailability when present", () => {

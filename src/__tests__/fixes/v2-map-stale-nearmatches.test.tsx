@@ -72,6 +72,8 @@ describe("SSR v2 snapshot map hydration contract", () => {
       /usedV2\s*&&\s*v2Response\s*&&\s*features\.searchSnapshotContract\s*\?/
     );
     expect(source).toMatch(/<V2MapDataSetter/);
+    expect(source).toMatch(/import \{ V1PathResetSetter \}/);
+    expect(source).toMatch(/:\s*\(\s*<V1PathResetSetter\s*\/>\s*\)/);
   });
 });
 

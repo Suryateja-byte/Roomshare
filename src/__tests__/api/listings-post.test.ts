@@ -36,6 +36,32 @@ jest.mock("@/lib/geocoding", () => ({
   geocodeAddress: jest.fn(),
 }));
 
+jest.mock("@/lib/geocoding/address-suggestion-token", () => ({
+  verifyAddressSuggestionToken: jest.fn().mockReturnValue({
+    valid: false,
+    reason: "malformed",
+  }),
+}));
+
+const mockValidateAddressForPublish = jest.fn();
+
+jest.mock("@/lib/geocoding/google-places", () => {
+  class GooglePlacesUnavailableError extends Error {
+    constructor(
+      message: string,
+      public readonly code: "MISSING_KEY" | "TIMEOUT" | "UPSTREAM"
+    ) {
+      super(message);
+    }
+  }
+
+  return {
+    GooglePlacesUnavailableError,
+    validateAddressForPublish: (...args: unknown[]) =>
+      mockValidateAddressForPublish(...args),
+  };
+});
+
 jest.mock("@/lib/data", () => ({}));
 
 jest.mock("@/lib/with-rate-limit", () => ({
@@ -115,12 +141,10 @@ jest.mock("@/lib/profile-completion", () => ({
   calculateProfileCompletion: jest.fn().mockReturnValue({
     percentage: 100,
     missing: [],
-    canCreateListing: true,
     canSendMessages: true,
     canBookRooms: true,
   }),
   PROFILE_REQUIREMENTS: {
-    createListing: 60,
     sendMessages: 40,
     bookRooms: 80,
   },
@@ -149,6 +173,7 @@ import { POST } from "@/app/api/listings/route";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { geocodeAddress } from "@/lib/geocoding";
+import { verifyAddressSuggestionToken } from "@/lib/geocoding/address-suggestion-token";
 import { checkSuspension, checkEmailVerified } from "@/app/actions/suspension";
 import { checkListingLanguageCompliance } from "@/lib/listing-language-guard";
 import { withIdempotency } from "@/lib/idempotency";
@@ -156,6 +181,7 @@ import { upsertSearchDocSync } from "@/lib/search/search-doc-sync";
 import { triggerInstantAlerts } from "@/lib/search-alerts";
 import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 import { syncCanonicalListingInventory } from "@/lib/listings/canonical-inventory";
+import { calculateProfileCompletion } from "@/lib/profile-completion";
 
 // ---------------------------------------------------------------------------
 // Shared fixtures
@@ -235,9 +261,21 @@ function mockSuccessfulTransaction() {
 // ---------------------------------------------------------------------------
 
 describe("POST /api/listings — extended edge cases", () => {
+  const originalGooglePlacesApiKey = process.env.GOOGLE_PLACES_API_KEY;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    process.env.GOOGLE_PLACES_API_KEY = "test-google-key";
+    (geocodeAddress as jest.Mock).mockReset();
+    (verifyAddressSuggestionToken as jest.Mock).mockReset();
+    mockValidateAddressForPublish.mockReset();
     (auth as jest.Mock).mockResolvedValue(mockSession);
+    (calculateProfileCompletion as jest.Mock).mockReturnValue({
+      percentage: 100,
+      missing: [],
+      canSendMessages: true,
+      canBookRooms: true,
+    });
     (checkSuspension as jest.Mock).mockResolvedValue({ suspended: false });
     (checkEmailVerified as jest.Mock).mockResolvedValue({ verified: true });
     (prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: "user-123" });
@@ -252,6 +290,58 @@ describe("POST /api/listings — extended edge cases", () => {
       status: "success",
       lat: 37.7749,
       lng: -122.4194,
+    });
+    (verifyAddressSuggestionToken as jest.Mock).mockReturnValue({
+      valid: false,
+      reason: "malformed",
+    });
+    mockValidateAddressForPublish.mockResolvedValue({
+      address: "123 Main St",
+      city: "San Francisco",
+      state: "CA",
+      zip: "94102",
+      lat: 37.7749,
+      lng: -122.4194,
+      precision: "PREMISE",
+    });
+  });
+
+  afterAll(() => {
+    if (originalGooglePlacesApiKey === undefined) {
+      delete process.env.GOOGLE_PLACES_API_KEY;
+    } else {
+      process.env.GOOGLE_PLACES_API_KEY = originalGooglePlacesApiKey;
+    }
+  });
+
+  // =========================================================================
+  // 0. Authorization gates
+  // =========================================================================
+
+  describe("authorization gates", () => {
+    it("allows an email-verified incomplete, identity-unverified user to create a listing", async () => {
+      (calculateProfileCompletion as jest.Mock).mockReturnValue({
+        percentage: 20,
+        missing: [
+          "Write a bio (at least 20 characters)",
+          "Add your country of origin",
+          "Add languages you speak",
+          "Complete ID verification",
+        ],
+        canSendMessages: false,
+        canBookRooms: false,
+      });
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        id: "user-123",
+      });
+      mockSuccessfulTransaction();
+
+      const response = await POST(makeRequest(validBody));
+      const data = await response.json();
+
+      expect(response.status).toBe(201);
+      expect(data).toEqual({ id: "listing-new" });
+      expect(calculateProfileCompletion).not.toHaveBeenCalled();
     });
   });
 
@@ -651,7 +741,255 @@ describe("POST /api/listings — extended edge cases", () => {
   });
 
   // =========================================================================
-  // 7. Side effects verification
+  // 7. Address suggestion token handling
+  // =========================================================================
+
+  describe("address suggestion token handling", () => {
+    it("uses verified premise suggestion coordinates without re-geocoding", async () => {
+      (verifyAddressSuggestionToken as jest.Mock).mockReturnValueOnce({
+        valid: true,
+        coords: { lat: 37.775, lng: -122.419 },
+        payload: { precision: "PREMISE" },
+      });
+      mockSuccessfulTransaction();
+
+      const response = await POST(
+        makeRequest({
+          ...validBody,
+          addressSuggestionToken: "signed-token",
+        })
+      );
+
+      expect(response.status).toBe(201);
+      expect(verifyAddressSuggestionToken).toHaveBeenCalledWith(
+        "signed-token",
+        expect.objectContaining({
+          userId: "user-123",
+          address: "123 Main St",
+          city: "San Francisco",
+          state: "CA",
+          zip: "94102",
+        })
+      );
+      expect(geocodeAddress).not.toHaveBeenCalled();
+    });
+
+    it("uses verified premise suggestion coordinates when the submitted address includes a trailing unit", async () => {
+      (verifyAddressSuggestionToken as jest.Mock).mockReturnValueOnce({
+        valid: true,
+        coords: { lat: 32.8765, lng: -96.9432 },
+        payload: { precision: "PREMISE" },
+      });
+      mockSuccessfulTransaction();
+
+      const response = await POST(
+        makeRequest({
+          ...validBody,
+          address: "123 Main St, Apt 4",
+          addressSuggestionToken: "signed-token",
+        })
+      );
+
+      expect(response.status).toBe(201);
+      expect(verifyAddressSuggestionToken).toHaveBeenCalledWith(
+        "signed-token",
+        expect.objectContaining({
+          userId: "user-123",
+          address: "123 Main St, Apt 4",
+          city: "San Francisco",
+          state: "CA",
+          zip: "94102",
+        })
+      );
+      expect(geocodeAddress).not.toHaveBeenCalled();
+    });
+
+    it("validates with Google when the suggestion token is invalid", async () => {
+      (verifyAddressSuggestionToken as jest.Mock).mockReturnValueOnce({
+        valid: false,
+        reason: "field_mismatch",
+      });
+      mockValidateAddressForPublish.mockResolvedValueOnce({
+        address: "123 Main St",
+        city: "San Francisco",
+        state: "CA",
+        zip: "94102",
+        lat: 37.7749,
+        lng: -122.4194,
+        precision: "PREMISE",
+      });
+      mockSuccessfulTransaction();
+
+      const response = await POST(
+        makeRequest({
+          ...validBody,
+          addressSuggestionToken: "stale-token",
+        })
+      );
+
+      expect(response.status).toBe(201);
+      expect(mockValidateAddressForPublish).toHaveBeenCalledWith({
+        address: "123 Main St",
+        city: "San Francisco",
+        state: "CA",
+        zip: "94102",
+      });
+      expect(geocodeAddress).not.toHaveBeenCalled();
+    });
+
+    it("validates manual publish addresses with Google when Places is configured", async () => {
+      process.env.GOOGLE_PLACES_API_KEY = "test-google-key";
+      (verifyAddressSuggestionToken as jest.Mock).mockReturnValueOnce({
+        valid: false,
+        reason: "malformed",
+      });
+      mockValidateAddressForPublish.mockResolvedValueOnce({
+        address: "1121 Hidden Ridge",
+        city: "Irving",
+        state: "TX",
+        zip: "75038",
+        lat: 32.8765,
+        lng: -96.9432,
+        precision: "PREMISE",
+      });
+      mockSuccessfulTransaction();
+
+      const response = await POST(
+        makeRequest({
+          ...validBody,
+          address: "1121 Hidden Ridge",
+          city: "Irving",
+          state: "TX",
+          zip: "75038",
+        })
+      );
+
+      expect(response.status).toBe(201);
+      expect(mockValidateAddressForPublish).toHaveBeenCalledWith({
+        address: "1121 Hidden Ridge",
+        city: "Irving",
+        state: "TX",
+        zip: "75038",
+      });
+      expect(geocodeAddress).not.toHaveBeenCalled();
+    });
+
+    it("validates manual typed-address fallback with Google when submitting without a token", async () => {
+      (verifyAddressSuggestionToken as jest.Mock).mockReturnValueOnce({
+        valid: false,
+        reason: "malformed",
+      });
+      mockSuccessfulTransaction();
+
+      const response = await POST(
+        makeRequest({
+          ...validBody,
+          address: "1121 Hidden Ridge",
+          city: "Irving",
+          state: "TX",
+          zip: "75038",
+        })
+      );
+
+      expect(response.status).toBe(201);
+      expect(verifyAddressSuggestionToken).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          userId: "user-123",
+          address: "1121 Hidden Ridge",
+          city: "Irving",
+          state: "TX",
+          zip: "75038",
+        })
+      );
+      expect(mockValidateAddressForPublish).toHaveBeenCalledWith({
+        address: "1121 Hidden Ridge",
+        city: "Irving",
+        state: "TX",
+        zip: "75038",
+      });
+      expect(geocodeAddress).not.toHaveBeenCalled();
+    });
+
+    it("blocks publish when trusted address validation is disabled", async () => {
+      delete process.env.GOOGLE_PLACES_API_KEY;
+      (verifyAddressSuggestionToken as jest.Mock).mockReturnValueOnce({
+        valid: false,
+        reason: "field_mismatch",
+      });
+
+      const response = await POST(
+        makeRequest({
+          ...validBody,
+          address: "123 Main St, Apt 4",
+          addressSuggestionToken: "stale-token",
+        })
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(503);
+      expect(data.error).toBe(
+        "Address verification temporarily unavailable. Please try again."
+      );
+      expect(geocodeAddress).not.toHaveBeenCalled();
+    });
+
+    it("returns a field-level address error when Google validation rejects the address", async () => {
+      (verifyAddressSuggestionToken as jest.Mock).mockReturnValueOnce({
+        valid: false,
+        reason: "signature_mismatch",
+      });
+      mockValidateAddressForPublish.mockResolvedValueOnce(null);
+
+      const response = await POST(
+        makeRequest({
+          ...validBody,
+          addressSuggestionToken: "tampered-token",
+        })
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data).toMatchObject({
+        field: "address",
+        fields: {
+          address:
+            "Could not verify this exact address. Please choose a suggested address or check the details and try again.",
+        },
+      });
+      expect(geocodeAddress).not.toHaveBeenCalled();
+    });
+
+    it("does not retry free geocoding when validation rejects an address with a unit", async () => {
+      (verifyAddressSuggestionToken as jest.Mock).mockReturnValueOnce({
+        valid: false,
+        reason: "signature_mismatch",
+      });
+      mockValidateAddressForPublish.mockResolvedValueOnce(null);
+
+      const response = await POST(
+        makeRequest({
+          ...validBody,
+          address: "123 Main St, Apt 4",
+          addressSuggestionToken: "tampered-token",
+        })
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(geocodeAddress).not.toHaveBeenCalled();
+      expect(data).toMatchObject({
+        field: "address",
+        fields: {
+          address:
+            "Could not verify this exact address. Please choose a suggested address or check the details and try again.",
+        },
+      });
+    });
+  });
+
+  // =========================================================================
+  // 8. Side effects verification
   // =========================================================================
 
   describe("side effects", () => {
@@ -727,7 +1065,7 @@ describe("POST /api/listings — extended edge cases", () => {
   });
 
   // =========================================================================
-  // 8. Concurrent listing cap (10-listing limit)
+  // 9. Concurrent listing cap (10-listing limit)
   // =========================================================================
 
   describe("concurrent listing cap", () => {

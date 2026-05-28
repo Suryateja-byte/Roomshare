@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { checkSuspension } from "@/app/actions/suspension";
+import { checkEmailVerified, checkSuspension } from "@/app/actions/suspension";
 import { createClient } from "@supabase/supabase-js";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { captureApiError } from "@/lib/api-error-handler";
@@ -50,6 +50,97 @@ const deleteUploadSchema = z.object({
   path: z.string().trim().min(1).max(500),
 });
 
+const STORAGE_RETRY_AFTER_SECONDS = "30";
+const STORAGE_CONNECTION_ERROR =
+  "Unable to connect to storage service. Please try again.";
+const STORAGE_UPLOAD_ERROR = "Unable to upload image. Please try again.";
+
+const STORAGE_NETWORK_ERROR_CODES = new Set([
+  "EAI_AGAIN",
+  "ECONNABORTED",
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "ENOTFOUND",
+  "ETIMEDOUT",
+  "UND_ERR_CONNECT_TIMEOUT",
+  "UND_ERR_HEADERS_TIMEOUT",
+  "UND_ERR_SOCKET",
+]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function getStringField(value: unknown, field: string): string | undefined {
+  if (!isRecord(value)) return undefined;
+  const fieldValue = value[field];
+  return typeof fieldValue === "string" ? fieldValue : undefined;
+}
+
+function getErrorName(error: unknown): string | undefined {
+  return error instanceof Error ? error.name : getStringField(error, "name");
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return getStringField(error, "message") || String(error);
+}
+
+function hasStorageNetworkCause(error: unknown, depth = 0): boolean {
+  if (depth > 4 || !isRecord(error)) return false;
+
+  const code = getStringField(error, "code");
+  if (code && STORAGE_NETWORK_ERROR_CODES.has(code)) return true;
+
+  const name = getErrorName(error);
+  const message = getErrorMessage(error).toLowerCase();
+  if (name === "TypeError" && message.includes("fetch")) return true;
+  if (message.includes("fetch failed")) return true;
+
+  return (
+    hasStorageNetworkCause(error.cause, depth + 1) ||
+    hasStorageNetworkCause(error.originalError, depth + 1)
+  );
+}
+
+function isSupabaseStorageError(error: unknown): boolean {
+  const name = getErrorName(error);
+  return (
+    (isRecord(error) &&
+      (error.__isStorageError === true || error.namespace === "storage")) ||
+    name === "StorageError" ||
+    name === "StorageApiError" ||
+    name === "StorageUnknownError"
+  );
+}
+
+function classifyUploadStorageError(error: unknown): "network" | "api" | null {
+  const name = getErrorName(error);
+
+  if (name === "StorageUnknownError" || hasStorageNetworkCause(error)) {
+    return "network";
+  }
+
+  if (isSupabaseStorageError(error)) {
+    return "api";
+  }
+
+  return null;
+}
+
+function logUploadStorageFailure(error: unknown, responseStatus: number): void {
+  logger.sync.warn("Supabase upload failed", {
+    route: "/api/upload",
+    responseStatus,
+    errorName: getErrorName(error),
+    error: getErrorMessage(error),
+    storageStatus: isRecord(error) ? error.status : undefined,
+    storageStatusCode: isRecord(error) ? error.statusCode : undefined,
+  });
+}
+
 export async function POST(request: NextRequest) {
   const csrfResponse = validateCsrf(request);
   if (csrfResponse) return csrfResponse;
@@ -81,6 +172,25 @@ export async function POST(request: NextRequest) {
     });
     if (userUploadRateLimit) return userUploadRateLimit;
 
+    // Get form data
+    const formData = await request.formData();
+    const file = formData.get("file") as File;
+    const type = formData.get("type") as string; // 'profile' or 'listing'
+
+    if (type === "listing") {
+      const emailCheck = await checkEmailVerified(session.user.id);
+      if (!emailCheck.verified) {
+        return NextResponse.json(
+          { error: emailCheck.error || "Please verify your email" },
+          { status: 403 }
+        );
+      }
+    }
+
+    if (!file) {
+      return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    }
+
     // Check Supabase configuration
     if (!supabaseUrl || !supabaseServiceKey) {
       logger.sync.error("Missing Supabase config", {
@@ -100,15 +210,6 @@ export async function POST(request: NextRequest) {
         autoRefreshToken: false,
       },
     });
-
-    // Get form data
-    const formData = await request.formData();
-    const file = formData.get("file") as File;
-    const type = formData.get("type") as string; // 'profile' or 'listing'
-
-    if (!file) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 });
-    }
 
     // Validate file size first (max 5MB) - check before reading buffer
     const maxSize = 5 * 1024 * 1024; // 5MB
@@ -245,7 +346,10 @@ export async function POST(request: NextRequest) {
       if (isCircuitOpenError(error)) {
         return NextResponse.json(
           { error: "Storage service temporarily unavailable" },
-          { status: 503, headers: { "Retry-After": "30" } }
+          {
+            status: 503,
+            headers: { "Retry-After": STORAGE_RETRY_AFTER_SECONDS },
+          }
         );
       }
       if (error instanceof Error && error.message === "Upload timeout") {
@@ -254,6 +358,27 @@ export async function POST(request: NextRequest) {
           { status: 504 }
         );
       }
+
+      const storageErrorKind = classifyUploadStorageError(error);
+      if (storageErrorKind === "network") {
+        logUploadStorageFailure(error, 503);
+        return NextResponse.json(
+          { error: STORAGE_CONNECTION_ERROR },
+          {
+            status: 503,
+            headers: { "Retry-After": STORAGE_RETRY_AFTER_SECONDS },
+          }
+        );
+      }
+
+      if (storageErrorKind === "api") {
+        logUploadStorageFailure(error, 502);
+        return NextResponse.json(
+          { error: STORAGE_UPLOAD_ERROR },
+          { status: 502 }
+        );
+      }
+
       throw error;
     }
   } catch (error) {
@@ -261,8 +386,11 @@ export async function POST(request: NextRequest) {
     if (error instanceof TypeError && error.message.includes("fetch")) {
       captureApiError(error, { route: "/api/upload", method: "POST" });
       return NextResponse.json(
-        { error: "Unable to connect to storage service" },
-        { status: 503 }
+        { error: STORAGE_CONNECTION_ERROR },
+        {
+          status: 503,
+          headers: { "Retry-After": STORAGE_RETRY_AFTER_SECONDS },
+        }
       );
     }
 

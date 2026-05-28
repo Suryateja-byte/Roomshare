@@ -29,6 +29,7 @@ function makeMap(contextKey: string): SearchV2Map {
               completeness: "complete",
               contextKey,
             },
+            hostIdentityStatus: "unverified",
           },
         },
       ],
@@ -50,6 +51,16 @@ describe("searchV2MapToListings", () => {
 
     expect(listings[0].groupContext?.contextKey).toBe("pg1_public-key");
     expect(listings[0].location).toEqual({ lat: 30.27, lng: -97.74 });
+    expect(listings[0].hostIdentityStatus).toBe("unverified");
+  });
+
+  it("defaults missing cached host identity status to unknown", () => {
+    const map = makeMap("pg1_public-key");
+    delete map.geojson.features[0].properties.hostIdentityStatus;
+
+    const listings = searchV2MapToListings(map);
+
+    expect(listings[0].hostIdentityStatus).toBe("unknown");
   });
 
   it("handles partial map features without exposing raw metadata", () => {
@@ -109,6 +120,7 @@ describe("searchV2MapToListings", () => {
       groupSummary: null,
       groupContext: null,
       tier: "primary",
+      hostIdentityStatus: "unknown",
       publicAvailability: {
         availabilitySource: "HOST_MANAGED",
         openSlots: 0,

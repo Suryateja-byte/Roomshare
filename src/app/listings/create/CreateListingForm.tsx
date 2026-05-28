@@ -35,6 +35,9 @@ import * as Sentry from "@sentry/nextjs";
 import { createListingClientSchema } from "@/lib/schemas";
 import { checkListingLanguageCompliance } from "@/lib/listing-language-guard";
 import ImageUploader from "@/components/listings/ImageUploader";
+import AddressAutocompleteInput, {
+  type AddressAutocompleteSelection,
+} from "@/components/listings/AddressAutocompleteInput";
 import {
   useFormPersistence,
   formatTimeSince,
@@ -167,6 +170,9 @@ export default function CreateListingForm({
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
   const [zip, setZip] = useState("");
+  const [addressSuggestionToken, setAddressSuggestionToken] = useState<
+    string | undefined
+  >(undefined);
   const [amenitiesValue, setAmenitiesValue] = useState("");
   const [houseRulesValue, setHouseRulesValue] = useState("");
 
@@ -234,6 +240,7 @@ export default function CreateListingForm({
       setCity(persistedData.city || "");
       setState(persistedData.state || "");
       setZip(persistedData.zip || "");
+      setAddressSuggestionToken(undefined);
       let restoredMoveInDate = persistedData.moveInDate || "";
       if (restoredMoveInDate) {
         const now = new Date();
@@ -309,6 +316,7 @@ export default function CreateListingForm({
 
   // Save when controlled states change (M-U1: fix operator precedence, M-U2: fix deps)
   useEffect(() => {
+    if (submitSucceededRef.current) return;
     if (!isHydrated || (!draftRestored && hasDraft)) return;
     saveData(collectFormData());
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -414,9 +422,9 @@ export default function CreateListingForm({
 
       if (abortController.signal.aborted) return;
 
+      submitSucceededRef.current = true;
       cancelSave();
       clearPersistedData();
-      submitSucceededRef.current = true;
       navGuard.disable();
       idempotencyKeyRef.current = crypto.randomUUID();
       setCollisionBody(null);
@@ -453,6 +461,28 @@ export default function CreateListingForm({
     setSelectedLanguages((prev) =>
       prev.includes(lang) ? prev.filter((l) => l !== lang) : [...prev, lang]
     );
+  };
+
+  const clearAddressSuggestionToken = () => {
+    setAddressSuggestionToken(undefined);
+  };
+
+  const handleAddressSuggestionSelect = (
+    suggestion: AddressAutocompleteSelection
+  ) => {
+    setAddress(suggestion.address);
+    setCity(suggestion.city);
+    setState(suggestion.state);
+    setZip(suggestion.zip);
+    setAddressSuggestionToken(suggestion.addressSuggestionToken);
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      delete next.address;
+      delete next.city;
+      delete next.state;
+      delete next.zip;
+      return next;
+    });
   };
 
   // Show a non-field error in the banner and focus it for screen readers
@@ -510,6 +540,7 @@ export default function CreateListingForm({
       city,
       state,
       zip,
+      addressSuggestionToken,
       totalSlots,
       amenities: amenitiesValue || undefined,
       houseRules: houseRulesValue || undefined,
@@ -627,9 +658,9 @@ export default function CreateListingForm({
 
       if (abortController.signal.aborted) return;
 
+      submitSucceededRef.current = true;
       cancelSave();
       clearPersistedData();
-      submitSucceededRef.current = true;
       navGuard.disable();
       idempotencyKeyRef.current = crypto.randomUUID();
       toast.success("Listing published successfully!", {
@@ -861,7 +892,11 @@ export default function CreateListingForm({
         ref={formRef}
         onSubmit={handleSubmit}
         noValidate
-        onChange={() => saveData(collectFormData())}
+        onChange={() => {
+          if (!submitSucceededRef.current) {
+            saveData(collectFormData());
+          }
+        }}
         className="space-y-12"
       >
         {/* Section 1: The Basics */}
@@ -1036,20 +1071,21 @@ export default function CreateListingForm({
 
           <div>
             <Label htmlFor="address">Street Address</Label>
-            <Input
+            <AddressAutocompleteInput
               id="address"
               name="address"
-              required
-              maxLength={200}
               value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder="123 Boulevard St"
+              city={city}
+              state={state}
+              zip={zip}
+              onChange={setAddress}
+              onManualEdit={clearAddressSuggestionToken}
+              onSuggestionSelect={handleAddressSuggestionSelect}
               disabled={loading}
-              aria-invalid={!!fieldErrors.address}
-              aria-describedby={
+              ariaInvalid={!!fieldErrors.address}
+              ariaDescribedBy={
                 fieldErrors.address ? "address-error" : undefined
               }
-              className={fieldErrors.address ? "border-red-500" : ""}
             />
             <FieldError field="address" fieldErrors={fieldErrors} />
           </div>
@@ -1062,7 +1098,10 @@ export default function CreateListingForm({
                 required
                 maxLength={100}
                 value={city}
-                onChange={(e) => setCity(e.target.value)}
+                onChange={(e) => {
+                  setCity(e.target.value);
+                  clearAddressSuggestionToken();
+                }}
                 placeholder="San Francisco"
                 disabled={loading}
                 aria-invalid={!!fieldErrors.city}
@@ -1079,7 +1118,10 @@ export default function CreateListingForm({
                 required
                 maxLength={50}
                 value={state}
-                onChange={(e) => setState(e.target.value)}
+                onChange={(e) => {
+                  setState(e.target.value);
+                  clearAddressSuggestionToken();
+                }}
                 placeholder="CA"
                 disabled={loading}
                 aria-invalid={!!fieldErrors.state}
@@ -1096,7 +1138,10 @@ export default function CreateListingForm({
                 required
                 maxLength={20}
                 value={zip}
-                onChange={(e) => setZip(e.target.value)}
+                onChange={(e) => {
+                  setZip(e.target.value);
+                  clearAddressSuggestionToken();
+                }}
                 placeholder="94103"
                 disabled={loading}
                 aria-invalid={!!fieldErrors.zip}
@@ -1170,7 +1215,10 @@ export default function CreateListingForm({
 
           <div>
             <Label htmlFor="moveInDate">
-              Move-In Date <span className="text-red-500" aria-hidden="true">*</span>
+              Move-In Date{" "}
+              <span className="text-red-500" aria-hidden="true">
+                *
+              </span>
               <span className="sr-only"> required</span>
             </Label>
             <DatePicker

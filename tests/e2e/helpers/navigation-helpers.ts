@@ -156,9 +156,12 @@ const knownSearchLocations: Record<
   },
 };
 
+function getKnownSearchLocation(location: string) {
+  return knownSearchLocations[location.trim().toLowerCase()] ?? null;
+}
+
 function buildKnownLocationSearchUrl(location: string): string | null {
-  const normalized = location.trim().toLowerCase();
-  const knownLocation = knownSearchLocations[normalized];
+  const knownLocation = getKnownSearchLocation(location);
   if (!knownLocation) return null;
 
   const params = new URLSearchParams({
@@ -172,6 +175,16 @@ function buildKnownLocationSearchUrl(location: string): string | null {
   });
 
   return `/search?${params.toString()}`;
+}
+
+function escapeRegExp(input: string): string {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function locationSuggestionPattern(location: string): RegExp {
+  const knownLocation = getKnownSearchLocation(location);
+  const expectedText = knownLocation?.label ?? location.trim();
+  return new RegExp(escapeRegExp(expectedText), "i");
 }
 
 /**
@@ -380,6 +393,8 @@ export function navigationHelpers(page: Page) {
     async search(location: string) {
       const initialUrl = page.url();
       const initialQueryHash = await getSearchShellQueryHash(page);
+      const fallbackSearchUrl = buildKnownLocationSearchUrl(location);
+      const expectedSuggestion = locationSuggestionPattern(location);
       const searchInput = page
         .locator(
           [
@@ -398,28 +413,29 @@ export function navigationHelpers(page: Page) {
 
       await searchInput.click();
       await searchInput.fill(location);
-      const suggestionButton = page
-        .locator(
-          '[role="listbox"] [role="option"] button, [role="listbox"] button'
-        )
+      const suggestionOption = page
+        .locator('[role="listbox"] [role="option"]')
+        .filter({ hasText: expectedSuggestion })
         .filter({ visible: true })
         .first();
 
-      const selectedSuggestion = await suggestionButton
+      const selectedSuggestion = await suggestionOption
         .waitFor({ state: "visible", timeout: 12_000 })
         .then(() => true)
         .catch(() => false);
 
       if (selectedSuggestion) {
-        await suggestionButton.click();
-      } else {
-        const fallbackSearchUrl = buildKnownLocationSearchUrl(location);
-        if (fallbackSearchUrl) {
-          await page.goto(fallbackSearchUrl);
-          await page.waitForURL(/\/search/, { timeout: timeouts.navigation });
-          await waitForPageReady(page, { selector: "main" });
-          return;
+        const suggestionButton = suggestionOption.locator("button").first();
+        if (await suggestionButton.isVisible().catch(() => false)) {
+          await suggestionButton.click();
+        } else {
+          await suggestionOption.click();
         }
+      } else if (fallbackSearchUrl) {
+        await page.goto(fallbackSearchUrl);
+        await page.waitForURL(/\/search/, { timeout: timeouts.navigation });
+        await waitForPageReady(page, { selector: "main" });
+        return;
       }
 
       const form = searchInput.locator("xpath=ancestor::form[1]");
@@ -431,7 +447,7 @@ export function navigationHelpers(page: Page) {
 
       await searchInput.press("Enter").catch(() => {});
 
-      const navigated = await waitForSearchTransition(
+      let navigated = await waitForSearchTransition(
         page,
         initialUrl,
         initialQueryHash,
@@ -439,13 +455,25 @@ export function navigationHelpers(page: Page) {
       );
 
       if (!navigated) {
-        await searchButton.click();
-        await waitForSearchTransition(
-          page,
-          initialUrl,
-          initialQueryHash,
-          timeouts.navigation
-        );
+        const clickedSearch = await searchButton
+          .click()
+          .then(() => true)
+          .catch(() => false);
+        if (clickedSearch) {
+          navigated = await waitForSearchTransition(
+            page,
+            initialUrl,
+            initialQueryHash,
+            timeouts.navigation
+          );
+        }
+      }
+
+      if (!navigated && fallbackSearchUrl) {
+        await page.goto(fallbackSearchUrl);
+        await page.waitForURL(/\/search/, { timeout: timeouts.navigation });
+      } else if (!navigated) {
+        throw new Error(`Search did not navigate for location: ${location}`);
       }
 
       await waitForPageReady(page, { selector: "main" });

@@ -75,6 +75,7 @@ describe("public listing payload sanitizer", () => {
     expect(serialized.location.zip).toBeUndefined();
     expect(serialized.statusReason).toBeUndefined();
     expect(serialized.description).toBe("");
+    expect(serialized.hostIdentityStatus).toBe("unknown");
     expect(serialized.location).toEqual({
       city: "Austin",
       state: "TX",
@@ -105,6 +106,19 @@ describe("public listing payload sanitizer", () => {
     expect(toPublicGroupKey(publicKey)).toBe(publicKey);
   });
 
+  it("preserves only public host identity trust status", () => {
+    expect(
+      toPublicSearchListing(
+        makeListing({ hostIdentityStatus: "verified" })
+      ).hostIdentityStatus
+    ).toBe("verified");
+    expect(
+      toPublicSearchListing(
+        makeListing({ hostIdentityStatus: "unverified" })
+      ).hostIdentityStatus
+    ).toBe("unverified");
+  });
+
   it("sanitizes map listing group metadata without exposing status reasons", () => {
     const mapListing: MapListingData = {
       id: "map-private-1",
@@ -125,6 +139,7 @@ describe("public listing payload sanitizer", () => {
         completeness: "complete",
         contextKey: "unit-secret-map:7",
       },
+      hostIdentityStatus: "unverified",
       statusReason: "PRIVATE_MAP_REASON",
     };
 
@@ -138,6 +153,7 @@ describe("public listing payload sanitizer", () => {
       new RegExp(`^${PUBLIC_GROUP_KEY_PREFIX}`)
     );
     expect(publicMapListing.groupKey).not.toContain("unit-secret-map");
+    expect(publicMapListing.hostIdentityStatus).toBe("unverified");
     expect(publicMapListing.statusReason).toBeNull();
   });
 });

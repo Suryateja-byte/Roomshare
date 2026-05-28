@@ -1,17 +1,17 @@
 /**
- * E2E Test Suite: Breathing Pending State (PR1)
+ * E2E Test Suite: Quiet Pending State (PR1)
  *
  * Tests the non-blocking pending state during search transitions:
- * - Old results stay visible with translucent overlay
+ * - Old results stay visible without visual transition chrome
  * - No duplicate skeleton grid rendered during transitions
  * - aria-busy attribute during transition
- * - Compact pending status for slow transitions
+ * - Screen-reader-only pending status for slow transitions
  *
  * Implementation note:
  * - SearchViewToggle renders `data-testid="search-results-container"` (width/scroll wrapper)
  * - SearchResultsLoadingWrapper renders `data-testid="search-results-pending-region"` INSIDE the container
- * - Pending state uses a compact status pill + subtle scrim
- * - pointer-events-none is applied to the stale results body, not the outer container
+ * - Pending state announces progress without a visible pill or scrim
+ * - pointer-events-none is applied only for non-map-pan stale result transitions
  */
 
 import {
@@ -31,7 +31,7 @@ import {
   waitForUrlParam,
 } from "../helpers/filter-helpers";
 
-test.describe("Breathing Pending State (PR1)", () => {
+test.describe("Quiet Pending State (PR1)", () => {
   // Filter tests run as anonymous user
   test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -40,7 +40,7 @@ test.describe("Breathing Pending State (PR1)", () => {
   });
 
   test.describe("Pending State Styling", () => {
-    test(`${tags.anon} ${tags.smoke} - Results container shows breathing fade during filter transition`, async ({
+    test(`${tags.anon} ${tags.smoke} - Results container announces filter transition quietly`, async ({
       page,
       nav,
     }) => {
@@ -83,14 +83,25 @@ test.describe("Breathing Pending State (PR1)", () => {
         return;
       }
 
-      // Toggle Parking amenity (scoped to amenities group for reliable mobile scrolling)
+      // Toggle Wifi amenity (seeded and used by the stable filter race specs)
       try {
-        await toggleAmenity(page, "Parking");
+        await toggleAmenity(page, "Wifi");
       } catch {
         await page.unroute("**/search**");
-        test.skip(true, "Parking amenity button not available");
+        test.skip(true, "Wifi amenity button not available");
         return;
       }
+
+      const wifiToggle = page
+        .locator('[aria-label="Select amenities"]')
+        .getByRole("button", { name: /^Wifi/i });
+      const currentState = await wifiToggle.getAttribute("aria-pressed");
+      if (currentState !== "true") {
+        await wifiToggle.click();
+      }
+      await expect(wifiToggle).toHaveAttribute("aria-pressed", "true", {
+        timeout: 3_000,
+      });
 
       // Wait for the search-count API response to settle so the Apply button's
       // disabled/enabled state is stable before we check visibility.
@@ -121,8 +132,14 @@ test.describe("Breathing Pending State (PR1)", () => {
         // Pending state was observed -- good
         expect(wasBusy).toBe(true);
         await expect(
+          page.getByTestId("search-results-pending-overlay")
+        ).toHaveCount(0);
+        await expect(
           page.getByTestId("search-results-pending-status")
         ).toContainText(/updating results|still loading/i);
+        await expect(
+          page.getByTestId("search-results-pending-status")
+        ).not.toBeVisible();
         await expect(
           page.locator('[data-testid="listing-card-skeleton-grid"]')
         ).toHaveCount(0);
@@ -134,7 +151,7 @@ test.describe("Breathing Pending State (PR1)", () => {
       }
 
       // Wait for transition to complete (URL should include amenities param)
-      await waitForUrlParam(page, "amenities", undefined, 30_000);
+      await waitForUrlParam(page, "amenities", "Wifi", 30_000);
 
       // After transition, the wrapper should NOT be busy
       if ((await ariaBusyWrapper.count()) > 0) {
@@ -178,7 +195,7 @@ test.describe("Breathing Pending State (PR1)", () => {
       await expect(container).toBeVisible();
     });
 
-    test(`${tags.anon} - Container has pointer-events-none during pending state`, async ({
+    test(`${tags.anon} - Container allows pointer events when idle`, async ({
       page,
       nav,
     }) => {
@@ -309,7 +326,7 @@ test.describe("Breathing Pending State (PR1)", () => {
           await expect(wrapper).toBeAttached();
         }
         console.log(
-          "Info: Container transition check - transitions handled by loading overlay"
+          "Info: Container transition check - transitions handled by the search loading wrapper"
         );
       }
     });

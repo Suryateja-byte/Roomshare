@@ -6,6 +6,7 @@ import type {
   MapListingData,
   PaginatedResultHybrid,
 } from "@/lib/data";
+import type { HostIdentityStatus } from "@/lib/search-types";
 import { getReadEmbeddingVersion } from "@/lib/embeddings/version";
 import { currentProjectionEpoch } from "@/lib/projections/epoch";
 import { prisma } from "@/lib/prisma";
@@ -44,15 +45,20 @@ import {
 import { toPublicSearchListings } from "./public-listing-payload";
 import {
   buildPublicAvailability,
+  STALE_THRESHOLD_DAYS,
   type PublicAvailability,
 } from "./public-availability";
-import { searchV2MapToListings } from "./v2-map-data";
 import {
   isPhase04ForceClustersOnlyActive,
   isPhase04ForceListOnlyActive,
 } from "@/lib/flags/phase04";
 import { recordSearchSnapshotHoleRatio } from "./search-telemetry";
 import type { SearchV2Params, SearchV2Result } from "./search-v2-service";
+import {
+  buildSearchDocListWhereConditions,
+  SEARCH_DOC_ALLOWED_SQL_LITERALS,
+} from "@/lib/search/search-doc-queries";
+import { joinWhereClauseWithSecurityInvariant } from "@/lib/sql-safety";
 
 const DEFAULT_UNIT_IDENTITY_EPOCH_FLOOR = 1;
 
@@ -75,6 +81,21 @@ type RawSqlClient = {
 
 const rawSql = prisma as unknown as RawSqlClient;
 
+const CURRENT_PUBLIC_LISTING_SQL_CONDITIONS = [
+  "l.status = 'ACTIVE'",
+  `u."isSuspended" = FALSE`,
+  `COALESCE(l."statusReason", '') NOT IN ('MIGRATION_REVIEW', 'ADMIN_PAUSED', 'SUPPRESSED')`,
+  `l."totalSlots" >= 1`,
+  `l."openSlots" IS NOT NULL`,
+  `l."openSlots" > 0`,
+  `l."openSlots" <= l."totalSlots"`,
+  `l."moveInDate" IS NOT NULL`,
+  `(l."availableUntil" IS NULL OR l."availableUntil" >= CURRENT_DATE)`,
+  `(l."availableUntil" IS NULL OR l."availableUntil" >= l."moveInDate"::DATE)`,
+  `l."minStayMonths" >= 1`,
+  `(l."lastConfirmedAt" IS NULL OR l."lastConfirmedAt" > NOW() - INTERVAL '${STALE_THRESHOLD_DAYS} days')`,
+];
+
 interface ProjectionUnitRow {
   unitKey: string;
   unitId: string;
@@ -91,6 +112,7 @@ interface ProjectionUnitRow {
   displayTitle: string | null;
   displaySubtitle: string | null;
   heroImageUrl: string | null;
+  hostIdentityStatus: HostIdentityStatus;
   projectionEpoch: bigint;
   sourceVersion: bigint;
 }
@@ -111,6 +133,7 @@ interface RawProjectionUnitRow {
   display_title: string | null;
   display_subtitle: string | null;
   hero_image_url: string | null;
+  host_identity_status?: string | null;
   projection_epoch: bigint | number | string;
   source_version: bigint | number | string;
 }
@@ -149,6 +172,10 @@ function parseDate(value: Date | string | null): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function normalizeHostIdentityStatus(value: unknown): HostIdentityStatus {
+  return value === "verified" || value === "unverified" ? value : "unknown";
+}
+
 function normalizeProjectionRow(row: RawProjectionUnitRow): ProjectionUnitRow {
   const roomCategories = toStringArray(row.room_categories);
   const inventoryIds = toStringArray(row.inventory_ids);
@@ -174,6 +201,7 @@ function normalizeProjectionRow(row: RawProjectionUnitRow): ProjectionUnitRow {
     displayTitle: row.display_title,
     displaySubtitle: row.display_subtitle,
     heroImageUrl: row.hero_image_url,
+    hostIdentityStatus: normalizeHostIdentityStatus(row.host_identity_status),
     projectionEpoch: BigInt(row.projection_epoch ?? 1),
     sourceVersion: BigInt(row.source_version ?? 1),
   };
@@ -321,6 +349,7 @@ function projectionRowToListing(row: ProjectionUnitRow): ListingData {
     openSlots: publicAvailability.openSlots,
     availableUntil: null,
     minStayMonths: 1,
+    hostIdentityStatus: row.hostIdentityStatus,
     groupKey: row.unitKey,
     groupSummary: buildGroupSummary(row),
     groupContext: {
@@ -361,6 +390,7 @@ function projectionRowsToMapListings(
       openSlots: listing.openSlots,
       availableUntil: listing.availableUntil,
       minStayMonths: listing.minStayMonths,
+      hostIdentityStatus: listing.hostIdentityStatus,
       groupKey: listing.groupKey,
       groupSummary: listing.groupSummary,
       groupContext: listing.groupContext,
@@ -408,6 +438,7 @@ async function queryProjectionUnitRows(
   const where = [
     "isp.publish_status IN ('PUBLISHED', 'STALE_PUBLISHED')",
     "upp.matching_inventory_count > 0",
+    ...CURRENT_PUBLIC_LISTING_SQL_CONDITIONS,
   ];
 
   if (spec.filterParams.minPrice !== undefined) {
@@ -521,9 +552,14 @@ async function queryProjectionUnitRows(
       upp.display_title,
       upp.display_subtitle,
       upp.hero_image_url,
+      (array_agg(CASE WHEN u."isVerified" THEN 'verified' ELSE 'unverified' END ORDER BY isp.price ASC, isp.available_from ASC, isp.inventory_id ASC))[1] AS host_identity_status,
       GREATEST(upp.projection_epoch, MAX(isp.projection_epoch)) AS projection_epoch,
       GREATEST(upp.source_version, MAX(isp.source_version)) AS source_version
     FROM inventory_search_projection isp
+    INNER JOIN "Listing" l
+      ON l.id = isp.inventory_id
+    INNER JOIN "User" u
+      ON u.id = l."ownerId"
     INNER JOIN unit_public_projection upp
       ON upp.unit_id = isp.unit_id
      AND upp.unit_identity_epoch = isp.unit_identity_epoch_written_at
@@ -543,6 +579,54 @@ async function queryProjectionUnitRows(
   return rows
     .map(normalizeProjectionRow)
     .filter((row) => isInsideBounds(row, spec));
+}
+
+export async function hasProjectionFreshnessHoles(input: {
+  parsed: ParsedSearchParams;
+}): Promise<boolean> {
+  if (!input.parsed.filterParams.bounds) {
+    return false;
+  }
+
+  const { conditions, params } = buildSearchDocListWhereConditions(
+    input.parsed.filterParams
+  );
+  const whereClause = joinWhereClauseWithSecurityInvariant(
+    conditions,
+    SEARCH_DOC_ALLOWED_SQL_LITERALS
+  );
+
+  const sql = `
+    SELECT d.id
+    FROM listing_search_docs d
+    INNER JOIN "Listing" l
+      ON l.id = d.id
+    INNER JOIN "User" u
+      ON u.id = l."ownerId"
+    LEFT JOIN listing_inventories li
+      ON li.id = d.id
+    LEFT JOIN inventory_search_projection isp
+      ON isp.inventory_id = d.id
+     AND isp.publish_status IN ('PUBLISHED', 'STALE_PUBLISHED')
+    LEFT JOIN unit_public_projection upp
+      ON upp.unit_id = isp.unit_id
+     AND upp.unit_identity_epoch = isp.unit_identity_epoch_written_at
+     AND upp.matching_inventory_count > 0
+    WHERE ${whereClause}
+      AND (
+        li.id IS NULL
+        OR li.publish_status IN ('PENDING_GEOCODE', 'PENDING_PROJECTION')
+        OR isp.inventory_id IS NULL
+        OR upp.unit_id IS NULL
+      )
+    LIMIT 1
+  `;
+
+  const rows = await rawSql.$queryRawUnsafe<{ id: string }[]>(
+    sql,
+    ...(params as SqlValue[])
+  );
+  return rows.length > 0;
 }
 
 async function fetchProjectionRowsByUnitKeys(
@@ -586,6 +670,7 @@ async function fetchProjectionRowsByUnitKeys(
       upp.display_title,
       upp.display_subtitle,
       upp.hero_image_url,
+      (array_agg(CASE WHEN u."isVerified" THEN 'verified' ELSE 'unverified' END ORDER BY isp.price ASC, isp.available_from ASC, isp.inventory_id ASC))[1] AS host_identity_status,
       GREATEST(upp.projection_epoch, MAX(isp.projection_epoch)) AS projection_epoch,
       GREATEST(upp.source_version, MAX(isp.source_version)) AS source_version
     FROM unit_public_projection upp
@@ -593,8 +678,13 @@ async function fetchProjectionRowsByUnitKeys(
       ON isp.unit_id = upp.unit_id
      AND isp.unit_identity_epoch_written_at = upp.unit_identity_epoch
      AND isp.publish_status IN ('PUBLISHED', 'STALE_PUBLISHED')
+    INNER JOIN "Listing" l
+      ON l.id = isp.inventory_id
+    INNER JOIN "User" u
+      ON u.id = l."ownerId"
     WHERE (upp.unit_id, upp.unit_identity_epoch) IN (${tupleClause})
       AND upp.matching_inventory_count > 0
+      AND ${CURRENT_PUBLIC_LISTING_SQL_CONDITIONS.join("\n      AND ")}
     GROUP BY
       upp.unit_id, upp.unit_identity_epoch, upp.public_point, upp.public_cell_id,
       upp.public_area_name, upp.display_title, upp.display_subtitle,
@@ -969,22 +1059,6 @@ export async function hydratePhase04MapSnapshot(input: {
         queryHash: requestedQueryHash || snapshot.queryHash,
         reason: "search_contract_changed",
       },
-    };
-  }
-  if (snapshot.mapPayload) {
-    const storedMap = snapshot.mapPayload as unknown as SearchV2Map;
-    return {
-      kind: "ok",
-      data: {
-        listings: searchV2MapToListings(storedMap),
-        ...(storedMap.truncated !== undefined
-          ? { truncated: storedMap.truncated }
-          : {}),
-        ...(storedMap.totalCandidates !== undefined
-          ? { totalCandidates: storedMap.totalCandidates }
-          : {}),
-      },
-      meta: toSnapshotResponseMeta(snapshot),
     };
   }
   const rows = await fetchProjectionRowsByUnitKeys(

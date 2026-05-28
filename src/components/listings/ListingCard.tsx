@@ -16,15 +16,18 @@ import {
   useListingFocusActions,
   useIsListingFocused,
 } from "@/contexts/ListingFocusContext";
+import { useSearchMapUI } from "@/contexts/SearchMapUIContext";
 import { SlotBadge } from "./SlotBadge";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import type {
   GroupContextPresentation,
   GroupSummary,
+  HostIdentityStatus,
 } from "@/lib/search-types";
 import { buildListingDetailHref } from "@/lib/search/listing-detail-link";
 import GroupDatesPanel from "./GroupDatesPanel";
 import GroupDatesModal from "./GroupDatesModal";
+import HostIdentityBadge from "../HostIdentityBadge";
 
 export interface Listing {
   id: string;
@@ -55,6 +58,7 @@ export interface Listing {
   groupKey?: string | null;
   groupSummary?: GroupSummary | null;
   groupContext?: GroupContextPresentation | null;
+  hostIdentityStatus?: HostIdentityStatus;
 }
 
 // State abbreviation map
@@ -145,6 +149,13 @@ function formatMoveInDate(date?: Date | string): string | null {
   }
 }
 
+function formatShortAvailabilityDate(
+  date?: Date | string | null
+): string | null {
+  if (!date) return null;
+  return formatMoveInDate(date)?.replace(/^Available\s+/, "") ?? null;
+}
+
 // Map lease duration values to display labels
 const LEASE_DURATION_LABELS: Record<string, string> = {
   month_to_month: "Month-to-month",
@@ -215,6 +226,7 @@ function arePropsEqual(
     pl.totalSlots === nl.totalSlots &&
     pl.avgRating === nl.avgRating &&
     pl.reviewCount === nl.reviewCount &&
+    pl.hostIdentityStatus === nl.hostIdentityStatus &&
     pl.images === nl.images &&
     pl.roomType === nl.roomType &&
     pl.leaseDuration === nl.leaseDuration &&
@@ -290,6 +302,7 @@ function ListingCardInner({
   const { setHovered, setActive, hasProvider, focusSourceRef } =
     useListingFocusActions();
   const { isHovered, isActive } = useIsListingFocused(listing.id);
+  const { focusListingOnMap, canShowMap } = useSearchMapUI();
   const router = useRouter();
   const isMobile = useMediaQuery("(max-width: 767px)") === true;
   const groupTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -356,8 +369,23 @@ function ListingCardInner({
   const displayLease = formatLeaseDuration(listing.leaseDuration);
   const groupTriggerLabel = useMemo(() => {
     if (!hasGroupDates) return null;
-    return `+${extraDateCount} more date${extraDateCount === 1 ? "" : "s"}`;
-  }, [extraDateCount, hasGroupDates]);
+    if (extraDateCount === 1) {
+      const members = groupSummary?.members ?? [];
+      const extraMember =
+        members.find(
+          (member) => member.listingId !== listing.id && !member.isCanonical
+        ) ??
+        members.find((member) => member.listingId !== listing.id) ??
+        members.find((member) => !member.isCanonical);
+      const dateLabel = formatShortAvailabilityDate(extraMember?.availableFrom);
+
+      if (dateLabel) {
+        return `Also available ${dateLabel}`;
+      }
+    }
+
+    return `View ${extraDateCount} more available date${extraDateCount === 1 ? "" : "s"}`;
+  }, [extraDateCount, groupSummary?.members, hasGroupDates, listing.id]);
 
   useEffect(() => {
     setIsGroupDatesOpen(false);
@@ -414,6 +442,11 @@ function ListingCardInner({
   if (isTopRated) srParts.push("top rated");
   if (hasRating) srParts.push(`rated ${avgRating!.toFixed(1)} out of 5`);
   else srParts.push("new listing");
+  if (listing.hostIdentityStatus === "verified") {
+    srParts.push("identity verified host");
+  } else if (listing.hostIdentityStatus === "unverified") {
+    srParts.push("host not identity verified");
+  }
 
   srParts.push(availabilityPresentation.ariaLabel);
   if (availabilityPresentation.secondaryGroupLabel) {
@@ -443,7 +476,7 @@ function ListingCardInner({
       }}
       onBlur={() => setHovered(null)}
       className={cn(
-        "group relative mb-4 flex cursor-pointer flex-col overflow-hidden rounded-2xl bg-surface-container-lowest shadow-ambient-sm transition-all duration-500",
+        "group relative mb-4 flex cursor-pointer flex-col overflow-hidden rounded-2xl rounded-[1.25rem] bg-surface-container-lowest shadow-[0_18px_44px_-32px_rgba(27,28,25,0.38),inset_0_0_0_1px_rgba(220,193,185,0.14)] transition-all duration-500",
         isDesktopRow &&
           "md:mb-2 md:overflow-visible md:bg-transparent md:p-2 md:shadow-none",
         !isActive &&
@@ -451,7 +484,7 @@ function ListingCardInner({
           "hover:-translate-y-1 hover:shadow-ambient-lg",
         !isActive &&
           isDesktopRow &&
-          "md:hover:bg-surface-container-lowest md:hover:shadow-[inset_0_0_0_1px_rgba(220,193,185,0.38)]",
+          "md:hover:bg-surface-container-lowest md:hover:shadow-[0_18px_44px_-30px_rgba(27,28,25,0.34),inset_0_0_0_1px_rgba(220,193,185,0.2)]",
         isActive &&
           (isDesktopRow
             ? "bg-surface-container-lowest shadow-[inset_0_0_0_1px_rgba(154,64,39,0.32)] md:-translate-y-0"
@@ -465,23 +498,28 @@ function ListingCardInner({
       )}
     >
       <div className="absolute z-20 top-3 right-3 flex items-center gap-1.5">
-        {hasProvider && (
+        {hasProvider && canShowMap && (
           <button
             type="button"
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
               setActive(listing.id);
+              focusListingOnMap(listing.id);
             }}
             data-show-on-map-id={listing.id}
-            className="relative p-1.5 rounded-full bg-surface-container-lowest/80 backdrop-blur-sm shadow-ambient-sm hover:bg-surface-container-lowest transition-colors before:absolute before:inset-0 before:-m-[10px] before:content-['']"
+            className="relative flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-lowest/88 text-on-surface backdrop-blur-sm shadow-ghost transition-colors hover:bg-surface-container-lowest before:absolute before:inset-0 before:-m-[10px] before:content-['']"
             aria-label="Show on map"
             title="Show on map"
           >
-            <MapPin className="w-3.5 h-3.5 text-on-surface-variant" />
+            <MapPin className="h-4 w-4 text-on-surface" />
           </button>
         )}
-        <FavoriteButton listingId={listing.id} initialIsSaved={isSaved} />
+        <FavoriteButton
+          listingId={listing.id}
+          initialIsSaved={isSaved}
+          className="bg-surface-container-lowest/92 shadow-ghost hover:bg-surface-container-lowest"
+        />
       </div>
 
       <Link
@@ -497,7 +535,7 @@ function ListingCardInner({
       >
         <div
           className={cn(
-            "relative aspect-[4/3] overflow-hidden bg-surface-canvas",
+            "relative aspect-[4/3] overflow-hidden bg-surface-canvas md:aspect-[16/7]",
             isDesktopRow && "md:h-full md:min-h-[132px] md:rounded-xl"
           )}
         >
@@ -505,7 +543,7 @@ function ListingCardInner({
             images={displayImages}
             alt={imageAlt}
             priority={priority}
-            className="w-full h-full object-cover transition-transform duration-1000 ease-out group-hover:scale-105"
+            className="w-full h-full object-cover transition-transform duration-1000 ease-out group-hover:scale-[1.035]"
             onImageError={handleImageError}
             onDragStateChange={setIsDragging}
           />
@@ -524,7 +562,7 @@ function ListingCardInner({
             </div>
           )}
 
-          <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
+          <div className="absolute top-3 left-3 z-20 flex flex-col gap-2">
             <SlotBadge
               availableSlots={effectiveOpenSlots}
               totalSlots={effectiveTotalSlots}
@@ -532,11 +570,11 @@ function ListingCardInner({
               overlay
             />
             {isTopRated ? (
-              <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] uppercase tracking-wider font-bold bg-surface-container-lowest/90 text-on-surface shadow-ambient-sm backdrop-blur-md">
+              <span className="inline-flex items-center rounded-lg bg-surface-container-lowest/90 px-2.5 py-1 text-[11px] font-bold uppercase tracking-normal text-on-surface shadow-ambient-sm backdrop-blur-md">
                 Top Rated
               </span>
             ) : !hasRating ? (
-              <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] uppercase tracking-wider font-bold bg-amber-300 text-amber-950 shadow-ambient-sm backdrop-blur-md">
+              <span className="inline-flex items-center rounded-lg bg-amber-300 px-2.5 py-1 text-[11px] font-bold uppercase tracking-normal text-amber-950 shadow-ambient-sm backdrop-blur-md">
                 New
               </span>
             ) : null}
@@ -544,9 +582,10 @@ function ListingCardInner({
         </div>
 
         <div
+          data-testid="listing-card-details"
           className={cn(
-            "flex flex-1 flex-col p-4",
-            isDesktopRow && "md:min-w-0 md:p-1 md:py-1.5"
+            "flex flex-1 flex-col px-4 pb-4 pt-3",
+            isDesktopRow && "md:min-w-0 md:p-1 md:py-1.5 md:pr-28"
           )}
         >
           {displayRoomType ? (
@@ -556,12 +595,12 @@ function ListingCardInner({
           ) : null}
 
           {/* Row 1: Price + Rating */}
-          <div className="flex items-baseline justify-between gap-3 mb-1">
+          <div className="mb-1 flex items-baseline justify-between gap-3">
             <div className="flex items-baseline gap-1">
               <span
                 data-testid="listing-price"
                 className={cn(
-                  "font-display text-xl font-medium italic text-on-surface",
+                  "font-display text-[1.7rem] font-semibold italic leading-none text-on-surface",
                   isDesktopRow && "md:text-[1.45rem]"
                 )}
               >
@@ -569,7 +608,7 @@ function ListingCardInner({
                   ? formatPrice(listing.price * estimatedMonths)
                   : formatPrice(listing.price)}
               </span>
-              <span className="text-xs uppercase tracking-wider font-semibold text-on-surface-variant">
+              <span className="text-xs font-bold uppercase tracking-normal text-on-surface-variant">
                 {showTotalPrice && estimatedMonths > 1 ? "total" : "/mo"}
               </span>
             </div>
@@ -590,7 +629,7 @@ function ListingCardInner({
           {/* Row 2: Room Type / Title + Location */}
           <h3
             className={cn(
-              "mb-0.5 line-clamp-1 text-[0.95rem] font-medium leading-tight text-on-surface",
+              "mb-1 line-clamp-1 text-[0.98rem] font-bold leading-tight text-on-surface",
               isDesktopRow && "md:text-base md:font-semibold"
             )}
             title={displayTitle}
@@ -609,16 +648,27 @@ function ListingCardInner({
                   .filter(Boolean)
                   .join(" · ")}
           </p>
-          {availabilityPresentation.secondaryGroupLabel ? (
+          {availabilityPresentation.secondaryGroupLabel && !hasGroupDates ? (
             <p className="mt-2 text-xs font-medium text-on-surface-variant">
               {availabilityPresentation.secondaryGroupLabel}
             </p>
           ) : null}
+          <HostIdentityBadge
+            status={listing.hostIdentityStatus}
+            compact
+            className="mt-3 w-full justify-start rounded-[0.875rem] px-3 py-2"
+          />
         </div>
       </Link>
       {hasGroupDates && groupSummary ? (
         <>
-          <div className="px-4 pb-4">
+          <div
+            data-testid="group-dates-action"
+            className={cn(
+              "px-4 pb-4",
+              isDesktopRow && "md:pb-1.5 md:pl-[184px] md:pr-28"
+            )}
+          >
             <button
               ref={groupTriggerRef}
               id={triggerId}

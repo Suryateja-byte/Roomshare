@@ -117,7 +117,16 @@ describe("search/transform", () => {
         }),
         groupSummary: null,
         groupContext: null,
+        hostIdentityStatus: "unknown",
       });
+    });
+
+    it("passes through explicit host identity status", () => {
+      const item = transformToListItem(
+        createListingData({ hostIdentityStatus: "unverified" })
+      );
+
+      expect(item.hostIdentityStatus).toBe("unverified");
     });
 
     it("coarsens public list coordinates", () => {
@@ -367,6 +376,21 @@ describe("search/transform", () => {
           availableSlots: 1,
           totalSlots: 2,
         })
+      );
+      expect(props.hostIdentityStatus).toBe("unknown");
+    });
+
+    it("includes explicit host identity status in GeoJSON properties", () => {
+      const [listing] = [
+        createMapListingData("verified-host", 37.7749, -122.4194),
+      ];
+
+      const geojson = transformToGeoJSON([
+        { ...listing, hostIdentityStatus: "verified" },
+      ]);
+
+      expect(geojson.features[0].properties.hostIdentityStatus).toBe(
+        "verified"
       );
     });
 

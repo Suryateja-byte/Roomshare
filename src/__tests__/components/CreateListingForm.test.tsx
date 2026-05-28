@@ -126,6 +126,37 @@ jest.mock("@/components/listings/ImageUploader", () => ({
   ),
 }));
 
+jest.mock("@/components/listings/AddressAutocompleteInput", () => ({
+  __esModule: true,
+  default: ({
+    id,
+    name,
+    value,
+    onChange,
+    disabled,
+    ariaInvalid,
+    ariaDescribedBy,
+  }: {
+    id?: string;
+    name?: string;
+    value: string;
+    onChange: (value: string) => void;
+    disabled?: boolean;
+    ariaInvalid?: boolean;
+    ariaDescribedBy?: string;
+  }) => (
+    <input
+      id={id}
+      name={name}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      disabled={disabled}
+      aria-invalid={ariaInvalid}
+      aria-describedby={ariaDescribedBy}
+    />
+  ),
+}));
+
 // Capture roomType onValueChange for auto-set tests
 // We identify the roomType Select by inspecting its SelectContent children for "Entire Place"
 let capturedRoomTypeOnValueChange: ((val: string) => void) | undefined;

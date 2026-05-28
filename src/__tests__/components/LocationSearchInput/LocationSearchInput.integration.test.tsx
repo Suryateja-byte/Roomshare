@@ -247,6 +247,69 @@ describe("LocationSearchInput - Integration Tests", () => {
         expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
       });
     });
+
+    it("resolves Google place details before selecting a destination", async () => {
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            results: [
+              {
+                id: "google:ChIJIrving",
+                place_id: "ChIJIrving",
+                provider: "google",
+                place_name: "Irving, TX, USA",
+                primary_text: "Irving",
+                secondary_text: "TX, USA",
+                place_type: ["place"],
+                requires_resolution: true,
+              },
+            ],
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            result: {
+              id: "google:ChIJIrving",
+              place_id: "ChIJIrving",
+              provider: "google",
+              place_name: "Irving, TX, USA",
+              primary_text: "Irving",
+              secondary_text: "TX, USA",
+              center: [-96.9489, 32.814],
+              bbox: [-97.03, 32.75, -96.86, 32.9],
+              place_type: ["place"],
+              requires_resolution: false,
+            },
+          }),
+        });
+
+      renderInput();
+      const input = screen.getByRole("combobox");
+
+      await user.type(input, "irving");
+      jest.advanceTimersByTime(350);
+
+      await user.click(
+        await screen.findByRole("button", { name: /Irving/i })
+      );
+
+      await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2));
+      expect(mockFetch.mock.calls[1][0]).toContain(
+        "/api/geocoding/place-details"
+      );
+      expect(mockOnLocationSelect).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "Irving, TX, USA",
+          lat: 32.814,
+          lng: -96.9489,
+          bbox: [-97.03, 32.75, -96.86, 32.9],
+        })
+      );
+    });
   });
 
   describe("Dropdown Lifecycle", () => {

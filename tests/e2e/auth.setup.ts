@@ -169,3 +169,26 @@ setup("authenticate as reviewer", async ({ page }) => {
       .or(page.locator('[aria-label*="user"]'))
   ).toBeVisible({ timeout: 10000 });
 });
+
+setup("authenticate as incomplete identity-unverified host", async ({
+  page,
+}) => {
+  const incompleteHostAuthFile = path.join(
+    __dirname,
+    "../../playwright/.auth/incomplete-host.json"
+  );
+
+  await loginAndSaveState(
+    page,
+    "e2e-incomplete-host@roomshare.dev",
+    "TestPassword123!",
+    incompleteHostAuthFile
+  );
+
+  await expect(
+    page
+      .getByRole("button", { name: /menu|profile|account/i })
+      .or(page.locator('[data-testid="user-menu"]'))
+      .or(page.locator('[aria-label*="user"]'))
+  ).toBeVisible({ timeout: 10000 });
+});

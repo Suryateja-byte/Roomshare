@@ -272,6 +272,40 @@ describe("ListingPageClient", () => {
     expect(screen.getByTestId("report-listing")).toBeInTheDocument();
   });
 
+  it("shows the verified host trust status on listing detail", async () => {
+    render(<ListingPageClient {...makeProps()} />);
+
+    expect(
+      await screen.findByText("Identity verified host")
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Host not identity verified")
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders sparse identity-unverified host profiles safely", async () => {
+    render(
+      <ListingPageClient
+        {...makeProps({
+          listing: {
+            ...makeProps().listing,
+            owner: {
+              ...makeProps().listing.owner,
+              name: null,
+              image: null,
+              bio: null,
+              isVerified: false,
+            },
+          },
+        })}
+      />
+    );
+
+    expect(await screen.findByText("Hosted by Host")).toBeInTheDocument();
+    expect(screen.getByText("Host not identity verified")).toBeInTheDocument();
+    expect(screen.queryByText("Identity verified host")).not.toBeInTheDocument();
+  });
+
   it("shows the private feedback link when viewer-state allows it", async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,

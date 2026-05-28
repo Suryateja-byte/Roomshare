@@ -16,6 +16,10 @@
 
 import { renderHook, act } from "@testing-library/react";
 import { useMapPreference } from "@/hooks/useMapPreference";
+import {
+  SEARCH_PHONE_MAX_QUERY,
+  SEARCH_SPLIT_VIEW_MEDIA_QUERY,
+} from "@/lib/search-layout";
 
 const STORAGE_KEY = "roomshare-map-preference";
 
@@ -69,18 +73,32 @@ function createMatchMediaMock(matches: boolean) {
   return mql;
 }
 
-let currentMqlMock = createMatchMediaMock(false);
+let mobileMqlMock = createMatchMediaMock(false);
+let splitViewMqlMock = createMatchMediaMock(true);
 
 Object.defineProperty(window, "matchMedia", {
   writable: true,
-  value: jest.fn((_query: string) => currentMqlMock),
+  value: jest.fn((query: string) => {
+    if (query === SEARCH_PHONE_MAX_QUERY) return mobileMqlMock;
+    if (query === SEARCH_SPLIT_VIEW_MEDIA_QUERY) return splitViewMqlMock;
+    return createMatchMediaMock(false);
+  }),
 });
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+function setViewportMedia(isMobile: boolean, isSplitViewCapable = !isMobile) {
+  mobileMqlMock = createMatchMediaMock(isMobile);
+  splitViewMqlMock = createMatchMediaMock(isSplitViewCapable);
+  (window.matchMedia as jest.Mock).mockImplementation((query: string) => {
+    if (query === SEARCH_PHONE_MAX_QUERY) return mobileMqlMock;
+    if (query === SEARCH_SPLIT_VIEW_MEDIA_QUERY) return splitViewMqlMock;
+    return createMatchMediaMock(false);
+  });
+}
+
 function setMobile(isMobile: boolean) {
-  currentMqlMock = createMatchMediaMock(isMobile);
-  (window.matchMedia as jest.Mock).mockImplementation(() => currentMqlMock);
+  setViewportMedia(isMobile);
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -235,7 +253,7 @@ describe("useMapPreference", () => {
     expect(result.current.isMobile).toBe(false);
 
     act(() => {
-      currentMqlMock._fire(true); // simulate resize to mobile
+      mobileMqlMock._fire(true); // simulate resize to mobile
     });
 
     expect(result.current.isMobile).toBe(true);

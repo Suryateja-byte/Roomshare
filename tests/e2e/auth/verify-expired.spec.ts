@@ -28,16 +28,16 @@ test.describe("VE: Page Structure", () => {
     await expect(
       page.getByRole("heading", { name: /Verification Link Expired/i })
     ).toBeVisible({ timeout: timeouts.navigation });
-    await expect(
-      page.locator("p").filter({ hasText: /no longer valid/i })
-    ).toBeVisible();
+    await expect(page.getByText(/no longer valid/i).first()).toBeVisible();
   });
 
   test("VE-02  'Back to Home' footer link", async ({ page }) => {
     await page.goto("/verify-expired");
     await page.waitForLoadState("domcontentloaded");
 
-    const backLink = page.getByText(/Back to Home/i);
+    const backLink = page.locator("main").getByRole("link", {
+      name: /Back to Home/i,
+    });
     await expect(backLink).toBeVisible({ timeout: timeouts.navigation });
 
     await backLink.click();

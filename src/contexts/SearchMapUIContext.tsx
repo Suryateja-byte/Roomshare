@@ -31,6 +31,7 @@ interface PendingMapFocus {
 
 interface SearchMapUIContextValue {
   shouldShowMap: boolean;
+  canShowMap: boolean;
   pendingFocus: PendingMapFocus | null;
   toggleMap: () => void;
   focusListingOnMap: (listingId: string) => void;
@@ -49,6 +50,7 @@ const SearchMapUIContext = createContext<SearchMapUIContextValue | null>(null);
 // Prevents creating new object on every render
 const NOOP_CONTEXT_VALUE: SearchMapUIContextValue = {
   shouldShowMap: false,
+  canShowMap: false,
   pendingFocus: null,
   toggleMap: () => {},
   focusListingOnMap: () => {},
@@ -65,6 +67,7 @@ interface SearchMapUIProviderProps {
   showMap: () => void;
   hideMap: () => void;
   shouldShowMap: boolean;
+  canShowMap?: boolean;
 }
 
 export function SearchMapUIProvider({
@@ -73,6 +76,7 @@ export function SearchMapUIProvider({
   showMap,
   hideMap,
   shouldShowMap,
+  canShowMap = true,
 }: SearchMapUIProviderProps) {
   const [pendingFocus, setPendingFocus] = useState<PendingMapFocus | null>(
     null
@@ -83,12 +87,18 @@ export function SearchMapUIProvider({
   // adding it to useCallback deps (avoids context value identity churn
   // on map toggle, which would re-render all consumers).
   const shouldShowMapRef = useRef(shouldShowMap);
+  const canShowMapRef = useRef(canShowMap);
   useEffect(() => {
     shouldShowMapRef.current = shouldShowMap;
   }, [shouldShowMap]);
+  useEffect(() => {
+    canShowMapRef.current = canShowMap;
+  }, [canShowMap]);
 
   const focusListingOnMap = useCallback(
     (listingId: string) => {
+      if (!canShowMapRef.current) return;
+
       nonceRef.current += 1;
       const nonce = nonceRef.current;
 
@@ -121,6 +131,7 @@ export function SearchMapUIProvider({
   const contextValue = useMemo(
     () => ({
       shouldShowMap,
+      canShowMap,
       pendingFocus,
       toggleMap,
       focusListingOnMap,
@@ -132,6 +143,7 @@ export function SearchMapUIProvider({
     }),
     [
       shouldShowMap,
+      canShowMap,
       pendingFocus,
       toggleMap,
       focusListingOnMap,

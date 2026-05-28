@@ -55,10 +55,10 @@ interface DesktopQuickFiltersProps {
 }
 
 const triggerClassName =
-  "flex min-h-[42px] shrink-0 items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium whitespace-nowrap transition-all duration-200 active:scale-[0.98]";
+  "flex min-h-[44px] shrink-0 items-center gap-2 rounded-[1.25rem] border px-4 py-2 text-sm font-semibold whitespace-nowrap transition-all duration-200 active:scale-[0.98] xl:px-5";
 
 const popoverContentClassName =
-  "z-[1200] w-[min(360px,calc(100vw-32px))] rounded-[1.25rem] border border-outline-variant/30 bg-surface-container-lowest/98 p-4 shadow-ambient-lg shadow-on-surface/5 backdrop-blur-[20px] outline-none";
+  "z-[1200] w-[min(360px,calc(100vw-32px))] rounded-[1.25rem] border border-outline-variant/20 bg-surface-container-lowest/98 p-4 shadow-ambient-lg shadow-on-surface/5 backdrop-blur-[20px] outline-none";
 
 interface QuickFilterTriggerProps extends Omit<
   ButtonHTMLAttributes<HTMLButtonElement>,
@@ -83,12 +83,14 @@ const QuickFilterTrigger = forwardRef<
       className={cn(
         triggerClassName,
         active || open
-          ? "border-on-surface bg-on-surface text-on-primary shadow-ambient-sm shadow-on-surface/10"
-          : "border-outline-variant/45 bg-surface-container-lowest text-on-surface shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] hover:border-on-surface-variant hover:bg-surface-canvas",
+          ? "border-on-surface/15 bg-on-surface text-on-primary shadow-ghost"
+          : "border-outline-variant/20 bg-surface-container-lowest/92 text-on-surface shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] hover:bg-surface-canvas",
         className
       )}
     >
-      <span>{label}</span>
+      <span className="min-w-0 max-w-[9rem] truncate xl:max-w-[11rem]">
+        {label}
+      </span>
       <ChevronDown className="h-3.5 w-3.5 opacity-60" aria-hidden />
     </button>
   );
@@ -382,7 +384,7 @@ export function DesktopQuickFilters({
         </Popover.Portal>
       </Popover.Root>
 
-      <div className="h-6 w-px shrink-0 bg-outline-variant/35" />
+      <div className="h-6 w-px shrink-0 bg-outline-variant/20" />
 
       <button
         type="button"
@@ -395,10 +397,10 @@ export function DesktopQuickFilters({
         data-hydrated={hasMounted || undefined}
         data-testid="quick-filter-more-filters"
         className={cn(
-          "flex min-h-[42px] shrink-0 items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-semibold whitespace-nowrap transition-all duration-200 active:scale-[0.98]",
+          "flex min-h-[44px] shrink-0 items-center gap-2 rounded-[1.25rem] border px-4 py-2 text-sm font-semibold whitespace-nowrap transition-all duration-200 active:scale-[0.98] xl:px-5",
           activeCount > 0
-            ? "border-on-surface bg-on-surface text-on-primary shadow-ambient-sm shadow-on-surface/10"
-            : "border-outline-variant/45 bg-surface-container-lowest text-on-surface shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] hover:border-on-surface-variant hover:bg-surface-canvas"
+            ? "border-on-surface/15 bg-on-surface text-on-primary shadow-ghost"
+            : "border-outline-variant/20 bg-surface-container-lowest/92 text-on-surface shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] hover:bg-surface-canvas"
         )}
       >
         <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />

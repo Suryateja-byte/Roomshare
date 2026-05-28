@@ -1,7 +1,7 @@
 /**
  * Search Page Loading States (P1)
  *
- * Validates skeleton loading, pending state overlay, aria-busy,
+ * Validates skeleton loading, quiet pending state semantics, aria-busy,
  * load-more button states, and rapid search resilience.
  * Uses authenticated (chromium) project.
  *
@@ -92,15 +92,15 @@ test.describe("Search Loading States", () => {
     await waitForResults(page);
   });
 
-  // 2. Pending state overlay during filter transitions
-  test("2. pending state overlay appears during filter transitions", async ({
+  // 2. Quiet pending state during filter transitions
+  test("2. pending state stays quiet during filter transitions", async ({
     page,
   }) => {
     await page.goto(SEARCH_URL);
     await waitForResults(page);
 
-    // SearchResultsLoadingWrapper shows a translucent overlay during transitions
-    // The overlay has class "bg-white/40" and is shown when isPending = true
+    // SearchResultsLoadingWrapper keeps stale results visible during transitions.
+    // Pending copy is screen-reader only; no centered visual pill or blur overlay.
 
     // Trigger a filter change by clicking a recommended filter pill.
     // Scope to visible container to avoid strict mode violations from dual containers.
@@ -129,8 +129,14 @@ test.describe("Search Loading States", () => {
       if (isBusy) {
         expect(isBusy).toBe(true);
         await expect(
+          page.getByTestId("search-results-pending-overlay")
+        ).toHaveCount(0);
+        await expect(
           page.getByTestId("search-results-pending-status")
         ).toContainText(/updating results|still loading/i);
+        await expect(
+          page.getByTestId("search-results-pending-status")
+        ).not.toBeVisible();
         await expect(
           page.locator('[data-testid="listing-card-skeleton-grid"]')
         ).toHaveCount(0);

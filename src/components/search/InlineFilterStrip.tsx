@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { SlidersHorizontal, X } from "lucide-react";
+import { Home, SlidersHorizontal, X } from "lucide-react";
 import FilterModal from "@/components/search/FilterModal";
 import DesktopQuickFilters, {
   type QuickFilterKey,
@@ -142,7 +142,7 @@ function PrimaryFilterButton({
       disabled={disabled}
       data-testid={testId}
       className={cn(
-        "flex min-h-[42px] shrink-0 items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium whitespace-nowrap transition-all duration-200 active:scale-[0.98]",
+        "flex min-h-[44px] shrink-0 items-center gap-2 rounded-[1.25rem] border px-5 py-2 text-sm font-semibold whitespace-nowrap transition-all duration-200 active:scale-[0.98]",
         active
           ? cn(QUICK_FILTER_ACTIVE_CLASSNAME, "font-medium")
           : QUICK_FILTER_INACTIVE_CLASSNAME
@@ -456,7 +456,12 @@ export function InlineFilterStrip({
       }
       role="region"
       aria-label="Applied filters"
-      className="hide-scrollbar flex min-w-fit shrink-0 items-center gap-2 overflow-x-auto"
+      className={cn(
+        "hide-scrollbar flex items-center gap-2",
+        separatedFromPrimary
+          ? "min-w-0 flex-wrap overflow-visible"
+          : "min-w-fit shrink-0 overflow-x-auto"
+      )}
     >
       {!separatedFromPrimary ? (
         <div className="h-6 w-px shrink-0 bg-outline-variant/40" />
@@ -506,39 +511,53 @@ export function InlineFilterStrip({
   return (
     <>
       {showDesktopQuickFilters && (desktopSummaryHeading || toolbarSlot) ? (
-        <div className="border-b border-outline-variant/25 px-1 py-4">
+        <div className="px-1 pb-4 pt-5">
           <div
             data-testid="desktop-results-heading-section"
-            className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between"
+            className="flex flex-col gap-4 2xl:flex-row 2xl:items-center 2xl:justify-between"
           >
-            <div className="min-w-0">
-              {desktopSummaryHeading ? (
-                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                  <h1
-                    id="search-results-heading"
-                    tabIndex={-1}
-                    className="truncate font-display text-[1.7rem] font-normal leading-tight tracking-normal text-on-surface focus:outline-none focus-visible:rounded-lg focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
-                  >
-                    {desktopSummaryHeading}
-                  </h1>
-                  {desktopSummaryRange ? (
-                    <span className="shrink-0 whitespace-nowrap text-sm font-medium text-on-surface-variant/80">
-                      &middot; {desktopSummaryRange}
-                    </span>
-                  ) : null}
-                  {desktopSummary?.browseMode ? (
-                    <span className="shrink-0 whitespace-nowrap text-sm font-medium text-on-surface-variant">
-                      &middot; Showing top listings
-                    </span>
-                  ) : null}
-                </div>
-              ) : null}
+            <div className="flex min-w-0 items-center gap-4">
+              <span
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-surface-container-high text-on-surface shadow-[inset_0_0_0_1px_rgba(220,193,185,0.18)]"
+                aria-hidden="true"
+              >
+                <Home className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                {desktopSummaryHeading ? (
+                  <div className="flex flex-col gap-0.5">
+                    <h1
+                      id="search-results-heading"
+                      tabIndex={-1}
+                      className="text-[1.35rem] font-bold leading-tight tracking-normal text-on-surface focus:outline-none lg:text-[1.45rem]"
+                    >
+                      {desktopSummaryHeading}
+                    </h1>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-on-surface-variant">
+                      {desktopSummaryRange ? (
+                        <span className="shrink-0 whitespace-nowrap">
+                          {desktopSummaryRange} of{" "}
+                          {desktopSummary?.total === null
+                            ? "100+"
+                            : desktopSummary?.total}{" "}
+                          places
+                        </span>
+                      ) : null}
+                      {desktopSummary?.browseMode ? (
+                        <span className="shrink-0 whitespace-nowrap text-primary">
+                          Showing top listings
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             </div>
 
             {toolbarSlot ? (
               <div
                 data-testid="desktop-toolbar-cluster"
-                className="flex flex-wrap items-center gap-2.5 lg:justify-end"
+                className="flex w-full flex-wrap items-center gap-2.5 2xl:w-auto 2xl:justify-end"
               >
                 {toolbarSlot}
               </div>
@@ -548,11 +567,18 @@ export function InlineFilterStrip({
       ) : null}
 
       {showInlineFilterStrip ? (
-        <div className="hide-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto border-b border-outline-variant/20 px-1 py-3">
+        <div
+          className={cn(
+            "-mx-1 flex gap-3 rounded-[1.5rem] bg-surface-container-high/35 px-3 py-3",
+            showDesktopQuickFilters
+              ? "flex-wrap items-center overflow-visible"
+              : "hide-scrollbar items-center overflow-x-auto"
+          )}
+        >
           {showDesktopQuickFilters ? (
             <>
-              <div className="flex min-h-[42px] shrink-0 items-center pr-1">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">
+              <div className="flex min-h-[44px] shrink-0 items-center pr-1">
+                <span className="text-[11px] font-bold uppercase tracking-normal text-on-surface-variant">
                   Refine
                 </span>
                 {activeCount > 0 ? (
@@ -663,12 +689,16 @@ export function InlineFilterStrip({
             </>
           ) : null}
 
-          {showAppliedChips
+          {showAppliedChips && !showDesktopQuickFilters
             ? renderAppliedFilters(
                 !(showDesktopQuickFilters || showMobileInlineFilters)
               )
             : null}
         </div>
+      ) : null}
+
+      {showAppliedChips && showDesktopQuickFilters ? (
+        <div className="px-1 pt-2">{renderAppliedFilters(true)}</div>
       ) : null}
 
       <FilterModal

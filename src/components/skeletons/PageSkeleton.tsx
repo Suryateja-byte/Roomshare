@@ -1,5 +1,4 @@
 import { Skeleton, TextSkeleton, CardSkeleton } from "./Skeleton";
-import { ListingGridSkeleton as SearchListingGridSkeleton } from "./ListingCardSkeleton";
 
 export function PageSkeleton() {
   return (
@@ -195,88 +194,226 @@ export function ListingGridSkeleton({ count = 6 }: { count?: number }) {
   );
 }
 
-export function SearchResultsSkeleton({ count = 6 }: { count?: number }) {
+function SearchLoadingFilterStrip() {
   return (
     <div
-      className="h-screen flex flex-col bg-surface-container-lowest overflow-hidden pt-[80px] sm:pt-[96px]"
+      className="hide-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto border-b border-outline-variant/20 px-1 py-3"
+      aria-hidden="true"
+      role="presentation"
+    >
+      <Skeleton
+        variant="text"
+        width={72}
+        height={16}
+        animation="shimmer"
+        className="hidden shrink-0 md:block motion-reduce:animate-none"
+      />
+      {[116, 132, 148, 124].map((width) => (
+        <Skeleton
+          key={width}
+          variant="rounded"
+          width={width}
+          height={42}
+          animation="shimmer"
+          className="shrink-0 rounded-full border border-outline-variant/20 bg-surface-container-lowest motion-reduce:animate-none"
+        />
+      ))}
+      <Skeleton
+        variant="rounded"
+        width={104}
+        height={42}
+        animation="shimmer"
+        className="shrink-0 rounded-full border border-outline-variant/20 bg-surface-container-lowest motion-reduce:animate-none"
+      />
+    </div>
+  );
+}
+
+function SearchLoadingListingRow({ index }: { index: number }) {
+  const titleWidths = ["78%", "68%", "74%", "62%"];
+  const bodyWidths = ["92%", "84%", "88%", "78%"];
+
+  return (
+    <div
+      data-testid="search-loading-listing-row"
+      className="relative mb-4 flex flex-col overflow-hidden rounded-2xl bg-surface-container-lowest shadow-ambient-sm md:grid md:grid-cols-[168px_minmax(0,1fr)] md:gap-4 md:overflow-visible md:bg-transparent md:p-2 md:shadow-none"
+      aria-hidden="true"
+      role="presentation"
+    >
+      <div className="relative aspect-[4/3] overflow-hidden bg-surface-container-high/50 md:h-full md:min-h-[132px] md:rounded-xl">
+        <Skeleton
+          variant="rectangular"
+          animation="shimmer"
+          className="h-full w-full bg-gradient-to-br from-surface-container-high via-surface-canvas to-surface-container-high motion-reduce:animate-none"
+        />
+        <div className="absolute inset-0 flex items-center justify-center text-outline-variant/70">
+          <div className="h-9 w-9 rounded-lg border-2 border-current opacity-45" />
+        </div>
+        <div className="absolute right-3 top-3 flex items-center gap-1.5">
+          <Skeleton
+            variant="circular"
+            width={32}
+            height={32}
+            animation="shimmer"
+            className="bg-surface-container-lowest/85 motion-reduce:animate-none"
+          />
+          <Skeleton
+            variant="circular"
+            width={40}
+            height={40}
+            animation="shimmer"
+            className="bg-surface-container-lowest/85 motion-reduce:animate-none"
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-1 flex-col p-4 md:min-w-0 md:p-1 md:py-1.5">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div className="flex items-baseline gap-2">
+            <Skeleton
+              variant="text"
+              width={96}
+              height={28}
+              animation="shimmer"
+              className="motion-reduce:animate-none"
+            />
+            <Skeleton
+              variant="text"
+              width={28}
+              height={14}
+              animation="shimmer"
+              className="motion-reduce:animate-none"
+            />
+          </div>
+          <Skeleton
+            variant="text"
+            width={52}
+            height={18}
+            animation="shimmer"
+            className="motion-reduce:animate-none"
+          />
+        </div>
+
+        <Skeleton
+          variant="text"
+          width={titleWidths[index % titleWidths.length]}
+          height={18}
+          animation="shimmer"
+          className="mb-2 motion-reduce:animate-none"
+        />
+        <Skeleton
+          variant="text"
+          width={bodyWidths[index % bodyWidths.length]}
+          height={14}
+          animation="shimmer"
+          className="mb-2 motion-reduce:animate-none"
+        />
+        <Skeleton
+          variant="text"
+          width="58%"
+          height={14}
+          animation="shimmer"
+          className="motion-reduce:animate-none"
+        />
+
+        <div className="mt-4 hidden items-center gap-2 md:flex">
+          <Skeleton
+            variant="rounded"
+            width={92}
+            height={22}
+            animation="shimmer"
+            className="rounded-full motion-reduce:animate-none"
+          />
+          <Skeleton
+            variant="rounded"
+            width={78}
+            height={22}
+            animation="shimmer"
+            className="rounded-full motion-reduce:animate-none"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function SearchResultsSkeleton({ count = 4 }: { count?: number }) {
+  return (
+    <section
+      data-testid="search-page-loading-skeleton"
+      className="min-h-full bg-surface-canvas"
       role="status"
       aria-busy="true"
       aria-label="Loading search results"
     >
-      {/* Search Header Skeleton */}
-      <header className="w-full bg-surface-container-lowest/80 backdrop-blur-[20px]">
-        <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4">
-          <Skeleton
-            variant="rounded"
-            height={56}
-            className="w-full max-w-2xl mx-auto"
-          />
-        </div>
-      </header>
-
-      {/* Filter Bar Skeleton */}
-      <div className="w-full border-b border-outline-variant/20 bg-surface-container-lowest">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-3">
-          <div className="flex items-center gap-3">
-            {/* Category tabs skeleton */}
-            <div className="flex gap-2">
-              <Skeleton variant="rounded" width={70} height={32} />
-              <Skeleton variant="rounded" width={90} height={32} />
-              <Skeleton variant="rounded" width={80} height={32} />
-            </div>
-            <div className="h-8 w-px bg-surface-container-high hidden sm:block" />
-            <div className="flex-1" />
-            {/* More filters button */}
-            <Skeleton
-              variant="rounded"
-              width={110}
-              height={36}
-              className="rounded-full"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Results Skeleton */}
-      <div className="flex-1 overflow-auto">
-        <div className="max-w-[840px] mx-auto pb-24 md:pb-6">
-          <div className="px-4 sm:px-5 lg:px-8 pt-0">
-            {/* Header */}
-            <div className="flex flex-row items-center justify-between gap-4 py-2 mb-4">
+      <span className="sr-only">Loading search results</span>
+      <div className="mx-auto max-w-[840px] pb-24 md:pb-6">
+        <div className="px-4 pt-0 sm:px-5 lg:px-8">
+          <div className="border-b border-outline-variant/25 px-1 py-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
               <div className="flex-1 min-w-0">
                 <div className="flex items-baseline gap-3">
                   <Skeleton
                     variant="text"
-                    width={180}
-                    height={24}
+                    width={210}
+                    height={28}
+                    animation="shimmer"
                     className="mb-1"
                   />
                   <Skeleton
                     variant="rounded"
-                    width={92}
+                    width={64}
                     height={24}
+                    animation="shimmer"
                     className="rounded-full"
                   />
                 </div>
-                <Skeleton variant="text" width={220} height={14} />
+                <Skeleton
+                  variant="text"
+                  width={190}
+                  height={14}
+                  animation="shimmer"
+                  className="motion-reduce:animate-none"
+                />
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex shrink-0 items-center gap-2">
                 <Skeleton
                   variant="rounded"
-                  width={112}
-                  height={36}
-                  className="rounded-full"
+                  width={118}
+                  height={44}
+                  animation="shimmer"
+                  className="rounded-full motion-reduce:animate-none"
                 />
-                <Skeleton variant="rounded" width={104} height={36} />
+                <Skeleton
+                  variant="rounded"
+                  width={124}
+                  height={44}
+                  animation="shimmer"
+                  className="hidden rounded-full motion-reduce:animate-none sm:block"
+                />
               </div>
             </div>
+          </div>
 
-            {/* Listing Cards Grid */}
-            <SearchListingGridSkeleton count={count} />
+          <SearchLoadingFilterStrip />
+
+          <div className="relative py-5">
+            <div
+              data-testid="search-loading-listing-list"
+              className="grid grid-cols-1 gap-2 sm:gap-3"
+            >
+              {Array.from({ length: count }).map((_, index) => (
+                <SearchLoadingListingRow key={index} index={index} />
+              ))}
+            </div>
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-surface-canvas via-surface-canvas/90 to-transparent"
+            />
           </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 }
 

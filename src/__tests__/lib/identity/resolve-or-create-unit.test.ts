@@ -1,6 +1,13 @@
 import { resolveOrCreateUnit } from "@/lib/identity/resolve-or-create-unit";
 
-function makeTx(sourceVersion: bigint) {
+function makeTx(
+  sourceVersion: bigint,
+  overrides: Partial<{
+    geocodeStatus: string;
+    canonicalUnit: string;
+    canonicalizerVersion: string;
+  }> = {}
+) {
   return {
     $executeRawUnsafe: jest.fn().mockResolvedValue(undefined),
     $executeRaw: jest.fn().mockResolvedValue(0),
@@ -9,9 +16,9 @@ function makeTx(sourceVersion: bigint) {
       upsert: jest.fn().mockResolvedValue({
         id: "unit-1",
         unitIdentityEpoch: 1,
-        canonicalUnit: "_none_",
-        canonicalizerVersion: "v1",
-        geocodeStatus: "PENDING",
+        canonicalUnit: overrides.canonicalUnit ?? "_none_",
+        canonicalizerVersion: overrides.canonicalizerVersion ?? "v1",
+        geocodeStatus: overrides.geocodeStatus ?? "PENDING",
         sourceVersion,
       }),
     },
@@ -103,6 +110,76 @@ describe("resolveOrCreateUnit", () => {
       },
     });
 
+    expect(tx.outboxEvent.create).toHaveBeenCalledTimes(1);
+    expect(tx.outboxEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ kind: "UNIT_UPSERTED" }),
+      })
+    );
+  });
+
+  it("uses trusted coordinates to complete geocode state without enqueueing geocode work", async () => {
+    const tx = makeTx(BigInt(1));
+    tx.$queryRaw.mockResolvedValueOnce([
+      { exactPointType: "geography", publicPointType: "geography" },
+    ]);
+    tx.$queryRaw.mockResolvedValueOnce([
+      {
+        id: "unit-1",
+        unitIdentityEpoch: 1,
+        canonicalUnit: "_none_",
+        canonicalizerVersion: "v1",
+        geocodeStatus: "COMPLETE",
+        sourceVersion: BigInt(2),
+      },
+    ]);
+
+    const result = await resolveOrCreateUnit(tx as never, {
+      actor: { role: "host", id: "user-1" },
+      address: {
+        address: "1121 Hidden Rdg",
+        city: "Irving",
+        state: "TX",
+        zip: "75038",
+      },
+      trustedCoordinates: { lat: 32.87742, lng: -96.96477 },
+    });
+
+    expect(result.geocodeStatus).toBe("COMPLETE");
+    expect(result.sourceVersion).toBe(BigInt(2));
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(2);
+    expect(tx.$queryRaw.mock.calls[1][0].join("")).toContain(
+      "ST_SetSRID(ST_GeomFromText("
+    );
+    expect(tx.outboxEvent.create).toHaveBeenCalledTimes(1);
+    expect(tx.outboxEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          kind: "UNIT_UPSERTED",
+          sourceVersion: BigInt(2),
+          payload: expect.objectContaining({ trustedCoordinates: true }),
+        }),
+      })
+    );
+  });
+
+  it("does not overwrite an already complete geocode row with trusted coordinates", async () => {
+    const tx = makeTx(BigInt(5), { geocodeStatus: "COMPLETE" });
+
+    const result = await resolveOrCreateUnit(tx as never, {
+      actor: { role: "host", id: "user-1" },
+      address: {
+        address: "1121 Hidden Rdg",
+        city: "Irving",
+        state: "TX",
+        zip: "75038",
+      },
+      trustedCoordinates: { lat: 32.87742, lng: -96.96477 },
+    });
+
+    expect(result.geocodeStatus).toBe("COMPLETE");
+    expect(result.sourceVersion).toBe(BigInt(5));
+    expect(tx.$queryRaw).not.toHaveBeenCalled();
     expect(tx.outboxEvent.create).toHaveBeenCalledTimes(1);
     expect(tx.outboxEvent.create).toHaveBeenCalledWith(
       expect.objectContaining({

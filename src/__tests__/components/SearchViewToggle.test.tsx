@@ -106,6 +106,7 @@ jest.mock("@/components/search/FloatingMapButton", () => {
 const props = {
   mapComponent: <div data-testid="map">Map</div>,
   shouldShowMap: true,
+  canShowMap: true,
   onToggle: jest.fn(),
   isLoading: false,
 };

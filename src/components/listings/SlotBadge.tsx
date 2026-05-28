@@ -34,7 +34,7 @@ interface SlotBadgeProps {
 }
 
 const overlayBase =
-  "bg-surface-container-lowest/90 backdrop-blur-sm shadow-ambient-sm rounded-lg";
+  "rounded-full bg-surface-container-lowest/92 backdrop-blur-sm shadow-ghost";
 
 const overlayText = {
   success: "text-green-700",

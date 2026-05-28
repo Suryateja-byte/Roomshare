@@ -23,6 +23,32 @@ jest.mock("@/lib/geocoding", () => ({
   geocodeAddress: jest.fn(),
 }));
 
+jest.mock("@/lib/geocoding/address-suggestion-token", () => ({
+  verifyAddressSuggestionToken: jest.fn().mockReturnValue({
+    valid: false,
+    reason: "malformed",
+  }),
+}));
+
+const mockValidateAddressForPublish = jest.fn();
+
+jest.mock("@/lib/geocoding/google-places", () => {
+  class GooglePlacesUnavailableError extends Error {
+    constructor(
+      message: string,
+      public readonly code: "MISSING_KEY" | "TIMEOUT" | "UPSTREAM"
+    ) {
+      super(message);
+    }
+  }
+
+  return {
+    GooglePlacesUnavailableError,
+    validateAddressForPublish: (...args: unknown[]) =>
+      mockValidateAddressForPublish(...args),
+  };
+});
+
 jest.mock("@/lib/data", () => ({}));
 
 jest.mock("@/lib/with-rate-limit", () => ({
@@ -85,10 +111,12 @@ jest.mock("@/lib/profile-completion", () => ({
   calculateProfileCompletion: jest.fn().mockReturnValue({
     percentage: 100,
     missing: [],
-    canCreateListing: true,
+    canSendMessages: true,
+    canBookRooms: true,
   }),
   PROFILE_REQUIREMENTS: {
-    createListing: 60,
+    sendMessages: 40,
+    bookRooms: 80,
   },
 }));
 
@@ -220,11 +248,22 @@ describe("POST /api/listings collision flow", () => {
     process.env = {
       ...originalEnv,
       FEATURE_LISTING_CREATE_COLLISION_WARN: "false",
+      GOOGLE_PLACES_API_KEY: "test-google-key",
       NEXT_PUBLIC_SUPABASE_URL: "https://test-project.supabase.co",
     } as NodeJS.ProcessEnv;
 
     (auth as jest.Mock).mockResolvedValue(mockSession);
     (prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: "user-123" });
+    mockValidateAddressForPublish.mockReset();
+    mockValidateAddressForPublish.mockResolvedValue({
+      address: "123 Main St",
+      city: "San Francisco",
+      state: "CA",
+      zip: "94102",
+      lat: 37.7749,
+      lng: -122.4194,
+      precision: "PREMISE",
+    });
     (geocodeAddress as jest.Mock).mockResolvedValue({
       status: "success",
       lat: 37.7749,

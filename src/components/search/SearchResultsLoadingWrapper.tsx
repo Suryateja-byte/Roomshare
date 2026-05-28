@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
 import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -15,21 +14,24 @@ interface SearchResultsLoadingWrapperProps {
  * filter, sort, and bounds transitions.
  *
  * The current results remain mounted so the list height and scroll position stay
- * stable while the next payload loads. Only the results body is dimmed and made
- * temporarily non-interactive.
+ * stable while the next payload loads. Visual loading chrome is intentionally
+ * quiet: screen readers still get a status update, but the UI does not blur or
+ * cover stale results with a centered pill.
  *
  * UX considerations:
  * - Keeps current results visible (no jarring content flash)
- * - Uses a compact status pill instead of painting a second card grid
+ * - Avoids transition pills and list blur while preserving aria-busy
  * - Restricts aria-busy to the results body region
- * - Smooth transitions for professional feel
  */
 export function SearchResultsLoadingWrapper({
   children,
 }: SearchResultsLoadingWrapperProps) {
   const transitionContext = useSearchTransitionSafe();
   const isPending = transitionContext?.isPending ?? false;
+  const pendingReason = transitionContext?.pendingReason ?? null;
   const isSlowTransition = transitionContext?.isSlowTransition ?? false;
+  const isMapPanPending = isPending && pendingReason === "map-pan";
+  const shouldBlockStaleInteractions = isPending && !isMapPanPending;
   const pendingLabel = isSlowTransition
     ? "Still loading..."
     : "Updating results...";
@@ -89,33 +91,22 @@ export function SearchResultsLoadingWrapper({
       </span>
 
       {isPending && (
-        <>
-          <div
-            className="pointer-events-none absolute inset-0 z-10 bg-surface-canvas/58 backdrop-blur-[1px] transition-opacity duration-200"
-            data-testid="search-results-pending-overlay"
-            aria-hidden="true"
-          />
-          <div className="pointer-events-none absolute inset-x-0 top-3 z-20 flex justify-center px-3">
-            <div
-              role="status"
-              aria-live="polite"
-              aria-atomic="true"
-              data-testid="search-results-pending-status"
-              className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-outline-variant/20 bg-surface-container-lowest/95 px-4 py-2 text-sm font-medium text-on-surface shadow-ambient backdrop-blur-md"
-            >
-              <Loader2
-                className="h-4 w-4 animate-spin text-on-surface-variant"
-                aria-hidden="true"
-              />
-              <span>{pendingLabel}</span>
-            </div>
-          </div>
-        </>
+        <span
+          className="sr-only"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          data-testid="search-results-pending-status"
+        >
+          {pendingLabel}
+        </span>
       )}
 
       <div
         data-testid="search-results-content"
-        className={cn(isPending && "pointer-events-none select-none")}
+        className={cn(
+          shouldBlockStaleInteractions && "pointer-events-none select-none"
+        )}
       >
         {children}
       </div>

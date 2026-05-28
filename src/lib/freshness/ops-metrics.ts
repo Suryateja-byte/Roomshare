@@ -108,6 +108,7 @@ async function getStaleInSearchCount(): Promise<number> {
       SELECT COUNT(*) AS count
       FROM listing_search_docs d
       JOIN "Listing" l ON l.id = d.id
+      JOIN "User" u ON u.id = l."ownerId"
       WHERE ${whereClause}
     `,
     ...whereBuilder.params,
