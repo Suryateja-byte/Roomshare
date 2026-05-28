@@ -121,6 +121,9 @@ describe("resolveOrCreateUnit", () => {
   it("uses trusted coordinates to complete geocode state without enqueueing geocode work", async () => {
     const tx = makeTx(BigInt(1));
     tx.$queryRaw.mockResolvedValueOnce([
+      { exactPointType: "geography", publicPointType: "geography" },
+    ]);
+    tx.$queryRaw.mockResolvedValueOnce([
       {
         id: "unit-1",
         unitIdentityEpoch: 1,
@@ -144,7 +147,10 @@ describe("resolveOrCreateUnit", () => {
 
     expect(result.geocodeStatus).toBe("COMPLETE");
     expect(result.sourceVersion).toBe(BigInt(2));
-    expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(2);
+    expect(tx.$queryRaw.mock.calls[1][0].join("")).toContain(
+      "ST_SetSRID(ST_GeomFromText("
+    );
     expect(tx.outboxEvent.create).toHaveBeenCalledTimes(1);
     expect(tx.outboxEvent.create).toHaveBeenCalledWith(
       expect.objectContaining({

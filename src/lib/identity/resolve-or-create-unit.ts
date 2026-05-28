@@ -12,6 +12,7 @@ import {
 } from "@/lib/identity/canonical-address";
 import {
   buildPublicGeocodeFields,
+  getPhysicalUnitGeocodePointStorage,
   type ProjectionCoordinates,
 } from "@/lib/projections/public-geocode";
 
@@ -152,34 +153,55 @@ export async function resolveOrCreateUnit(
   let effectiveUnit = unit;
   if (input.trustedCoordinates && unit.geocodeStatus !== "COMPLETE") {
     const publicGeocode = buildPublicGeocodeFields(input.trustedCoordinates);
-    const updatedRows = await tx.$queryRaw<
-      {
-        id: string;
-        unitIdentityEpoch: number;
-        canonicalUnit: string;
-        canonicalizerVersion: string;
-        geocodeStatus: string;
-        sourceVersion: bigint;
-      }[]
-    >`
-      UPDATE physical_units
-      SET geocode_status  = 'COMPLETE',
-          exact_point     = ${publicGeocode.exactPointWkt},
-          public_point    = ${publicGeocode.publicPointWkt},
-          public_cell_id  = ${publicGeocode.publicCellId},
-          source_version  = source_version + 1,
-          row_version     = row_version + 1,
-          updated_at      = NOW()
-      WHERE id = ${unit.id}
-        AND geocode_status <> 'COMPLETE'
-      RETURNING
-        id,
-        unit_identity_epoch AS "unitIdentityEpoch",
-        canonical_unit AS "canonicalUnit",
-        canonicalizer_version AS "canonicalizerVersion",
-        geocode_status AS "geocodeStatus",
-        source_version AS "sourceVersion"
-    `;
+    type UpdatedPhysicalUnitRow = {
+      id: string;
+      unitIdentityEpoch: number;
+      canonicalUnit: string;
+      canonicalizerVersion: string;
+      geocodeStatus: string;
+      sourceVersion: bigint;
+    };
+    const pointStorage = await getPhysicalUnitGeocodePointStorage(tx);
+    const updatedRows =
+      pointStorage === "geography"
+        ? await tx.$queryRaw<UpdatedPhysicalUnitRow[]>`
+            UPDATE physical_units
+            SET geocode_status  = 'COMPLETE',
+                exact_point     = ST_SetSRID(ST_GeomFromText(${publicGeocode.exactPointWkt}), 4326)::geography,
+                public_point    = ST_SetSRID(ST_GeomFromText(${publicGeocode.publicPointWkt}), 4326)::geography,
+                public_cell_id  = ${publicGeocode.publicCellId},
+                source_version  = source_version + 1,
+                row_version     = row_version + 1,
+                updated_at      = NOW()
+            WHERE id = ${unit.id}
+              AND geocode_status <> 'COMPLETE'
+            RETURNING
+              id,
+              unit_identity_epoch AS "unitIdentityEpoch",
+              canonical_unit AS "canonicalUnit",
+              canonicalizer_version AS "canonicalizerVersion",
+              geocode_status AS "geocodeStatus",
+              source_version AS "sourceVersion"
+          `
+        : await tx.$queryRaw<UpdatedPhysicalUnitRow[]>`
+            UPDATE physical_units
+            SET geocode_status  = 'COMPLETE',
+                exact_point     = ${publicGeocode.exactPointWkt},
+                public_point    = ${publicGeocode.publicPointWkt},
+                public_cell_id  = ${publicGeocode.publicCellId},
+                source_version  = source_version + 1,
+                row_version     = row_version + 1,
+                updated_at      = NOW()
+            WHERE id = ${unit.id}
+              AND geocode_status <> 'COMPLETE'
+            RETURNING
+              id,
+              unit_identity_epoch AS "unitIdentityEpoch",
+              canonical_unit AS "canonicalUnit",
+              canonicalizer_version AS "canonicalizerVersion",
+              geocode_status AS "geocodeStatus",
+              source_version AS "sourceVersion"
+          `;
     effectiveUnit = updatedRows[0] ?? unit;
   }
 

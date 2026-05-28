@@ -18,7 +18,10 @@ import { appendOutboxEvent } from "@/lib/outbox/append";
 import { geocodeAddress } from "@/lib/geocoding";
 import { MAX_ATTEMPTS } from "@/lib/projections/alert-thresholds";
 import { isCircuitOpenError } from "@/lib/circuit-breaker";
-import { buildPublicGeocodeFields } from "@/lib/projections/public-geocode";
+import {
+  buildPublicGeocodeFields,
+  getPhysicalUnitGeocodePointStorage,
+} from "@/lib/projections/public-geocode";
 
 export interface GeocodeOutboxEvent {
   id: string;
@@ -110,19 +113,39 @@ export async function handleGeocodeNeeded(
   const publicGeocode = buildPublicGeocodeFields({ lat, lng });
 
   // Update physical_units with geocode results
-  await tx.$executeRaw`
-    UPDATE physical_units
-    SET geocode_status  = 'COMPLETE',
-        exact_point     = ${publicGeocode.exactPointWkt},
-        public_point    = ${publicGeocode.publicPointWkt},
-        public_cell_id  = ${publicGeocode.publicCellId},
-        source_version  = source_version + 1,
-        updated_at      = NOW()
-    WHERE id = ${unitId}
-  `;
+  const pointStorage = await getPhysicalUnitGeocodePointStorage(tx);
+  if (pointStorage === "geography") {
+    await tx.$executeRaw`
+      UPDATE physical_units
+      SET geocode_status  = 'COMPLETE',
+          exact_point     = ST_SetSRID(ST_GeomFromText(${publicGeocode.exactPointWkt}), 4326)::geography,
+          public_point    = ST_SetSRID(ST_GeomFromText(${publicGeocode.publicPointWkt}), 4326)::geography,
+          public_cell_id  = ${publicGeocode.publicCellId},
+          source_version  = source_version + 1,
+          updated_at      = NOW()
+      WHERE id = ${unitId}
+    `;
+  } else {
+    await tx.$executeRaw`
+      UPDATE physical_units
+      SET geocode_status  = 'COMPLETE',
+          exact_point     = ${publicGeocode.exactPointWkt},
+          public_point    = ${publicGeocode.publicPointWkt},
+          public_cell_id  = ${publicGeocode.publicCellId},
+          source_version  = source_version + 1,
+          updated_at      = NOW()
+      WHERE id = ${unitId}
+    `;
+  }
 
   // Transition PENDING_GEOCODE → PENDING_PROJECTION for associated inventories
-  const affectedInventories = await tx.$queryRaw<{ id: string; source_version: bigint; unit_identity_epoch_written_at: number }[]>`
+  const affectedInventories = await tx.$queryRaw<
+    {
+      id: string;
+      source_version: bigint;
+      unit_identity_epoch_written_at: number;
+    }[]
+  >`
     UPDATE listing_inventories
     SET publish_status = 'PENDING_PROJECTION',
         updated_at     = NOW()
