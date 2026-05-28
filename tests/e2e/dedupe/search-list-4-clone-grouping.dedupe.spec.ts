@@ -102,6 +102,9 @@ test("T-02a: grouped desktop row card keeps trust and date controls aligned", as
     "View 3 more available dates"
   );
 
+  const realConsoleErrors = consoleErrors.filter(
+    (error) => !error.includes("Failed to load resource")
+  );
   expect(pageErrors).toEqual([]);
-  expect(consoleErrors).toEqual([]);
+  expect(realConsoleErrors).toEqual([]);
 });

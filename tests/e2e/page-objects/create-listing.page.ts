@@ -196,12 +196,14 @@ export class CreateListingPage {
     await this.moveInDateInput.scrollIntoViewIfNeeded();
     await this.moveInDateInput.click();
     const enabledDayButton = this.page
-      .locator('[data-radix-popper-content-wrapper] button:not([disabled])')
+      .locator("[data-radix-popper-content-wrapper] button:not([disabled])")
       .filter({ hasText: /^\d+$/ })
       .first();
     await enabledDayButton.waitFor({ state: "visible", timeout: 5000 });
     await enabledDayButton.click();
-    await expect(this.moveInDateInput).not.toContainText(/select move-in date/i);
+    await expect(this.moveInDateInput).not.toContainText(
+      /select move-in date/i
+    );
   }
 
   async fillAllFields(data: CreateListingData) {
@@ -232,6 +234,22 @@ export class CreateListingPage {
     const secret = process.env.E2E_TEST_SECRET;
     const email =
       ownerEmail || process.env.E2E_TEST_EMAIL || "e2e-test@roomshare.dev";
+
+    try {
+      const response = await this.page.request.get("/api/auth/session", {
+        timeout: 10_000,
+      });
+      if (response.ok()) {
+        const session = (await response.json()) as {
+          user?: { id?: string | null };
+        };
+        if (session.user?.id) {
+          return session.user.id;
+        }
+      }
+    } catch {
+      // Fall through to the test-helper lookup.
+    }
 
     if (!secret) {
       return fallbackUserId;

@@ -1,6 +1,9 @@
 import type { Page } from "@playwright/test";
 import { expect } from "../helpers";
-import { CreateListingPage, type CreateListingData } from "../page-objects/create-listing.page";
+import {
+  CreateListingPage,
+  type CreateListingData,
+} from "../page-objects/create-listing.page";
 import { testApi } from "../helpers/stability-helpers";
 import { signAddressSuggestionToken } from "../../../src/lib/geocoding/address-suggestion-token";
 
@@ -57,7 +60,9 @@ export async function seedCollisionListings(
   );
 
   if (!response.ok) {
-    throw new Error(`seedCollisionListings failed: ${JSON.stringify(response.data)}`);
+    throw new Error(
+      `seedCollisionListings failed: ${JSON.stringify(response.data)}`
+    );
   }
 
   return response.data.listingIds;
@@ -117,6 +122,16 @@ export function buildCollisionFormData(
 }
 
 async function getOwnerId(page: Page): Promise<string> {
+  const sessionResponse = await page.request.get("/api/auth/session");
+  if (sessionResponse.ok()) {
+    const session = (await sessionResponse.json()) as {
+      user?: { id?: string | null };
+    };
+    if (session.user?.id) {
+      return session.user.id;
+    }
+  }
+
   const response = await testApi<{ id: string }>(page, "findUserByEmail", {
     email: OWNER_EMAIL,
   });
@@ -149,38 +164,34 @@ async function mockAddressSuggestionForCollision(
     expiresAt: issuedAt + 15 * 60 * 1000,
   });
 
-  await page.route("**/api/geocoding/address-autocomplete?**", async (route) => {
-    const requestUrl = new URL(route.request().url());
-    const query = requestUrl.searchParams.get("q") ?? "";
-    if (!query.toLowerCase().includes(data.address.toLowerCase())) {
-      await route.continue();
-      return;
+  await page.route(
+    /\/api\/geocoding\/address-autocomplete(?:\?|$)/,
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          suggestions: [
+            {
+              id: `e2e-collision-${data.zipCode}`,
+              label: `${data.address}, ${data.city}, ${data.state} ${data.zipCode}`,
+              primaryText: data.address,
+              secondaryText: `${data.city}, ${data.state} ${data.zipCode}`,
+              address: data.address,
+              city: data.city,
+              state: data.state,
+              zip: data.zipCode,
+              lat: 37.7861,
+              lng: -122.4094,
+              precision: "PREMISE",
+              provider: "google",
+              addressSuggestionToken,
+            },
+          ],
+        }),
+      });
     }
-
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        suggestions: [
-          {
-            id: `e2e-collision-${data.zipCode}`,
-            label: `${data.address}, ${data.city}, ${data.state} ${data.zipCode}`,
-            primaryText: data.address,
-            secondaryText: `${data.city}, ${data.state} ${data.zipCode}`,
-            address: data.address,
-            city: data.city,
-            state: data.state,
-            zip: data.zipCode,
-            lat: 37.7861,
-            lng: -122.4094,
-            precision: "PREMISE",
-            provider: "google",
-            addressSuggestionToken,
-          },
-        ],
-      }),
-    });
-  });
+  );
 }
 
 async function selectCollisionAddressSuggestion(
@@ -189,7 +200,15 @@ async function selectCollisionAddressSuggestion(
   data: CreateListingData
 ): Promise<void> {
   await mockAddressSuggestionForCollision(page, data);
+  const suggestionsResponse = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/geocoding/address-autocomplete") &&
+      response.request().method() === "GET" &&
+      response.status() === 200,
+    { timeout: 15_000 }
+  );
   await createPage.addressInput.fill(data.address);
+  await suggestionsResponse;
   await expect(
     page.getByRole("listbox", { name: "Address suggestions" })
   ).toBeVisible();
