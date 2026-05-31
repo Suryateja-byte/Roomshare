@@ -431,24 +431,27 @@ describe("Error Handling Integration", () => {
 
 describe("Neighborhood Performance Smoke Tests", () => {
   it("computes distances for 100 POIs quickly", () => {
-    // Generate 100 POIs
     const manyPois: POI[] = Array.from({ length: 100 }, (_, i) => ({
       placeId: `poi-${i}`,
       name: `Place ${i}`,
-      lat: LISTING_COORDS.lat + (Math.random() - 0.5) * 0.1,
-      lng: LISTING_COORDS.lng + (Math.random() - 0.5) * 0.1,
+      lat: LISTING_COORDS.lat + ((i % 10) - 5) * 0.01,
+      lng: LISTING_COORDS.lng + (Math.floor(i / 10) - 5) * 0.01,
     }));
 
-    const start = performance.now();
+    const samples = Array.from({ length: 5 }, () => {
+      const start = performance.now();
 
-    for (let i = 0; i < 100; i++) {
-      computeDistances(manyPois, LISTING_COORDS);
-    }
+      for (let i = 0; i < 100; i++) {
+        computeDistances(manyPois, LISTING_COORDS);
+      }
 
-    const elapsed = performance.now() - start;
+      return performance.now() - start;
+    }).sort((a, b) => a - b);
+    const medianElapsed = samples[Math.floor(samples.length / 2)];
 
-    // 100 iterations should complete in < 100ms
-    expect(elapsed).toBeLessThan(100);
+    // 100 iterations should complete in < 100ms. Median sampling avoids
+    // failing the gate on one scheduler pause during the full Jest run.
+    expect(medianElapsed).toBeLessThan(100);
   });
 
   it("sorts 100 POIs by distance quickly", () => {

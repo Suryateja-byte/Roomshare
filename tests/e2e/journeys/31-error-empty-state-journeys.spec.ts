@@ -41,9 +41,11 @@ test.describe("Error & Empty State Journeys", () => {
 
       // Verify "Back to Search" navigation link exists and is clickable
       // Use .first() because navbar may also have a "Search" link
-      const searchLink = page.getByRole("link", {
-        name: /back to search|search|browse/i,
-      }).first();
+      const searchLink = page
+        .getByRole("link", {
+          name: /back to search|search|browse/i,
+        })
+        .first();
       await expect(searchLink).toBeVisible();
       await expect(searchLink).toHaveAttribute("href", /\/search/);
 
@@ -178,26 +180,31 @@ test.describe("Error & Empty State Journeys", () => {
         timeout: 30000,
       });
 
-      // Check for empty state or conversations
+      // Check for real conversations before looking for empty-state copy.
+      // Conversation previews can contain "No messages yet" without the page
+      // itself being empty.
+      const conversationLinks = page.locator('main a[href^="/messages/"]');
+      const hasConversations =
+        (await conversationLinks.count().catch(() => 0)) > 0;
+
+      if (hasConversations) {
+        await expect(conversationLinks.first()).toBeVisible();
+        return;
+      }
+
+      // Check for empty state
       const emptyText = page
         .getByText(/no conversation|no message|start chatting/i)
         .first();
-      const conversations = page.locator(
-        '[data-testid*="conversation"], [data-testid*="message"]'
-      );
 
       const hasEmptyText = await emptyText
         .isVisible({ timeout: 5000 })
         .catch(() => false);
-      const hasConversations =
-        (await conversations.count().catch(() => 0)) > 0;
 
       if (hasEmptyText) {
         // Verify empty state has guidance
         await expect(
-          page
-            .getByText(/no conversation.*yet|start chatting/i)
-            .first()
+          page.getByText(/no conversation.*yet|start chatting/i).first()
         ).toBeVisible();
 
         // Verify guidance about how to start messaging
@@ -205,9 +212,7 @@ test.describe("Error & Empty State Journeys", () => {
           .locator("#main-content, main")
           .first()
           .textContent();
-        const hasGuidance = /contact|host|listing|browse/i.test(
-          pageText || ""
-        );
+        const hasGuidance = /contact|host|listing|browse/i.test(pageText || "");
         expect(hasGuidance || hasEmptyText).toBeTruthy();
       } else if (hasConversations) {
         expect(hasConversations).toBeTruthy();
@@ -253,16 +258,25 @@ test.describe("Error & Empty State Journeys", () => {
 
       // Should show validation errors — check multiple mechanisms
       const hasFieldErrors =
-        (await page.locator('[role="alert"], .text-red-500, .text-destructive, [aria-invalid="true"]').count()) > 0;
+        (await page
+          .locator(
+            '[role="alert"], .text-red-500, .text-destructive, [aria-invalid="true"]'
+          )
+          .count()) > 0;
       const hasRequiredMessage =
-        (await page.getByText(/required|can.*empty|must provide|please enter/i).count()) > 0;
+        (await page
+          .getByText(/required|can.*empty|must provide|please enter/i)
+          .count()) > 0;
       const hasNativeValidation =
-        (await page.locator('input:invalid').count()) > 0;
+        (await page.locator("input:invalid").count()) > 0;
       const stayedOnPage = page.url().includes("/signup");
 
       // At least one validation mechanism should prevent empty submission
       expect(
-        hasFieldErrors || hasRequiredMessage || hasNativeValidation || stayedOnPage
+        hasFieldErrors ||
+          hasRequiredMessage ||
+          hasNativeValidation ||
+          stayedOnPage
       ).toBeTruthy();
 
       // Should NOT have navigated away from signup
@@ -299,9 +313,8 @@ test.describe("Error & Empty State Journeys", () => {
       const isInvalid =
         (await passwordInput.getAttribute("aria-invalid")) === "true";
       const hasError =
-        (await page
-          .getByText(/password.*required|enter.*password/i)
-          .count()) > 0;
+        (await page.getByText(/password.*required|enter.*password/i).count()) >
+        0;
       const hasNativeInvalid = await page
         .locator('input[type="password"]:invalid')
         .count();
@@ -369,7 +382,9 @@ test.describe("Error & Empty State Journeys", () => {
         // Listen for JavaScript dialog events (alert/confirm/prompt).
         // If any XSS payload executes, it will trigger an alert dialog.
         let alertFired = false;
-        const dialogHandler = () => { alertFired = true; };
+        const dialogHandler = () => {
+          alertFired = true;
+        };
         page.on("dialog", dialogHandler);
 
         await page.goto(payload, {

@@ -13,6 +13,7 @@ import {
   timeouts,
   SF_BOUNDS,
   searchResultsContainer,
+  waitForHydration,
 } from "../helpers";
 
 test.beforeEach(async () => {
@@ -37,7 +38,10 @@ test.describe("J25: Send Message in Conversation", () => {
 
     // Check we weren't redirected to login or signup
     const messagesUrl = page.url();
-    const onAuthPage = messagesUrl.includes("/login") || messagesUrl.includes("/signin") || messagesUrl.includes("/signup");
+    const onAuthPage =
+      messagesUrl.includes("/login") ||
+      messagesUrl.includes("/signin") ||
+      messagesUrl.includes("/signup");
     test.skip(onAuthPage, "Auth redirect — session not available in CI");
     if (onAuthPage) return;
 
@@ -67,13 +71,10 @@ test.describe("J25: Send Message in Conversation", () => {
       waitUntil: "commit",
     });
     await page.waitForLoadState("domcontentloaded").catch(() => {});
+    await waitForHydration(page, { timeout: timeouts.navigation });
 
     // Step 4: Type and send a message
-    const msgInput = page
-      .getByPlaceholder(/message|type|write/i)
-      .or(page.locator('input[name*="message"]'))
-      .or(page.locator('textarea[name*="message"]'))
-      .or(page.locator('[data-testid="message-input"]'));
+    const msgInput = page.locator('main [data-testid="message-input"]');
 
     const canType = await msgInput
       .first()
@@ -86,17 +87,46 @@ test.describe("J25: Send Message in Conversation", () => {
 
     const testMsg = `E2E test message ${Date.now()}`;
     await input.click();
-    await input.pressSequentially(testMsg, { delay: 5 });
+    await input.fill(testMsg);
     await expect(input).toHaveValue(testMsg);
 
-    const sendBtn = page
-      .getByRole("button", { name: /send/i })
-      .or(page.locator('[data-testid="send-button"]'))
-      .or(page.locator('button[type="submit"]'));
-    await expect(sendBtn.first()).toBeEnabled({ timeout: 10_000 });
-    await sendBtn.first().click({ timeout: 30000 });
+    const sendBtn = page.locator('main [data-testid="send-button"]').first();
+    await expect
+      .poll(
+        async () =>
+          input.evaluate((el) => {
+            const button = el
+              .closest("form")
+              ?.querySelector<HTMLButtonElement>('[data-testid="send-button"]');
+            return {
+              hasInput: (el as HTMLInputElement).value.trim().length > 0,
+              canSend: button ? !button.disabled : false,
+            };
+          }),
+        {
+          timeout: 10_000,
+          message:
+            "Expected the message input state to enable the paired send button",
+        }
+      )
+      .toEqual({ hasInput: true, canSend: true });
+
+    const sendResponse = page
+      .waitForResponse(
+        (response) =>
+          response.request().method() === "POST" &&
+          response.url().includes("/messages"),
+        { timeout: timeouts.navigation }
+      )
+      .catch(() => null);
+    await sendBtn.click({ timeout: 30_000 });
+    await sendResponse;
     // Wait for sent message to appear
-    await page.getByText(testMsg).last().waitFor({ state: "visible", timeout: 10_000 }).catch(() => {});
+    await page
+      .getByText(testMsg)
+      .last()
+      .waitFor({ state: "visible", timeout: 10_000 })
+      .catch(() => {});
 
     // Step 5: Verify message appears in thread
     // TODO: add data-testid="sent-message" to ChatWindow sent message bubbles
@@ -169,7 +199,10 @@ test.describe("J26: Start Conversation from Listing", () => {
         async () => {
           const onMessages = page.url().includes("/messages");
           const hasToast = await toast.isVisible().catch(() => false);
-          const canType = await msgInput.first().isVisible().catch(() => false);
+          const canType = await msgInput
+            .first()
+            .isVisible()
+            .catch(() => false);
           return onMessages || hasToast || canType;
         },
         {
@@ -235,7 +268,8 @@ test.describe("J27: Empty Messages Inbox", () => {
     await nav.goToMessages();
 
     // Check we weren't redirected to login
-    const onLoginPage = page.url().includes("/login") || page.url().includes("/signin");
+    const onLoginPage =
+      page.url().includes("/login") || page.url().includes("/signin");
     test.skip(onLoginPage, "Auth session expired - redirected to login");
     if (onLoginPage) return;
 

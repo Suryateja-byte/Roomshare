@@ -701,7 +701,7 @@ export default function NavbarClient({
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2.5">
+                  <div className="hidden items-center gap-2.5 md:flex">
                     <Link
                       href="/login"
                       className="text-sm font-medium text-on-surface-variant hover:text-on-surface px-4 py-2 min-h-[44px] flex items-center transition-colors duration-300 rounded-full hover:bg-surface-container-high"

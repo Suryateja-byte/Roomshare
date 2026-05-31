@@ -1,6 +1,14 @@
 # State Machines
 
 > State lifecycle documentation for all stateful entities in Roomshare.
+>
+> **Legacy notice:** This document still contains booking-first lifecycle
+> material. For Roomshare v1 public discovery, listing availability, Contact
+> Host, Phone Reveal, payments, and recovery rules, use
+> [`ROOMSHARE_RULEBOOK.md`](ROOMSHARE_RULEBOOK.md) as the canonical
+> contact-first rulebook. Booking lifecycle content here is legacy/drain-only
+> unless a newer rulebook section or implementation plan explicitly references
+> it.
 
 ## Table of Contents
 

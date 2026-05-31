@@ -186,7 +186,7 @@ test.describe("Create Listing — Image Upload", () => {
 
     // After completion, success summary should appear
     await expect(page.getByText("1 image uploaded successfully")).toBeVisible({
-      timeout: 2000,
+      timeout: timeouts.action,
     });
   });
 

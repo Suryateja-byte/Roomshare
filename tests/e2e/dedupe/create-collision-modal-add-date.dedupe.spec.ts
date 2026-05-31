@@ -5,8 +5,11 @@ import {
   expectCreatedListingId,
   getListingCollisionState,
   openPreparedCreateListingPage,
+  resetCreateListingRateLimits,
   seedCollisionListings,
 } from "./create-collision-helpers";
+
+test.use({ storageState: "playwright/.auth/incomplete-host.json" });
 
 test("T-17: add-date collision retry re-posts with ack and creates a listing", async ({
   page,
@@ -40,6 +43,7 @@ test("T-17: add-date collision retry re-posts with ack and creates a listing", a
     );
 
     await page.getByTestId("collision-radio-add-date").check();
+    await resetCreateListingRateLimits(page);
     await page.getByTestId("collision-continue").click();
 
     const ackRequest = await ackRequestPromise;

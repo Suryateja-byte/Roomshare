@@ -15,6 +15,21 @@ test.describe("Create Listing — Performance Tests", () => {
   // Performance tests need extended timeouts for measurement windows
   test.slow();
 
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.removeItem("listing-draft");
+    });
+
+    // Warm the dev route once so browser metrics are not dominated by Next.js
+    // route compilation on the first request.
+    await page.goto("/listings/create");
+    await page.waitForLoadState("domcontentloaded");
+    await page
+      .getByRole("heading", { name: "List your sanctuary." })
+      .waitFor({ state: "visible", timeout: timeouts.navigation });
+    await page.goto("about:blank");
+  });
+
   // ────────────────────────────────────────────────────────
   // P1 — Core Web Vitals
   // ────────────────────────────────────────────────────────

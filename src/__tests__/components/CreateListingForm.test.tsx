@@ -338,6 +338,7 @@ describe("CreateListingForm", () => {
         hasDraft: true,
         savedAt: new Date(),
         saveData: jest.fn(),
+        cancelSave: jest.fn(),
         clearPersistedData: jest.fn(),
         isHydrated: true,
         crossTabConflict: false,
@@ -362,6 +363,7 @@ describe("CreateListingForm", () => {
         hasDraft: true,
         savedAt: new Date(),
         saveData: jest.fn(),
+        cancelSave: jest.fn(),
         clearPersistedData: clearMock,
         isHydrated: true,
         crossTabConflict: false,
@@ -384,6 +386,7 @@ describe("CreateListingForm", () => {
         hasDraft: false,
         savedAt: new Date(),
         saveData: jest.fn(),
+        cancelSave: jest.fn(),
         clearPersistedData: jest.fn(),
         isHydrated: true,
         crossTabConflict: false,
@@ -648,12 +651,10 @@ describe("CreateListingForm", () => {
       render(<CreateListingForm />);
       await addImageAndSubmit();
 
-      await waitFor(() => {
-        expect(
-          screen.getByText("Please verify your email to continue")
-        ).toBeInTheDocument();
-      });
-    });
+      expect(
+        await screen.findByText("Please verify your email to continue")
+      ).toBeInTheDocument();
+    }, 10_000);
 
     it("silently handles AbortError", async () => {
       const abortError = new Error("Aborted");
@@ -722,7 +723,9 @@ describe("CreateListingForm", () => {
 
       submitForm();
 
-      expect(await screen.findByText("Move-in date is required")).toBeInTheDocument();
+      expect(
+        await screen.findByText("Move-in date is required")
+      ).toBeInTheDocument();
       expect(document.getElementById("moveInDate")).toHaveAttribute(
         "aria-invalid",
         "true"

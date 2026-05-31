@@ -646,12 +646,14 @@ test.describe("Edge Case Journeys", () => {
       await nav.clickListingCard(0);
       await page.waitForLoadState("domcontentloaded");
 
-      // Images should be lazy loaded or optimized
-      // Images should be lazy loaded or optimized (img[loading="lazy"], img[decoding="async"])
+      await expect(
+        page.locator('[data-testid="listing-detail-header"]')
+      ).toBeVisible({ timeout: 30000 });
 
-      // Page should remain responsive
+      // The listing page should be interactive even if noncritical image work is
+      // still in flight after domcontentloaded.
       const isResponsive = await page.evaluate(() => {
-        return document.readyState === "complete";
+        return document.readyState !== "loading";
       });
 
       expect(isResponsive).toBeTruthy();
@@ -711,7 +713,16 @@ test.describe("Edge Case Journeys", () => {
         await saveButton.click();
 
         // Step 5: Go to saved listings
-        await nav.goToSaved();
+        await page
+          .goto("/saved", { waitUntil: "domcontentloaded" })
+          .catch((error) => {
+            if (!String(error).includes("ERR_ABORTED")) {
+              throw error;
+            }
+          });
+        await page
+          .waitForURL(/\/(?:saved|login)(?:\?|$)/, { timeout: 30000 })
+          .catch(() => {});
 
         // Check we weren't redirected to login
         if (!(await nav.isOnAuthenticatedPage())) {
@@ -719,6 +730,10 @@ test.describe("Edge Case Journeys", () => {
           return;
         }
 
+        await expect(page).toHaveURL(/\/saved(?:\?|$)/, { timeout: 30000 });
+        await expect(
+          page.getByRole("heading", { name: /saved listings/i })
+        ).toBeVisible({ timeout: 30000 });
         await assert.pageLoaded();
 
         // Step 6: Unsave from saved page

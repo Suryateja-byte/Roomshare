@@ -5,8 +5,11 @@ import {
   expectCreatedListingId,
   getListingCollisionState,
   openPreparedCreateListingPage,
+  resetCreateListingRateLimits,
   seedCollisionListings,
 } from "./create-collision-helpers";
+
+test.use({ storageState: "playwright/.auth/incomplete-host.json" });
 
 test("T-18: create-separate requires a reason and creates a non-moderated listing", async ({
   page,
@@ -42,6 +45,7 @@ test("T-18: create-separate requires a reason and creates a non-moderated listin
 
     await reasonTextarea.fill("Separate lease and entrance justify its own listing.");
     await expect(page.getByTestId("collision-continue")).toBeEnabled();
+    await resetCreateListingRateLimits(page);
     await page.getByTestId("collision-continue").click();
 
     const ackResponse = await ackResponsePromise;

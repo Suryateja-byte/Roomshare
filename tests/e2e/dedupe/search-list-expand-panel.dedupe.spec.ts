@@ -1,7 +1,7 @@
 import { test, expect, searchResultsContainer } from "../helpers";
 import {
   DEDUPE_IDS,
-  openGroupTrigger,
+  clickGroupTriggerUntilOpen,
   searchUrls,
   waitForVisibleCards,
 } from "./dedupe-helpers";
@@ -18,7 +18,7 @@ test("T-03: expanding the grouped dates panel shows all dates and routes to the 
   await page.goto(searchUrls.cloneGroup, { waitUntil: "domcontentloaded" });
   await waitForVisibleCards(page);
 
-  await (await openGroupTrigger(page)).click();
+  await clickGroupTriggerUntilOpen(page);
 
   const panel = searchResultsContainer(page).locator(
     '[data-testid="group-dates-panel"]'

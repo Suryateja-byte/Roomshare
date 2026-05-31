@@ -248,7 +248,16 @@ export function navigationHelpers(page: Page) {
         }
         if (params.toString()) url += `?${params.toString()}`;
       }
-      await page.goto(url);
+      await page
+        .goto(url, { waitUntil: "domcontentloaded" })
+        .catch((error) => {
+          if (!String(error).includes("ERR_ABORTED")) {
+            throw error;
+          }
+        });
+      await expect(page).toHaveURL(/\/search(?:\?|$)/, {
+        timeout: timeouts.navigation,
+      });
       await waitForPageReady(page, {
         selector: 'form, [data-testid="search-form"], main',
       });

@@ -3,6 +3,7 @@ import {
   expect,
   SF_BOUNDS,
   searchResultsContainer,
+  waitForHydration,
   waitForMapReady,
 } from "../helpers";
 
@@ -69,10 +70,35 @@ export async function visibleMarkerCount(page: Page): Promise<number> {
 }
 
 export async function openGroupTrigger(page: Page): Promise<Locator> {
+  await waitForHydration(page, { timeout: 30_000 });
+  await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {
+    // Search pages can keep background requests open; visible results are enough
+    // once hydration has completed.
+  });
   const trigger = searchResultsContainer(page)
     .locator('[data-testid="group-dates-trigger"]')
     .first();
   await expect(trigger).toBeVisible();
+  return trigger;
+}
+
+export async function clickGroupTriggerUntilOpen(page: Page): Promise<Locator> {
+  const trigger = await openGroupTrigger(page);
+  await expect
+    .poll(
+      async () => {
+        if ((await trigger.getAttribute("aria-expanded")) === "true") {
+          return "true";
+        }
+        await trigger.click();
+        return trigger.getAttribute("aria-expanded");
+      },
+      {
+        timeout: 30_000,
+        message: "Expected grouped-date trigger to open",
+      }
+    )
+    .toBe("true");
   return trigger;
 }
 

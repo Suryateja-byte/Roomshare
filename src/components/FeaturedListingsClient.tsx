@@ -162,7 +162,7 @@ export default function FeaturedListingsClient({
             </Button>
           </div>
         ) : (
-          <div className="grid gap-x-6 gap-y-10 md:grid-cols-12">
+          <div className="grid grid-cols-1 gap-x-6 gap-y-10 md:grid-cols-12">
             {visibleListings.map((listing, index) => {
               const big = index % 5 === 0;
               return (
@@ -222,11 +222,11 @@ function EditorialListingCard({
     <article
       data-testid="listing-card"
       data-listing-id={listing.id}
-      className={`group ${big ? "md:col-span-6" : "md:col-span-3"} col-span-1`}
+      className={`group col-span-1 min-w-0 ${big ? "md:col-span-6" : "md:col-span-3"}`}
     >
       <div
         className={`relative overflow-hidden rounded-[1.125rem] bg-surface-container-high ${
-          big ? "h-[26rem]" : "h-[19rem]"
+          big ? "h-72 sm:h-80 md:h-[26rem]" : "h-64 sm:h-72 md:h-[19rem]"
         }`}
       >
         <Link
@@ -244,11 +244,11 @@ function EditorialListingCard({
           <span className="absolute inset-0 bg-gradient-to-t from-on-surface/40 via-transparent to-transparent" />
         </Link>
 
-        <div className="absolute left-3 right-3 top-3 z-10 flex items-center gap-2">
+        <div className="absolute left-3 right-3 top-3 z-10 flex min-w-0 items-center gap-2">
           {tags.map((tag) => (
             <span
               key={tag}
-              className="rounded-full bg-surface-canvas/95 px-3 py-1.5 text-[0.68rem] font-bold uppercase tracking-[0.08em] text-on-surface shadow-ambient-sm backdrop-blur"
+              className="min-w-0 truncate rounded-full bg-surface-canvas/95 px-3 py-1.5 text-[0.68rem] font-bold uppercase tracking-[0.08em] text-on-surface shadow-ambient-sm backdrop-blur"
             >
               {tag}
             </span>
@@ -256,7 +256,7 @@ function EditorialListingCard({
           <div className="flex-1" />
           <FavoriteButton
             listingId={listing.id}
-            className="min-h-[2.25rem] min-w-[2.25rem] p-0"
+            className="min-h-[44px] min-w-[44px] p-0"
           />
         </div>
 
@@ -278,12 +278,12 @@ function EditorialListingCard({
         ) : null}
       </div>
 
-      <div className="pt-4">
-        <div className="flex items-baseline justify-between gap-4">
-          <h3 className="line-clamp-1 text-base font-semibold text-on-surface">
+      <div className="min-w-0 pt-4">
+        <div className="flex min-w-0 items-baseline justify-between gap-4">
+          <h3 className="line-clamp-1 min-w-0 text-base font-semibold text-on-surface">
             <Link
               href={`/listings/${listing.id}`}
-              className="inline-flex min-h-8 items-center hover:underline"
+              className="inline-flex min-h-8 min-w-0 items-center hover:underline"
             >
               {listing.title}
             </Link>

@@ -87,7 +87,7 @@ function HeroSection() {
   return (
     <section
       aria-label="Search for rooms"
-      className="relative isolate flex min-h-[100dvh] flex-col overflow-hidden bg-surface-canvas pb-6 pt-[4.75rem] md:pb-8 md:pt-24"
+      className="home-hero-section relative isolate flex flex-col overflow-hidden bg-surface-canvas pb-4 pt-[4.25rem] sm:pt-[4.75rem] md:pb-8 md:pt-24"
     >
       <div
         aria-hidden="true"

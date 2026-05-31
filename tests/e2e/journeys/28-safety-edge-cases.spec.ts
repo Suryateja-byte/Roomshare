@@ -17,6 +17,7 @@ import {
   SF_BOUNDS,
   searchResultsContainer,
 } from "../helpers";
+import { testApi } from "../helpers/stability-helpers";
 
 test.beforeEach(async () => {
   test.slow();
@@ -24,129 +25,84 @@ test.beforeEach(async () => {
 
 // ─── J45: Report a Listing ────────────────────────────────────────────────────
 test.describe("J45: Report a Listing", () => {
-  test("listing detail → report → fill reason → submit → verify toast", async ({
+  test("listing detail → report → fill reason → submit → verify confirmation", async ({
     page,
-    nav,
   }) => {
-    // Step 1: Find a listing NOT owned by test user (report button only shows for non-owners)
-    await nav.goToSearch({ q: "Reviewer Nob Hill", bounds: SF_BOUNDS });
-    await page.waitForLoadState("domcontentloaded");
+    let listingId: string | undefined;
 
-    const container = searchResultsContainer(page);
-    const cards = container.locator(selectors.listingCard);
-    test.skip((await cards.count()) === 0, "No listings — skipping");
-
-    // Step 2: Go to listing
-    await nav.clickListingCard(0);
-    await page.waitForURL(/\/listings\//, {
-      timeout: timeouts.navigation,
-      waitUntil: "commit",
-    });
-    await page.waitForLoadState("domcontentloaded");
-
-    // Step 3: Find report button (text is "Report this listing")
-    const reportBtn = page
-      .getByRole("button", { name: /report this listing|report|flag/i })
-      .or(page.locator('[data-testid="report-listing"]'));
-
-    const canReport = await reportBtn
-      .first()
-      .isVisible()
-      .catch(() => false);
-    test.skip(!canReport, "No report button — skipping");
-
-    await reportBtn.first().click();
-
-    // Step 4: Fill report form — ReportButton uses shadcn Dialog
-    // The dialog content renders in a portal with data-state="open"
-    const dialog = page
-      .locator('[role="dialog"][data-state="open"]')
-      .or(
-        page
-          .locator('[role="dialog"]')
-          .filter({ hasText: /report listing|report/i })
+    try {
+      const title = `E2E Safety Report ${Date.now()}`;
+      const seeded = await testApi<{ listingIds: string[] }>(
+        page,
+        "seedCollisionListings",
+        {
+          ownerEmail: "e2e-incomplete-host@roomshare.dev",
+          title,
+          address: `${Date.now()} Safety Report St`,
+          city: "San Francisco",
+          state: "CA",
+          zip: "94103",
+          count: 1,
+          createdAtOffsetsHours: [1],
+          moveInDateOffsetsDays: [7],
+        }
       );
-    await dialog
-      .first()
-      .waitFor({ state: "visible", timeout: 5000 })
-      .catch(() => {});
-    const dialogVisible = await dialog
-      .first()
-      .isVisible()
-      .catch(() => false);
-    if (!dialogVisible) {
-      // Try clicking the report button again — may need a second click after hydration
-      await reportBtn.first().click();
-      await dialog
-        .first()
-        .waitFor({ state: "visible", timeout: 5000 })
-        .catch(() => {});
-    }
-    const hasDialog = await dialog
-      .first()
-      .isVisible()
-      .catch(() => false);
-    test.skip(!hasDialog, "Report dialog did not open — skipping");
+      expect(seeded.ok, JSON.stringify(seeded.data)).toBe(true);
+      listingId = seeded.data.listingIds[0];
+      expect(listingId).toBeTruthy();
 
-    // Click the Select trigger to open dropdown
-    const reportDialog = dialog.first();
-    const selectTrigger = reportDialog
-      .locator('[role="combobox"]')
-      .or(reportDialog.getByRole("combobox"));
-    if (
-      await selectTrigger
-        .first()
-        .isVisible()
-        .catch(() => false)
-    ) {
+      await page.goto(`/listings/${listingId}`, {
+        waitUntil: "domcontentloaded",
+      });
+
+      // ReportButton has a hydration guard. Wait for the hydrated trigger
+      // instead of clicking the SSR placeholder shell.
+      const reportBtn = page.locator(
+        '[data-testid="report-listing"][data-state]'
+      );
+      await expect(reportBtn.first()).toBeVisible({
+        timeout: timeouts.action,
+      });
+      await reportBtn.first().click();
+
+      // Fill report form. The select options render in a portal outside the
+      // dialog, so select the option from the page after opening the trigger.
+      const reportDialog = page.getByRole("dialog").filter({
+        hasText: /report listing/i,
+      });
+      await expect(reportDialog).toBeVisible({ timeout: timeouts.action });
+
+      const selectTrigger = reportDialog.getByRole("combobox");
       await selectTrigger.first().click();
-      await page
-        .locator('[role="option"]')
-        .first()
-        .waitFor({ state: "visible", timeout: 3000 })
-        .catch(() => {});
-      // Select "Spam" option from dropdown (options render in a portal outside dialog)
-      const option = page
-        .locator('[role="option"]')
-        .filter({ hasText: /spam|fraud|inappropriate/i })
-        .first();
-      if (await option.isVisible().catch(() => false)) {
-        await option.click();
+      await page.getByRole("option", { name: /spam/i }).click();
+
+      const detailsField = reportDialog.locator("textarea");
+      if (await detailsField.first().isVisible().catch(() => false)) {
+        await detailsField.first().fill("Misleading photos - E2E test report");
+      }
+
+      const submitBtn = reportDialog.getByRole("button", {
+        name: /submit report/i,
+      });
+      await expect(submitBtn).toBeEnabled({ timeout: timeouts.action });
+
+      const reportResponsePromise = page.waitForResponse(
+        (response) =>
+          response.url().includes("/api/reports") &&
+          response.request().method() === "POST"
+      );
+      await submitBtn.click();
+      const reportResponse = await reportResponsePromise;
+      expect(reportResponse.status()).toBeLessThan(300);
+
+      await expect(
+        reportDialog.getByText(/thank you for your report/i)
+      ).toBeVisible({ timeout: timeouts.action });
+    } finally {
+      if (listingId) {
+        await testApi(page, "deleteListings", { listingIds: [listingId] });
       }
     }
-
-    // Fill optional details textarea if visible
-    const detailsField = reportDialog.locator("textarea");
-    if (
-      await detailsField
-        .first()
-        .isVisible()
-        .catch(() => false)
-    ) {
-      await detailsField.first().fill("Misleading photos — E2E test report");
-    }
-
-    // Step 5: Submit report — click "Submit Report" button inside the dialog
-    const submitBtn = reportDialog
-      .getByRole("button", { name: /submit report/i })
-      .or(reportDialog.getByRole("button", { name: /submit/i }));
-    if (
-      await submitBtn
-        .first()
-        .isVisible()
-        .catch(() => false)
-    ) {
-      await submitBtn.first().click();
-      await page.waitForLoadState("domcontentloaded");
-    }
-
-    // Step 6: Verify confirmation — ReportButton shows inline "Thank you" text
-    const confirmation = page
-      .locator(selectors.toast)
-      .filter({ hasText: /reported|submitted|thank/i })
-      .or(page.getByText(/reported|submitted|thank/i))
-      .first();
-    await expect(confirmation).toBeVisible({ timeout: timeouts.action });
   });
 });
 

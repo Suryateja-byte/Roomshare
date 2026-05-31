@@ -23,7 +23,10 @@ const breakpoints = [
 // Pages that can be tested without auth (public routes)
 const publicPages = [
   { name: "homepage", url: "/" },
-  { name: "search", url: "/search?minLat=37.7&minLng=-122.5&maxLat=37.8&maxLng=-122.4" },
+  {
+    name: "search",
+    url: "/search?minLat=37.7&minLng=-122.5&maxLat=37.8&maxLng=-122.4",
+  },
   { name: "about", url: "/about" },
   { name: "login", url: "/login" },
   { name: "signup", url: "/signup" },
@@ -43,12 +46,17 @@ for (const bp of breakpoints) {
         await p.waitForLoadState("networkidle").catch(() => {});
 
         const hasHorizontalScroll = await p.evaluate(() => {
-          return document.documentElement.scrollWidth > document.documentElement.clientWidth;
+          return (
+            document.documentElement.scrollWidth >
+            document.documentElement.clientWidth
+          );
         });
         expect(hasHorizontalScroll).toBe(false);
       });
 
-      test(`no element overflows viewport on ${page.name}`, async ({ page: p }) => {
+      test(`no element overflows viewport on ${page.name}`, async ({
+        page: p,
+      }) => {
         await p.goto(page.url, { waitUntil: "domcontentloaded" });
         await p.waitForLoadState("networkidle").catch(() => {});
 
@@ -67,7 +75,12 @@ for (const bp of breakpoints) {
             while (parent && parent !== document.body) {
               const parentStyle = window.getComputedStyle(parent);
               const overflow = parentStyle.overflow + parentStyle.overflowX;
-              if (overflow.includes("hidden") || overflow.includes("clip") || overflow.includes("auto") || overflow.includes("scroll")) {
+              if (
+                overflow.includes("hidden") ||
+                overflow.includes("clip") ||
+                overflow.includes("auto") ||
+                overflow.includes("scroll")
+              ) {
                 const parentRect = parent.getBoundingClientRect();
                 // Parent clips content and its right edge is within viewport
                 if (parentRect.right <= viewportWidth + 2) {
@@ -83,7 +96,11 @@ for (const bp of breakpoints) {
             const rect = el.getBoundingClientRect();
             // Only check visible elements
             const style = window.getComputedStyle(el);
-            if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") {
+            if (
+              style.display === "none" ||
+              style.visibility === "hidden" ||
+              style.opacity === "0"
+            ) {
               continue;
             }
             if (rect.right > viewportWidth + 2) {
@@ -93,14 +110,21 @@ for (const bp of breakpoints) {
               }
               // 2px tolerance for sub-pixel rendering
               const tag = el.tagName.toLowerCase();
-              const cls = el.className ? `.${String(el.className).split(" ").slice(0, 2).join(".")}` : "";
-              overflows.push(`${tag}${cls} (right: ${Math.round(rect.right)}px > viewport: ${viewportWidth}px)`);
+              const cls = el.className
+                ? `.${String(el.className).split(" ").slice(0, 2).join(".")}`
+                : "";
+              overflows.push(
+                `${tag}${cls} (right: ${Math.round(rect.right)}px > viewport: ${viewportWidth}px)`
+              );
             }
           }
           return overflows.slice(0, 5); // Cap at 5 to keep output readable
         });
 
-        expect(overflowingElements, `Overflowing elements at ${bp.width}px`).toEqual([]);
+        expect(
+          overflowingElements,
+          `Overflowing elements at ${bp.width}px`
+        ).toEqual([]);
       });
     }
 
@@ -114,7 +138,9 @@ for (const bp of breakpoints) {
         const mobileMenu = p.locator(
           'button[aria-label*="menu" i], button[aria-label*="nav" i], [data-testid="mobile-menu"], nav button'
         );
-        const desktopNav = p.locator('nav a:visible, nav [role="menuitem"]:visible');
+        const desktopNav = p.locator(
+          'nav a:visible, nav [role="menuitem"]:visible'
+        );
         const desktopNavCount = await desktopNav.count();
 
         // Either there's a hamburger, or nav items are few enough to be shown
@@ -165,7 +191,10 @@ for (const bp of breakpoints) {
         return tiny.slice(0, 5);
       });
 
-      expect(tinyTextElements, `Text elements below 11px at ${bp.width}px`).toEqual([]);
+      expect(
+        tinyTextElements,
+        `Text elements below 11px at ${bp.width}px`
+      ).toEqual([]);
     });
 
     // Images should have proper sizing (no broken aspect ratios from missing width/height)
@@ -174,19 +203,28 @@ for (const bp of breakpoints) {
       await p.waitForLoadState("networkidle").catch(() => {});
 
       const brokenImages = await p.evaluate(() => {
-        const images = document.querySelectorAll("img:not([aria-hidden='true'])");
+        const images = document.querySelectorAll(
+          "img:not([aria-hidden='true'])"
+        );
         const broken: string[] = [];
         for (const img of images) {
           const el = img as HTMLImageElement;
           const rect = el.getBoundingClientRect();
+          const style = window.getComputedStyle(el);
           // Skip hidden images
           if (rect.width === 0 || rect.height === 0) continue;
+          // object-fit intentionally crops or letterboxes images without
+          // distorting pixels, so the display box ratio can differ safely.
+          if (style.objectFit === "cover" || style.objectFit === "contain") {
+            continue;
+          }
           // Check for stretched images (aspect ratio mismatch)
           if (el.naturalWidth > 0 && el.naturalHeight > 0) {
             const naturalRatio = el.naturalWidth / el.naturalHeight;
             const displayRatio = rect.width / rect.height;
             // Allow object-fit: cover/contain to change ratios — check for extreme distortion only
-            const ratioDiff = Math.abs(naturalRatio - displayRatio) / naturalRatio;
+            const ratioDiff =
+              Math.abs(naturalRatio - displayRatio) / naturalRatio;
             if (ratioDiff > 2) {
               broken.push(
                 `${el.src.slice(-40)} (natural: ${naturalRatio.toFixed(2)}, display: ${displayRatio.toFixed(2)})`
@@ -202,9 +240,93 @@ for (const bp of breakpoints) {
   });
 }
 
+test.describe("homepage responsive composition", () => {
+  const homepageViewports = [
+    { name: "small-mobile", width: 320, height: 568 },
+    { name: "mobile-se", width: 375, height: 667 },
+    { name: "mobile-large", width: 414, height: 896 },
+    { name: "tablet", width: 768, height: 1024 },
+    { name: "laptop", width: 1024, height: 768 },
+    { name: "desktop-sm", width: 1280, height: 800 },
+    { name: "desktop", width: 1440, height: 900 },
+    { name: "desktop-wide", width: 1920, height: 1080 },
+    { name: "desktop-2xl", width: 2560, height: 1440 },
+  ] as const;
+
+  for (const viewport of homepageViewports) {
+    test(`home layout fits and hints next section at ${viewport.name}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({
+        width: viewport.width,
+        height: viewport.height,
+      });
+      await page.goto("/", { waitUntil: "domcontentloaded" });
+      await page.waitForLoadState("networkidle").catch(() => {});
+
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible({
+        timeout: 15_000,
+      });
+      await expect(page.locator('form[role="search"]').first()).toBeVisible({
+        timeout: 15_000,
+      });
+      await expect(
+        page.locator('form[role="search"] button[type="submit"]').first()
+      ).toBeVisible();
+
+      const layoutState = await page.evaluate(() => {
+        const root = document.documentElement;
+        const scroller =
+          document.querySelector("[data-app-scroll-container]") ?? root;
+        const hero = document.querySelector(
+          'section[aria-label="Search for rooms"]'
+        );
+        const why = document
+          .querySelector("#why-roomshare-heading")
+          ?.closest("section");
+        const firstCard = document.querySelector(
+          '[data-testid="featured-listings-section"] [data-testid="listing-card"]'
+        );
+
+        const rect = (element: Element | null | undefined) => {
+          if (!element) return null;
+          const r = element.getBoundingClientRect();
+          return {
+            left: r.left,
+            right: r.right,
+            top: r.top,
+            width: r.width,
+          };
+        };
+
+        const cardRect = rect(firstCard);
+        const viewportWidth = root.clientWidth;
+
+        return {
+          hasHorizontalScroll:
+            root.scrollWidth > root.clientWidth + 1 ||
+            scroller.scrollWidth > scroller.clientWidth + 1,
+          heroTop: rect(hero)?.top ?? null,
+          whyTop: rect(why)?.top ?? null,
+          cardEscapesViewport: cardRect
+            ? cardRect.left < -1 || cardRect.right > viewportWidth + 1
+            : false,
+        };
+      });
+
+      expect(layoutState.hasHorizontalScroll).toBe(false);
+      expect(layoutState.heroTop).toBe(0);
+      expect(layoutState.whyTop).toBeGreaterThan(0);
+      expect(layoutState.whyTop).toBeLessThan(viewport.height);
+      expect(layoutState.cardEscapesViewport).toBe(false);
+    });
+  }
+});
+
 // Search page specific responsive tests
 test.describe("search page responsive layout", () => {
-  const searchUrl = "/search?minLat=37.7&minLng=-122.5&maxLat=37.8&maxLng=-122.4";
+  const searchUrl =
+    "/search?minLat=37.7&minLng=-122.5&maxLat=37.8&maxLng=-122.4";
 
   test.describe("mobile (375px)", () => {
     test.use({ viewport: { width: 375, height: 812 } });
@@ -214,8 +336,12 @@ test.describe("search page responsive layout", () => {
       await page.waitForLoadState("networkidle").catch(() => {});
 
       // On mobile, either bottom sheet or list is visible
-      const bottomSheet = page.locator('[data-testid="mobile-bottom-sheet"], [role="region"]');
-      const listView = page.locator('[data-testid="listings-list"], [data-testid="search-results"]');
+      const bottomSheet = page.locator(
+        '[data-testid="mobile-bottom-sheet"], [role="region"]'
+      );
+      const listView = page.locator(
+        '[data-testid="listings-list"], [data-testid="search-results"]'
+      );
 
       const hasBottomSheet = (await bottomSheet.count()) > 0;
       const hasListView = (await listView.count()) > 0;
@@ -228,7 +354,9 @@ test.describe("search page responsive layout", () => {
       await page.waitForLoadState("networkidle").catch(() => {});
 
       // Per CLAUDE.md: "Map is always visible on mobile"
-      const mapContainer = page.locator('[data-testid="map"], .mapboxgl-map, .maplibregl-map, [class*="map"]');
+      const mapContainer = page.locator(
+        '[data-testid="map"], .mapboxgl-map, .maplibregl-map, [class*="map"]'
+      );
       // Map should be in DOM even if behind bottom sheet
       expect(await mapContainer.count()).toBeGreaterThan(0);
     });
@@ -243,7 +371,10 @@ test.describe("search page responsive layout", () => {
 
       // Desktop should show list and map side by side
       const hasNoHScroll = await page.evaluate(() => {
-        return document.documentElement.scrollWidth <= document.documentElement.clientWidth;
+        return (
+          document.documentElement.scrollWidth <=
+          document.documentElement.clientWidth
+        );
       });
       expect(hasNoHScroll).toBe(true);
     });
@@ -264,7 +395,9 @@ test.describe("search page responsive layout", () => {
         await page.goto(searchUrl, { waitUntil: "domcontentloaded" });
         await page.waitForLoadState("networkidle").catch(() => {});
 
-        const results = page.locator('[data-testid="search-results-container"]');
+        const results = page.locator(
+          '[data-testid="search-results-container"]'
+        );
         await expect(results).toBeVisible({ timeout: 30_000 });
         const headingSection = page
           .locator('[data-testid="desktop-results-heading-section"]')
@@ -276,21 +409,20 @@ test.describe("search page responsive layout", () => {
         const layoutState = await page.evaluate(() => {
           const viewportWidth = document.documentElement.clientWidth;
           const header = document.querySelector("header");
-          const logo = document.querySelector(
-            'a[aria-label="RoomShare Home"]'
-          );
+          const logo = document.querySelector('a[aria-label="RoomShare Home"]');
           const searchForm = document.querySelector(
             '[data-testid="desktop-header-search-form"], [data-testid="desktop-header-search-summary"]'
           );
-          const authCluster = Array.from(
-            document.querySelectorAll("header a, header button")
-          ).find((element) =>
-            /^(Log in|Join|User menu|List a room|Shortlist|Messages)$/i.test(
-              element.textContent?.trim() ||
-                element.getAttribute("aria-label") ||
-                ""
-            )
-          ) ?? null;
+          const authCluster =
+            Array.from(
+              document.querySelectorAll("header a, header button")
+            ).find((element) =>
+              /^(Log in|Join|User menu|List a room|Shortlist|Messages)$/i.test(
+                element.textContent?.trim() ||
+                  element.getAttribute("aria-label") ||
+                  ""
+              )
+            ) ?? null;
           const listPane = document.querySelector(
             '[data-testid="search-results-container"]'
           );
@@ -303,9 +435,9 @@ test.describe("search page responsive layout", () => {
           const toolbar = document.querySelector(
             '[data-testid="desktop-toolbar-cluster"]'
           );
-          const filterStrip = document.querySelector(
-            '[data-testid="quick-filter-more-filters"]'
-          )?.parentElement ?? null;
+          const filterStrip =
+            document.querySelector('[data-testid="quick-filter-more-filters"]')
+              ?.parentElement ?? null;
           const cards = Array.from(
             document.querySelectorAll('[data-testid="listing-card"]')
           ).slice(0, 4);
@@ -360,22 +492,21 @@ test.describe("search page responsive layout", () => {
               overlaps(rect(logo), rect(searchForm)) ||
               overlaps(rect(searchForm), rect(authCluster)),
             mapVisible: mapRect !== null,
-            listMapOverlap:
-              Boolean(listRect && mapRect && listRect.right > mapRect.left + 1),
-            toolbarEscapesList:
-              Boolean(
-                listRect &&
-                  toolbarRect &&
-                  (toolbarRect.left < listRect.left - 1 ||
-                    toolbarRect.right > listRect.right + 1)
-              ),
-            filtersEscapeList:
-              Boolean(
-                listRect &&
-                  filterRect &&
-                  (filterRect.left < listRect.left - 1 ||
-                    filterRect.right > listRect.right + 1)
-              ),
+            listMapOverlap: Boolean(
+              listRect && mapRect && listRect.right > mapRect.left + 1
+            ),
+            toolbarEscapesList: Boolean(
+              listRect &&
+              toolbarRect &&
+              (toolbarRect.left < listRect.left - 1 ||
+                toolbarRect.right > listRect.right + 1)
+            ),
+            filtersEscapeList: Boolean(
+              listRect &&
+              filterRect &&
+              (filterRect.left < listRect.left - 1 ||
+                filterRect.right > listRect.right + 1)
+            ),
             headingClipped: headingElement
               ? headingElement.scrollWidth > headingElement.clientWidth + 1
               : true,
@@ -416,14 +547,19 @@ test.describe("listing detail responsive", () => {
         .or(page.locator('main a[href^="/listings/"]:visible'))
         .first();
 
-      const hasLink = await listingLink.isVisible({ timeout: 10000 }).catch(() => false);
+      const hasLink = await listingLink
+        .isVisible({ timeout: 10000 })
+        .catch(() => false);
       if (hasLink) {
         await listingLink.click();
         await page.waitForLoadState("domcontentloaded");
         await page.waitForLoadState("networkidle").catch(() => {});
 
         const hasHScroll = await page.evaluate(() => {
-          return document.documentElement.scrollWidth > document.documentElement.clientWidth;
+          return (
+            document.documentElement.scrollWidth >
+            document.documentElement.clientWidth
+          );
         });
         expect(hasHScroll).toBe(false);
       } else {
@@ -443,14 +579,19 @@ test.describe("listing detail responsive", () => {
         .or(page.locator('main a[href^="/listings/"]:visible'))
         .first();
 
-      const hasLink = await listingLink.isVisible({ timeout: 10000 }).catch(() => false);
+      const hasLink = await listingLink
+        .isVisible({ timeout: 10000 })
+        .catch(() => false);
       if (hasLink) {
         await listingLink.click();
         await page.waitForLoadState("domcontentloaded");
         await page.waitForLoadState("networkidle").catch(() => {});
 
         const hasHScroll = await page.evaluate(() => {
-          return document.documentElement.scrollWidth > document.documentElement.clientWidth;
+          return (
+            document.documentElement.scrollWidth >
+            document.documentElement.clientWidth
+          );
         });
         expect(hasHScroll).toBe(false);
       } else {

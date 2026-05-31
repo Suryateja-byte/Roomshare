@@ -118,6 +118,7 @@ export default function SavedListingsClient({
             {listings.length > 1 && (
               <div className="relative">
                 <select
+                  aria-label="Sort saved listings"
                   value={sortOption}
                   onChange={(e) => setSortOption(e.target.value as SortOption)}
                   className="appearance-none pl-3 pr-8 py-2 bg-surface-container-lowest border border-outline-variant/20 rounded-full text-sm font-medium text-on-surface-variant hover:border-outline-variant/40 focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"

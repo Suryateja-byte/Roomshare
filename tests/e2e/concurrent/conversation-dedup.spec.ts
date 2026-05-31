@@ -16,6 +16,8 @@ import type { Locator, Page } from "@playwright/test";
 
 // User1 (host) owns the listing; user2 (tenant) contacts the host.
 const USER1_EMAIL = process.env.E2E_TEST_EMAIL || "e2e-test@roomshare.dev";
+const USER2_EMAIL =
+  process.env.E2E_SECONDARY_EMAIL || "e2e-other@roomshare.dev";
 const USER2_STATE = "playwright/.auth/user2.json";
 
 async function getVisibleContactHostButton(page: Page): Promise<Locator> {
@@ -26,13 +28,24 @@ async function getVisibleContactHostButton(page: Page): Promise<Locator> {
     .getByTestId("contact-host-sidebar")
     .getByRole("button", { name: /contact host/i });
 
-  const visibleContactButton = hostSectionButton.or(sidebarButton).first();
-  await expect(visibleContactButton).toBeVisible({ timeout: 15_000 });
+  const isDesktop = (page.viewportSize()?.width ?? 1280) >= 1024;
+  const candidates = isDesktop
+    ? [sidebarButton, hostSectionButton]
+    : [hostSectionButton, sidebarButton];
 
-  if (await hostSectionButton.isVisible().catch(() => false)) {
-    return hostSectionButton;
+  let lastError: unknown;
+  for (const button of candidates) {
+    try {
+      await expect(button).toBeVisible({ timeout: 15_000 });
+      return button;
+    } catch (error) {
+      lastError = error;
+    }
   }
-  return sidebarButton;
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Contact Host button was not visible");
 }
 
 async function waitForConversationId(
@@ -51,6 +64,37 @@ async function waitForConversationId(
   const convId = page.url().match(/\/messages\/([a-zA-Z0-9_-]+)/)?.[1];
   expect(convId).toBeTruthy();
   return convId!;
+}
+
+function waitForStartConversationResponse(page: Page, listingId: string) {
+  return page.waitForResponse((response) => {
+    const request = response.request();
+    return (
+      request.method() === "POST" &&
+      !!request.headers()["next-action"] &&
+      request.postData()?.includes(listingId) === true
+    );
+  });
+}
+
+async function getConversationIdsForListingParticipant(
+  page: Page,
+  listingId: string
+): Promise<string[]> {
+  const countResult = await testApi<{
+    count: number;
+    conversationIds: string[];
+  }>(
+    page,
+    "countConversationsForListingParticipant",
+    {
+      listingId,
+      participantEmail: USER2_EMAIL,
+    }
+  );
+  expect(countResult.ok).toBe(true);
+  expect(countResult.data.count).toBe(1);
+  return countResult.data.conversationIds;
 }
 
 test.describe("P0-1: Conversation Deduplication", () => {
@@ -152,11 +196,15 @@ test.describe("P0-1: Conversation Deduplication", () => {
     const contactBtn = await getVisibleContactHostButton(page);
     await expect(contactBtn).toBeVisible({ timeout: 15_000 });
 
-    // Track server action requests to count how many fire.
-    let serverActionCount = 0;
+    // Track only Contact Host server action requests for this listing.
+    let startConversationActionCount = 0;
     page.on("request", (req) => {
-      if (req.method() === "POST" && req.headers()["next-action"]) {
-        serverActionCount++;
+      if (
+        req.method() === "POST" &&
+        req.headers()["next-action"] &&
+        req.postData()?.includes(listingId)
+      ) {
+        startConversationActionCount++;
       }
     });
 
@@ -170,36 +218,14 @@ test.describe("P0-1: Conversation Deduplication", () => {
     // The UI guard should have prevented the second request entirely.
     // But even if two requests fired, they both return the same conversation.
     // At most 2 server actions should have been sent (not more).
-    expect(serverActionCount).toBeLessThanOrEqual(2);
+    expect(startConversationActionCount).toBeGreaterThanOrEqual(1);
+    expect(startConversationActionCount).toBeLessThanOrEqual(2);
 
-    // Navigate to messages list and verify no duplicate conversations for this listing.
-    await page.goto("/messages", {
-      waitUntil: "domcontentloaded",
-      timeout: 30_000,
-    });
-
-    // Count conversation items that reference this listing (by conversation link).
-    // Each conversation item links to /messages/<conversationId>.
-    const conversationItems = page.locator('[data-testid="conversation-item"]');
-    const itemCount = await conversationItems.count();
-
-    // Collect all conversation IDs visible in the list.
-    const visibleConvIds = new Set<string>();
-    for (let i = 0; i < itemCount; i++) {
-      const link = conversationItems.nth(i).locator("a");
-      const href = await link.getAttribute("href").catch(() => null);
-      if (href?.includes("/messages/")) {
-        const id = href.match(/\/messages\/([a-zA-Z0-9_-]+)/)?.[1];
-        if (id) visibleConvIds.add(id);
-      }
-    }
-
-    // The conversation we just created should appear exactly once.
-    // (There may be pre-existing seeded conversations, but our convId should not be duplicated.)
-    const matchingIds = Array.from(visibleConvIds).filter(
-      (id) => id === convId
+    const conversationIds = await getConversationIdsForListingParticipant(
+      page,
+      listingId
     );
-    expect(matchingIds.length).toBeLessThanOrEqual(1);
+    expect(conversationIds).toEqual([convId]);
 
     await ctx.close();
   });
@@ -222,9 +248,16 @@ test.describe("P0-1: Conversation Deduplication", () => {
 
     const contactBtn = await getVisibleContactHostButton(page);
     await expect(contactBtn).toBeVisible({ timeout: 15_000 });
+    const firstStartResponse = waitForStartConversationResponse(
+      page,
+      listingId
+    );
     await contactBtn.click();
-
-    const firstConvId = await waitForConversationId(page);
+    expect((await firstStartResponse).ok()).toBe(true);
+    const [firstConvId] = await getConversationIdsForListingParticipant(
+      page,
+      listingId
+    );
 
     // Navigate away — go back to listing.
     await page.goto(`/listings/${listingId}`, {
@@ -235,12 +268,21 @@ test.describe("P0-1: Conversation Deduplication", () => {
     // Second contact: click Contact Host again.
     const contactBtn2 = await getVisibleContactHostButton(page);
     await expect(contactBtn2).toBeVisible({ timeout: 15_000 });
+    const secondStartResponse = waitForStartConversationResponse(
+      page,
+      listingId
+    );
     await contactBtn2.click();
+    const response = await secondStartResponse;
+    expect(response.ok()).toBe(true);
 
-    const secondConvId = await waitForConversationId(page);
+    const conversationIds = await getConversationIdsForListingParticipant(
+      page,
+      listingId
+    );
 
     // Both visits must return the same conversation — no duplicate created.
-    expect(secondConvId).toBe(firstConvId);
+    expect(conversationIds).toEqual([firstConvId]);
 
     await ctx.close();
   });

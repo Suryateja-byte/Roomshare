@@ -1,6 +1,8 @@
 import { test as setup, expect, Page } from "@playwright/test";
 import path from "path";
 
+setup.describe.configure({ mode: "serial" });
+
 const authFile = path.join(__dirname, "../../playwright/.auth/user.json");
 
 /**

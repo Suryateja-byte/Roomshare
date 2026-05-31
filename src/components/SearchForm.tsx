@@ -912,7 +912,7 @@ export default function SearchForm({
   const fieldPaddingClasses = isCompact
     ? "px-4 py-2"
     : isHome
-      ? "px-3 py-2.5 md:px-5 md:py-4 lg:px-6 lg:py-5"
+      ? "px-3 py-2 sm:py-2.5 md:px-5 md:py-4 lg:px-6 lg:py-5"
       : "px-4 py-2 md:px-6 md:py-2.5";
 
   const getFieldStateClasses = (field: "what" | "where" | "budget") => {
@@ -964,7 +964,7 @@ export default function SearchForm({
               style={getFieldFlex("what")}
               className={cn(
                 "w-full flex-col relative overflow-hidden whitespace-nowrap transition-opacity duration-300",
-                isHome ? "flex md:hidden lg:flex" : "hidden lg:flex",
+                isHome ? "hidden lg:flex" : "hidden lg:flex",
                 fieldPaddingClasses,
                 getFieldStateClasses("what")
               )}
@@ -1040,7 +1040,7 @@ export default function SearchForm({
             <div
               className={cn(
                 isHome
-                  ? "my-0 block h-px w-[calc(100%-1rem)] self-center bg-on-surface/10 md:hidden lg:my-0 lg:block lg:h-14 lg:w-px lg:bg-on-surface/10"
+                  ? "hidden self-center bg-on-surface/10 lg:my-0 lg:block lg:h-14 lg:w-px"
                   : "mx-0 my-1 hidden h-1.5 w-full rounded-full bg-surface-container-high/70 lg:mx-1 lg:my-0 lg:block lg:h-8 lg:w-1.5"
               )}
               aria-hidden="true"
@@ -1117,7 +1117,7 @@ export default function SearchForm({
                   ? "City or area"
                   : "Search destinations"
               }
-              className="flex-1"
+              className="min-w-0 flex-1"
               inputClassName={
                 isHome
                   ? "rounded-md px-1 py-1 -ml-1 text-[16px] text-on-surface placeholder:text-on-surface-variant transition-colors focus:bg-surface-canvas md:-ml-0 md:px-0 md:py-0 md:text-base md:font-medium md:focus:bg-transparent"
@@ -1131,7 +1131,7 @@ export default function SearchForm({
               className={cn(
                 "flex-shrink-0 rounded-full transition-colors disabled:opacity-50",
                 isHome
-                  ? "p-2 -mr-2 text-on-surface-variant hover:bg-surface-canvas hover:text-on-surface active:bg-surface-container-high md:mr-0 md:p-1.5 md:hover:bg-transparent"
+                  ? "-mr-2 min-h-[44px] min-w-[44px] p-2 text-on-surface-variant hover:bg-surface-canvas hover:text-on-surface active:bg-surface-container-high md:mr-0 md:p-1.5 md:hover:bg-transparent"
                   : "p-3 text-on-surface-variant hover:text-on-surface"
               )}
               aria-label="Use my current location"
@@ -1237,7 +1237,7 @@ export default function SearchForm({
             </label>
           )}
           <div className={cn("flex items-center", isHome ? "gap-3" : "gap-2")}>
-            <div className="flex items-center gap-1 flex-1">
+            <div className="flex min-w-0 flex-1 items-center gap-1">
               <span
                 className={cn(
                   "text-on-surface-variant text-xs",
@@ -1276,7 +1276,7 @@ export default function SearchForm({
             >
               —
             </span>
-            <div className="flex items-center gap-1 flex-1">
+            <div className="flex min-w-0 flex-1 items-center gap-1">
               <span
                 className={cn(
                   "text-on-surface-variant text-xs",
@@ -1340,8 +1340,8 @@ export default function SearchForm({
                     "relative flex items-center gap-2 transition-all duration-300",
                     isHome
                       ? activeFilterCount > 0
-                        ? "-ml-3 rounded-xl bg-primary/10 px-3 py-2 text-[12px] font-bold uppercase tracking-[0.1em] text-primary md:ml-0 md:h-14 md:rounded-full md:px-5 md:text-xs md:tracking-wider"
-                        : "-ml-3 rounded-xl px-3 py-2 text-[12px] font-bold uppercase tracking-[0.1em] text-on-surface-variant hover:bg-surface-canvas hover:text-on-surface active:bg-surface-container-high md:ml-0 md:h-14 md:rounded-full md:px-5 md:text-xs md:tracking-wider md:hover:bg-surface-container-high"
+                        ? "-ml-3 min-h-[44px] rounded-xl bg-primary/10 px-3 py-2 text-[12px] font-bold uppercase tracking-[0.1em] text-primary md:ml-0 md:h-14 md:min-h-0 md:rounded-full md:px-5 md:text-xs md:tracking-wider"
+                        : "-ml-3 min-h-[44px] rounded-xl px-3 py-2 text-[12px] font-bold uppercase tracking-[0.1em] text-on-surface-variant hover:bg-surface-canvas hover:text-on-surface active:bg-surface-container-high md:ml-0 md:h-14 md:min-h-0 md:rounded-full md:px-5 md:text-xs md:tracking-wider md:hover:bg-surface-container-high"
                       : activeFilterCount > 0
                         ? "h-10 rounded-full bg-primary/10 px-4 text-xs font-bold uppercase tracking-wider text-primary"
                         : "h-10 rounded-full px-4 text-xs font-bold uppercase tracking-wider text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
