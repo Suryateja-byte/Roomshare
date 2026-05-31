@@ -223,6 +223,25 @@ describe("POST /api/upload", () => {
     expect(body.error).toBe("No file provided");
   });
 
+  it("returns 400 for invalid upload type before email or storage work", async () => {
+    (checkEmailVerified as jest.Mock).mockResolvedValue({
+      verified: false,
+      error: "Please verify your email",
+    });
+    const sharpMock = jest.requireMock("sharp") as jest.Mock;
+
+    const file = createFakeFile(JPEG_MAGIC, "photo.jpg", "image/jpeg");
+    const request = makeUploadRequest(file, "avatar");
+    const response = await POST(request as any);
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe("Invalid upload type");
+    expect(checkEmailVerified).not.toHaveBeenCalled();
+    expect(createClient).not.toHaveBeenCalled();
+    expect(sharpMock).not.toHaveBeenCalled();
+  });
+
   it("returns 403 for listing uploads when email is not verified before storage work", async () => {
     (checkEmailVerified as jest.Mock).mockResolvedValue({
       verified: false,

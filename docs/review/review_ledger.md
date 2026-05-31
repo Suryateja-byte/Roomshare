@@ -6,11 +6,11 @@ confirmed issue.
 
 ## Ledger Status
 
-- Audit status: `Phase2TestingCiAudited`
+- Audit status: `AuthAuthorizationValidationAudited`
 - Release candidate status: `NotReady`
 - Open P0 count: `0`
 - Open P1 count: `0`
-- Last updated: `2026-05-30`
+- Last updated: `2026-05-31`
 
 ## Finding Schema
 
@@ -52,6 +52,59 @@ Allowed statuses:
 - `AcceptedRisk`
 
 ## Confirmed Findings
+
+### P1-VALIDATION-001 - Upload type validation bypassed listing email verification
+
+- Severity: P1
+- Confidence: High
+- Status: VerifiedFixed
+- Duplicate status: Unique
+- Slice: Auth/Authorization/Validation
+- Exact location: `src/app/api/upload/route.ts:POST`
+- Evidence: Before the fix, `/api/upload` read `type` directly from multipart
+  form data and only called `checkEmailVerified` when `type === "listing"`.
+  The same route mapped every non-`profile` value to the
+  `listings/{userId}/...` storage folder. Existing regression coverage only
+  asserted the literal `listing` and `profile` paths.
+- Failure scenario: An authenticated but email-unverified user could submit a
+  valid image with `type=avatar`, another arbitrary string, or an otherwise
+  invalid type. That request skipped the listing email-verification gate and
+  still stored the file under the listing image namespace.
+- Impact: Listing publication and listing create remain separately gated, so
+  this was not a full listing-publish bypass. It was still a release-blocking
+  validation/auth gap because unverified users could write listing-scoped public
+  images and bypass the upload policy enforced by the create-listing flow.
+- Reproduction or test idea: Mock an authenticated, unsuspended,
+  email-unverified user; POST a valid JPEG multipart request to `/api/upload`
+  with `type=avatar`; assert `400`, no email-verification call, and no Sharp or
+  Supabase storage work.
+- Suggested fix direction: Validate upload type as a strict server-side enum
+  before branching. Only allow `profile` and `listing`; reject missing or
+  unknown types before email verification, image processing, or storage.
+- False-positive challenge: Not a false positive. The route's control flow
+  skipped the email check for arbitrary non-`listing` values, and the storage
+  path fallback treated arbitrary non-`profile` values as listing uploads.
+  Severity remains P1, not P0, because listing creation/publishing still has
+  independent auth, email verification, and validation gates.
+- Fix summary: Added a strict `z.enum(["profile", "listing"])` check before the
+  email-verification branch and storage-path selection. Invalid or missing
+  upload types now return `400` before policy or storage work.
+- Files changed: `src/app/api/upload/route.ts`
+- Tests added or updated: Added
+  `src/__tests__/api/upload-integration.test.ts` coverage for arbitrary upload
+  type rejection before email verification, Sharp processing, or Supabase
+  storage.
+- Commands run: `pnpm run test -- src/__tests__/api/upload-integration.test.ts --runInBand`
+  passed with 22 tests; targeted Auth/AuthZ/Validation Jest run passed with 22
+  suites and 449 tests; `pnpm run typecheck` passed after removing a stale,
+  unreachable assertion from an E2E test file that had blocked the diagnostics
+  fallback.
+- Remaining risk: The broader uploads/images release row remains a later matrix
+  slice; this finding covers the upload type/email-verification bypass found
+  during Auth/Authorization/Validation review.
+- Adversarial re-review: Pass. The invalid-type path is validated before
+  `checkEmailVerified`, Sharp, and Supabase, and the existing verified
+  `listing` and `profile` upload behaviors remain covered.
 
 ### P1-TEST-001 - Jest baseline gate fails
 
@@ -356,3 +409,4 @@ Fix order is determined after Phase 2 deduplication:
 | P1-TEST-001    | Codex Critic | Pass    | Focused CreateListingForm, filter-performance, and neighborhood timing suites passed, then full `pnpm run test` passed with 477 passed suites and 7562 passed tests on 2026-05-30.                                                                                          | None for the Jest release blocker.                                                                                               |
 | P1-SUPPLY-001  | Codex Critic | Pass    | `pnpm install --frozen-lockfile`, `pnpm why @lhci/cli fast-uri next eslint-config-next`, and `pnpm audit --audit-level high` passed after removing `@lhci/cli`, upgrading Next packages, and overriding vulnerable `fast-uri` ranges. Recheck on 2026-05-30 still exited 0. | Triage remaining low/moderate advisories as non-blocking backlog.                                                                |
 | P1-E2E-001     | Codex Critic | Pass    | User approved the production-build E2E contract on 2026-05-30. `pnpm run test:e2e:ci` now builds, starts `next start`, waits for readiness, and passed with 1026 passed, 164 skipped, 4 retry-recovered flaky tests, and exit code 0 in 35.1 minutes.                  | Track the four retry-recovered flaky tests as reliability follow-up; continue remaining `NotStarted` matrix gates before any release claim. |
+| P1-VALIDATION-001 | Codex Critic | Pass | `pnpm run test -- src/__tests__/api/upload-integration.test.ts --runInBand` passed with 22 tests; targeted Auth/AuthZ/Validation Jest run passed with 22 suites and 449 tests; `pnpm run typecheck` passed after the test-only unreachable-branch cleanup. | Continue with the separate uploads/images matrix row for storage permission and URL exposure review. |

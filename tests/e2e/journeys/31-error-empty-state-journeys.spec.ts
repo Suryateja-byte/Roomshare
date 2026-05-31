@@ -214,8 +214,6 @@ test.describe("Error & Empty State Journeys", () => {
           .textContent();
         const hasGuidance = /contact|host|listing|browse/i.test(pageText || "");
         expect(hasGuidance || hasEmptyText).toBeTruthy();
-      } else if (hasConversations) {
-        expect(hasConversations).toBeTruthy();
       } else {
         // Page loaded with content
         const pageText = await page
