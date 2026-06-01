@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { getSession, useSession } from "next-auth/react";
 import { saveSearch } from "@/app/actions/saved-search";
 import {
   normalizeSearchFilters,
@@ -94,6 +94,15 @@ export default function SaveSearchButton({
     return `/login?callbackUrl=${encodeURIComponent(callbackUrl)}`;
   };
 
+  const redirectToLogin = () => {
+    setError(null);
+    setIsOpen(false);
+    setIsLoading(false);
+    setIsOpeningCheckout(false);
+    setLockedSearchId(null);
+    redirectToUrl(getLoginRedirectHref());
+  };
+
   const handleOpen = () => {
     setName(generateDefaultName());
     setError(null);
@@ -149,10 +158,7 @@ export default function SaveSearchButton({
     }
 
     if (sessionStatus === "unauthenticated") {
-      setError(null);
-      setIsOpen(false);
-      setLockedSearchId(null);
-      router.push(getLoginRedirectHref());
+      redirectToLogin();
       return;
     }
 
@@ -160,6 +166,14 @@ export default function SaveSearchButton({
     setError(null);
 
     try {
+      if (sessionStatus === "loading") {
+        const session = await getSession().catch(() => null);
+        if (!session?.user) {
+          redirectToLogin();
+          return;
+        }
+      }
+
       const result = await saveSearch({
         name: name.trim(),
         filters: getCurrentFilters(),
@@ -169,9 +183,7 @@ export default function SaveSearchButton({
 
       if ("error" in result) {
         if (result.error === "Unauthorized") {
-          setIsOpen(false);
-          setLockedSearchId(null);
-          router.push(getLoginRedirectHref());
+          redirectToLogin();
           return;
         }
 
