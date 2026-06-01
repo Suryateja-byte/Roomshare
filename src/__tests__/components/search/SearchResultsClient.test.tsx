@@ -329,14 +329,10 @@ describe("SearchResultsClient", () => {
       );
     });
 
-    it("keeps the save-search callout desktop-only", async () => {
+    it("keeps the save-search callout desktop-only without hydration gating", () => {
       render(<SearchResultsClient {...defaultProps} />);
 
-      await waitFor(() => {
-        expect(
-          screen.getByText("New places, straight to you")
-        ).toBeInTheDocument();
-      });
+      expect(screen.getByText("New places, straight to you")).toBeInTheDocument();
 
       const callout = screen
         .getByText("New places, straight to you")

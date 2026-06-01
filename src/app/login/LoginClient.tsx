@@ -198,7 +198,13 @@ function LoginForm() {
         <AuthDivider />
       </div>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4 md:gap-0">
+      <form
+        method="post"
+        onSubmit={handleSubmit}
+        data-testid="login-form"
+        data-hydrated={hasHydrated || undefined}
+        className="flex flex-col gap-4 md:gap-0"
+      >
         <AuthField
           label="Email"
           icon={Mail}
@@ -221,7 +227,7 @@ function LoginForm() {
           icon={Lock}
           id="password"
           type={showPassword ? "text" : "password"}
-          name={hasHydrated ? "password" : undefined}
+          name="password"
           required
           autoComplete="current-password"
           placeholder="••••••••"

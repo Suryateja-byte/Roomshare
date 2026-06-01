@@ -87,6 +87,7 @@ jest.mock("@/lib/search/split-stay", () => ({
 jest.mock("@/contexts/MobileSearchContext", () => ({
   useMobileSearch: () => ({
     setSearchResultsLabel: mockSetSearchResultsLabel,
+    setMobileResultsState: jest.fn(),
   }),
 }));
 

@@ -215,6 +215,27 @@ describe("InlineFilterStrip", () => {
     expect(screen.queryByTestId("filter-modal")).not.toBeInTheDocument();
   });
 
+  it("uses the themed date picker for the desktop move-in quick filter", () => {
+    const today = new Date().toLocaleDateString("en-CA");
+
+    render(<InlineFilterStrip />);
+
+    fireEvent.click(screen.getByTestId("quick-filter-move-in"));
+
+    const popover = screen.getByTestId("quick-filter-move-in-popover");
+    expect(popover.querySelector('input[type="date"]')).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /select move-in date/i })
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Today" }));
+
+    expect(mockCommit).toHaveBeenCalledWith({ moveInDate: today });
+    expect(
+      screen.queryByTestId("quick-filter-move-in-popover")
+    ).not.toBeInTheDocument();
+  });
+
   it("renders the desktop summary row and toolbar slot when provided", () => {
     render(
       <InlineFilterStrip
@@ -259,6 +280,20 @@ describe("InlineFilterStrip", () => {
       screen.queryByTestId("inline-applied-filters-row")
     ).not.toBeInTheDocument();
     expect(screen.getByText("$1,200 - $1,800")).toBeInTheDocument();
+  });
+
+  it("renders applied filters before media-query hydration resolves", () => {
+    mockUseMediaQuery.mockReturnValue(undefined);
+    mockSearchParams = new URLSearchParams("minPrice=500&maxPrice=2000");
+
+    render(<InlineFilterStrip />);
+
+    expect(screen.getByTestId("desktop-applied-filters-row")).toBeInTheDocument();
+    expect(screen.getByText("$500 - $2,000")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Remove filter: $500 - $2,000" })
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("quick-filter-more-filters")).toBeInTheDocument();
   });
 
   it("keeps the mobile strip on the full drawer flow", () => {

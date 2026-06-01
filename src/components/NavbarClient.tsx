@@ -19,6 +19,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { FocusTrap } from "@/components/ui/FocusTrap";
 import UserAvatar from "@/components/UserAvatar";
 import NotificationCenter from "@/components/NotificationCenter";
 
@@ -180,6 +181,8 @@ export default function NavbarClient({
   const profileRef = useRef<HTMLDivElement>(null);
   const menuItemsRef = useRef<HTMLElement[]>([]);
   const triggerButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileMenuCloseButtonRef = useRef<HTMLButtonElement>(null);
 
   // Refs for exponential backoff polling
   const failureCountRef = useRef(0);
@@ -328,6 +331,7 @@ export default function NavbarClient({
         if (headerBar) {
           headerBar.removeAttribute("inert");
         }
+        mobileMenuButtonRef.current?.focus();
       };
     }
   }, [isMobileMenuOpen]);
@@ -721,6 +725,7 @@ export default function NavbarClient({
                 {/* Mobile Menu Toggle */}
                 <div className="md:hidden flex items-center">
                   <button
+                    ref={mobileMenuButtonRef}
                     onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                     className="text-on-surface p-2 min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors hover:bg-surface-container-high rounded-full focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
                     aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
@@ -750,10 +755,16 @@ export default function NavbarClient({
         aria-hidden={!isMobileMenuOpen}
         inert={!isMobileMenuOpen || undefined}
       >
-        <div className="flex flex-col h-full">
+        <FocusTrap
+          active={isMobileMenuOpen}
+          returnFocus={false}
+          initialFocusRef={mobileMenuCloseButtonRef}
+          className="flex flex-col h-full"
+        >
           {/* Close button */}
           <div className="flex justify-end p-6 relative z-10">
             <button
+              ref={mobileMenuCloseButtonRef}
               onClick={() => setIsMobileMenuOpen(false)}
               className="text-on-surface p-2 hover:bg-surface-container-high rounded-full transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
               aria-label="Close menu"
@@ -828,7 +839,7 @@ export default function NavbarClient({
               </button>
             )}
           </div>
-        </div>
+        </FocusTrap>
       </div>
     </>
   );

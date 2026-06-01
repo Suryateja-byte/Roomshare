@@ -12,7 +12,7 @@ import {
   EyeOff,
 } from "lucide-react";
 import { signIn } from "next-auth/react";
-import { useState, useRef, Suspense } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import TurnstileWidget, {
   type TurnstileWidgetRef,
@@ -40,6 +40,7 @@ function SignUpForm() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
+  const [hasHydrated, setHasHydrated] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -48,6 +49,10 @@ function SignUpForm() {
   const [turnstileToken, setTurnstileToken] = useState<string>("");
   const [turnstileError, setTurnstileError] = useState(false);
   const turnstileRef = useRef<TurnstileWidgetRef>(null);
+
+  useEffect(() => {
+    setHasHydrated(true);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -195,7 +200,13 @@ function SignUpForm() {
 
       <AuthDivider />
 
-      <form onSubmit={handleSubmit} className="flex flex-col">
+      <form
+        method="post"
+        onSubmit={handleSubmit}
+        data-testid="signup-form"
+        data-hydrated={hasHydrated || undefined}
+        className="flex flex-col"
+      >
         <AuthField
           label="Full Name"
           icon={User}

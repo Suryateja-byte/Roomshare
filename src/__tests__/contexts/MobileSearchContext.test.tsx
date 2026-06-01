@@ -43,6 +43,7 @@ describe("MobileSearchContext", () => {
       expect(typeof result.current.searchResultsLabel).toBe("string");
       expect(result.current.mobileSheetOverrideLabel).toBeNull();
       expect(result.current.mobileResultsView).toBe("map");
+      expect(result.current.mobileResultsState).toBe("unknown");
       expect(result.current.mobileResultsViewPreference).toBeNull();
       expect(typeof result.current.expand).toBe("function");
       expect(typeof result.current.collapse).toBe("function");
@@ -51,6 +52,7 @@ describe("MobileSearchContext", () => {
         "function"
       );
       expect(typeof result.current.setMobileResultsView).toBe("function");
+      expect(typeof result.current.setMobileResultsState).toBe("function");
       expect(typeof result.current.setMobileResultsViewPreference).toBe(
         "function"
       );
@@ -285,6 +287,37 @@ describe("MobileSearchContext", () => {
     });
   });
 
+  describe("mobileResultsState", () => {
+    it('defaults to "unknown"', () => {
+      const { result } = renderHook(() => useMobileSearch(), { wrapper });
+      expect(result.current.mobileResultsState).toBe("unknown");
+    });
+
+    it("updates the list result state and can reset to unknown", () => {
+      const { result } = renderHook(() => useMobileSearch(), { wrapper });
+
+      act(() => {
+        result.current.setMobileResultsState("positive");
+      });
+      expect(result.current.mobileResultsState).toBe("positive");
+
+      act(() => {
+        result.current.setMobileResultsState("zero");
+      });
+      expect(result.current.mobileResultsState).toBe("zero");
+
+      act(() => {
+        result.current.setMobileResultsState("location-required");
+      });
+      expect(result.current.mobileResultsState).toBe("location-required");
+
+      act(() => {
+        result.current.setMobileResultsState("unknown");
+      });
+      expect(result.current.mobileResultsState).toBe("unknown");
+    });
+  });
+
   describe("mobileResultsViewPreference", () => {
     it("defaults to null", () => {
       const { result } = renderHook(() => useMobileSearch(), { wrapper });
@@ -320,6 +353,7 @@ describe("MobileSearchContext", () => {
       expect(result1.current.searchResultsLabel).toBe("Search results");
       expect(result1.current.mobileSheetOverrideLabel).toBeNull();
       expect(result1.current.mobileResultsView).toBe("map");
+      expect(result1.current.mobileResultsState).toBe("unknown");
       expect(result1.current.mobileResultsViewPreference).toBeNull();
       expect(typeof result1.current.expand).toBe("function");
       expect(typeof result1.current.collapse).toBe("function");
@@ -328,6 +362,7 @@ describe("MobileSearchContext", () => {
         "function"
       );
       expect(typeof result1.current.setMobileResultsView).toBe("function");
+      expect(typeof result1.current.setMobileResultsState).toBe("function");
       expect(typeof result1.current.setMobileResultsViewPreference).toBe(
         "function"
       );
@@ -348,6 +383,9 @@ describe("MobileSearchContext", () => {
         result.current.setMobileSheetOverrideLabel("No places in this area")
       ).not.toThrow();
       expect(() => result.current.setMobileResultsView("list")).not.toThrow();
+      expect(() =>
+        result.current.setMobileResultsState("positive")
+      ).not.toThrow();
       expect(() =>
         result.current.setMobileResultsViewPreference("map")
       ).not.toThrow();

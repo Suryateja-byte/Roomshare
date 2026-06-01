@@ -118,6 +118,29 @@ const FORM_SECTIONS = [
 ] as const;
 
 const LANGUAGE_CODES = Object.keys(SUPPORTED_LANGUAGES) as LanguageCode[];
+const FIELD_FOCUS_ORDER = [
+  "title",
+  "description",
+  "price",
+  "totalSlots",
+  "address",
+  "city",
+  "state",
+  "zip",
+  "moveInDate",
+] as const;
+
+function focusFirstFieldError(errors: Record<string, string>) {
+  const firstErrorKey =
+    FIELD_FOCUS_ORDER.find((field) => Boolean(errors[field])) ??
+    Object.keys(errors)[0];
+
+  if (firstErrorKey) {
+    requestAnimationFrame(() => {
+      document.getElementById(firstErrorKey)?.focus();
+    });
+  }
+}
 
 interface CreateListingFormProps {
   enableWholeUnitMode?: boolean;
@@ -545,25 +568,7 @@ export default function CreateListingForm({
       return;
     }
 
-    if (successfulImages.length === 0) {
-      showError("At least one photo is required to publish your listing");
-      return;
-    }
-
-    if (failedImages.length > 0 && !forceSubmit) {
-      setShowPartialUploadDialog(true);
-      return;
-    }
-
-    isSubmittingRef.current = true;
-    setLoading(true);
-
-    if (submitAbortRef.current) submitAbortRef.current.abort();
-    const abortController = new AbortController();
-    submitAbortRef.current = abortController;
-
     const imageUrls = successfulImages.map((img) => img.uploadedUrl as string);
-    const idempotencyKey = idempotencyKeyRef.current;
 
     // Build body exclusively from React state (all fields are controlled)
     const bodyObj = {
@@ -598,36 +603,54 @@ export default function CreateListingForm({
         }
       });
       setFieldErrors(errors);
-      const firstErrorKey = Object.keys(errors)[0];
-      if (firstErrorKey) {
-        document.getElementById(firstErrorKey)?.focus();
-      }
+      focusFirstFieldError(errors);
       setLoading(false);
       isSubmittingRef.current = false;
+      return;
+    }
+
+    if (successfulImages.length === 0) {
+      showError("At least one photo is required to publish your listing");
+      return;
+    }
+
+    if (failedImages.length > 0 && !forceSubmit) {
+      setShowPartialUploadDialog(true);
       return;
     }
 
     // Client-side language compliance pre-check (server validates as defense-in-depth)
     const titleCompliance = checkListingLanguageCompliance(bodyObj.title);
     if (!titleCompliance.allowed) {
-      setFieldErrors({
+      const errors = {
         title: titleCompliance.message || "Content policy violation",
-      });
-      document.getElementById("title")?.focus();
+      };
+      setFieldErrors(errors);
+      focusFirstFieldError(errors);
       setLoading(false);
       isSubmittingRef.current = false;
       return;
     }
     const descCompliance = checkListingLanguageCompliance(bodyObj.description);
     if (!descCompliance.allowed) {
-      setFieldErrors({
+      const errors = {
         description: descCompliance.message || "Content policy violation",
-      });
-      document.getElementById("description")?.focus();
+      };
+      setFieldErrors(errors);
+      focusFirstFieldError(errors);
       setLoading(false);
       isSubmittingRef.current = false;
       return;
     }
+
+    isSubmittingRef.current = true;
+    setLoading(true);
+
+    if (submitAbortRef.current) submitAbortRef.current.abort();
+    const abortController = new AbortController();
+    submitAbortRef.current = abortController;
+
+    const idempotencyKey = idempotencyKeyRef.current;
 
     try {
       const res = await fetch("/api/listings", {
@@ -679,11 +702,7 @@ export default function CreateListingForm({
                 string
               >);
           setFieldErrors(newFieldErrors);
-          const firstErrorKey = Object.keys(newFieldErrors)[0];
-          if (firstErrorKey) {
-            const element = document.getElementById(firstErrorKey);
-            element?.focus();
-          }
+          focusFirstFieldError(newFieldErrors);
         }
         throw new Error(json.error || "Failed to create listing");
       }

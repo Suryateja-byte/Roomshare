@@ -7,6 +7,7 @@ interface FocusTrapProps {
   active?: boolean;
   returnFocus?: boolean;
   initialFocusRef?: RefObject<HTMLElement | null>;
+  className?: string;
 }
 
 const FOCUSABLE_SELECTORS = [
@@ -26,6 +27,7 @@ export function FocusTrap({
   active = true,
   returnFocus = true,
   initialFocusRef,
+  className,
 }: FocusTrapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
@@ -56,16 +58,27 @@ export function FocusTrap({
 
       const firstElement = focusableElements[0];
       const lastElement = focusableElements[focusableElements.length - 1];
+      const activeElement = document.activeElement;
+
+      if (!container.contains(activeElement)) {
+        event.preventDefault();
+        if (event.shiftKey) {
+          lastElement.focus();
+        } else {
+          firstElement.focus();
+        }
+        return;
+      }
 
       if (event.shiftKey) {
         // Shift + Tab
-        if (document.activeElement === firstElement) {
+        if (activeElement === firstElement) {
           event.preventDefault();
           lastElement.focus();
         }
       } else {
         // Tab
-        if (document.activeElement === lastElement) {
+        if (activeElement === lastElement) {
           event.preventDefault();
           firstElement.focus();
         }
@@ -85,7 +98,11 @@ export function FocusTrap({
   }, [active, initialFocusRef, returnFocus]);
 
   return (
-    <div ref={containerRef} data-focus-trap={active ? "" : undefined}>
+    <div
+      ref={containerRef}
+      className={className}
+      data-focus-trap={active ? "" : undefined}
+    >
       {children}
     </div>
   );

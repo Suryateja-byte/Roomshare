@@ -338,7 +338,35 @@ describe("middleware matcher config", () => {
     expect(proxySource).toContain("_next/image");
   });
 
+  it("matcher pattern excludes dev HMR websocket traffic", () => {
+    expect(proxySource).toContain("_next/webpack-hmr");
+  });
+
   it("matcher pattern excludes favicon.ico", () => {
     expect(proxySource).toContain("favicon.ico");
+  });
+});
+
+describe("Next dev origin config", () => {
+  /**
+   * Importing next.config.ts rewrites public/sw-version.js as a side effect.
+   * Read the source instead so this regression check does not mutate files.
+   */
+  let nextConfigSource: string;
+
+  beforeAll(async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    nextConfigSource = fs.readFileSync(
+      path.join(process.cwd(), "next.config.ts"),
+      "utf-8"
+    );
+  });
+
+  it("allowlists loopback and local network dev origins for HMR", () => {
+    expect(nextConfigSource).toContain("allowedDevOrigins");
+    expect(nextConfigSource).toContain('"127.0.0.1"');
+    expect(nextConfigSource).toContain('"::1"');
+    expect(nextConfigSource).toContain("os.networkInterfaces()");
   });
 });

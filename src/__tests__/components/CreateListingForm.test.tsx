@@ -674,6 +674,39 @@ describe("CreateListingForm", () => {
   });
 
   describe("submission guards", () => {
+    it("shows required field errors before the missing-photo banner", async () => {
+      (createListingClientSchema.safeParse as jest.Mock).mockReturnValueOnce({
+        success: false,
+        error: {
+          issues: [
+            {
+              path: ["title"],
+              message: "Title is required",
+            },
+            {
+              path: ["description"],
+              message: "Description must be at least 10 characters",
+            },
+          ],
+        },
+      });
+
+      render(<CreateListingForm />);
+
+      submitForm();
+
+      expect(await screen.findByText("Title is required")).toBeInTheDocument();
+      expect(screen.getByLabelText(/listing title/i)).toHaveAttribute(
+        "aria-invalid",
+        "true"
+      );
+      expect(screen.queryByTestId("form-error-banner")).not.toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByLabelText(/listing title/i)).toHaveFocus();
+      });
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
     it("blocks submit when no images", () => {
       render(<CreateListingForm />);
 

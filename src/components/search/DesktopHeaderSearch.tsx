@@ -23,6 +23,7 @@ import {
   readSearchIntentState,
   type SearchLocationSelection,
 } from "@/lib/search/search-intent";
+import { resolveTypedSearchLocation } from "@/lib/search/typed-location-resolver";
 import {
   applySearchQueryChange,
   buildCanonicalSearchUrl,
@@ -110,6 +111,8 @@ export const DesktopHeaderSearch = forwardRef<
   const [vibe, setVibe] = useState(intentState.vibeInput);
   const [selectedLocation, setSelectedLocation] =
     useState<SearchLocationSelection | null>(intentState.selectedLocation);
+  const [isResolvingTypedLocation, setIsResolvingTypedLocation] =
+    useState(false);
   const [minPrice, setMinPrice] = useState(() => {
     const parsed = getPriceParam(
       new URLSearchParams(searchParamsString),
@@ -293,21 +296,41 @@ export const DesktopHeaderSearch = forwardRef<
   );
 
   const handleSubmit = useCallback(
-    (event: React.FormEvent) => {
+    async (event: React.FormEvent) => {
       event.preventDefault();
 
-      if (location.trim().length > 2 && !selectedLocation) {
-        toast.error("Select a location from the dropdown suggestions.");
-        focusInput("where");
-        return;
+      let nextLocationLabel = location;
+      let nextSelectedLocation = selectedLocation;
+
+      if (location.trim().length > 2 && !nextSelectedLocation) {
+        if (isResolvingTypedLocation) {
+          return;
+        }
+
+        setIsResolvingTypedLocation(true);
+        try {
+          const resolvedLocation = await resolveTypedSearchLocation(location);
+          if (!resolvedLocation) {
+            toast.error("Select a location from the dropdown suggestions.");
+            focusInput("where");
+            return;
+          }
+
+          nextLocationLabel = resolvedLocation.label;
+          nextSelectedLocation = resolvedLocation.selection;
+          setLocation(resolvedLocation.label);
+          setSelectedLocation(resolvedLocation.selection);
+        } finally {
+          setIsResolvingTypedLocation(false);
+        }
       }
 
       const searchUrlParams = buildSearchIntentParams(
         new URLSearchParams(searchParamsString),
         {
-          location,
+          location: nextLocationLabel,
           vibe,
-          selectedLocation,
+          selectedLocation: nextSelectedLocation,
         }
       );
 
@@ -348,13 +371,13 @@ export const DesktopHeaderSearch = forwardRef<
         )
       );
 
-      if (selectedLocation) {
+      if (nextSelectedLocation) {
         window.dispatchEvent(
           new CustomEvent<MapFlyToEventDetail>(MAP_FLY_TO_EVENT, {
             detail: {
-              lat: selectedLocation.lat,
-              lng: selectedLocation.lng,
-              bbox: selectedLocation.bounds,
+              lat: nextSelectedLocation.lat,
+              lng: nextSelectedLocation.lng,
+              bbox: nextSelectedLocation.bounds,
               zoom: 13,
             },
           })
@@ -369,6 +392,7 @@ export const DesktopHeaderSearch = forwardRef<
     },
     [
       collapsed,
+      isResolvingTypedLocation,
       location,
       maxPrice,
       minPrice,
@@ -536,6 +560,7 @@ export const DesktopHeaderSearch = forwardRef<
             collapsed ? "h-11 w-11" : "h-14 w-14"
           )}
           aria-label="Search"
+          disabled={isResolvingTypedLocation}
         >
           <Search className={cn(collapsed ? "h-4 w-4" : "h-5 w-5")} />
         </Button>

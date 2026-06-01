@@ -1,11 +1,12 @@
 import React from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import DesktopHeaderSearch from "@/components/search/DesktopHeaderSearch";
 import { SearchResultsLoadingWrapper } from "@/components/search/SearchResultsLoadingWrapper";
 import { MAP_FLY_TO_EVENT } from "@/components/SearchForm";
 
 const mockPush = jest.fn();
 const mockToastError = jest.fn();
+const mockFetch = jest.fn();
 let mockSearchParams = "";
 const mockRecentSearches = [
   {
@@ -110,7 +111,23 @@ jest.mock("@/components/LocationSearchInput", () => ({
 describe("DesktopHeaderSearch", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    global.fetch = mockFetch;
     mockSearchParams = "";
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        results: [
+          {
+            id: "local:place:seattle-wa",
+            place_name: "Seattle, WA",
+            center: [-122.3321, 47.6062],
+            bbox: [-122.5121, 47.4262, -122.1521, 47.7862],
+            place_type: ["place"],
+            requires_resolution: false,
+          },
+        ],
+      }),
+    });
   });
 
   it("renders a collapsed summary and expands to the inline editor on click", () => {
@@ -122,20 +139,64 @@ describe("DesktopHeaderSearch", () => {
 
     fireEvent.click(screen.getByTestId("desktop-header-search-summary"));
 
-    expect(screen.getByTestId("desktop-header-search-form")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("desktop-header-search-form")
+    ).toBeInTheDocument();
     expect(screen.getByLabelText("Vibe")).toBeInTheDocument();
   });
 
-  it("blocks typed locations that were not selected from autocomplete", () => {
+  it("resolves a typed destination on submit when autocomplete was not selected", async () => {
+    const events: CustomEvent[] = [];
+    const handler = (event: Event) => events.push(event as CustomEvent);
+    window.addEventListener(MAP_FLY_TO_EVENT, handler);
+
     render(<DesktopHeaderSearch collapsed={false} />);
 
     expect(screen.queryByText("⌘")).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByTestId("desktop-location-input"), {
-      target: { value: "Chicago" },
+      target: { value: "Seattle" },
     });
     fireEvent.submit(screen.getByTestId("desktop-header-search-form"));
 
+    await waitFor(() => expect(mockPush).toHaveBeenCalledTimes(1));
+    const pushedUrl = mockPush.mock.calls[0][0] as string;
+    const url = new URL(pushedUrl, "http://localhost");
+
+    expect(url.searchParams.get("locationLabel")).toBe("Seattle, WA");
+    expect(url.searchParams.get("lat")).toBe("47.6062");
+    expect(url.searchParams.get("lng")).toBe("-122.3321");
+    expect(url.searchParams.get("minLng")).toBe("-122.512");
+    expect(url.searchParams.get("maxLat")).toBe("47.786");
+    expect(mockToastError).not.toHaveBeenCalled();
+    expect(events[0]?.detail).toEqual({
+      lat: 47.6062,
+      lng: -122.3321,
+      bbox: [-122.5121, 47.4262, -122.1521, 47.7862],
+      zoom: 13,
+    });
+
+    window.removeEventListener(MAP_FLY_TO_EVENT, handler);
+  });
+
+  it("prompts for an autocomplete selection when typed destination cannot resolve", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ results: [] }),
+    });
+
+    render(<DesktopHeaderSearch collapsed={false} />);
+
+    fireEvent.change(screen.getByTestId("desktop-location-input"), {
+      target: { value: "Atlantis" },
+    });
+    fireEvent.submit(screen.getByTestId("desktop-header-search-form"));
+
+    await waitFor(() =>
+      expect(mockToastError).toHaveBeenCalledWith(
+        "Select a location from the dropdown suggestions."
+      )
+    );
     expect(mockToastError).toHaveBeenCalledWith(
       "Select a location from the dropdown suggestions."
     );

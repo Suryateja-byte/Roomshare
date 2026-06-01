@@ -159,7 +159,7 @@ export function SearchResultsClient({
   const router = useRouter();
   const { setIsV2Enabled, setPendingQueryHash } = useSearchV2Setters();
   const { setV2MapData, dataVersion } = useV2MapDataSetter();
-  const { setSearchResultsLabel } = useMobileSearch();
+  const { setSearchResultsLabel, setMobileResultsState } = useMobileSearch();
   const { shouldShowMap } = useSearchMapUI();
   const testScenario = useSearchTestScenario();
   const [isHydrated, setIsHydrated] = useState(false);
@@ -875,14 +875,38 @@ export function SearchResultsClient({
         : formatMobileResultsLabel(effectiveTotal, effectiveZeroResults, query),
     [effectiveLocationRequired, effectiveTotal, effectiveZeroResults, query]
   );
+  const mobileResultsState = useMemo(() => {
+    if (effectiveLocationRequired) return "location-required";
+    if (effectiveZeroResults) return "zero";
+    if (
+      allListings.length > 0 ||
+      effectiveTotal === null ||
+      (effectiveTotal !== null && effectiveTotal > 0)
+    ) {
+      return "positive";
+    }
+    return "unknown";
+  }, [
+    allListings.length,
+    effectiveLocationRequired,
+    effectiveTotal,
+    effectiveZeroResults,
+  ]);
 
   useEffect(() => {
     setSearchResultsLabel(mobileResultsLabel);
+    setMobileResultsState(mobileResultsState);
 
     return () => {
       setSearchResultsLabel(null);
+      setMobileResultsState("unknown");
     };
-  }, [mobileResultsLabel, setSearchResultsLabel]);
+  }, [
+    mobileResultsLabel,
+    mobileResultsState,
+    setMobileResultsState,
+    setSearchResultsLabel,
+  ]);
 
   useEffect(() => {
     const allIds = allListings.map((listing) => listing.id);
@@ -1285,7 +1309,6 @@ export function SearchResultsClient({
 
           {allListings.length > 0 &&
             !effectiveZeroResults &&
-            isHydrated &&
             !isLoadingMore && (
               <section
                 aria-label="Save search"

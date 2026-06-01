@@ -13,6 +13,7 @@ interface DatePickerProps {
   disabled?: boolean;
   className?: string;
   id?: string;
+  "aria-label"?: string;
   "aria-describedby"?: string;
   "aria-invalid"?: boolean;
 }
@@ -41,6 +42,7 @@ export function DatePicker({
   disabled = false,
   className,
   id,
+  "aria-label": ariaLabel,
   "aria-describedby": ariaDescribedBy,
   "aria-invalid": ariaInvalid,
 }: DatePickerProps) {
@@ -188,6 +190,7 @@ export function DatePicker({
         type="button"
         id={id}
         disabled={disabled}
+        aria-label={ariaLabel}
         aria-describedby={ariaDescribedBy}
         className={cn(
           "w-full flex items-center justify-between gap-2 p-2.5 sm:p-3 rounded-lg",
@@ -220,6 +223,7 @@ export function DatePicker({
         type="button"
         id={id}
         disabled={disabled}
+        aria-label={ariaLabel}
         aria-describedby={ariaDescribedBy}
         aria-invalid={ariaInvalid}
         className={cn(
@@ -268,10 +272,10 @@ export function DatePicker({
       <Popover.Portal>
         <Popover.Content
           className={cn(
-            "z-popover p-4",
-            "bg-surface-container-lowest/95 backdrop-blur-[20px]",
-            "rounded-lg",
-            "shadow-ambient",
+            "z-popover w-[min(320px,calc(100vw-32px))] p-4",
+            "rounded-[1.25rem] border border-outline-variant/20",
+            "bg-surface-container-lowest/98 backdrop-blur-[20px]",
+            "shadow-ambient-lg shadow-on-surface/5 outline-none",
             "animate-in fade-in-0",
             "data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
             "data-[side=bottom]:slide-in-from-top-2",

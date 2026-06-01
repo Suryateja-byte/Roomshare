@@ -56,6 +56,7 @@ describe("SignUpPage", () => {
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
     expect(screen.getByLabelText("Confirm Password")).toBeInTheDocument();
+    expect(screen.getByTestId("signup-form")).toHaveAttribute("method", "post");
     expect(screen.getByRole("checkbox")).toBeInTheDocument();
   });
 

@@ -61,6 +61,11 @@ export function buildCspHeader(
   const isLocalRequestHost = isLocalHost(options?.host);
   const needsUnsafeEval = isDev || isMapPage(options?.pathname ?? "");
 
+  const connectSrcTokens = [...CONNECT_SRC_ORIGINS];
+  if (isDev) {
+    connectSrcTokens.push("ws:");
+  }
+
   const scriptSrcTokens: string[] = ["'self'"];
   if (isDev) {
     scriptSrcTokens.push("'unsafe-inline'", "'unsafe-eval'");
@@ -83,7 +88,7 @@ export function buildCspHeader(
     "img-src 'self' data: blob: https:",
     "object-src 'none'",
     "font-src 'self' https://tiles.openfreemap.org",
-    `connect-src ${CONNECT_SRC_ORIGINS.join(" ")}`,
+    `connect-src ${connectSrcTokens.join(" ")}`,
     "worker-src 'self' blob:",
     "child-src blob:",
     "frame-src 'self' https://accounts.google.com https://challenges.cloudflare.com",

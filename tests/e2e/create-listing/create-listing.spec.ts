@@ -110,20 +110,18 @@ test.describe("Create Listing — Functional Tests", () => {
     test(`F-003: Validation — empty form submit ${tags.auth} ${tags.core}`, async ({
       page,
     }) => {
+      await page.addInitScript(() => localStorage.removeItem("listing-draft"));
       const clp = new CreateListingPage(page);
       await clp.goto();
 
-      // The form has HTML `required` attributes on inputs, so clicking submit
-      // with empty fields triggers browser native validation (not handleSubmit).
-      // We verify that the page stays on /listings/create and no crash occurs.
+      // The form uses noValidate, so empty submits should surface controlled
+      // field errors before non-field publish blockers such as missing photos.
       await clp.submit();
       await clp.expectOnCreatePage();
-
-      // Verify HTML required validation is active: title input should be :invalid
-      const titleInvalid = await clp.titleInput.evaluate(
-        (el) => !(el as HTMLInputElement).validity.valid
-      );
-      expect(titleInvalid).toBe(true);
+      await clp.expectValidationError("title");
+      await clp.expectFieldAriaInvalid("title");
+      await expect(clp.titleInput).toBeFocused();
+      await clp.expectNoErrorBanner();
     });
 
     test(`F-004: Validation — description too short ${tags.auth} ${tags.core}`, async ({

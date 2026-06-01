@@ -25,6 +25,11 @@ test.describe("Login Form", () => {
     await expect(
       page.getByRole("heading", { name: /welcome back/i })
     ).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId("login-form")).toHaveAttribute(
+      "data-hydrated",
+      "true",
+      { timeout: 30_000 }
+    );
   });
 
   // LS-01: Login page loads with email and password fields
@@ -40,6 +45,7 @@ test.describe("Login Form", () => {
     // Verify input types
     await expect(emailInput).toHaveAttribute("type", "email");
     await expect(passwordInput).toHaveAttribute("type", "password");
+    await expect(passwordInput).toHaveAttribute("name", "password");
 
     // Sign in button is present
     await expect(
@@ -158,6 +164,11 @@ test.describe("Signup Form", () => {
     await expect(
       page.getByRole("heading", { name: /join roomshare/i })
     ).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId("signup-form")).toHaveAttribute(
+      "data-hydrated",
+      "true",
+      { timeout: 30_000 }
+    );
   });
 
   // LS-05: Signup page loads with required fields

@@ -2,13 +2,28 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import SaveSearchButton from "@/components/SaveSearchButton";
 
+const mockRouterPush = jest.fn();
+let mockSessionStatus: "authenticated" | "loading" | "unauthenticated" =
+  "authenticated";
+
 // Mock next/navigation
 jest.mock("next/navigation", () => ({
   useRouter: () => ({
-    push: jest.fn(),
+    push: mockRouterPush,
   }),
+  usePathname: () => "/search",
   useSearchParams: () =>
     new URLSearchParams("q=apartment&minPrice=500&maxPrice=1500"),
+}));
+
+jest.mock("next-auth/react", () => ({
+  useSession: () => ({
+    data:
+      mockSessionStatus === "authenticated"
+        ? { user: { id: "user-123" } }
+        : null,
+    status: mockSessionStatus,
+  }),
 }));
 
 // Mock saveSearch
@@ -20,6 +35,7 @@ jest.mock("@/app/actions/saved-search", () => ({
 describe("SaveSearchButton", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSessionStatus = "authenticated";
     global.fetch = jest.fn();
   });
 
@@ -136,6 +152,39 @@ describe("SaveSearchButton", () => {
         screen.getByText("You can only save up to 10 searches")
       ).toBeInTheDocument();
     });
+  });
+
+  it("redirects unauthorized saves to login without showing raw Unauthorized", async () => {
+    mockSaveSearch.mockResolvedValue({ error: "Unauthorized" });
+
+    render(<SaveSearchButton />);
+
+    await userEvent.click(screen.getByRole("button"));
+    const saveButtons = screen.getAllByText("Save Search");
+    await userEvent.click(saveButtons[saveButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        "/login?callbackUrl=%2Fsearch%3Fq%3Dapartment%26minPrice%3D500%26maxPrice%3D1500"
+      );
+    });
+    expect(screen.queryByText("Unauthorized")).not.toBeInTheDocument();
+  });
+
+  it("redirects anonymous users to login before calling saveSearch", async () => {
+    mockSessionStatus = "unauthenticated";
+
+    render(<SaveSearchButton />);
+
+    await userEvent.click(screen.getByRole("button"));
+    const saveButtons = screen.getAllByText("Save Search");
+    await userEvent.click(saveButtons[saveButtons.length - 1]);
+
+    expect(mockSaveSearch).not.toHaveBeenCalled();
+    expect(mockRouterPush).toHaveBeenCalledWith(
+      "/login?callbackUrl=%2Fsearch%3Fq%3Dapartment%26minPrice%3D500%26maxPrice%3D1500"
+    );
+    expect(screen.queryByText("Unauthorized")).not.toBeInTheDocument();
   });
 
   it("handles exceptions", async () => {

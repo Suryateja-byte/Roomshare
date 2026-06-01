@@ -639,6 +639,40 @@ test.describe("Search P0 Smoke Suite", () => {
     expect(count).toBeGreaterThanOrEqual(1);
   });
 
+  test("S16b: anonymous save search redirects to login without raw Unauthorized", async ({
+    page,
+  }) => {
+    const pageErrors: string[] = [];
+    page.on("pageerror", (error) => pageErrors.push(error.message));
+
+    await page.goto("/search?locationLabel=Seattle%2C+WA");
+    await page.waitForLoadState("domcontentloaded");
+
+    await expect(
+      page.getByText(/application error|unhandled runtime error/i)
+    ).toHaveCount(0);
+
+    const saveSearchButton = page
+      .getByRole("button", { name: /save search/i })
+      .filter({ visible: true })
+      .first();
+    await expect(saveSearchButton).toBeVisible({ timeout: 30_000 });
+    await saveSearchButton.click();
+
+    const dialog = page.getByRole("dialog", { name: /save this search/i });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: /^save search$/i }).click();
+
+    await expect(page).toHaveURL(/\/login/, { timeout: 30_000 });
+    const loginUrl = new URL(page.url());
+    const callbackUrl = loginUrl.searchParams.get("callbackUrl");
+    expect(loginUrl.pathname).toBe("/login");
+    expect(callbackUrl).toContain("/search");
+    expect(callbackUrl).toContain("locationLabel=Seattle");
+    await expect(page.getByText(/^Unauthorized$/i)).toHaveCount(0);
+    expect(pageErrors).toHaveLength(0);
+  });
+
   // S17: Responsive layout at breakpoints
   test("S17: responsive layout at breakpoints", async ({ page }) => {
     // Desktop (1280px) -- map and list side by side

@@ -87,6 +87,73 @@ test.describe("Search release gate", () => {
     }
   });
 
+  test("typed destination submit resolves Seattle without selecting autocomplete", async ({
+    page,
+  }) => {
+    await page.route("**/api/geocoding/autocomplete**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          results: [
+            {
+              id: "local:place:seattle-wa",
+              provider: "local",
+              place_name: "Seattle, WA",
+              center: [-122.3321, 47.6062],
+              bbox: [-122.5121, 47.4262, -122.1521, 47.7862],
+              place_type: ["place"],
+              requires_resolution: false,
+            },
+          ],
+        }),
+      });
+    });
+
+    await gotoSearchPage(page, DEFAULT_SCENARIO);
+    await waitForSearchResolution(page);
+
+    const destinationInput = page
+      .getByPlaceholder(/search destinations/i)
+      .filter({ visible: true })
+      .first();
+    await expect(destinationInput).toBeVisible({ timeout: 15_000 });
+    await destinationInput.click();
+    await destinationInput.pressSequentially("Seattle");
+    await expect(destinationInput).toHaveValue("Seattle");
+
+    const form = destinationInput.locator("xpath=ancestor::form[1]");
+    await form.getByRole("button", { name: /^search$/i }).click();
+
+    await expect
+      .poll(
+        () => {
+          const url = new URL(page.url());
+          return {
+            locationLabel: url.searchParams.get("locationLabel"),
+            lat: url.searchParams.get("lat"),
+            lng: url.searchParams.get("lng"),
+            minLng: url.searchParams.get("minLng"),
+            maxLat: url.searchParams.get("maxLat"),
+          };
+        },
+        { timeout: 15_000 }
+      )
+      .toEqual({
+        locationLabel: "Seattle, WA",
+        lat: "47.6062",
+        lng: "-122.3321",
+        minLng: "-122.512",
+        maxLat: "47.786",
+      });
+
+    await waitForSearchResolution(page);
+    await expect(searchShell(page)).toBeVisible();
+    await expect(
+      page.getByText(/application error|unhandled runtime error/i)
+    ).toHaveCount(0);
+  });
+
   test("saved-search reopen lands on the canonical search shell", async ({
     page,
   }) => {
@@ -149,7 +216,9 @@ test.describe("Search release gate", () => {
     const hasLoadMore = await loadMore.isVisible().catch(() => false);
     if (hasLoadMore) {
       await loadMore.click();
-      await expect(loadMore).toBeHidden({ timeout: 30_000 }).catch(() => {});
+      await expect(loadMore)
+        .toBeHidden({ timeout: 30_000 })
+        .catch(() => {});
       await assertNoDuplicateListingIds(page);
     }
   });
@@ -202,7 +271,9 @@ test.describe("Search release gate", () => {
     await waitForSearchResolution(page);
 
     await waitForMapReady(page);
-    const mapBox = await mapShell(page).boundingBox().catch(() => null);
+    const mapBox = await mapShell(page)
+      .boundingBox()
+      .catch(() => null);
     test.skip(!mapBox, "Map not available in this browser/runtime");
 
     const centerX = mapBox!.x + mapBox!.width / 2;
@@ -216,7 +287,9 @@ test.describe("Search release gate", () => {
     });
     await page.mouse.up();
 
-    const searching = await searchStatus(page).isVisible().catch(() => false);
+    const searching = await searchStatus(page)
+      .isVisible()
+      .catch(() => false);
     if (searching) {
       await expect(searchStatus(page)).toBeVisible({ timeout: 10_000 });
       await expect(searchStatus(page)).not.toBeVisible({ timeout: 30_000 });
