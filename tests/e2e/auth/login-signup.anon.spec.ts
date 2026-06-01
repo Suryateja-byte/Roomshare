@@ -13,8 +13,13 @@
 
 import { test, expect } from "../helpers/test-utils";
 import { waitForTurnstileIfPresent } from "../helpers/auth-helpers";
+import type { Page } from "@playwright/test";
 
 test.use({ storageState: { cookies: [], origins: [] } });
+
+function visibleForm(page: Page, testId: "login-form" | "signup-form") {
+  return page.locator(`[data-testid="${testId}"]:visible`).first();
+}
 
 // ─── Login Form Tests ────────────────────────────────────────────────────────
 
@@ -25,7 +30,7 @@ test.describe("Login Form", () => {
     await expect(
       page.getByRole("heading", { name: /welcome back/i })
     ).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByTestId("login-form")).toHaveAttribute(
+    await expect(visibleForm(page, "login-form")).toHaveAttribute(
       "data-hydrated",
       "true",
       { timeout: 30_000 }
@@ -36,8 +41,9 @@ test.describe("Login Form", () => {
   test("LS-01: login page renders email and password fields", async ({
     page,
   }) => {
-    const emailInput = page.getByLabel(/^email$/i);
-    const passwordInput = page.getByLabel(/^password$/i);
+    const form = visibleForm(page, "login-form");
+    const emailInput = form.getByLabel(/^email$/i);
+    const passwordInput = form.getByLabel(/^password$/i);
 
     await expect(emailInput).toBeVisible();
     await expect(passwordInput).toBeVisible();
@@ -48,9 +54,7 @@ test.describe("Login Form", () => {
     await expect(passwordInput).toHaveAttribute("name", "password");
 
     // Sign in button is present
-    await expect(
-      page.getByRole("button", { name: /sign in/i })
-    ).toBeVisible();
+    await expect(form.getByRole("button", { name: /sign in/i })).toBeVisible();
   });
 
   // LS-02: Login with valid credentials redirects away from /login
@@ -63,8 +67,9 @@ test.describe("Login Form", () => {
       return;
     }
 
-    await page.getByLabel(/^email$/i).fill(email);
-    await page.getByLabel(/^password$/i).first().fill(password);
+    const form = visibleForm(page, "login-form");
+    await form.getByLabel(/^email$/i).fill(email);
+    await form.getByLabel(/^password$/i).fill(password);
 
     await waitForTurnstileIfPresent(page);
 
@@ -73,7 +78,7 @@ test.describe("Login Form", () => {
       { timeout: 30_000 }
     );
 
-    await page.getByRole("button", { name: /sign in/i }).click();
+    await form.getByRole("button", { name: /sign in/i }).click();
 
     await authResponsePromise;
 
@@ -88,34 +93,36 @@ test.describe("Login Form", () => {
 
   // LS-03: Login with wrong password shows error message
   test("LS-03: wrong password shows error message", async ({ page }) => {
-    await page.getByLabel(/^email$/i).fill("e2e-test@roomshare.dev");
-    await page.getByLabel(/^password$/i).first().fill("WrongPassword999!");
+    const form = visibleForm(page, "login-form");
+    await form.getByLabel(/^email$/i).fill("e2e-test@roomshare.dev");
+    await form.getByLabel(/^password$/i).fill("WrongPassword999!");
 
     await waitForTurnstileIfPresent(page);
 
-    await page.getByRole("button", { name: /sign in/i }).click();
+    await form.getByRole("button", { name: /sign in/i }).click();
 
     // Error message: "Incorrect email or password..."
-    await expect(
-      page.getByText(/incorrect email or password/i)
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/incorrect email or password/i)).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
   // LS-04: Login with non-existent email shows error message
   test("LS-04: non-existent email shows error message", async ({ page }) => {
-    await page
+    const form = visibleForm(page, "login-form");
+    await form
       .getByLabel(/^email$/i)
       .fill(`nonexistent-${Date.now()}@example.com`);
-    await page.getByLabel(/^password$/i).first().fill("SomePassword123!");
+    await form.getByLabel(/^password$/i).fill("SomePassword123!");
 
     await waitForTurnstileIfPresent(page);
 
-    await page.getByRole("button", { name: /sign in/i }).click();
+    await form.getByRole("button", { name: /sign in/i }).click();
 
     // Same generic error to prevent user enumeration
-    await expect(
-      page.getByText(/incorrect email or password/i)
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/incorrect email or password/i)).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
   // LS-09: Login form has proper labels and accessibility
@@ -123,8 +130,9 @@ test.describe("Login Form", () => {
     page,
   }) => {
     // Labels connect to inputs via htmlFor/id
-    const emailInput = page.getByLabel(/^email$/i);
-    const passwordInput = page.getByLabel(/^password$/i);
+    const form = visibleForm(page, "login-form");
+    const emailInput = form.getByLabel(/^email$/i);
+    const passwordInput = form.getByLabel(/^password$/i);
 
     await expect(emailInput).toBeVisible();
     await expect(passwordInput).toBeVisible();
@@ -142,7 +150,7 @@ test.describe("Login Form", () => {
 
     // Show/hide password toggle has an accessible label
     await expect(
-      page.getByRole("button", { name: /show password|hide password/i })
+      form.getByRole("button", { name: /show password|hide password/i })
     ).toBeVisible();
 
     // Forgot password link is present
@@ -164,7 +172,7 @@ test.describe("Signup Form", () => {
     await expect(
       page.getByRole("heading", { name: /join roomshare/i })
     ).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByTestId("signup-form")).toHaveAttribute(
+    await expect(visibleForm(page, "signup-form")).toHaveAttribute(
       "data-hydrated",
       "true",
       { timeout: 30_000 }
@@ -173,35 +181,37 @@ test.describe("Signup Form", () => {
 
   // LS-05: Signup page loads with required fields
   test("LS-05: signup page renders all required fields", async ({ page }) => {
-    await expect(page.getByLabel(/full name/i)).toBeVisible();
-    await expect(page.getByLabel(/^email$/i)).toBeVisible();
-    await expect(page.getByLabel(/^password$/i)).toBeVisible();
-    await expect(page.getByLabel(/confirm password/i)).toBeVisible();
+    const form = visibleForm(page, "signup-form");
+    await expect(form.getByLabel(/full name/i)).toBeVisible();
+    await expect(form.getByLabel(/^email$/i)).toBeVisible();
+    await expect(form.getByLabel(/^password$/i)).toBeVisible();
+    await expect(form.getByLabel(/confirm password/i)).toBeVisible();
 
     // Terms checkbox
-    const termsCheckbox = page.getByRole("checkbox");
+    const termsCheckbox = form.getByRole("checkbox");
     await expect(termsCheckbox).toBeVisible();
 
     // Submit button
     await expect(
-      page.getByRole("button", { name: /join roomshare/i })
+      form.getByRole("button", { name: /join roomshare/i })
     ).toBeVisible();
   });
 
   // LS-06: Signup with valid data calls register API
   test("LS-06: valid signup submits to register API", async ({ page }) => {
     const uniqueEmail = `test-${Date.now()}-${Math.random().toString(36).slice(2, 7)}@example.com`;
+    const form = visibleForm(page, "signup-form");
 
-    await page.getByLabel(/full name/i).fill("E2E Test User");
-    await page.getByLabel(/^email$/i).fill(uniqueEmail);
+    await form.getByLabel(/full name/i).fill("E2E Test User");
+    await form.getByLabel(/^email$/i).fill(uniqueEmail);
 
     // Password must be >= 12 chars per server-side zod schema
-    const passwordInputs = page.locator('input[type="password"]');
+    const passwordInputs = form.locator('input[type="password"]');
     await passwordInputs.first().fill("SecureTestPass123!");
     await passwordInputs.nth(1).fill("SecureTestPass123!");
 
     // Accept terms
-    await page.getByRole("checkbox").check();
+    await form.getByRole("checkbox").check();
 
     await waitForTurnstileIfPresent(page);
 
@@ -211,7 +221,7 @@ test.describe("Signup Form", () => {
       { timeout: 30_000 }
     );
 
-    await page.getByRole("button", { name: /join roomshare/i }).click();
+    await form.getByRole("button", { name: /join roomshare/i }).click();
 
     const registerResponse = await registerResponsePromise;
 
@@ -227,15 +237,16 @@ test.describe("Signup Form", () => {
   }) => {
     // Use the known seeded test user email
     const existingEmail = "e2e-test@roomshare.dev";
+    const form = visibleForm(page, "signup-form");
 
-    await page.getByLabel(/full name/i).fill("Duplicate User");
-    await page.getByLabel(/^email$/i).fill(existingEmail);
+    await form.getByLabel(/full name/i).fill("Duplicate User");
+    await form.getByLabel(/^email$/i).fill(existingEmail);
 
-    const passwordInputs = page.locator('input[type="password"]');
+    const passwordInputs = form.locator('input[type="password"]');
     await passwordInputs.first().fill("SecureTestPass123!");
     await passwordInputs.nth(1).fill("SecureTestPass123!");
 
-    await page.getByRole("checkbox").check();
+    await form.getByRole("checkbox").check();
 
     await waitForTurnstileIfPresent(page);
 
@@ -244,7 +255,7 @@ test.describe("Signup Form", () => {
       { timeout: 30_000 }
     );
 
-    await page.getByRole("button", { name: /join roomshare/i }).click();
+    await form.getByRole("button", { name: /join roomshare/i }).click();
 
     const registerResponse = await registerResponsePromise;
 
@@ -282,16 +293,21 @@ test.describe("Signup Form", () => {
   test("LS-08: weak password shows client-side validation feedback", async ({
     page,
   }) => {
-    await page.getByLabel(/full name/i).fill("Weak Pass User");
-    await page.getByLabel(/^email$/i).fill("weakpass@example.com");
+    const form = visibleForm(page, "signup-form");
+
+    await form.getByLabel(/full name/i).fill("Weak Pass User");
+    await form.getByLabel(/^email$/i).fill("weakpass@example.com");
 
     // Type a short password — below the 12-char minimum
-    const passwordInput = page.locator('input[type="password"]').first();
+    const passwordInput = form.locator('input[type="password"]').first();
     await passwordInput.fill("short");
 
     // The PasswordStrengthMeter component should indicate weakness
     // Check that the strength meter is present and shows a low-strength indicator
-    const strengthMeter = page.locator('[class*="strength"], [role="progressbar"], [aria-label*="strength" i]')
+    const strengthMeter = page
+      .locator(
+        '[class*="strength"], [role="progressbar"], [aria-label*="strength" i]'
+      )
       .or(page.getByText(/weak/i));
 
     // The meter renders below the password field — just verify it's present
@@ -299,14 +315,14 @@ test.describe("Signup Form", () => {
     await expect(strengthMeter.first()).toBeVisible({ timeout: 5_000 });
 
     // Attempting to submit with mismatched/short passwords should show an error
-    const confirmInput = page.locator('input[type="password"]').nth(1);
+    const confirmInput = form.locator('input[type="password"]').nth(1);
     await confirmInput.fill("different");
 
-    await page.getByRole("checkbox").check();
+    await form.getByRole("checkbox").check();
 
     await waitForTurnstileIfPresent(page);
 
-    await page.getByRole("button", { name: /join roomshare/i }).click();
+    await form.getByRole("button", { name: /join roomshare/i }).click();
 
     // Client-side validation: "Those passwords don't match"
     await expect(

@@ -15,11 +15,20 @@
  */
 
 import { test, expect, tags } from "../helpers";
+import type { Page } from "@playwright/test";
 import {
   clearAuthCookies,
   expectLoginRedirect,
   revokeCurrentUserSession,
 } from "../helpers";
+
+function visibleMessageInput(page: Page) {
+  return page.locator('[data-testid="message-input"]:visible').first();
+}
+
+function visibleSendButton(page: Page) {
+  return page.locator('[data-testid="send-button"]:visible').first();
+}
 
 async function openFirstConversationThread(
   page: import("@playwright/test").Page
@@ -55,7 +64,7 @@ test.describe("Session Expiry: Messaging", () => {
     const conversationId = await openFirstConversationThread(page);
 
     // 2. Type a message
-    const input = page.locator('[data-testid="message-input"]');
+    const input = visibleMessageInput(page);
     await expect(input).toBeVisible({ timeout: 10000 });
     await input.fill("Test message before session expiry");
 
@@ -65,7 +74,7 @@ test.describe("Session Expiry: Messaging", () => {
 
     try {
       // 4. Click send
-      const sendBtn = page.locator('[data-testid="send-button"]');
+      const sendBtn = visibleSendButton(page);
       await sendBtn.click();
 
       // 5. Verify toast notification about session expiry
@@ -107,7 +116,7 @@ test.describe("Session Expiry: Messaging", () => {
     });
 
     // Verify the input has the draft content restored
-    const input = page.locator('[data-testid="message-input"]');
+    const input = visibleMessageInput(page);
     await expect(input).toHaveValue(testDraft, { timeout: 10000 });
 
     // Verify restoration toast appeared

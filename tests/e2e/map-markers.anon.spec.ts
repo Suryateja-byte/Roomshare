@@ -74,6 +74,18 @@ function getFirstVisibleMarker(page: Page) {
   return page.locator(".maplibregl-marker:visible").first();
 }
 
+function boxesOverlap(
+  a: { x: number; y: number; width: number; height: number },
+  b: { x: number; y: number; width: number; height: number }
+) {
+  return (
+    a.x < b.x + b.width &&
+    a.x + a.width > b.x &&
+    a.y < b.y + b.height &&
+    a.y + a.height > b.y
+  );
+}
+
 async function getMarkerClosestToMapEdge(page: Page) {
   const index = await page.locator(".maplibregl-marker:visible").evaluateAll(
     (elements) => {
@@ -395,7 +407,8 @@ test.describe("Map Marker Interactions", () => {
 
       test.skip(!mapBox || !popupBox, "Map or popup bounding box unavailable");
 
-      expect(popupBox!.y).toBeGreaterThanOrEqual(mapBox!.y + 92);
+      const edgeInset = 20;
+      expect(popupBox!.y).toBeGreaterThanOrEqual(mapBox!.y + edgeInset);
       expect(popupBox!.x).toBeGreaterThanOrEqual(mapBox!.x + 20);
       expect(popupBox!.x + popupBox!.width).toBeLessThanOrEqual(
         mapBox!.x + mapBox!.width - 20
@@ -403,6 +416,26 @@ test.describe("Map Marker Interactions", () => {
       expect(popupBox!.y + popupBox!.height).toBeLessThanOrEqual(
         mapBox!.y + mapBox!.height - 20
       );
+
+      const avoidBoxes = await page
+        .locator("[data-map-avoid]")
+        .evaluateAll((elements) =>
+          elements
+            .map((element) => {
+              const rect = element.getBoundingClientRect();
+              return {
+                x: rect.x,
+                y: rect.y,
+                width: rect.width,
+                height: rect.height,
+              };
+            })
+            .filter((rect) => rect.width > 0 && rect.height > 0)
+        );
+      const overlappingAvoidBoxes = avoidBoxes.filter((avoidBox) =>
+        boxesOverlap(popupBox!, avoidBox)
+      );
+      expect(overlappingAvoidBoxes).toHaveLength(0);
     });
 
     test("3.2a - close popup via close button", async ({ page }) => {
@@ -821,14 +854,24 @@ test.describe("Map Marker Interactions", () => {
       });
       expect(highlightCountAfter).toBe(0);
 
-      const activeElementListingId = await page.evaluate(() => {
-        const active = document.activeElement as HTMLElement | null;
-        return active?.closest("[data-listing-id]")?.getAttribute(
-          "data-listing-id"
-        ) ?? null;
-      });
       if (highlightCountBefore > 0) {
-        expect(activeElementListingId).toBe(listingId);
+        await expect
+          .poll(
+            () =>
+              page.evaluate(() => {
+                const active = document.activeElement as HTMLElement | null;
+                return (
+                  active
+                    ?.closest("[data-listing-id]")
+                    ?.getAttribute("data-listing-id") ?? null
+                );
+              }),
+            {
+              timeout: 2_000,
+              message: "Expected Escape to restore focus to the marker/listing",
+            }
+          )
+          .toBe(listingId);
       }
     });
   });
