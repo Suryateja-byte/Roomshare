@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { expect } from "../helpers";
+import { expect, timeouts } from "../helpers";
 import {
   CreateListingPage,
   type CreateListingData,
@@ -7,7 +7,8 @@ import {
 import { testApi } from "../helpers/stability-helpers";
 import { signAddressSuggestionToken } from "../../../src/lib/geocoding/address-suggestion-token";
 
-const OWNER_EMAIL = process.env.E2E_TEST_EMAIL || "e2e-test@roomshare.dev";
+const OWNER_EMAIL =
+  process.env.E2E_COLLISION_OWNER_EMAIL || "e2e-incomplete-host@roomshare.dev";
 
 export const COLLISION_ADDRESS = {
   address: "1555 Market St",
@@ -43,16 +44,25 @@ export async function seedCollisionListings(
     moveInDateOffsetsDays?: number[];
   }
 ): Promise<string[]> {
+  const address = {
+    address: params.address ?? COLLISION_ADDRESS.address,
+    city: params.city ?? COLLISION_ADDRESS.city,
+    state: params.state ?? COLLISION_ADDRESS.state,
+    zipCode: params.zipCode ?? COLLISION_ADDRESS.zipCode,
+  };
+
+  await cleanupCollisionTestListings(page, address);
+
   const response = await testApi<{ listingIds: string[] }>(
     page,
     "seedCollisionListings",
     {
       ownerEmail: OWNER_EMAIL,
       title: params.title,
-      address: params.address ?? COLLISION_ADDRESS.address,
-      city: params.city ?? COLLISION_ADDRESS.city,
-      state: params.state ?? COLLISION_ADDRESS.state,
-      zip: params.zipCode ?? COLLISION_ADDRESS.zipCode,
+      address: address.address,
+      city: address.city,
+      state: address.state,
+      zip: address.zipCode,
       count: params.count ?? 1,
       createdAtOffsetsHours: params.createdAtOffsetsHours ?? [1],
       moveInDateOffsetsDays: params.moveInDateOffsetsDays ?? [-1],
@@ -68,6 +78,23 @@ export async function seedCollisionListings(
   return response.data.listingIds;
 }
 
+export async function cleanupCollisionTestListings(
+  page: Page,
+  address: CollisionAddress = COLLISION_ADDRESS
+): Promise<void> {
+  const listingIds = new Set<string>();
+
+  for (const titlePrefix of ["E2E Collision", "Collision"]) {
+    const ids = await findOwnerListingsByTitlePrefix(page, {
+      titlePrefix,
+      address,
+    });
+    ids.forEach((id) => listingIds.add(id));
+  }
+
+  await deleteListings(page, [...listingIds]);
+}
+
 export async function deleteListings(
   page: Page,
   listingIds: string[]
@@ -79,6 +106,51 @@ export async function deleteListings(
   });
   if (!response.ok) {
     throw new Error(`deleteListings failed: ${JSON.stringify(response.data)}`);
+  }
+}
+
+export async function findOwnerListingsByTitlePrefix(
+  page: Page,
+  params: {
+    titlePrefix: string;
+    address?: CollisionAddress;
+  }
+): Promise<string[]> {
+  const response = await testApi<{ listingIds: string[] }>(
+    page,
+    "findOwnerListingsByTitlePrefix",
+    {
+      ownerEmail: OWNER_EMAIL,
+      titlePrefix: params.titlePrefix,
+      address: params.address?.address,
+      city: params.address?.city,
+      state: params.address?.state,
+      zip: params.address?.zipCode,
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `findOwnerListingsByTitlePrefix failed: ${JSON.stringify(response.data)}`
+    );
+  }
+
+  return response.data.listingIds;
+}
+
+export async function resetCreateListingRateLimits(page: Page): Promise<void> {
+  const response = await testApi<{ deleted: number }>(
+    page,
+    "resetCreateListingRateLimits",
+    {
+      ownerEmail: OWNER_EMAIL,
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `resetCreateListingRateLimits failed: ${JSON.stringify(response.data)}`
+    );
   }
 }
 
@@ -229,11 +301,14 @@ export async function openPreparedCreateListingPage(
   await createPage.mockImageUpload();
   await createPage.uploadTestImage();
   await createPage.waitForUploadComplete();
+  await resetCreateListingRateLimits(page);
   return createPage;
 }
 
 export async function expectCreatedListingId(page: Page): Promise<string> {
-  await expect(page).toHaveURL(/\/listings\/(?!create)[^/?#]+/);
+  await expect(page).toHaveURL(/\/listings\/(?!create)[^/?#]+/, {
+    timeout: timeouts.navigation,
+  });
   const match = page.url().match(/\/listings\/([^/?#]+)/);
   if (!match) {
     throw new Error(`Could not extract listing id from URL: ${page.url()}`);

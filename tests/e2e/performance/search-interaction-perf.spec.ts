@@ -10,6 +10,7 @@
  */
 
 import { test, expect, SF_BOUNDS } from "../helpers";
+import { setupPaginationMock } from "../helpers/pagination-mock-factory";
 
 test.describe("Search Interaction Performance", () => {
   test.slow();
@@ -83,6 +84,10 @@ test.describe("Search Interaction Performance", () => {
 
   test("Load-more latency under budget", async ({ page }) => {
     const budget = process.env.CI ? 18000 : 5000;
+
+    await setupPaginationMock(page, { totalLoadMoreItems: 12 });
+    await page.goto(searchUrl);
+    await page.waitForLoadState("domcontentloaded");
 
     // Wait for initial listing cards to appear before looking for load-more
     const cards = page.locator('[data-testid="listing-card"]');

@@ -118,6 +118,29 @@ const FORM_SECTIONS = [
 ] as const;
 
 const LANGUAGE_CODES = Object.keys(SUPPORTED_LANGUAGES) as LanguageCode[];
+const FIELD_FOCUS_ORDER = [
+  "title",
+  "description",
+  "price",
+  "totalSlots",
+  "address",
+  "city",
+  "state",
+  "zip",
+  "moveInDate",
+] as const;
+
+function focusFirstFieldError(errors: Record<string, string>) {
+  const firstErrorKey =
+    FIELD_FOCUS_ORDER.find((field) => Boolean(errors[field])) ??
+    Object.keys(errors)[0];
+
+  if (firstErrorKey) {
+    requestAnimationFrame(() => {
+      document.getElementById(firstErrorKey)?.focus();
+    });
+  }
+}
 
 interface CreateListingFormProps {
   enableWholeUnitMode?: boolean;
@@ -131,6 +154,7 @@ export default function CreateListingForm({
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [uploadedImages, setUploadedImages] = useState<ImageObject[]>([]);
+  const [imageUploaderVersion, setImageUploaderVersion] = useState(0);
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
   const [showDraftBanner, setShowDraftBanner] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
@@ -219,10 +243,15 @@ export default function CreateListingForm({
       : "You have unsaved changes. Your uploaded images and data will be lost if you leave."
   );
 
-  // Show draft banner when we have a draft and haven't restored yet
+  // Show the draft banner only for drafts that existed before this page load.
+  // Newly autosaved work in the current editing session should stay quiet.
   useEffect(() => {
-    if (isHydrated && hasDraft && !draftRestored) {
+    if (!isHydrated || draftRestored) return;
+
+    if (hasDraft) {
       setShowDraftBanner(true);
+    } else {
+      setDraftRestored(true);
     }
   }, [isHydrated, hasDraft, draftRestored]);
 
@@ -260,17 +289,16 @@ export default function CreateListingForm({
       setHouseRulesValue(persistedData.houseRules || "");
 
       // Restore images (they're already uploaded to Supabase)
-      if (persistedData.images && persistedData.images.length > 0) {
-        const restoredImages: ImageObject[] = persistedData.images.map(
-          (img) => ({
-            id: img.id,
-            previewUrl: img.uploadedUrl, // Use the uploaded URL as preview
-            uploadedUrl: img.uploadedUrl,
-            isUploading: false,
-          })
-        );
-        setUploadedImages(restoredImages);
-      }
+      const restoredImages: ImageObject[] = (persistedData.images || []).map(
+        (img) => ({
+          id: img.id,
+          previewUrl: img.uploadedUrl, // Use the uploaded URL as preview
+          uploadedUrl: img.uploadedUrl,
+          isUploading: false,
+        })
+      );
+      setUploadedImages(restoredImages);
+      setImageUploaderVersion((version) => version + 1);
 
       setDraftRestored(true);
       setShowDraftBanner(false);
@@ -318,12 +346,41 @@ export default function CreateListingForm({
   useEffect(() => {
     if (submitSucceededRef.current) return;
     if (!isHydrated || (!draftRestored && hasDraft)) return;
+
+    const hasPersistableContent = Boolean(
+      title.trim() ||
+        description.trim() ||
+        price.trim() ||
+        address.trim() ||
+        city.trim() ||
+        state.trim() ||
+        zip.trim() ||
+        amenitiesValue.trim() ||
+        houseRulesValue.trim() ||
+        moveInDate ||
+        leaseDuration ||
+        roomType ||
+        genderPreference ||
+        householdGender ||
+        selectedLanguages.length > 0 ||
+        uploadedImages.some((img) => img.uploadedUrl && !img.error)
+    );
+
+    if (!hasPersistableContent) {
+      cancelSave();
+      if (hasDraft || savedAt) {
+        clearPersistedData();
+      }
+      return;
+    }
+
     saveData(collectFormData());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     isHydrated,
     draftRestored,
     hasDraft,
+    savedAt,
     title,
     description,
     price,
@@ -511,25 +568,7 @@ export default function CreateListingForm({
       return;
     }
 
-    if (successfulImages.length === 0) {
-      showError("At least one photo is required to publish your listing");
-      return;
-    }
-
-    if (failedImages.length > 0 && !forceSubmit) {
-      setShowPartialUploadDialog(true);
-      return;
-    }
-
-    isSubmittingRef.current = true;
-    setLoading(true);
-
-    if (submitAbortRef.current) submitAbortRef.current.abort();
-    const abortController = new AbortController();
-    submitAbortRef.current = abortController;
-
     const imageUrls = successfulImages.map((img) => img.uploadedUrl as string);
-    const idempotencyKey = idempotencyKeyRef.current;
 
     // Build body exclusively from React state (all fields are controlled)
     const bodyObj = {
@@ -564,36 +603,54 @@ export default function CreateListingForm({
         }
       });
       setFieldErrors(errors);
-      const firstErrorKey = Object.keys(errors)[0];
-      if (firstErrorKey) {
-        document.getElementById(firstErrorKey)?.focus();
-      }
+      focusFirstFieldError(errors);
       setLoading(false);
       isSubmittingRef.current = false;
+      return;
+    }
+
+    if (successfulImages.length === 0) {
+      showError("At least one photo is required to publish your listing");
+      return;
+    }
+
+    if (failedImages.length > 0 && !forceSubmit) {
+      setShowPartialUploadDialog(true);
       return;
     }
 
     // Client-side language compliance pre-check (server validates as defense-in-depth)
     const titleCompliance = checkListingLanguageCompliance(bodyObj.title);
     if (!titleCompliance.allowed) {
-      setFieldErrors({
+      const errors = {
         title: titleCompliance.message || "Content policy violation",
-      });
-      document.getElementById("title")?.focus();
+      };
+      setFieldErrors(errors);
+      focusFirstFieldError(errors);
       setLoading(false);
       isSubmittingRef.current = false;
       return;
     }
     const descCompliance = checkListingLanguageCompliance(bodyObj.description);
     if (!descCompliance.allowed) {
-      setFieldErrors({
+      const errors = {
         description: descCompliance.message || "Content policy violation",
-      });
-      document.getElementById("description")?.focus();
+      };
+      setFieldErrors(errors);
+      focusFirstFieldError(errors);
       setLoading(false);
       isSubmittingRef.current = false;
       return;
     }
+
+    isSubmittingRef.current = true;
+    setLoading(true);
+
+    if (submitAbortRef.current) submitAbortRef.current.abort();
+    const abortController = new AbortController();
+    submitAbortRef.current = abortController;
+
+    const idempotencyKey = idempotencyKeyRef.current;
 
     try {
       const res = await fetch("/api/listings", {
@@ -645,11 +702,7 @@ export default function CreateListingForm({
                 string
               >);
           setFieldErrors(newFieldErrors);
-          const firstErrorKey = Object.keys(newFieldErrors)[0];
-          if (firstErrorKey) {
-            const element = document.getElementById(firstErrorKey);
-            element?.focus();
-          }
+          focusFirstFieldError(newFieldErrors);
         }
         throw new Error(json.error || "Failed to create listing");
       }
@@ -1173,7 +1226,7 @@ export default function CreateListingForm({
               initialImages={uploadedImages
                 .filter((img) => img.uploadedUrl)
                 .map((img) => img.uploadedUrl!)}
-              key={draftRestored ? "restored" : "initial"}
+              key={imageUploaderVersion}
             />
             {fieldErrors.images && (
               <p className="text-sm text-red-500 mt-1">{fieldErrors.images}</p>

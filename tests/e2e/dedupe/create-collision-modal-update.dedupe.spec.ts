@@ -6,6 +6,8 @@ import {
   seedCollisionListings,
 } from "./create-collision-helpers";
 
+test.use({ storageState: "playwright/.auth/incomplete-host.json" });
+
 test("T-16: duplicate create opens the collision modal and update routes to edit", async ({
   page,
 }) => {

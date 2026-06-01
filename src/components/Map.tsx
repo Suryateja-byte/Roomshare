@@ -1333,6 +1333,7 @@ export default function MapComponent({
   );
   const {
     mobileResultsView,
+    mobileResultsState,
     setMobileMapOverlayActive,
     setMobileSheetOverrideLabel,
     setMobileResultsViewPreference,
@@ -3479,6 +3480,14 @@ export default function MapComponent({
     setPin: setUserPin,
     handleMapClick: handleUserPinClick,
   } = useUserPin();
+  const hasSearchBoundsInUrl =
+    searchParams.has("minLng") &&
+    searchParams.has("maxLng") &&
+    searchParams.has("minLat") &&
+    searchParams.has("maxLat");
+  const canShowMobileEmptyState =
+    mobileResultsState !== "positive" &&
+    (mobileResultsState === "zero" || hasSearchBoundsInUrl || hasUserMoved);
   const hasConfirmedEmptyViewport =
     isMapLoaded &&
     isMapInitialized &&
@@ -3487,12 +3496,16 @@ export default function MapComponent({
     !suppressEmptyState &&
     listings.length === 0;
   const mobileMapStatus = useMemo<MobileMapStatus | null>(() => {
-    if (isPhoneViewport !== true || !hasConfirmedEmptyViewport) {
+    if (
+      isPhoneViewport !== true ||
+      !hasConfirmedEmptyViewport ||
+      !canShowMobileEmptyState
+    ) {
       return null;
     }
 
     return "confirmed-empty";
-  }, [hasConfirmedEmptyViewport, isPhoneViewport]);
+  }, [canShowMobileEmptyState, hasConfirmedEmptyViewport, isPhoneViewport]);
   const hasPhonePreviewCard =
     usesPreviewSelection &&
     isPhoneViewport === true &&
@@ -3500,7 +3513,9 @@ export default function MapComponent({
   const shouldShowMobileStatusCard =
     mobileMapStatus !== null && !hasPhonePreviewCard;
   const shouldShowDesktopEmptyState =
-    isPhoneViewport === false && hasConfirmedEmptyViewport;
+    isPhoneViewport === false &&
+    hasConfirmedEmptyViewport &&
+    mobileResultsState !== "positive";
   const [lightMapStyle, setLightMapStyle] = useState<
     string | StyleSpecification
   >(LIGHT_STYLE_FALLBACK);

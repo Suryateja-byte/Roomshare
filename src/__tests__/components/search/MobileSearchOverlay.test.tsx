@@ -6,19 +6,37 @@
  */
 
 const mockPush = jest.fn();
+const mockToastError = jest.fn();
+const mockFetch = jest.fn();
 const mockLocationSearchInput = jest.fn(
   ({
+    id,
+    value,
+    onChange,
     className,
     inputClassName,
+    inputRef,
   }: {
+    id?: string;
+    value?: string;
+    onChange?: (value: string) => void;
     className?: string;
     inputClassName?: string;
+    inputRef?: React.MutableRefObject<HTMLInputElement | null>;
   }) => (
-    <div
-      data-testid="location-search-input"
-      data-class-name={className}
-      data-input-class-name={inputClassName}
-    />
+    <div data-testid="location-search-input" data-class-name={className}>
+      <input
+        id={id}
+        ref={(node) => {
+          if (inputRef) {
+            inputRef.current = node;
+          }
+        }}
+        value={value ?? ""}
+        onChange={(event) => onChange?.(event.target.value)}
+        data-input-class-name={inputClassName}
+      />
+    </div>
   )
 );
 
@@ -108,11 +126,21 @@ jest.mock("@/hooks/useBodyScrollLock", () => ({
   useBodyScrollLock: jest.fn(),
 }));
 
+jest.mock("sonner", () => ({
+  toast: {
+    error: (...args: unknown[]) => mockToastError(...args),
+  },
+}));
+
 jest.mock("@/components/LocationSearchInput", () => ({
   __esModule: true,
   default: (props: {
+    id?: string;
+    value?: string;
+    onChange?: (value: string) => void;
     className?: string;
     inputClassName?: string;
+    inputRef?: React.MutableRefObject<HTMLInputElement | null>;
   }) => mockLocationSearchInput(props),
 }));
 
@@ -127,13 +155,29 @@ jest.mock("@/components/filters/filter-chip-utils", () => ({
 }));
 
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import MobileSearchOverlay from "@/components/search/MobileSearchOverlay";
 import { MAP_FLY_TO_EVENT } from "@/components/SearchForm";
 
 describe("MobileSearchOverlay", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    global.fetch = mockFetch;
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        results: [
+          {
+            id: "local:place:seattle-wa",
+            place_name: "Seattle, WA",
+            center: [-122.3321, 47.6062],
+            bbox: [-122.5121, 47.4262, -122.1521, 47.7862],
+            place_type: ["place"],
+            requires_resolution: false,
+          },
+        ],
+      }),
+    });
   });
 
   it("passes shell classes to the mobile location field and keeps text styles on the input", () => {
@@ -158,7 +202,9 @@ describe("MobileSearchOverlay", () => {
     expect(props.className).toContain("pr-11");
     expect(props.className).toContain("focus-within:ring-2");
     expect(props.className).toContain("focus-within:border-primary/30");
-    expect(props.className).not.toContain("placeholder:text-on-surface-variant");
+    expect(props.className).not.toContain(
+      "placeholder:text-on-surface-variant"
+    );
 
     expect(props.inputClassName).toContain("text-base");
     expect(props.inputClassName).toContain("text-on-surface");
@@ -205,6 +251,69 @@ describe("MobileSearchOverlay", () => {
     // Verify the import exists — this ensures the MobileSearchOverlay
     // module can access the event constant for dispatching.
     expect(MAP_FLY_TO_EVENT).toBe("mapFlyToLocation");
+  });
+
+  it("resolves a typed destination on mobile submit when autocomplete was not selected", async () => {
+    const onClose = jest.fn();
+    const events: CustomEvent[] = [];
+    const handler = (event: Event) => events.push(event as CustomEvent);
+    window.addEventListener(MAP_FLY_TO_EVENT, handler);
+
+    render(
+      <MobileSearchOverlay isOpen onClose={onClose} onOpenFilters={jest.fn()} />
+    );
+
+    fireEvent.change(screen.getByLabelText(/where/i), {
+      target: { value: "Seattle" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^search$/i }));
+
+    await waitFor(() => expect(mockPush).toHaveBeenCalledTimes(1));
+    const pushedUrl = mockPush.mock.calls[0][0] as string;
+    const url = new URL(pushedUrl, "http://localhost");
+
+    expect(url.searchParams.get("locationLabel")).toBe("Seattle, WA");
+    expect(url.searchParams.get("lat")).toBe("47.6062");
+    expect(url.searchParams.get("lng")).toBe("-122.3321");
+    expect(url.searchParams.get("minLng")).toBe("-122.512");
+    expect(url.searchParams.get("maxLat")).toBe("47.786");
+    expect(mockToastError).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(events[0]?.detail).toEqual({
+      lat: 47.6062,
+      lng: -122.3321,
+      bbox: [-122.5121, 47.4262, -122.1521, 47.7862],
+      zoom: 13,
+    });
+
+    window.removeEventListener(MAP_FLY_TO_EVENT, handler);
+  });
+
+  it("prompts on mobile when typed destination cannot resolve", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ results: [] }),
+    });
+
+    render(
+      <MobileSearchOverlay
+        isOpen
+        onClose={jest.fn()}
+        onOpenFilters={jest.fn()}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText(/where/i), {
+      target: { value: "Atlantis" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^search$/i }));
+
+    await waitFor(() =>
+      expect(mockToastError).toHaveBeenCalledWith(
+        "Select a location from the dropdown suggestions."
+      )
+    );
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it("handleSearch dispatches MAP_FLY_TO_EVENT when locationCoords is set", () => {

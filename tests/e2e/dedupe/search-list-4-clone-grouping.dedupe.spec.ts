@@ -67,37 +67,49 @@ test("T-02a: grouped desktop row card keeps trust and date controls aligned", as
   );
   expect(overflow).toBeLessThanOrEqual(1);
 
-  const detailsBox = await card
-    .locator('[data-testid="listing-card-details"]')
-    .boundingBox();
-  const actionBox = await card
-    .locator('[data-testid="group-dates-action"]')
-    .boundingBox();
-  const triggerBox = await card
-    .locator('[data-testid="group-dates-trigger"]')
-    .boundingBox();
-  const badgeBox = await card
-    .locator('[data-testid="host-identity-badge"]')
-    .boundingBox();
-  const cardBox = await card.boundingBox();
+  await expect
+    .poll(
+      async () => {
+        const detailsBox = await card
+          .locator('[data-testid="listing-card-details"]')
+          .boundingBox();
+        const actionBox = await card
+          .locator('[data-testid="group-dates-action"]')
+          .boundingBox();
+        const triggerBox = await card
+          .locator('[data-testid="group-dates-trigger"]')
+          .boundingBox();
+        const badgeBox = await card
+          .locator('[data-testid="host-identity-badge"]')
+          .boundingBox();
+        const cardBox = await card.boundingBox();
 
-  expect(detailsBox).not.toBeNull();
-  expect(actionBox).not.toBeNull();
-  expect(triggerBox).not.toBeNull();
-  expect(badgeBox).not.toBeNull();
-  expect(cardBox).not.toBeNull();
+        if (!detailsBox || !actionBox || !triggerBox || !badgeBox || !cardBox) {
+          return Number.POSITIVE_INFINITY;
+        }
 
-  const triggerDeltaToDetails = Math.abs(triggerBox!.x - detailsBox!.x);
-  const triggerDeltaToDetailsContent = Math.abs(
-    triggerBox!.x - (detailsBox!.x + 16)
-  );
-  expect(
-    Math.min(triggerDeltaToDetails, triggerDeltaToDetailsContent)
-  ).toBeLessThanOrEqual(2);
-  expect(badgeBox!.x).toBeGreaterThanOrEqual(cardBox!.x);
-  expect(badgeBox!.x + badgeBox!.width).toBeLessThanOrEqual(
-    cardBox!.x + cardBox!.width + 1
-  );
+        const triggerDeltaToDetails = Math.abs(triggerBox.x - detailsBox.x);
+        const triggerDeltaToDetailsContent = Math.abs(
+          triggerBox.x - (detailsBox.x + 16)
+        );
+        const triggerDelta = Math.min(
+          triggerDeltaToDetails,
+          triggerDeltaToDetailsContent
+        );
+        const badgeOverflow = Math.max(
+          cardBox.x - badgeBox.x,
+          badgeBox.x + badgeBox.width - (cardBox.x + cardBox.width + 1),
+          0
+        );
+
+        return Math.max(triggerDelta, badgeOverflow);
+      },
+      {
+        timeout: 15_000,
+        message: "Expected grouped row controls to settle into alignment",
+      }
+    )
+    .toBeLessThanOrEqual(2);
   await expect(card.locator('[data-testid="group-dates-trigger"]')).toHaveText(
     "View 3 more available dates"
   );

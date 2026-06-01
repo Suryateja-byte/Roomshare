@@ -14,10 +14,43 @@ import {
   SF_BOUNDS,
   searchResultsContainer,
 } from "../helpers";
+import type { Page } from "@playwright/test";
 
 test.beforeEach(async () => {
   test.slow();
 });
+
+test.describe.configure({ mode: "serial" });
+
+const gotoPath = async (page: Page, href: string) => {
+  const baseUrl = page.url().startsWith("http")
+    ? page.url()
+    : "http://localhost:3000";
+  const targetPath = new URL(href, baseUrl).pathname;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await page.goto(href, { waitUntil: "domcontentloaded" });
+      break;
+    } catch (error) {
+      if (!String(error).includes("ERR_ABORTED")) {
+        throw error;
+      }
+      if (new URL(page.url()).pathname === targetPath) {
+        break;
+      }
+      if (attempt === 2) {
+        throw error;
+      }
+    }
+  }
+
+  await expect
+    .poll(() => new URL(page.url()).pathname, {
+      timeout: timeouts.navigation,
+    })
+    .toBe(targetPath);
+};
 
 // ─── J35: View Public User Profile ────────────────────────────────────────────
 test.describe("J35: View Public User Profile", () => {
@@ -56,15 +89,11 @@ test.describe("J35: View Public User Profile", () => {
       .catch(() => false);
     test.skip(!hasHostLink, "No host profile link — skipping");
 
-    await hostLink.first().click();
+    const hostHref = await hostLink.first().getAttribute("href");
+    test.skip(!hostHref, "No host profile link href — skipping");
 
-    // Wait for navigation to user profile page
-    try {
-      await page.waitForURL(/\/users\//, { timeout: 10000 });
-    } catch {
-      // May already be on user page or redirected
-      await page.waitForLoadState("domcontentloaded");
-    }
+    await gotoPath(page, hostHref!);
+    await expect(page).toHaveURL(/\/users\//, { timeout: timeouts.navigation });
 
     // Step 3: Verify profile page
     const onProfile =
@@ -131,12 +160,11 @@ test.describe("J36: Block a User", () => {
       .catch(() => false);
     test.skip(!hasHostLink, "No host profile link — skipping");
 
-    await hostLink.first().click();
-    try {
-      await page.waitForURL(/\/users\//, { timeout: 10000 });
-    } catch {
-      await page.waitForLoadState("domcontentloaded");
-    }
+    const hostHref = await hostLink.first().getAttribute("href");
+    test.skip(!hostHref, "No host profile link href — skipping");
+
+    await gotoPath(page, hostHref!);
+    await expect(page).toHaveURL(/\/users\//, { timeout: timeouts.navigation });
 
     // Step 3: Look for block button
     const blockBtn = page
@@ -149,6 +177,19 @@ test.describe("J36: Block a User", () => {
       .catch(() => false);
     test.skip(!canBlock, "No block button — skipping");
 
+    await page.waitForFunction(
+      () => {
+        const blockButton = Array.from(document.querySelectorAll("button")).find(
+          (button) => button.textContent?.trim() === "Block"
+        );
+        return (
+          !!blockButton &&
+          Object.keys(blockButton).some((key) => key.startsWith("__reactProps$"))
+        );
+      },
+      undefined,
+      { timeout: timeouts.navigation }
+    );
     await blockBtn.first().click();
     await page
       .locator('[role="dialog"], [role="alertdialog"]')

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { getSession, useSession } from "next-auth/react";
 import { saveSearch } from "@/app/actions/saved-search";
 import {
   normalizeSearchFilters,
@@ -23,6 +24,8 @@ export default function SaveSearchButton({
   className = "",
 }: SaveSearchButtonProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const { status: sessionStatus } = useSession();
   const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState("");
   const [alertEnabled, setAlertEnabled] = useState(true);
@@ -85,6 +88,21 @@ export default function SaveSearchButton({
     return parts.length > 0 ? parts.join(" - ") : "My Search";
   };
 
+  const getLoginRedirectHref = (): string => {
+    const queryString = searchParams.toString();
+    const callbackUrl = `${pathname}${queryString ? `?${queryString}` : ""}`;
+    return `/login?callbackUrl=${encodeURIComponent(callbackUrl)}`;
+  };
+
+  const redirectToLogin = () => {
+    setError(null);
+    setIsOpen(false);
+    setIsLoading(false);
+    setIsOpeningCheckout(false);
+    setLockedSearchId(null);
+    redirectToUrl(getLoginRedirectHref());
+  };
+
   const handleOpen = () => {
     setName(generateDefaultName());
     setError(null);
@@ -139,10 +157,23 @@ export default function SaveSearchButton({
       return;
     }
 
+    if (sessionStatus === "unauthenticated") {
+      redirectToLogin();
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
     try {
+      if (sessionStatus === "loading") {
+        const session = await getSession().catch(() => null);
+        if (!session?.user) {
+          redirectToLogin();
+          return;
+        }
+      }
+
       const result = await saveSearch({
         name: name.trim(),
         filters: getCurrentFilters(),
@@ -151,6 +182,11 @@ export default function SaveSearchButton({
       });
 
       if ("error" in result) {
+        if (result.error === "Unauthorized") {
+          redirectToLogin();
+          return;
+        }
+
         setError(result.error ?? "Failed to save search");
       } else {
         if (result.effectiveAlertState === "LOCKED" && alertEnabled) {

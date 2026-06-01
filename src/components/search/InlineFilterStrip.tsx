@@ -176,7 +176,8 @@ export function InlineFilterStrip({
   const transitionCtx = useSearchTransitionSafe();
   const { mobileResultsView, registerOpenFilters } = useMobileSearch();
   const isPending = transitionCtx?.isPending ?? false;
-  const isDesktopQuickFilters = useMediaQuery("(min-width: 768px)") === true;
+  const mediaQueryMatchesDesktop = useMediaQuery("(min-width: 768px)");
+  const isDesktopQuickFilters = mediaQueryMatchesDesktop !== false;
 
   const [hasMounted, setHasMounted] = useState(false);
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
@@ -242,9 +243,8 @@ export function InlineFilterStrip({
     () => countActiveFilters(searchParams),
     [searchParams]
   );
-  // Use the media query result directly. SSR hydration mismatch is handled
-  // by SearchViewToggle rendering children in both containers with inert on
-  // the inactive one — no need to force desktop layout pre-mount here.
+  // Before media query hydration resolves, render the desktop contract so URL
+  // applied filters and toolbar affordances are present in SSR output.
   const showDesktopQuickFilters = isDesktopQuickFilters;
   const showMobileInlineFilters =
     !showDesktopQuickFilters && mobileResultsView === "list";

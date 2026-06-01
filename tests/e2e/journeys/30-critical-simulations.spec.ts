@@ -387,7 +387,9 @@ test.describe("30 Critical User Journey Simulations", () => {
     await page.waitForLoadState("domcontentloaded");
     // Wait for the signup form to render (Suspense boundary + hydration)
     await expect(
-      page.getByRole("heading", { name: /sign up|create.*account|register|join/i })
+      page.getByRole("heading", {
+        name: /sign up|create.*account|register|join/i,
+      })
     )
       .toBeVisible({ timeout: 30000 })
       .catch(() => {});
@@ -431,11 +433,26 @@ test.describe("30 Critical User Journey Simulations", () => {
     const imgCount = await images.count();
 
     if (imgCount > 1) {
+      const carousel = page
+        .getByRole("region", { name: /image carousel/i })
+        .first();
+      if (await carousel.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await carousel.hover();
+      }
+
       const nextArrow = page
         .locator('button[aria-label*="next" i], [data-testid="carousel-next"]')
         .first();
-      if (await nextArrow.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await nextArrow.click();
+      const isActionable =
+        (await nextArrow.isVisible({ timeout: 2000 }).catch(() => false)) &&
+        (await nextArrow.getAttribute("aria-hidden").catch(() => null)) !==
+          "true" &&
+        (await nextArrow
+          .evaluate((element) => getComputedStyle(element).pointerEvents)
+          .catch(() => "none")) !== "none";
+
+      if (isActionable) {
+        await nextArrow.click({ timeout: 5000 });
       }
     }
     expect(imgCount).toBeGreaterThanOrEqual(0);
@@ -542,9 +559,10 @@ test.describe("30 Critical User Journey Simulations", () => {
     await page.waitForLoadState("domcontentloaded");
 
     const pageText = await page.locator("body").textContent();
-    const has404 = /not found|404|doesn't exist|no longer available|packed up|moved out/i.test(
-      pageText || ""
-    );
+    const has404 =
+      /not found|404|doesn't exist|no longer available|packed up|moved out/i.test(
+        pageText || ""
+      );
     const isRedirected = !page.url().includes("nonexistent-fake-id");
     expect(has404 || isRedirected).toBeTruthy();
   });
@@ -727,8 +745,8 @@ test.describe("30 Critical User Journey Simulations", () => {
     expect(htmlClass).not.toContain("dark");
 
     // Verify warm canvas background is applied (body has bg-surface-canvas)
-    const bodyBg = await page.evaluate(() =>
-      getComputedStyle(document.body).backgroundColor
+    const bodyBg = await page.evaluate(
+      () => getComputedStyle(document.body).backgroundColor
     );
     // #fbf9f4 warm cream = rgb(251, 249, 244)
     expect(bodyBg).toBeTruthy();

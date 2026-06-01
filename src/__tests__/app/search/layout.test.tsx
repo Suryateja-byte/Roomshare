@@ -2,6 +2,10 @@ import { render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import SearchLayout from "@/app/search/layout";
 
+jest.mock("next/headers", () => ({
+  headers: jest.fn(async () => new Headers()),
+}));
+
 jest.mock("@/components/SearchHeaderWrapper", () => ({
   __esModule: true,
   default: function MockSearchHeaderWrapper() {
@@ -108,12 +112,12 @@ jest.mock("@/contexts/MobileSearchContext", () => ({
 }));
 
 describe("SearchLayout", () => {
-  it("includes the search-scoped account notice inside the fixed header", () => {
-    render(
-      <SearchLayout>
-        <div>Results</div>
-      </SearchLayout>
-    );
+  it("includes the search-scoped account notice inside the fixed header", async () => {
+    const layout = await SearchLayout({
+      children: <div>Results</div>,
+    });
+
+    render(layout);
 
     const header = screen.getByRole("banner");
     expect(

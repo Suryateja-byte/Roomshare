@@ -24,6 +24,12 @@ import {
   within,
 } from "@testing-library/react";
 import "@testing-library/jest-dom";
+import { useEffect } from "react";
+import {
+  MobileSearchProvider,
+  useMobileSearch,
+  type MobileResultsState,
+} from "@/contexts/MobileSearchContext";
 
 // --------------------------------------------------------------------------
 // Mock Modules - Must be before component import
@@ -573,6 +579,32 @@ function setDesktopAvoidRects(
   });
 }
 
+function MobileResultsStateSetter({
+  state,
+}: {
+  state: MobileResultsState;
+}) {
+  const { setMobileResultsState } = useMobileSearch();
+
+  useEffect(() => {
+    setMobileResultsState(state);
+  }, [state, setMobileResultsState]);
+
+  return null;
+}
+
+function renderMapWithMobileResultsState(
+  listings: React.ComponentProps<typeof MapComponent>["listings"],
+  state: MobileResultsState
+) {
+  return render(
+    <MobileSearchProvider>
+      <MobileResultsStateSetter state={state} />
+      <MapComponent listings={listings} />
+    </MobileSearchProvider>
+  );
+}
+
 async function renderMapAndPopulateMarkers(listings = mockListings) {
   render(<MapComponent listings={listings} />);
 
@@ -830,9 +862,30 @@ describe("Map Component", () => {
       expect(mockReplaceWithTransition).toHaveBeenCalled();
     });
 
-    it("uses the confirmed-empty mobile status card when the phone viewport has no listings", async () => {
+    it("does not show the phone empty status card when bare search list results are positive", async () => {
       phoneViewportMatches = true;
       mockQuerySourceFeaturesData = [];
+
+      renderMapWithMobileResultsState([], "positive");
+
+      await act(async () => {
+        jest.advanceTimersByTime(2000);
+      });
+
+      expect(
+        screen.queryByTestId("mobile-map-status-card")
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/no listings in this area/i)
+      ).not.toBeInTheDocument();
+    });
+
+    it("uses the confirmed-empty mobile status card when bounded phone viewport has no listings", async () => {
+      phoneViewportMatches = true;
+      mockQuerySourceFeaturesData = [];
+      mockSearchParams = new URLSearchParams(
+        "minLat=37.7&maxLat=37.85&minLng=-122.52&maxLng=-122.35"
+      );
 
       render(<MapComponent listings={[]} />);
 
@@ -847,6 +900,22 @@ describe("Map Component", () => {
       expect(
         screen.queryByText(/no listings in this area/i)
       ).not.toBeInTheDocument();
+    });
+
+    it("uses the confirmed-empty mobile status card when list results are confirmed zero", async () => {
+      phoneViewportMatches = true;
+      mockQuerySourceFeaturesData = [];
+
+      renderMapWithMobileResultsState([], "zero");
+
+      await act(async () => {
+        jest.advanceTimersByTime(2000);
+      });
+
+      expect(screen.getByTestId("mobile-map-status-card")).toHaveAttribute(
+        "data-status",
+        "confirmed-empty"
+      );
     });
 
     it("opens the mobile tools sheet, exposes map actions and layers, and hides it during status-card states", async () => {
@@ -908,6 +977,9 @@ describe("Map Component", () => {
       expect(screen.getByTestId("mobile-map-tools-sheet")).toBeInTheDocument();
 
       mockQuerySourceFeaturesData = [];
+      mockSearchParams = new URLSearchParams(
+        "minLat=37.7&maxLat=37.85&minLng=-122.52&maxLng=-122.35"
+      );
       rerender(<MapComponent listings={[]} />);
 
       await act(async () => {

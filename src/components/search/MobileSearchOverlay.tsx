@@ -3,7 +3,13 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
-import { LazyMotion, domAnimation, m, AnimatePresence, useReducedMotion } from "framer-motion";
+import {
+  LazyMotion,
+  domAnimation,
+  m,
+  AnimatePresence,
+  useReducedMotion,
+} from "framer-motion";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -27,6 +33,7 @@ import {
   readSearchIntentState,
   type SearchLocationSelection,
 } from "@/lib/search/search-intent";
+import { resolveTypedSearchLocation } from "@/lib/search/typed-location-resolver";
 import {
   applySearchQueryChange,
   buildCanonicalSearchUrl,
@@ -73,6 +80,8 @@ export default function MobileSearchOverlay({
   const [location, setLocation] = useState("");
   const [locationCoords, setLocationCoords] =
     useState<SearchLocationSelection | null>(null);
+  const [isResolvingTypedLocation, setIsResolvingTypedLocation] =
+    useState(false);
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
   // FilterModal is handled by the parent via onOpenFilters callback
@@ -194,20 +203,40 @@ export default function MobileSearchOverlay({
     [recentSearches]
   );
 
-  const handleSearch = useCallback(() => {
-    if (location.trim().length > 2 && !locationCoords) {
-      toast.error("Select a location from the dropdown suggestions.");
-      locationInputRef.current?.focus();
-      return;
+  const handleSearch = useCallback(async () => {
+    let nextLocationLabel = location;
+    let nextLocationCoords = locationCoords;
+
+    if (location.trim().length > 2 && !nextLocationCoords) {
+      if (isResolvingTypedLocation) {
+        return;
+      }
+
+      setIsResolvingTypedLocation(true);
+      try {
+        const resolvedLocation = await resolveTypedSearchLocation(location);
+        if (!resolvedLocation) {
+          toast.error("Select a location from the dropdown suggestions.");
+          locationInputRef.current?.focus();
+          return;
+        }
+
+        nextLocationLabel = resolvedLocation.label;
+        nextLocationCoords = resolvedLocation.selection;
+        setLocation(resolvedLocation.label);
+        setLocationCoords(resolvedLocation.selection);
+      } finally {
+        setIsResolvingTypedLocation(false);
+      }
     }
 
     const currentIntent = readSearchIntentState(
       new URLSearchParams(searchParamsString)
     );
     const params = buildSearchIntentParams(searchParams, {
-      location,
+      location: nextLocationLabel,
       vibe: currentIntent.vibeInput,
-      selectedLocation: locationCoords,
+      selectedLocation: nextLocationCoords,
     });
     // CFM-604: canonical-on-write guarantee — must go through buildCanonicalSearchUrl.
     const nextUrl = buildCanonicalSearchUrl(
@@ -220,12 +249,12 @@ export default function MobileSearchOverlay({
     // Dispatch fly-to event so the persistent map flies to the new location.
     // On mobile the map never remounts (it lives in layout), so without this
     // event the map stays at its old position after a location search.
-    if (locationCoords) {
+    if (nextLocationCoords) {
       const event = new CustomEvent<MapFlyToEventDetail>(MAP_FLY_TO_EVENT, {
         detail: {
-          lat: locationCoords.lat,
-          lng: locationCoords.lng,
-          bbox: locationCoords.bounds,
+          lat: nextLocationCoords.lat,
+          lng: nextLocationCoords.lng,
+          bbox: nextLocationCoords.bounds,
           zoom: 13,
         },
       });
@@ -237,6 +266,7 @@ export default function MobileSearchOverlay({
   }, [
     searchParams,
     searchParamsString,
+    isResolvingTypedLocation,
     location,
     locationCoords,
     minPrice,
@@ -260,9 +290,7 @@ export default function MobileSearchOverlay({
           : null,
       });
       // CFM-604: canonical-on-write guarantee — must go through buildCanonicalSearchUrl.
-      router.push(
-        buildCanonicalSearchUrl(normalizeSearchQuery(params))
-      );
+      router.push(buildCanonicalSearchUrl(normalizeSearchQuery(params)));
       onClose();
     },
     [onClose, recentSearches, router, searchParams, searchParamsString]
@@ -281,7 +309,11 @@ export default function MobileSearchOverlay({
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
-            transition={reducedMotion ? { duration: 0 } : { type: "spring", damping: 25, stiffness: 300, mass: 0.8 }}
+            transition={
+              reducedMotion
+                ? { duration: 0 }
+                : { type: "spring", damping: 25, stiffness: 300, mass: 0.8 }
+            }
             className="fixed inset-0 z-[1200] bg-surface-container-lowest flex flex-col"
             data-testid="mobile-search-overlay"
             role="dialog"
@@ -298,10 +330,14 @@ export default function MobileSearchOverlay({
                 >
                   <ArrowLeft className="w-5 h-5 text-on-surface" />
                 </button>
-                <m.span 
+                <m.span
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={reducedMotion ? { duration: 0 } : { delay: 0.1, duration: 0.3 }}
+                  transition={
+                    reducedMotion
+                      ? { duration: 0 }
+                      : { delay: 0.1, duration: 0.3 }
+                  }
                   className="text-base font-semibold text-on-surface"
                 >
                   Search
@@ -309,10 +345,14 @@ export default function MobileSearchOverlay({
               </div>
 
               {/* Form fields */}
-              <m.div 
+              <m.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={reducedMotion ? { duration: 0 } : { delay: 0.15, duration: 0.4, ease: "easeOut" }}
+                transition={
+                  reducedMotion
+                    ? { duration: 0 }
+                    : { delay: 0.15, duration: 0.4, ease: "easeOut" }
+                }
                 className="flex-1 overflow-y-auto hide-scrollbar-mobile"
               >
                 <div className="px-5 pt-6 pb-4 space-y-5">
@@ -395,6 +435,7 @@ export default function MobileSearchOverlay({
                   <button
                     type="button"
                     onClick={handleSearch}
+                    disabled={isResolvingTypedLocation}
                     className="flex items-center justify-center gap-2.5 w-full h-13 py-3.5 bg-primary hover:bg-primary/90 text-on-primary rounded-full text-base font-semibold shadow-ambient shadow-primary/20 transition-colors active:scale-[0.98]"
                   >
                     <Search className="w-5 h-5" />

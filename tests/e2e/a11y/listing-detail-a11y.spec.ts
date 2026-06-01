@@ -10,7 +10,7 @@
  * - Keyboard navigation through page sections
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect, type Locator, type Page } from "@playwright/test";
 import { selectors } from "../helpers/test-utils";
 import {
   runAxeScan,
@@ -19,9 +19,7 @@ import {
 } from "../helpers/a11y-helpers";
 
 /** Navigate to the first available listing detail page */
-async function navigateToListing(
-  page: import("@playwright/test").Page
-): Promise<boolean> {
+async function navigateToListing(page: Page): Promise<boolean> {
   await page.goto("/search");
   await page.waitForLoadState("domcontentloaded");
 
@@ -284,15 +282,28 @@ test.describe("Listing Detail — Accessibility Deep-Dive", () => {
       const found = await navigateToListing(page);
       test.skip(!found, "No listings available");
 
-      // Look for apply/contact button
-      const applyButton = page.getByRole("button", {
-        name: /apply|contact|message|book/i,
-      });
-      const isVisible = await applyButton
-        .isVisible({ timeout: 5000 })
-        .catch(() => false);
+      const contactButtons = page
+        .locator(
+          '[data-testid="contact-host-sidebar"], [data-testid="contact-host-host-section"]'
+        )
+        .getByRole("button", {
+          name: /contact host|unlock to contact|verify email/i,
+        });
 
-      if (isVisible) {
+      let applyButton: Locator | null = null;
+      const buttonCount = await contactButtons.count();
+      for (let index = 0; index < buttonCount; index += 1) {
+        const candidate = contactButtons.nth(index);
+        const isVisible = await candidate
+          .isVisible({ timeout: 1000 })
+          .catch(() => false);
+        if (isVisible) {
+          applyButton = candidate;
+          break;
+        }
+      }
+
+      if (applyButton) {
         // Button should have accessible name
         const ariaLabel = await applyButton.getAttribute("aria-label");
         const text = await applyButton.textContent();

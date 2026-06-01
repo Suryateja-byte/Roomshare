@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 import { execSync } from "child_process";
 import fs from "fs";
+import os from "os";
 import path from "path";
 
 // P2-08 FIX: Generate SW version from git commit or timestamp for cache invalidation
@@ -28,8 +29,28 @@ const isSentryEnabled =
   process.env.NODE_ENV === "production" ||
   process.env.SENTRY_ENABLE_IN_DEV === "1";
 
+function getLocalNetworkDevOrigins() {
+  try {
+    return Object.values(os.networkInterfaces()).flatMap((entries) =>
+      (entries ?? [])
+        .filter(({ family, internal }) => family === "IPv4" && !internal)
+        .map(({ address }) => address)
+    );
+  } catch {
+    return [];
+  }
+}
+
+const allowedDevOrigins =
+  process.env.NODE_ENV === "production"
+    ? undefined
+    : Array.from(
+        new Set(["127.0.0.1", "::1", ...getLocalNetworkDevOrigins()])
+      );
+
 const nextConfig: NextConfig = {
   transpilePackages: ["react-map-gl"],
+  allowedDevOrigins,
 
   // Optimize barrel file imports for better tree-shaking
   // Significantly reduces bundle size for icon libraries and UI component packages

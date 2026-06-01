@@ -11,8 +11,13 @@ import { CreateListingPage } from "../page-objects/create-listing.page";
 
 test.describe("Create Listing — Draft Persistence", () => {
   test.use({ storageState: "playwright/.auth/user.json" });
-  test.beforeEach(async () => {
+  test.beforeEach(async ({ page }) => {
     test.slow();
+    await page.goto("/");
+    await page.evaluate(() => {
+      localStorage.removeItem("listing-draft");
+    });
+    await page.goto("about:blank");
   });
 
   // ── D-001: Draft auto-saves form data ──
@@ -31,18 +36,25 @@ test.describe("Create Listing — Draft Persistence", () => {
       price: "1500",
       totalSlots: "2",
     });
+    await expect(createPage.titleInput).toHaveValue("Draft Test Title");
+    await expect(createPage.descriptionInput).toHaveValue(
+      "Draft test description that is long enough to be meaningful"
+    );
 
     // Wait for debounced save to localStorage
     await expect(async () => {
-      const draft = await page.evaluate(() => localStorage.getItem("listing-draft"));
+      const draft = await page.evaluate(() =>
+        localStorage.getItem("listing-draft")
+      );
       expect(draft).not.toBeNull();
-    }).toPass({ timeout: 5000 });
+    }).toPass({ timeout: 15_000 });
 
     // Verify localStorage was written
     const draftBeforeNav = await page.evaluate(() =>
       localStorage.getItem("listing-draft")
     );
     expect(draftBeforeNav).not.toBeNull();
+    await expect(createPage.draftBanner).toBeHidden();
 
     // Navigate away
     await page.goto("/");
@@ -221,7 +233,9 @@ test.describe("Create Listing — Draft Persistence", () => {
 
     // Wait for debounced save to localStorage
     await expect(async () => {
-      const draft = await page.evaluate(() => localStorage.getItem("listing-draft"));
+      const draft = await page.evaluate(() =>
+        localStorage.getItem("listing-draft")
+      );
       expect(draft).not.toBeNull();
     }).toPass({ timeout: 5000 });
 

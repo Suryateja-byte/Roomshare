@@ -4,7 +4,7 @@ import { forwardRef, type ButtonHTMLAttributes } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import { Check, ChevronDown, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { PriceRangeFilter } from "@/components/search/PriceRangeFilter";
 import { VALID_LEASE_DURATIONS, VALID_ROOM_TYPES } from "@/lib/search-params";
 import { cn } from "@/lib/utils";
@@ -269,13 +269,13 @@ export function DesktopQuickFilters({
                 </p>
               </div>
 
-              <Input
-                type="date"
-                min={minMoveInDate}
+              <DatePicker
                 value={moveInDateValue}
-                onChange={(event) => onMoveInSelect(event.target.value)}
+                onChange={onMoveInSelect}
+                placeholder="Select move-in date"
+                minDate={minMoveInDate}
                 aria-label="Move-in date"
-                className="h-11"
+                className="h-11 rounded-xl"
               />
 
               <div className="flex justify-between">

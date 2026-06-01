@@ -272,6 +272,24 @@ describe("ListingPageClient", () => {
     expect(screen.getByTestId("report-listing")).toBeInTheDocument();
   });
 
+  it("renders public detail content and guest contact CTA before session hydration resolves", () => {
+    mockUseSession.mockReturnValue({
+      data: null,
+      status: "loading",
+    });
+
+    render(<ListingPageClient {...makeProps({ isLoggedIn: false })} />);
+
+    expect(screen.getByText("Shared room near Japan Center.")).toBeInTheDocument();
+    expect(screen.getByText("Wifi")).toBeInTheDocument();
+    expect(screen.getByText("Kitchen")).toBeInTheDocument();
+    expect(screen.getByText("$850")).toBeInTheDocument();
+    expect(screen.getByTestId("contact-host-sidebar")).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("link", { name: "Sign in to contact host" })[0]
+    ).toHaveAttribute("href", "/login");
+  });
+
   it("shows the verified host trust status on listing detail", async () => {
     render(<ListingPageClient {...makeProps()} />);
 

@@ -41,6 +41,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!api/health|_next/static|_next/image|favicon.ico|sw.js|sw-version.js|manifest.json|icons).*)",
+    "/((?!api/health|_next/static|_next/image|_next/webpack-hmr|favicon.ico|sw.js|sw-version.js|manifest.json|icons).*)",
   ],
 };

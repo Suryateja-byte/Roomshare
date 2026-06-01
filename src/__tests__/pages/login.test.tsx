@@ -48,7 +48,11 @@ describe("LoginPage", () => {
 
     expect(screen.getByText("Welcome back")).toBeInTheDocument();
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
-    expect(screen.getByLabelText("Password")).toBeInTheDocument();
+    expect(screen.getByLabelText("Password")).toHaveAttribute(
+      "name",
+      "password"
+    );
+    expect(screen.getByTestId("login-form")).toHaveAttribute("method", "post");
   });
 
   it("renders google sign in button", () => {

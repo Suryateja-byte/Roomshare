@@ -50,6 +50,8 @@ const deleteUploadSchema = z.object({
   path: z.string().trim().min(1).max(500),
 });
 
+const uploadTypeSchema = z.enum(["profile", "listing"]);
+
 const STORAGE_RETRY_AFTER_SECONDS = "30";
 const STORAGE_CONNECTION_ERROR =
   "Unable to connect to storage service. Please try again.";
@@ -175,7 +177,16 @@ export async function POST(request: NextRequest) {
     // Get form data
     const formData = await request.formData();
     const file = formData.get("file") as File;
-    const type = formData.get("type") as string; // 'profile' or 'listing'
+    const typeResult = uploadTypeSchema.safeParse(formData.get("type"));
+
+    if (!typeResult.success) {
+      return NextResponse.json(
+        { error: "Invalid upload type" },
+        { status: 400 }
+      );
+    }
+
+    const type = typeResult.data;
 
     if (type === "listing") {
       const emailCheck = await checkEmailVerified(session.user.id);

@@ -1,5 +1,5 @@
 import { Page, Locator, expect } from "@playwright/test";
-import { timeouts } from "../helpers/test-utils";
+import { timeouts, waitForHydration } from "../helpers/test-utils";
 import path from "path";
 
 /**
@@ -124,7 +124,12 @@ export class CreateListingPage {
   async goto() {
     await this.page.goto("/listings/create");
     await this.page.waitForLoadState("domcontentloaded");
+    await waitForHydration(this.page, { timeout: timeouts.navigation });
     await this.form.waitFor({ state: "visible", timeout: timeouts.navigation });
+    await this.imageFileInput.waitFor({
+      state: "attached",
+      timeout: timeouts.navigation,
+    });
   }
 
   // ── Form Fill Actions ──
@@ -138,11 +143,20 @@ export class CreateListingPage {
     await this.titleInput.fill(data.title);
     await this.descriptionInput.fill(data.description);
     await this.priceInput.fill(String(data.price));
+    await expect(this.titleInput).toHaveValue(data.title, {
+      timeout: 2_000,
+    });
+    await expect(this.descriptionInput).toHaveValue(data.description, {
+      timeout: 2_000,
+    });
     await expect(this.priceInput).toHaveValue(String(data.price), {
       timeout: 2_000,
     });
     if (data.totalSlots !== undefined) {
       await this.totalSlotsInput.fill(String(data.totalSlots));
+      await expect(this.totalSlotsInput).toHaveValue(String(data.totalSlots), {
+        timeout: 2_000,
+      });
     }
   }
 
@@ -192,14 +206,33 @@ export class CreateListingPage {
     // DatePicker is a Radix Popover button trigger, not a text input. Choose
     // the first enabled calendar day so timezone boundaries do not make the
     // footer "Today" action a no-op when minDate is already tomorrow in UTC.
-    await this.moveInDateInput.waitFor({ state: "visible", timeout: 5000 });
-    await this.moveInDateInput.scrollIntoViewIfNeeded();
-    await this.moveInDateInput.click();
     const enabledDayButton = this.page
       .locator("[data-radix-popper-content-wrapper] button:not([disabled])")
       .filter({ hasText: /^\d+$/ })
       .first();
-    await enabledDayButton.waitFor({ state: "visible", timeout: 5000 });
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await this.moveInDateInput.waitFor({
+        state: "visible",
+        timeout: timeouts.action,
+      });
+      await this.moveInDateInput.scrollIntoViewIfNeeded();
+      await this.moveInDateInput.click();
+
+      const opened = await enabledDayButton
+        .waitFor({
+          state: "visible",
+          timeout: attempt === 0 ? 5_000 : timeouts.action,
+        })
+        .then(() => true)
+        .catch(() => false);
+      if (opened) break;
+    }
+
+    await enabledDayButton.waitFor({
+      state: "visible",
+      timeout: timeouts.action,
+    });
     await enabledDayButton.click();
     await expect(this.moveInDateInput).not.toContainText(
       /select move-in date/i
@@ -311,6 +344,11 @@ export class CreateListingPage {
       "../fixtures/test-images",
       fileName
     );
+    await waitForHydration(this.page, { timeout: timeouts.navigation });
+    await this.imageFileInput.waitFor({
+      state: "attached",
+      timeout: timeouts.navigation,
+    });
     await this.imageFileInput.setInputFiles(filePath);
   }
 

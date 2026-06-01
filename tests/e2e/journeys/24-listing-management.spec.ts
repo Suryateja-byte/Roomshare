@@ -14,11 +14,14 @@ import {
   timeouts,
   SF_BOUNDS,
   searchResultsContainer,
+  waitForHydration,
 } from "../helpers";
 
 test.beforeEach(async () => {
   test.slow();
 });
+
+test.describe.configure({ mode: "serial" });
 
 // ─── J31: Edit Listing and Verify ─────────────────────────────────────────────
 test.describe("J31: Edit Listing and Verify", () => {
@@ -170,73 +173,156 @@ test.describe("J31: Edit Listing and Verify", () => {
 test.describe("J32: Pause and Unpause Listing", () => {
   test("edit page → pause → verify hidden → unpause → verify visible", async ({
     page,
-    nav,
   }) => {
-    // Step 1: Navigate to own listing
-    await nav.goToSearch({
-      q: "Richmond District Room",
-      bounds: SF_BOUNDS,
-    });
-    await page.waitForLoadState("domcontentloaded");
+    const listingId = "e2e-sf-5-richmond-district-room";
+    const listingPath = `/listings/${listingId}`;
+    const gotoPath = async (path: string) => {
+      const baseUrl = page.url().startsWith("http")
+        ? page.url()
+        : "http://localhost:3000";
+      const targetPath = new URL(path, baseUrl).pathname;
 
-    const cards = searchResultsContainer(page).locator(selectors.listingCard);
-    test.skip((await cards.count()) === 0, "Listing not found — skipping");
-
-    await nav.clickListingCard(0);
-    await page.waitForURL(/\/listings\//, {
-      timeout: timeouts.navigation,
-      waitUntil: "commit",
-    });
-    await page.waitForLoadState("domcontentloaded");
-
-    // Step 2: Look for status toggle dropdown (shows "Active", "Paused", or "Rented")
-    const statusToggle = page
-      .getByRole("button", { name: /active|paused|rented/i })
-      .or(page.locator('[data-testid="pause-listing"]'));
-
-    const canToggle = await statusToggle
-      .first()
-      .isVisible()
-      .catch(() => false);
-    test.skip(!canToggle, "No status toggle — skipping");
-
-    // Step 3: Open dropdown and select "Paused"
-    await statusToggle.first().click();
-    const pausedOption = page.getByText("Paused").first();
-    await pausedOption
-      .waitFor({ state: "visible", timeout: 3000 })
-      .catch(() => {});
-    if (await pausedOption.isVisible().catch(() => false)) {
-      await pausedOption.click();
-      await page.waitForLoadState("domcontentloaded");
-    }
-
-    // Step 4: Verify paused state — button should now show "Paused"
-    const pausedBtn = page.getByRole("button", { name: /paused/i }).first();
-    const isPaused = await pausedBtn.isVisible().catch(() => false);
-    const hasToast = await page
-      .locator(selectors.toast)
-      .isVisible()
-      .catch(() => false);
-    expect(isPaused || hasToast).toBeTruthy();
-
-    // Step 5: Unpause — open dropdown and select "Active"
-    const currentToggle = page
-      .getByRole("button", { name: /active|paused|rented/i })
-      .first();
-    if (await currentToggle.isVisible().catch(() => false)) {
-      await currentToggle.click();
-      const activeOption = page.getByText("Active").first();
-      await activeOption
-        .waitFor({ state: "visible", timeout: 3000 })
-        .catch(() => {});
-      if (await activeOption.isVisible().catch(() => false)) {
-        await activeOption.click();
-        await page.waitForLoadState("domcontentloaded");
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          await page.goto(path, { waitUntil: "domcontentloaded" });
+          break;
+        } catch (error) {
+          if (!String(error).includes("ERR_ABORTED")) {
+            throw error;
+          }
+          if (new URL(page.url()).pathname === targetPath) {
+            break;
+          }
+          if (attempt === 2) {
+            throw error;
+          }
+        }
       }
-    }
 
-    await expect(page.locator("body")).toBeVisible();
+      await expect
+        .poll(() => new URL(page.url()).pathname, {
+          timeout: timeouts.navigation,
+        })
+        .toBe(targetPath);
+    };
+    const ensureDetailPage = async () => {
+      await page
+        .waitForURL((url) => url.pathname === listingPath, {
+          timeout: timeouts.action,
+        })
+        .catch(async () => {
+          await gotoPath(listingPath);
+        });
+      await waitForHydration(page, { timeout: timeouts.navigation });
+    };
+    const statusSelect = page
+      .locator('select[name="status"], select#status')
+      .first();
+    const saveBtn = page
+      .getByRole("button", { name: /save|update|submit/i })
+      .or(page.locator('button[type="submit"]'))
+      .first();
+    const editForm = page.locator('[data-testid="edit-listing-form"]').first();
+
+    const openEditPage = async () => {
+      await gotoPath(`${listingPath}/edit`);
+      await waitForHydration(page, { timeout: timeouts.navigation });
+      await expect(statusSelect).toBeVisible({ timeout: timeouts.navigation });
+      await expect(saveBtn).toBeVisible({ timeout: timeouts.navigation });
+      await expect(editForm).toBeVisible({ timeout: timeouts.navigation });
+      await page.waitForFunction(
+        () => {
+          const select = document.querySelector(
+            'select[name="status"], select#status'
+          );
+          const form = document.querySelector(
+            '[data-testid="edit-listing-form"]'
+          );
+          return (
+            !!select &&
+            !!form &&
+            Object.keys(select).some((key) => key.startsWith("__reactProps$")) &&
+            Object.keys(form).some((key) => key.startsWith("__reactProps$"))
+          );
+        },
+        undefined,
+        { timeout: timeouts.navigation }
+      );
+    };
+
+    const saveStatus = async (targetStatus: "ACTIVE" | "PAUSED") => {
+      if ((await statusSelect.inputValue()) === targetStatus) {
+        return;
+      }
+
+      await statusSelect.selectOption(targetStatus);
+      await expect(statusSelect).toHaveValue(targetStatus, {
+        timeout: timeouts.action,
+      });
+      await page.waitForFunction(
+        (expectedStatus) => {
+          const select = document.querySelector(
+            'select[name="status"], select#status'
+          ) as HTMLSelectElement | null;
+          const form = document.querySelector(
+            '[data-testid="edit-listing-form"]'
+          );
+          const reactSelectProps = select
+            ? Object.entries(select).find(([key]) =>
+                key.startsWith("__reactProps$")
+              )?.[1]
+            : null;
+          return (
+            select?.value === expectedStatus &&
+            (reactSelectProps as { value?: string } | null)?.value ===
+              expectedStatus &&
+            !!form &&
+            Object.keys(form).some((key) => key.startsWith("__reactProps$"))
+          );
+        },
+        targetStatus,
+        { timeout: timeouts.action }
+      );
+
+      const [statusResponse] = await Promise.all([
+        page.waitForResponse(
+          (response) =>
+            response.url().includes(`/api/listings/${listingId}`) &&
+            response.request().method() === "PATCH",
+          { timeout: timeouts.navigation }
+        ),
+        saveBtn.click(),
+      ]);
+      expect(statusResponse.ok()).toBeTruthy();
+      await ensureDetailPage();
+    };
+
+    // Step 1: Ensure the shared seeded listing starts active, even if a prior
+    // interrupted run left it paused.
+    await openEditPage();
+    await saveStatus("ACTIVE");
+
+    // Step 2: Pause through the owner edit form.
+    await openEditPage();
+    await saveStatus("PAUSED");
+
+    // Step 3: Verify paused state on the owner detail page.
+    await expect(
+      page.locator('[data-testid="listing-detail-header"]')
+    ).toBeVisible({ timeout: timeouts.navigation });
+    await expect(
+      page
+        .getByRole("button", { name: /paused/i })
+        .or(page.locator("main").getByText(/^Paused$/))
+        .first()
+    ).toBeVisible({ timeout: timeouts.navigation });
+
+    // Step 4: Restore original status for the rest of the suite.
+    await openEditPage();
+    await saveStatus("ACTIVE");
+    await expect(
+      page.locator('[data-testid="listing-detail-header"]')
+    ).toBeVisible({ timeout: timeouts.navigation });
   });
 });
 

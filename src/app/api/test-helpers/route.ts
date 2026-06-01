@@ -9,6 +9,8 @@
 import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { resolvePublicListingVisibilityState } from "@/lib/listings/public-contact-contract";
+import { RATE_LIMITS } from "@/lib/rate-limit";
 import { normalizeAddress } from "@/lib/search/normalize-address";
 
 const LEGACY_BOOKING_ACTIONS = new Set([
@@ -80,7 +82,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const action = toStringParam(body?.action);
-    const params = body?.params && typeof body.params === "object" ? body.params : {};
+    const params =
+      body?.params && typeof body.params === "object" ? body.params : {};
 
     if (LEGACY_BOOKING_ACTIONS.has(action)) {
       return NextResponse.json(
@@ -89,7 +92,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-      switch (action) {
+    switch (action) {
       case "findUserByEmail": {
         const email = toStringParam(params.email, "").toLowerCase();
         if (!email) {
@@ -201,7 +204,7 @@ export async function POST(request: NextRequest) {
         }
 
         const minSlots = Math.max(1, toNumberParam(params.minSlots, 1));
-        const listing = await prisma.listing.findFirst({
+        const listings = await prisma.listing.findMany({
           where: {
             ownerId: owner.id,
             status: "ACTIVE",
@@ -213,10 +216,27 @@ export async function POST(request: NextRequest) {
             totalSlots: true,
             availableSlots: true,
             openSlots: true,
+            moveInDate: true,
+            availableUntil: true,
+            minStayMonths: true,
+            lastConfirmedAt: true,
+            status: true,
+            statusReason: true,
             price: true,
+            owner: {
+              select: {
+                isSuspended: true,
+              },
+            },
           },
-          orderBy: { totalSlots: "desc" },
+          orderBy: [{ totalSlots: "desc" }, { createdAt: "asc" }],
+          take: 50,
         });
+        const listing = listings.find(
+          (candidate) =>
+            !candidate.owner.isSuspended &&
+            resolvePublicListingVisibilityState(candidate).isPubliclyVisible
+        );
 
         if (!listing) {
           return NextResponse.json(
@@ -225,7 +245,188 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        return NextResponse.json({ ...listing, price: Number(listing.price) });
+        const { owner: _owner, ...publicListing } = listing;
+        return NextResponse.json({
+          ...publicListing,
+          price: Number(publicListing.price),
+        });
+      }
+
+      case "findOwnerListingsByTitlePrefix": {
+        const ownerEmail = toStringParam(
+          params.ownerEmail,
+          process.env.E2E_TEST_EMAIL || "e2e-test@roomshare.dev"
+        ).toLowerCase();
+        const titlePrefix = toStringParam(params.titlePrefix);
+        if (titlePrefix.length < 8) {
+          return NextResponse.json(
+            { error: "titlePrefix must be at least 8 characters" },
+            { status: 400 }
+          );
+        }
+
+        const owner = await prisma.user.findUnique({
+          where: { email: ownerEmail },
+          select: { id: true },
+        });
+        if (!owner) {
+          return NextResponse.json(
+            { error: "Owner not found" },
+            { status: 404 }
+          );
+        }
+
+        const address = toStringParam(params.address);
+        const normalizedAddress = address
+          ? normalizeAddress({
+              address,
+              city: toStringParam(params.city, "San Francisco"),
+              state: toStringParam(params.state, "CA"),
+              zip: toStringParam(params.zip, "94103"),
+            })
+          : undefined;
+
+        const listings = await prisma.listing.findMany({
+          where: {
+            ownerId: owner.id,
+            title: { startsWith: titlePrefix },
+            ...(normalizedAddress ? { normalizedAddress } : {}),
+          },
+          select: { id: true },
+          take: 50,
+        });
+
+        return NextResponse.json({
+          listingIds: listings.map((listing) => listing.id),
+        });
+      }
+
+      case "countConversationsForListingParticipant": {
+        const listingId = toStringParam(params.listingId);
+        const participantEmail = toStringParam(
+          params.participantEmail
+        ).toLowerCase();
+        if (!listingId || !participantEmail) {
+          return NextResponse.json(
+            { error: "listingId and participantEmail are required" },
+            { status: 400 }
+          );
+        }
+
+        const participant = await prisma.user.findUnique({
+          where: { email: participantEmail },
+          select: { id: true },
+        });
+        if (!participant) {
+          return NextResponse.json(
+            { error: "Participant not found" },
+            { status: 404 }
+          );
+        }
+
+        const conversations = await prisma.conversation.findMany({
+          where: {
+            listingId,
+            deletedAt: null,
+            participants: { some: { id: participant.id } },
+          },
+          select: { id: true },
+          orderBy: { createdAt: "asc" },
+        });
+
+        return NextResponse.json({
+          count: conversations.length,
+          conversationIds: conversations.map((conversation) => conversation.id),
+        });
+      }
+
+      case "resetCreateListingRateLimits": {
+        const ownerEmail = toStringParam(
+          params.ownerEmail,
+          process.env.E2E_TEST_EMAIL || "e2e-test@roomshare.dev"
+        ).toLowerCase();
+        const owner = await prisma.user.findUnique({
+          where: { email: ownerEmail },
+          select: { id: true },
+        });
+
+        const result = await prisma.rateLimitEntry.deleteMany({
+          where: {
+            OR: [
+              { endpoint: "/api/listings" },
+              ...(owner
+                ? [
+                    {
+                      endpoint: "/api/listings/user",
+                      identifier: `user:${owner.id}`,
+                    },
+                  ]
+                : []),
+            ],
+          },
+        });
+
+        return NextResponse.json({ deleted: result.count });
+      }
+
+      case "primeListingStatusRateLimit": {
+        const listingId = toStringParam(params.listingId);
+        const identifier = toStringParam(params.identifier);
+        if (!listingId || !identifier) {
+          return NextResponse.json(
+            { error: "listingId and identifier are required" },
+            { status: 400 }
+          );
+        }
+
+        const listing = await prisma.listing.findUnique({
+          where: { id: listingId },
+          select: { id: true },
+        });
+        if (!listing) {
+          return NextResponse.json(
+            { error: "Listing not found" },
+            { status: 404 }
+          );
+        }
+
+        const now = new Date();
+        const expiresAt = new Date(
+          now.getTime() + RATE_LIMITS.listingStatus.windowMs
+        );
+        const endpoint = `/api/listings/${listing.id}/status`;
+        const isDev =
+          process.env.NODE_ENV !== "production" &&
+          process.env.NODE_ENV !== "test";
+        const devMultiplier =
+          isDev && process.env.DISABLE_RATE_LIMIT_DEV_MULTIPLIER !== "true"
+            ? 10
+            : 1;
+        const count = RATE_LIMITS.listingStatus.limit * devMultiplier;
+
+        await prisma.rateLimitEntry.upsert({
+          where: {
+            identifier_endpoint: { identifier, endpoint },
+          },
+          create: {
+            identifier,
+            endpoint,
+            count,
+            windowStart: now,
+            expiresAt,
+          },
+          update: {
+            count,
+            windowStart: now,
+            expiresAt,
+          },
+        });
+
+        return NextResponse.json({
+          identifier,
+          endpoint,
+          count,
+        });
       }
 
       case "getGroundTruthSlots": {
@@ -274,7 +475,10 @@ export async function POST(request: NextRequest) {
       case "setListingStatus": {
         const status = toStringParam(params.status);
         if (!["ACTIVE", "PAUSED", "RENTED"].includes(status)) {
-          return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+          return NextResponse.json(
+            { error: "Invalid status" },
+            { status: 400 }
+          );
         }
 
         await prisma.listing.update({
@@ -318,10 +522,14 @@ export async function POST(request: NextRequest) {
           Math.min(totalSlots, toNumberParam(params.availableSlots, 1))
         );
         const roomType = toStringParam(params.roomType, "Private Room");
-        const createdAtOffsetsHours = Array.isArray(params.createdAtOffsetsHours)
+        const createdAtOffsetsHours = Array.isArray(
+          params.createdAtOffsetsHours
+        )
           ? params.createdAtOffsetsHours
           : [];
-        const moveInDateOffsetsDays = Array.isArray(params.moveInDateOffsetsDays)
+        const moveInDateOffsetsDays = Array.isArray(
+          params.moveInDateOffsetsDays
+        )
           ? params.moveInDateOffsetsDays
           : [];
         const normalizedAddress = normalizeAddress({

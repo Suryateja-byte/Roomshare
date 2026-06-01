@@ -6,11 +6,11 @@ confirmed issue.
 
 ## Ledger Status
 
-- Audit status: `Phase2TestingCiAudited`
+- Audit status: `AuthAuthorizationValidationAudited`
 - Release candidate status: `NotReady`
 - Open P0 count: `0`
-- Open P1 count: `3`
-- Last updated: `2026-05-08`
+- Open P1 count: `0`
+- Last updated: `2026-05-31`
 
 ## Finding Schema
 
@@ -53,11 +53,64 @@ Allowed statuses:
 
 ## Confirmed Findings
 
+### P1-VALIDATION-001 - Upload type validation bypassed listing email verification
+
+- Severity: P1
+- Confidence: High
+- Status: VerifiedFixed
+- Duplicate status: Unique
+- Slice: Auth/Authorization/Validation
+- Exact location: `src/app/api/upload/route.ts:POST`
+- Evidence: Before the fix, `/api/upload` read `type` directly from multipart
+  form data and only called `checkEmailVerified` when `type === "listing"`.
+  The same route mapped every non-`profile` value to the
+  `listings/{userId}/...` storage folder. Existing regression coverage only
+  asserted the literal `listing` and `profile` paths.
+- Failure scenario: An authenticated but email-unverified user could submit a
+  valid image with `type=avatar`, another arbitrary string, or an otherwise
+  invalid type. That request skipped the listing email-verification gate and
+  still stored the file under the listing image namespace.
+- Impact: Listing publication and listing create remain separately gated, so
+  this was not a full listing-publish bypass. It was still a release-blocking
+  validation/auth gap because unverified users could write listing-scoped public
+  images and bypass the upload policy enforced by the create-listing flow.
+- Reproduction or test idea: Mock an authenticated, unsuspended,
+  email-unverified user; POST a valid JPEG multipart request to `/api/upload`
+  with `type=avatar`; assert `400`, no email-verification call, and no Sharp or
+  Supabase storage work.
+- Suggested fix direction: Validate upload type as a strict server-side enum
+  before branching. Only allow `profile` and `listing`; reject missing or
+  unknown types before email verification, image processing, or storage.
+- False-positive challenge: Not a false positive. The route's control flow
+  skipped the email check for arbitrary non-`listing` values, and the storage
+  path fallback treated arbitrary non-`profile` values as listing uploads.
+  Severity remains P1, not P0, because listing creation/publishing still has
+  independent auth, email verification, and validation gates.
+- Fix summary: Added a strict `z.enum(["profile", "listing"])` check before the
+  email-verification branch and storage-path selection. Invalid or missing
+  upload types now return `400` before policy or storage work.
+- Files changed: `src/app/api/upload/route.ts`
+- Tests added or updated: Added
+  `src/__tests__/api/upload-integration.test.ts` coverage for arbitrary upload
+  type rejection before email verification, Sharp processing, or Supabase
+  storage.
+- Commands run: `pnpm run test -- src/__tests__/api/upload-integration.test.ts --runInBand`
+  passed with 22 tests; targeted Auth/AuthZ/Validation Jest run passed with 22
+  suites and 449 tests; `pnpm run typecheck` passed after removing a stale,
+  unreachable assertion from an E2E test file that had blocked the diagnostics
+  fallback.
+- Remaining risk: The broader uploads/images release row remains a later matrix
+  slice; this finding covers the upload type/email-verification bypass found
+  during Auth/Authorization/Validation review.
+- Adversarial re-review: Pass. The invalid-type path is validated before
+  `checkEmailVerified`, Sharp, and Supabase, and the existing verified
+  `listing` and `profile` upload behaviors remain covered.
+
 ### P1-TEST-001 - Jest baseline gate fails
 
 - Severity: P1
 - Confidence: High
-- Status: Open
+- Status: VerifiedFixed
 - Duplicate status: Unique
 - Slice: Testing/CI/release gates
 - Exact location: `pnpm run test`
@@ -95,19 +148,37 @@ Allowed statuses:
   search layout rendering.
 - False-positive challenge: Not a false positive as a release gate result; the
   command returned non-zero. Individual product impact still needs slice review.
-- Fix summary:
-- Files changed:
-- Tests added or updated:
+- Fix summary: The remaining current Jest blocker was the async Next
+  `SearchLayout` test harness. The test now mocks async `next/headers`,
+  awaits the async layout component, and renders the resolved React tree without
+  weakening production search validation.
+- Files changed: `src/__tests__/app/search/layout.test.tsx`,
+  `src/__tests__/components/CreateListingForm.test.tsx`,
+  `src/__tests__/e2e/neighborhood.e2e.test.ts`
+- Tests added or updated: Updated
+  `src/__tests__/app/search/layout.test.tsx` and the CreateListingForm draft
+  persistence test mock to match the production hook contract.
 - Commands run: `pnpm run test`;
-  `pnpm exec jest src/__tests__/lib/search/search-query.test.ts src/__tests__/lib/search/search-doc-queries.test.ts src/__tests__/lib/search-alerts.test.ts --runInBand --silent`
-- Remaining risk: Full test suite is not a passing release gate.
-- Adversarial re-review:
+  `pnpm exec jest src/__tests__/lib/search/search-query.test.ts src/__tests__/lib/search/search-doc-queries.test.ts src/__tests__/lib/search-alerts.test.ts --runInBand --silent`;
+  `pnpm exec jest src/__tests__/lib/search/search-v2-service.test.ts src/__tests__/lib/search-alerts.test.ts src/__tests__/hooks/useBatchedFilters.test.ts src/__tests__/lib/search/search-doc-queries.test.ts src/__tests__/lib/search/hash.test.ts src/__tests__/lib/search/search-query.test.ts src/__tests__/components/SlotBadge.test.tsx src/__tests__/app/search/layout.test.tsx --runInBand --silent`;
+  `pnpm run test -- src/__tests__/components/CreateListingForm.test.tsx --runInBand`
+  passed with 42 tests; `pnpm run test -- src/__tests__/performance/filter-performance.test.ts --runInBand`
+  passed with 34 tests; `pnpm exec jest src/__tests__/e2e/neighborhood.e2e.test.ts --runInBand --testNamePattern="computes distances"`
+  passed after median-sample hardening; `pnpm exec jest src/__tests__/components/CreateListingForm.test.tsx --runInBand --testNamePattern="displays email verification error"`
+  passed after giving the async error-path test a 10s budget; `pnpm run test`
+  passed on 2026-05-30 with 477 passed suites, 2 skipped suites, 7562 passed
+  tests, and 8 skipped tests.
+- Remaining risk: Non-Jest release gates are tracked separately below; this
+  blocker no longer blocks the Jest baseline.
+- Adversarial re-review: Pass. The production layout code was not changed; the
+  test harness now matches the async layout contract, and the full Jest release
+  gate passed.
 
 ### P1-SUPPLY-001 - Dependency audit reports untriaged high vulnerabilities
 
 - Severity: P1
 - Confidence: High
-- Status: Open
+- Status: VerifiedFixed
 - Duplicate status: Unique
 - Slice: Dependencies/supply chain/secrets
 - Exact location: `pnpm audit --audit-level high`
@@ -129,12 +200,24 @@ Allowed statuses:
   evidence and expiration.
 - False-positive challenge: Not a false positive as a scanner result; exploit
   reachability and release-blocking severity require supply-chain review.
-- Fix summary:
-- Files changed:
-- Tests added or updated:
-- Commands run: `pnpm audit --audit-level high`
-- Remaining risk: No supply-chain exception or mitigation has been recorded.
-- Adversarial re-review:
+- Fix summary: Removed unused dev-only `@lhci/cli`, upgraded `next` and
+  `eslint-config-next` from 16.2.4 to 16.2.6, and forced vulnerable
+  `fast-uri <=3.1.1` transitive ranges to 3.1.2 through pnpm overrides.
+- Files changed: `package.json`, `pnpm-lock.yaml`
+- Tests added or updated: None; supply-chain gate fix.
+- Commands run: `pnpm audit --audit-level high` initially failed with high
+  advisories; `pnpm install --fetch-retries 5 --fetch-retry-maxtimeout 120000 --fetch-timeout 300000`
+  passed; `pnpm install --frozen-lockfile` passed; `pnpm why @lhci/cli fast-uri next eslint-config-next`
+  confirmed `@lhci/cli` absent, `fast-uri` resolved to 3.1.2, and Next packages
+  resolved to 16.2.6; `pnpm audit --audit-level high` passed on 2026-05-29 and
+  reported 6 remaining non-blocking vulnerabilities: 1 low and 5 moderate;
+  reran `pnpm audit --audit-level high` on 2026-05-30 and it still exited 0
+  with only low/moderate findings.
+- Remaining risk: Low/moderate advisories remain outside the high/critical
+  release blocker threshold and still need normal dependency backlog triage.
+- Adversarial re-review: Pass. No new production dependency was added, the
+  unused Lighthouse CI CLI transitive chain was removed, and the high/critical
+  audit gate now exits 0.
 
 ### P1-PRIVACY-001 - Public payload PII gate is not runnable without explicit payloads
 
@@ -199,7 +282,7 @@ Allowed statuses:
 
 - Severity: P1
 - Confidence: High
-- Status: Open
+- Status: VerifiedFixed
 - Duplicate status: Unique
 - Slice: Testing/CI/release gates
 - Exact location: `pnpm run test:e2e:ci`
@@ -220,24 +303,93 @@ Allowed statuses:
 - Reproduction or test idea: Run `pnpm run test:e2e:ci` and inspect
   `playwright-report` and `test-results` artifacts. If the full suite is too
   large, run critical scoped suites after recording the full-suite blocker.
-- Suggested fix direction: First align local release-gate environment with CI
-  (`E2E_TEST_HELPERS=true`, `E2E_TEST_SECRET`, seeded DB, and feature flags) or
-  gate helper-dependent specs out of the local smoke command. Then split full
-  E2E from the release smoke so one failing helper path cannot hide suite-wide
-  progress behind a timeout.
+- Suggested fix direction: Align the release-gate command with the production
+  deployment shape by building first, starting `next start`, waiting for
+  `/api/health/ready`, and then running the Chromium suite against that
+  production server with the existing gated E2E helper environment.
 - False-positive challenge: Not a false positive as a baseline gate result; no
   passing E2E evidence was produced.
-- Fix summary:
-- Files changed:
-- Tests added or updated:
-- Commands run: `pnpm run test:e2e:ci`
-- Remaining risk: Browser release smoke coverage is missing.
-- Adversarial re-review:
+- Fix summary: User approved changing the E2E gate contract on 2026-05-30.
+  `package.json` now routes `pnpm run test:e2e:ci` through
+  `scripts/run-playwright-e2e-ci.mjs`. The runner executes `pnpm run build`,
+  starts `pnpm exec next start --hostname 0.0.0.0`, waits for
+  `/api/health/ready`, and then runs the Chromium Playwright suite with
+  `--reporter=list,html --workers=1` unless narrower args are passed. The
+  runner supplies the gated local E2E helper environment
+  (`E2E_TEST_HELPERS=true` plus bearer secret), disables non-production rate
+  limiting and Turnstile for the browser suite, blanks live third-party provider
+  keys, uses local location/search provider settings, and does not print
+  secrets. Deterministic production-run failures were fixed without hiding
+  timeouts: load-more perf now uses the pagination mock, pagination no-next
+  assertions use seeded `q=sunset` fixtures, the safety report flow seeds and
+  deletes a unique listing while asserting the `/api/reports` response, and the
+  production runner isolates Redis/rate-limit and external-provider state.
+- Files changed: `package.json`, `scripts/run-playwright-e2e-ci.mjs`,
+  `playwright.config.ts`, `src/app/api/test-helpers/route.ts`,
+  `src/app/listings/create/CreateListingForm.tsx`,
+  `tests/e2e/admin/admin-boundary.spec.ts`, `tests/e2e/auth.setup.ts`,
+  `tests/e2e/auth/verify-expired.spec.ts`,
+  `tests/e2e/dedupe/create-collision-helpers.ts`,
+  `tests/e2e/dedupe/create-collision-cross-owner-no-modal.dedupe.spec.ts`,
+  `tests/e2e/create-listing/create-listing-draft.spec.ts`,
+  `tests/e2e/create-listing/create-listing-images.spec.ts`,
+  `tests/e2e/create-listing/create-listing.perf.spec.ts`,
+  `tests/e2e/create-listing/create-listing.visual.spec.ts`,
+  create-listing visual snapshots,
+  `tests/e2e/page-objects/create-listing.page.ts`,
+  `tests/e2e/dedupe/dedupe-helpers.ts`,
+  `tests/e2e/dedupe/search-list-expand-panel.dedupe.spec.ts`,
+  `tests/e2e/dedupe/search-list-4-clone-grouping.dedupe.spec.ts`,
+  `tests/e2e/a11y/listing-detail-a11y.spec.ts`,
+  `tests/e2e/concurrent/conversation-dedup.spec.ts`,
+  `tests/e2e/responsive/responsive-breakpoints.spec.ts`,
+  `tests/e2e/journeys/30-critical-simulations.spec.ts`,
+  `tests/e2e/journeys/31-error-empty-state-journeys.spec.ts`,
+  `tests/e2e/journeys/28-safety-edge-cases.spec.ts`,
+  `tests/e2e/pagination/pagination-core.spec.ts`,
+  `tests/e2e/performance/search-interaction-perf.spec.ts`,
+  `src/app/saved/SavedListingsClient.tsx`, and
+  `docs/review/review_ledger.md`,
+  `docs/review/production_readiness_matrix.md`
+- Tests added or updated: Updated dedupe helper, collision cleanup, grouped date
+  expansion, grouped row alignment, create-listing draft/image/visual/perf E2E
+  tests, auth/admin navigation waits, listing-detail a11y contact CTA locator,
+  conversation-dedup fixture selection, saved-listings sort label, carousel
+  actionability guard, messages empty-state detection, and responsive image
+  ratio handling.
+- Commands run: `node --check scripts/run-playwright-e2e-ci.mjs` passed;
+  `node scripts/run-playwright-e2e-ci.mjs tests/e2e/performance/search-interaction-perf.spec.ts --project=chromium --reporter=list --workers=1`
+  passed with 7 passed and 3 skipped; `node scripts/run-playwright-e2e-ci.mjs tests/e2e/create-listing/create-listing.spec.ts tests/e2e/dedupe/create-collision-cross-owner-no-modal.dedupe.spec.ts --grep "F-001|T-20" --project=chromium --reporter=list --workers=1`
+  passed with 6 passed and 1 skipped; `node scripts/run-playwright-e2e-ci.mjs tests/e2e/journeys/a11y-perf.spec.ts --project=chromium --reporter=list --workers=1`
+  passed with 12 passed and 1 skipped; `node scripts/run-playwright-e2e-ci.mjs tests/e2e/mobile-bottom-sheet.spec.ts --project=chromium --reporter=list --workers=1`
+  passed with 18 passed and 9 skipped; `node scripts/run-playwright-e2e-ci.mjs tests/e2e/pagination/pagination-core.spec.ts --grep "4.2 no end-of-results message when all results fit on first page" --project=chromium --reporter=list --workers=1`
+  passed with 5 passed and 1 skipped; `node scripts/run-playwright-e2e-ci.mjs tests/e2e/pagination/pagination-core.spec.ts --project=chromium --reporter=list --workers=1`
+  passed with 21 passed and 1 skipped; `node scripts/run-playwright-e2e-ci.mjs tests/e2e/journeys/28-safety-edge-cases.spec.ts --grep "J45: Report a Listing" --project=chromium --reporter=list --workers=1`
+  passed with 5 passed and 1 skipped; `node scripts/run-playwright-e2e-ci.mjs tests/e2e/journeys/28-safety-edge-cases.spec.ts --project=chromium --reporter=list --workers=1`
+  passed with 10 passed and 1 skipped; `pnpm run test:e2e:ci` passed on
+  2026-05-30 under the production-build contract with exit code 0, 1026
+  passed, 164 skipped, and 4 retry-recovered flaky tests in 35.1 minutes.
+- Remaining risk: Four tests were flaky but recovered under Playwright retries:
+  `J055-J056` offline message queue, `J34` empty messages state, `SS-05` saved
+  search alert toggle, and `SE-C01` chat session-expiry send. The gate runner
+  intentionally disables Turnstile, live third-party providers, and
+  non-production rate limiting for deterministic local E2E coverage; those
+  controls still require their own production/staging verification. Other
+  release-blocking matrix rows remain `NotStarted`, so this does not make the
+  project production-ready.
+- Adversarial re-review: Pass. The final gate uses `next build` plus
+  `next start`, so it verifies production bundles instead of masking dev-server
+  compile latency. The previous helper 404 path is covered by explicitly
+  setting helper env and bearer secret in the server process; the secret is not
+  printed, and the helper route remains disabled/404 outside the gated E2E
+  environment. Deterministic fixture changes target tests only and do not weaken
+  production validation. Residual retry-recovered flakes are recorded as risk,
+  not accepted-risk release exceptions.
 
 ## Deduplication Log
 
 | Candidate ID | Duplicate of | Rationale | Decision |
-| --- | --- | --- | --- |
+| ------------ | ------------ | --------- | -------- |
 
 ## Fix Order
 
@@ -251,6 +403,10 @@ Fix order is determined after Phase 2 deduplication:
 
 ## Adversarial Re-Review Log
 
-| Finding ID | Reviewer | Result | Evidence | Follow-up |
-| --- | --- | --- | --- | --- |
-| P0-PRIVACY-002 | Codex Critic | Pass | Focused unit/API scanner tests passed, typecheck passed, search release gate passed, and captured public payload scan returned `{"ok":true,"scannedFiles":4}`. | Add a deterministic scanner capture wrapper later so `scan:public-payload-pii` can run as a no-arg release gate. |
+| Finding ID     | Reviewer     | Result  | Evidence                                                                                                                                                                                                                                                                    | Follow-up                                                                                                                        |
+| -------------- | ------------ | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| P0-PRIVACY-002 | Codex Critic | Pass    | Focused unit/API scanner tests passed, typecheck passed, search release gate passed, and captured public payload scan returned `{"ok":true,"scannedFiles":4}`.                                                                                                              | Add a deterministic scanner capture wrapper later so `scan:public-payload-pii` can run as a no-arg release gate.                 |
+| P1-TEST-001    | Codex Critic | Pass    | Focused CreateListingForm, filter-performance, and neighborhood timing suites passed, then full `pnpm run test` passed with 477 passed suites and 7562 passed tests on 2026-05-30.                                                                                          | None for the Jest release blocker.                                                                                               |
+| P1-SUPPLY-001  | Codex Critic | Pass    | `pnpm install --frozen-lockfile`, `pnpm why @lhci/cli fast-uri next eslint-config-next`, and `pnpm audit --audit-level high` passed after removing `@lhci/cli`, upgrading Next packages, and overriding vulnerable `fast-uri` ranges. Recheck on 2026-05-30 still exited 0. | Triage remaining low/moderate advisories as non-blocking backlog.                                                                |
+| P1-E2E-001     | Codex Critic | Pass    | User approved the production-build E2E contract on 2026-05-30. `pnpm run test:e2e:ci` now builds, starts `next start`, waits for readiness, and passed with 1026 passed, 164 skipped, 4 retry-recovered flaky tests, and exit code 0 in 35.1 minutes.                  | Track the four retry-recovered flaky tests as reliability follow-up; continue remaining `NotStarted` matrix gates before any release claim. |
+| P1-VALIDATION-001 | Codex Critic | Pass | `pnpm run test -- src/__tests__/api/upload-integration.test.ts --runInBand` passed with 22 tests; targeted Auth/AuthZ/Validation Jest run passed with 22 suites and 449 tests; `pnpm run typecheck` passed after the test-only unreachable-branch cleanup. | Continue with the separate uploads/images matrix row for storage permission and URL exposure review. |

@@ -10,12 +10,21 @@
  */
 
 import { test, expect, tags } from "../helpers";
+import type { Page } from "@playwright/test";
 import {
   clearAuthCookies,
   expireSession,
   expectLoginRedirect,
   revokeCurrentUserSession,
 } from "../helpers";
+
+function visibleMessageInput(page: Page) {
+  return page.locator('[data-testid="message-input"]:visible').first();
+}
+
+function visibleSendButton(page: Page) {
+  return page.locator('[data-testid="send-button"]:visible').first();
+}
 
 async function openFirstConversationThread(
   page: import("@playwright/test").Page
@@ -55,11 +64,11 @@ test.describe("Session Expiry: Resilience", () => {
     const restoreSession = await revokeCurrentUserSession(page);
 
     try {
-      const input = page.locator('[data-testid="message-input"]');
+      const input = visibleMessageInput(page);
       await expect(input).toBeVisible({ timeout: 10000 });
 
       // Type and send rapidly 3 times
-      const sendBtn = page.locator('[data-testid="send-button"]');
+      const sendBtn = visibleSendButton(page);
       for (let i = 0; i < 3; i++) {
         const canType = await input.isEnabled().catch(() => false);
         if (!canType || /\/(login|signin|auth)/.test(page.url())) break;

@@ -8,13 +8,33 @@ import path from "path";
 // binds to 127.0.0.1 (IPv4). Force IPv4-first to prevent ECONNREFUSED.
 dns.setDefaultResultOrder("ipv4first");
 
+const explicitE2ETestEmail = process.env.E2E_TEST_EMAIL;
+const explicitE2ETestPassword = process.env.E2E_TEST_PASSWORD;
+
 // Load environment variables
 dotenv.config({ path: path.resolve(__dirname, ".env.local") });
 dotenv.config({ path: path.resolve(__dirname, ".env") });
 
+// Keep Playwright-managed runs on a dedicated seeded account by default. A
+// caller can still opt into another account by exporting these before launch.
+process.env.E2E_TEST_EMAIL = explicitE2ETestEmail || "e2e-test@roomshare.dev";
+process.env.E2E_TEST_PASSWORD = explicitE2ETestPassword || "TestPassword123!";
+
+// Local Playwright-managed servers need the same gated helper credentials as
+// the test runner. CI can still provide stronger explicit values.
+process.env.E2E_TEST_HELPERS = process.env.E2E_TEST_HELPERS || "true";
+process.env.E2E_TEST_SECRET =
+  process.env.E2E_TEST_SECRET || "roomshare-local-e2e-secret";
+process.env.CURSOR_SECRET =
+  process.env.CURSOR_SECRET || "roomshare-local-e2e-cursor-hmac-key-20260530";
+
 const runningDedupeSuite = process.argv.some(
   (arg) => arg.includes("tests/e2e/dedupe") || arg.includes("/dedupe/")
 );
+const enableDedupeFeatures =
+  runningDedupeSuite ||
+  process.env.CI === "true" ||
+  process.env.E2E_ENABLE_DEDUPE_FEATURES === "true";
 const retiredBookingLifecycleSpecs = [
   /concurrent\/admin-host-race\.spec\.ts/,
   /concurrent\/held-slot-restoration\.spec\.ts/,
@@ -26,12 +46,14 @@ const webServerEnv = Object.fromEntries(
   )
 );
 
-if (runningDedupeSuite) {
+if (enableDedupeFeatures) {
   webServerEnv.FEATURE_SEARCH_LISTING_DEDUP = "true";
   webServerEnv.FEATURE_LISTING_CREATE_COLLISION_WARN = "true";
 }
 webServerEnv.NEXT_PUBLIC_SUPABASE_URL =
   webServerEnv.NEXT_PUBLIC_SUPABASE_URL || "https://fake.supabase.co";
+webServerEnv.TURNSTILE_ENABLED = "false";
+webServerEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY = "";
 
 /**
  * Playwright configuration for RoomShare E2E tests
@@ -101,7 +123,10 @@ export default defineConfig({
 
     {
       name: "chromium",
-      testIgnore: [/(\.anon|\.admin)\.spec\.ts/, ...retiredBookingLifecycleSpecs],
+      testIgnore: [
+        /(\.anon|\.admin)\.spec\.ts/,
+        ...retiredBookingLifecycleSpecs,
+      ],
       use: {
         ...devices["Desktop Chrome"],
         storageState: "playwright/.auth/user.json",
@@ -111,7 +136,10 @@ export default defineConfig({
 
     {
       name: "firefox",
-      testIgnore: [/(\.anon|\.admin)\.spec\.ts/, ...retiredBookingLifecycleSpecs],
+      testIgnore: [
+        /(\.anon|\.admin)\.spec\.ts/,
+        ...retiredBookingLifecycleSpecs,
+      ],
       use: {
         ...devices["Desktop Firefox"],
         storageState: "playwright/.auth/user.json",
@@ -121,7 +149,10 @@ export default defineConfig({
 
     {
       name: "webkit",
-      testIgnore: [/(\.anon|\.admin)\.spec\.ts/, ...retiredBookingLifecycleSpecs],
+      testIgnore: [
+        /(\.anon|\.admin)\.spec\.ts/,
+        ...retiredBookingLifecycleSpecs,
+      ],
       use: {
         ...devices["Desktop Safari"],
         storageState: "playwright/.auth/user.json",
@@ -132,7 +163,10 @@ export default defineConfig({
     /* Mobile viewports */
     {
       name: "Mobile Chrome",
-      testIgnore: [/(\.anon|\.admin)\.spec\.ts/, ...retiredBookingLifecycleSpecs],
+      testIgnore: [
+        /(\.anon|\.admin)\.spec\.ts/,
+        ...retiredBookingLifecycleSpecs,
+      ],
       use: {
         ...devices["Pixel 7"],
         storageState: "playwright/.auth/user.json",
@@ -142,7 +176,10 @@ export default defineConfig({
 
     {
       name: "Mobile Safari",
-      testIgnore: [/(\.anon|\.admin)\.spec\.ts/, ...retiredBookingLifecycleSpecs],
+      testIgnore: [
+        /(\.anon|\.admin)\.spec\.ts/,
+        ...retiredBookingLifecycleSpecs,
+      ],
       use: {
         ...devices["iPhone 14"],
         storageState: "playwright/.auth/user.json",

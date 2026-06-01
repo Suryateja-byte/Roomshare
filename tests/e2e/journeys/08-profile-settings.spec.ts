@@ -69,6 +69,8 @@ test.describe("Profile & Settings Journeys", () => {
   });
 
   test.describe("J068: Edit profile information", () => {
+    test.describe.configure({ mode: "serial" });
+
     test(`${tags.auth} - Update profile name and bio`, async ({
       page,
       nav,
@@ -76,11 +78,7 @@ test.describe("Profile & Settings Journeys", () => {
       await nav.goToProfile();
 
       // Find edit button — profile page uses Edit2 icon link or button
-      const editButton = page
-        .getByRole("link", { name: /edit.*profile/i })
-        .or(page.getByRole("button", { name: /edit.*profile/i }))
-        .or(page.getByRole("link", { name: /edit/i }))
-        .first();
+      const editButton = page.getByTestId("edit-profile-link");
 
       if (await editButton.isVisible().catch(() => false)) {
         await editButton.click();
@@ -107,6 +105,13 @@ test.describe("Profile & Settings Journeys", () => {
           await bioInput.fill("Updated bio for testing purposes.");
         }
 
+        const removeImageButton = page
+          .getByRole("button", { name: /^remove$/i })
+          .first();
+        if (await removeImageButton.isVisible().catch(() => false)) {
+          await removeImageButton.click();
+        }
+
         // Save changes — button text is "Save Changes"
         const saveButton = page
           .getByRole("button", { name: /save|update/i })
@@ -116,16 +121,21 @@ test.describe("Profile & Settings Journeys", () => {
 
         // Verify success — EditProfileClient shows "Profile updated successfully! Redirecting..."
         // or it may redirect back to /profile. Wait for either success text or navigation.
-        const confirmed = await page
-          .getByText(/updated successfully|profile updated/i)
-          .or(page.locator(selectors.toast))
-          .first()
-          .isVisible({ timeout: 30000 })
-          .catch(() => false);
-        test.skip(
-          !confirmed,
-          "Profile save did not emit a visible confirmation in this browser run"
-        );
+        await expect
+          .poll(
+            async () =>
+              (await page
+                .getByText(/updated successfully|profile updated/i)
+                .or(page.locator(selectors.toast))
+                .first()
+                .isVisible()
+                .catch(() => false)) || /\/profile$/.test(page.url()),
+            {
+              timeout: 30000,
+              message: "Expected profile update confirmation or redirect",
+            }
+          )
+          .toBe(true);
       }
     });
 
@@ -298,7 +308,7 @@ test.describe("Profile & Settings Journeys", () => {
       // Wait for the form inputs to be interactive (hydration)
       await currentPasswordInput.waitFor({ state: "visible", timeout: 10000 });
 
-      const currentPwd = process.env.E2E_TEST_PASSWORD || "TestPassword123!";
+      const currentPwd = "WrongTestPassword123!";
       const newPwd = process.env.E2E_TEST_NEW_PASSWORD || "NewTestPassword123!";
 
       await currentPasswordInput.fill(currentPwd);
@@ -308,11 +318,12 @@ test.describe("Profile & Settings Journeys", () => {
       // Submit — button text is "Change Password"
       await page.getByRole("button", { name: /change.*password/i }).click();
 
-      // Should show success message, error message, or toast
+      // Should show a server-side validation error without mutating the shared
+      // seeded password used by the rest of the E2E suite.
       await expect(
         page
           .getByText(
-            /password changed|password updated|do not match|at least|failed/i
+            /current password is incorrect|do not match|at least|failed/i
           )
           .or(page.locator(selectors.toast))
           .first()

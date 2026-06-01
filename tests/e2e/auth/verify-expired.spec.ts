@@ -11,7 +11,13 @@
  * returns "Email is already verified". All resend tests mock the API.
  */
 
-import { test, expect, selectors, timeouts } from "../helpers";
+import {
+  test,
+  expect,
+  selectors,
+  timeouts,
+  waitForHydration,
+} from "../helpers";
 
 test.beforeEach(async () => {
   test.slow();
@@ -278,7 +284,8 @@ test.describe("VE: Unauthenticated State", () => {
       timeout: timeouts.navigation,
     });
 
-    await page.getByText(/Log In to Continue/i).click();
+    await waitForHydration(page, { timeout: timeouts.navigation });
+    await page.getByRole("link", { name: /Log In to Continue/i }).click();
     await expect(page).toHaveURL(/\/login/);
 
     const url = page.url();
@@ -292,6 +299,8 @@ test.describe("VE: Unauthenticated State", () => {
     await expect(page.getByText(/Log In to Continue/i)).toBeVisible({
       timeout: timeouts.navigation,
     });
+
+    await waitForHydration(page, { timeout: timeouts.navigation });
 
     // Scope to main content to avoid matching nav "Sign up" link
     const signupLink = page

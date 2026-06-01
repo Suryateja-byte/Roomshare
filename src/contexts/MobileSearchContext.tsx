@@ -17,6 +17,11 @@ import {
 } from "react";
 
 export type MobileResultsView = "map" | "peek" | "list";
+export type MobileResultsState =
+  | "unknown"
+  | "positive"
+  | "zero"
+  | "location-required";
 
 interface MobileSearchContextValue {
   /** Whether the search is forcibly expanded (overrides scroll collapse) */
@@ -27,6 +32,8 @@ interface MobileSearchContextValue {
   mobileSheetOverrideLabel: string | null;
   /** Whether mobile results are currently map-focused or list-focused */
   mobileResultsView: MobileResultsView;
+  /** Whether the list results are loaded, empty, or awaiting a scoped area */
+  mobileResultsState: MobileResultsState;
   /** Optional preferred mobile view requested by other surfaces (for example, stale map state) */
   mobileResultsViewPreference: MobileResultsView | null;
   /** Whether a modal mobile map overlay is currently covering the phone viewport */
@@ -41,6 +48,8 @@ interface MobileSearchContextValue {
   setMobileSheetOverrideLabel: (label: string | null) => void;
   /** Update the mobile map/list view mode */
   setMobileResultsView: (view: MobileResultsView) => void;
+  /** Update the mobile list result state used by map/list empty-state sync */
+  setMobileResultsState: (state: MobileResultsState) => void;
   /** Request a preferred mobile results view without forcing future refinements to reset */
   setMobileResultsViewPreference: (view: MobileResultsView | null) => void;
   /** Mark the phone viewport as covered by a modal map overlay */
@@ -66,6 +75,7 @@ const FALLBACK_CONTEXT: MobileSearchContextValue = {
   searchResultsLabel: "Search results",
   mobileSheetOverrideLabel: null,
   mobileResultsView: "map",
+  mobileResultsState: "unknown",
   mobileResultsViewPreference: null,
   mobileMapOverlayActive: false,
   expand: () => {},
@@ -73,6 +83,7 @@ const FALLBACK_CONTEXT: MobileSearchContextValue = {
   setSearchResultsLabel: () => {},
   setMobileSheetOverrideLabel: () => {},
   setMobileResultsView: () => {},
+  setMobileResultsState: () => {},
   setMobileResultsViewPreference: () => {},
   setMobileMapOverlayActive: () => {},
   openFilters: () => {},
@@ -91,6 +102,8 @@ export function MobileSearchProvider({
     useState<string | null>(null);
   const [mobileResultsView, setMobileResultsViewState] =
     useState<MobileResultsView>("map");
+  const [mobileResultsState, setMobileResultsState] =
+    useState<MobileResultsState>("unknown");
   const [mobileResultsViewPreference, setMobileResultsViewPreferenceState] =
     useState<MobileResultsView | null>(null);
   const [mobileMapOverlayActive, setMobileMapOverlayActiveState] =
@@ -179,6 +192,7 @@ export function MobileSearchProvider({
       searchResultsLabel,
       mobileSheetOverrideLabel,
       mobileResultsView,
+      mobileResultsState,
       mobileResultsViewPreference,
       mobileMapOverlayActive,
       expand,
@@ -186,6 +200,7 @@ export function MobileSearchProvider({
       setSearchResultsLabel,
       setMobileSheetOverrideLabel,
       setMobileResultsView,
+      setMobileResultsState,
       setMobileResultsViewPreference,
       setMobileMapOverlayActive,
       openFilters,
@@ -196,6 +211,7 @@ export function MobileSearchProvider({
       searchResultsLabel,
       mobileSheetOverrideLabel,
       mobileResultsView,
+      mobileResultsState,
       mobileResultsViewPreference,
       mobileMapOverlayActive,
       expand,

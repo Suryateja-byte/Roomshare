@@ -28,7 +28,21 @@ test.describe("Admin Boundary — Regular User", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for any redirect to settle after hydration
-    await page.waitForURL((url) => !(/^[^?]*\/admin(?:\/|$)/).test(url.pathname), { timeout: 15_000 }).catch(() => {});
+    await expect
+      .poll(
+        async () => {
+          const path = new URL(page.url()).pathname;
+          if (!/^\/admin(?:\/|$)/.test(path)) return "redirected";
+          const hasAccessDenied = await page
+            .getByText(/unauthorized|forbidden|access denied|not authorized/i)
+            .first()
+            .isVisible()
+            .catch(() => false);
+          return hasAccessDenied ? "denied" : "pending";
+        },
+        { timeout: timeouts.navigation }
+      )
+      .not.toBe("pending");
 
     // Regular user should be redirected away from admin
     // (either to /login, home, or shown a 403/unauthorized message)

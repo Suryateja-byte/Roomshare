@@ -57,6 +57,57 @@ test.describe("Mobile UX — Page Load", () => {
     expect(realErrors).toHaveLength(0);
   });
 
+  test("bare search does not show contradictory mobile empty states", async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    const pageErrors: string[] = [];
+    page.on("console", (msg) => {
+      if (msg.type() === "error") errors.push(msg.text());
+    });
+    page.on("pageerror", (error) => pageErrors.push(error.message));
+
+    await page.goto("/search");
+
+    const listings = page.locator('a[href^="/listings/"]');
+    await expect(listings.first()).toBeAttached({ timeout: 30_000 });
+    expect(await listings.count()).toBeGreaterThan(0);
+
+    await page
+      .locator('[data-testid="map-container"]')
+      .first()
+      .waitFor({ state: "attached", timeout: 30_000 })
+      .catch(() => {});
+
+    await expect(
+      page.locator('[data-testid="mobile-map-status-card"]')
+    ).toBeHidden({ timeout: 5_000 });
+
+    const sheetHeader = page
+      .locator('[role="region"][aria-label="Search results"]')
+      .filter({ visible: true })
+      .first()
+      .locator('[data-testid="sheet-header-text"]');
+    await expect(sheetHeader).toBeVisible({ timeout: 10_000 });
+    await expect(sheetHeader).not.toContainText(
+      /No places here|No places in this area/
+    );
+
+    const realErrors = errors.filter(
+      (e) =>
+        !e.includes("mapbox") &&
+        !e.includes("webpack") &&
+        !e.includes("HMR") &&
+        !e.includes("hydrat") &&
+        !e.includes("favicon") &&
+        !e.includes("ResizeObserver") &&
+        !e.includes("Failed to load resource") &&
+        !e.includes("net::ERR")
+    );
+    expect(realErrors).toHaveLength(0);
+    expect(pageErrors).toHaveLength(0);
+  });
+
   test("listing cards keep rounded corners inside the mobile results sheet", async ({
     page,
   }) => {

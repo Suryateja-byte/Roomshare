@@ -208,29 +208,27 @@ test.describe("Create Listing — Accessibility Tests", () => {
   test(`A-007: focus moves to first error after empty submit ${tags.a11y}`, async ({
     page,
   }) => {
+    await page.addInitScript(() => localStorage.removeItem("listing-draft"));
     const clp = new CreateListingPage(page);
     await clp.goto();
 
-    // Mock the API to return a validation error so we test server-driven focus
-    await clp.mockListingApiError(400, {
-      error: "Validation failed",
-      details: [{ field: "title", message: "Title is required" }],
+    let listingPostCount = 0;
+    page.on("request", (request) => {
+      if (
+        request.method() === "POST" &&
+        request.url().includes("/api/listings")
+      ) {
+        listingPostCount += 1;
+      }
     });
 
-    // Fill image to avoid client-side image block, leave required text fields empty
-    await clp.mockImageUpload();
-    await clp.uploadTestImage();
-    await clp.waitForUploadComplete();
-
-    // Submit the form
     await clp.submit();
-    await expect(clp.errorBanner.or(clp.titleInput)).toBeVisible({ timeout: 5000 });
 
-    // After validation failure, focus should move to the first error field
-    // or the error banner should be visible for screen readers
-    const firstErrorField = clp.titleInput;
-    const errorBannerOrField = clp.errorBanner.or(firstErrorField).first();
-    await expect(errorBannerOrField).toBeVisible({ timeout: 5000 });
+    await clp.expectValidationError("title");
+    await clp.expectFieldAriaInvalid("title");
+    await expect(clp.titleInput).toBeFocused();
+    await expect(clp.errorBanner).not.toBeVisible();
+    expect(listingPostCount).toBe(0);
   });
 
   test(`A-008: all visible inputs have associated labels ${tags.a11y}`, async ({

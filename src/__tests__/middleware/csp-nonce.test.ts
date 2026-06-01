@@ -120,5 +120,18 @@ describe("applySecurityHeaders", () => {
         .find((d: string) => d.trim().startsWith("script-src"));
       expect(scriptSrc).toContain("'unsafe-inline'");
     });
+
+    it("allows local dev websocket connections for Next HMR", () => {
+      jest.resetModules();
+      const { applySecurityHeaders } = require("@/lib/csp-middleware");
+      const request = createMockRequest("http://172.31.134.168:3000/login");
+      const { responseHeaders } = applySecurityHeaders(request);
+
+      const csp = responseHeaders.get("Content-Security-Policy")!;
+      const connectSrc = csp
+        .split(";")
+        .find((d: string) => d.trim().startsWith("connect-src"));
+      expect(connectSrc).toContain("ws:");
+    });
   });
 });

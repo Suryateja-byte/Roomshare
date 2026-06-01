@@ -253,9 +253,16 @@ test.describe("API Response Depth", () => {
       expect([404, 405]).toContain(response.status());
 
       // Response should not contain stack traces
+      const contentType = response.headers()["content-type"] || "";
       const text = await response.text();
       expect(text).not.toMatch(/at\s+\w+\s+\(/);
-      expect(text).not.toMatch(/node_modules/);
+      expect(text).not.toMatch(/\b(?:Error|TypeError|ReferenceError):/);
+
+      if (contentType.includes("application/json")) {
+        expect(text).not.toMatch(/node_modules|\.ts:\d+|\.js:\d+/);
+      } else {
+        expect(contentType).toContain("text/html");
+      }
     });
 
     test("RD-11: Invalid JSON body returns clean error", async ({

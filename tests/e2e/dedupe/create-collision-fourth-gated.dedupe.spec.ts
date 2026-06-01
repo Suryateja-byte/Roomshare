@@ -3,8 +3,11 @@ import {
   buildCollisionFormData,
   deleteListings,
   openPreparedCreateListingPage,
+  resetCreateListingRateLimits,
   seedCollisionListings,
 } from "./create-collision-helpers";
+
+test.use({ storageState: "playwright/.auth/incomplete-host.json" });
 
 test("T-19: the fourth acknowledged collision is blocked", async ({
   page,
@@ -33,6 +36,7 @@ test("T-19: the fourth acknowledged collision is blocked", async ({
     );
 
     await page.getByTestId("collision-radio-add-date").check();
+    await resetCreateListingRateLimits(page);
     await page.getByTestId("collision-continue").click();
 
     const ackResponse = await ackResponsePromise;

@@ -2,13 +2,35 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import SaveSearchButton from "@/components/SaveSearchButton";
 
+const mockRouterPush = jest.fn();
+const mockGetSession = jest.fn();
+const mockRedirectToUrl = jest.fn();
+let mockSessionStatus: "authenticated" | "loading" | "unauthenticated" =
+  "authenticated";
+
 // Mock next/navigation
 jest.mock("next/navigation", () => ({
   useRouter: () => ({
-    push: jest.fn(),
+    push: mockRouterPush,
   }),
+  usePathname: () => "/search",
   useSearchParams: () =>
     new URLSearchParams("q=apartment&minPrice=500&maxPrice=1500"),
+}));
+
+jest.mock("next-auth/react", () => ({
+  getSession: () => mockGetSession(),
+  useSession: () => ({
+    data:
+      mockSessionStatus === "authenticated"
+        ? { user: { id: "user-123" } }
+        : null,
+    status: mockSessionStatus,
+  }),
+}));
+
+jest.mock("@/lib/client-redirect", () => ({
+  redirectToUrl: (url: string) => mockRedirectToUrl(url),
 }));
 
 // Mock saveSearch
@@ -20,6 +42,8 @@ jest.mock("@/app/actions/saved-search", () => ({
 describe("SaveSearchButton", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSessionStatus = "authenticated";
+    mockGetSession.mockResolvedValue(null);
     global.fetch = jest.fn();
   });
 
@@ -136,6 +160,89 @@ describe("SaveSearchButton", () => {
         screen.getByText("You can only save up to 10 searches")
       ).toBeInTheDocument();
     });
+  });
+
+  it("redirects unauthorized saves to login without showing raw Unauthorized", async () => {
+    mockSaveSearch.mockResolvedValue({ error: "Unauthorized" });
+
+    render(<SaveSearchButton />);
+
+    await userEvent.click(screen.getByRole("button"));
+    const saveButtons = screen.getAllByText("Save Search");
+    await userEvent.click(saveButtons[saveButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(mockRedirectToUrl).toHaveBeenCalledWith(
+        "/login?callbackUrl=%2Fsearch%3Fq%3Dapartment%26minPrice%3D500%26maxPrice%3D1500"
+      );
+    });
+    expect(mockRouterPush).not.toHaveBeenCalled();
+    expect(screen.queryByText("Unauthorized")).not.toBeInTheDocument();
+  });
+
+  it("redirects anonymous users to login before calling saveSearch", async () => {
+    mockSessionStatus = "unauthenticated";
+
+    render(<SaveSearchButton />);
+
+    await userEvent.click(screen.getByRole("button"));
+    const saveButtons = screen.getAllByText("Save Search");
+    await userEvent.click(saveButtons[saveButtons.length - 1]);
+
+    expect(mockSaveSearch).not.toHaveBeenCalled();
+    expect(mockRedirectToUrl).toHaveBeenCalledWith(
+      "/login?callbackUrl=%2Fsearch%3Fq%3Dapartment%26minPrice%3D500%26maxPrice%3D1500"
+    );
+    expect(mockRouterPush).not.toHaveBeenCalled();
+    expect(screen.queryByText("Unauthorized")).not.toBeInTheDocument();
+  });
+
+  it("redirects loading anonymous sessions to login before calling saveSearch", async () => {
+    mockSessionStatus = "loading";
+    mockGetSession.mockResolvedValue(null);
+
+    render(<SaveSearchButton />);
+
+    await userEvent.click(screen.getByRole("button"));
+    const saveButtons = screen.getAllByText("Save Search");
+    await userEvent.click(saveButtons[saveButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(mockRedirectToUrl).toHaveBeenCalledWith(
+        "/login?callbackUrl=%2Fsearch%3Fq%3Dapartment%26minPrice%3D500%26maxPrice%3D1500"
+      );
+    });
+    expect(mockGetSession).toHaveBeenCalledTimes(1);
+    expect(mockSaveSearch).not.toHaveBeenCalled();
+    expect(mockRouterPush).not.toHaveBeenCalled();
+    expect(screen.queryByText("Unauthorized")).not.toBeInTheDocument();
+  });
+
+  it("saves after a loading session resolves to an authenticated user", async () => {
+    mockSessionStatus = "loading";
+    mockGetSession.mockResolvedValue({ user: { id: "user-123" } });
+    mockSaveSearch.mockResolvedValue({ success: true, searchId: "search-123" });
+
+    render(<SaveSearchButton />);
+
+    await userEvent.click(screen.getByRole("button"));
+    const saveButtons = screen.getAllByText("Save Search");
+    await userEvent.click(saveButtons[saveButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(mockSaveSearch).toHaveBeenCalledWith({
+        name: "apartment - $500-$1500",
+        filters: expect.objectContaining({
+          query: "apartment",
+          minPrice: 500,
+          maxPrice: 1500,
+        }),
+        alertEnabled: true,
+        alertFrequency: "DAILY",
+      });
+    });
+    expect(mockGetSession).toHaveBeenCalledTimes(1);
+    expect(mockRedirectToUrl).not.toHaveBeenCalled();
   });
 
   it("handles exceptions", async () => {

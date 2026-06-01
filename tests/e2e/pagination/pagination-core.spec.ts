@@ -425,11 +425,9 @@ test.describe("Pagination Core", () => {
   }) => {
     test.slow();
 
-    // Use tight bounds within SF to get fewer than 12 results from seed data.
-    // With ~19 listings spread across the full SF bounds, these narrow bounds
-    // should yield fewer than 12, so the server returns no nextCursor.
-    const narrowBoundsQS = `minLat=37.78&maxLat=37.82&minLng=-122.44&maxLng=-122.40`;
-    await page.goto(`/search?${narrowBoundsQS}`);
+    // Use a seeded text query that deterministically returns fewer than one
+    // page. Narrow geographic bounds became fragile as seed coverage grew.
+    await page.goto(`/search?${boundsQS}&q=sunset`);
     const container = searchResultsContainer(page);
 
     // Wait for the page to render -- either listing cards or zero-results UI
@@ -607,12 +605,12 @@ test.describe("Pagination Core", () => {
   }) => {
     test.slow();
 
-    // Use tight bounds within SF to get fewer than 12 results from seed data.
+    // Use a seeded text query that deterministically returns fewer than one
+    // page. Narrow geographic bounds became fragile as seed coverage grew.
     // With fewer than a full page of results, there is no cursor and no
     // load-more interaction -- so the "You've seen all N results" message
     // should NOT appear (it requires extraListings.length > 0).
-    const narrowBoundsQS = `minLat=37.78&maxLat=37.82&minLng=-122.44&maxLng=-122.40`;
-    await page.goto(`/search?${narrowBoundsQS}`);
+    await page.goto(`/search?${boundsQS}&q=sunset`);
     const container = searchResultsContainer(page);
 
     // Wait for the page to render
@@ -652,10 +650,10 @@ test.describe("Pagination Core", () => {
   }) => {
     test.slow();
 
-    // Narrow bounds to get < 12 results from seed data (approximates the
-    // "exactly 12 with no cursor" edge case at a broader level)
-    const narrowBoundsQS = `minLat=37.76&maxLat=37.79&minLng=-122.46&maxLng=-122.43`;
-    await page.goto(`/search?${narrowBoundsQS}`);
+    // Use a seeded text query that deterministically returns fewer than one
+    // page (approximates the "exactly 12 with no cursor" edge case at a
+    // broader level).
+    await page.goto(`/search?${boundsQS}&q=sunset`);
     const container = searchResultsContainer(page);
 
     // Wait for the page to render

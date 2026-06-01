@@ -26,7 +26,17 @@ import {
   waitForMapReady,
   waitForDebounceAndResponse,
 } from "../helpers";
+import type { Page } from "@playwright/test";
 import { isMapAvailable } from "../helpers/sync-helpers";
+
+async function gotoSearchViewport(page: Page, url: string) {
+  await page.goto(url, { waitUntil: "domcontentloaded" }).catch((error) => {
+    if (!String(error).includes("ERR_ABORTED")) {
+      throw error;
+    }
+  });
+  await page.waitForLoadState("domcontentloaded").catch(() => {});
+}
 
 test.describe("Map Error Handling", () => {
   // Map tests run as anonymous user with desktop viewport
@@ -51,14 +61,20 @@ test.describe("Map Error Handling", () => {
       page,
     }) => {
       // Navigate first so isMapAvailable has a page to check
-      await page.goto("/search?minLng=-122.5&maxLng=-122.0&minLat=37.5&maxLat=38.0");
+      await gotoSearchViewport(
+        page,
+        "/search?minLng=-122.5&maxLng=-122.0&minLat=37.5&maxLat=38.0"
+      );
       test.skip(!(await isMapAvailable(page)), "Map not available (WebGL unavailable in headless)");
 
       // Navigate to search with very wide bounds (beyond MAX spans)
       // lng span = 50 - (-100) = 150 degrees (exceeds MAX_LNG_SPAN of 130)
       // lat span = 60 - (-10) = 70 degrees (exceeds MAX_LAT_SPAN of 60)
       // PersistentMapWrapper clamps to max span and shows an info banner
-      await page.goto("/search?minLng=-100&maxLng=50&minLat=-10&maxLat=60");
+      await gotoSearchViewport(
+        page,
+        "/search?minLng=-100&maxLng=50&minLat=-10&maxLat=60"
+      );
 
       // The component clamps the viewport and shows zoom-in message
       // as a role="status" info banner (not an error alert).
@@ -77,11 +93,17 @@ test.describe("Map Error Handling", () => {
     test(`${tags.anon} - Clears info banner when viewport becomes valid`, async ({
       page,
     }) => {
-      await page.goto("/search?minLng=-122.5&maxLng=-122.0&minLat=37.5&maxLat=38.0");
+      await gotoSearchViewport(
+        page,
+        "/search?minLng=-122.5&maxLng=-122.0&minLat=37.5&maxLat=38.0"
+      );
       test.skip(!(await isMapAvailable(page)), "Map not available (WebGL unavailable in headless)");
 
       // Start with too-large viewport (clamped by PersistentMapWrapper)
-      await page.goto("/search?minLng=-100&maxLng=50&minLat=-10&maxLat=60");
+      await gotoSearchViewport(
+        page,
+        "/search?minLng=-100&maxLng=50&minLat=-10&maxLat=60"
+      );
 
       // Should show info banner initially — but in CI headless the clamping
       // effect may never fire, so soft-check and skip if banner never appears.
@@ -95,7 +117,8 @@ test.describe("Map Error Handling", () => {
       test.skip(!bannerAppeared, "Map viewport clamping did not fire (CI headless limitation)");
 
       // Navigate to valid viewport (within max span limits)
-      await page.goto(
+      await gotoSearchViewport(
+        page,
         "/search?minLng=-122.5&maxLng=-122.0&minLat=37.5&maxLat=38.0"
       );
 
@@ -208,7 +231,10 @@ test.describe("Map Error Handling", () => {
     test(`${tags.anon} - No console errors during normal map navigation`, async ({
       page,
     }) => {
-      await page.goto("/search?minLng=-122.5&maxLng=-122.0&minLat=37.5&maxLat=38.0");
+      await gotoSearchViewport(
+        page,
+        "/search?minLng=-122.5&maxLng=-122.0&minLat=37.5&maxLat=38.0"
+      );
       test.skip(!(await isMapAvailable(page)), "Map not available (WebGL unavailable in headless)");
 
       const consoleErrors: string[] = [];
@@ -219,7 +245,8 @@ test.describe("Map Error Handling", () => {
       });
 
       // Navigate to search with valid bounds
-      await page.goto(
+      await gotoSearchViewport(
+        page,
         "/search?minLng=-122.5&maxLng=-122.0&minLat=37.5&maxLat=38.0"
       );
 
@@ -241,7 +268,7 @@ test.describe("Map Error Handling", () => {
           minLat: bounds.minLat.toString(),
           maxLat: bounds.maxLat.toString(),
         });
-        await page.goto(`/search?${params.toString()}`);
+        await gotoSearchViewport(page, `/search?${params.toString()}`);
       }
 
       // Wait for any pending fetches to settle

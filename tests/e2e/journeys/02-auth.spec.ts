@@ -9,6 +9,8 @@
 import { test, expect, tags } from "../helpers";
 
 test.describe("Authentication Journeys", () => {
+  test.describe.configure({ mode: "serial" });
+
   // All auth tests must start unauthenticated — clear any inherited storageState
   test.use({ storageState: { cookies: [], origins: [] } });
 

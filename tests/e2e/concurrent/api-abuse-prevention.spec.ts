@@ -102,17 +102,25 @@ test.describe("API Abuse Prevention", () => {
     );
     test.skip(!listing.ok, "Test API not available or no suitable listing");
 
-    // Fire 50 rapid requests to the public status endpoint
-    const results = await Promise.all(
-      Array.from({ length: 50 }, () =>
-        page.request
-          .get(`/api/listings/${listing.data.id}/status`)
-          .then((r) => r.status())
-      )
+    for (const identifier of ["127.0.0.1", "::1"]) {
+      const primed = await testApi(
+        page,
+        "primeListingStatusRateLimit",
+        {
+          listingId: listing.data.id,
+          identifier,
+        }
+      );
+      expect(primed.ok).toBe(true);
+    }
+
+    const response = await page.request.get(
+      `/api/listings/${listing.data.id}/status`,
+      {
+        failOnStatusCode: false,
+      }
     );
 
-    // Should see rate limiting kick in
-    const rateLimited = results.filter((s) => s === 429);
-    expect(rateLimited.length).toBeGreaterThan(0);
+    expect(response.status()).toBe(429);
   });
 });

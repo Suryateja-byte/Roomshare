@@ -65,6 +65,12 @@ test.describe("Create Listing — Visual Regression Tests", () => {
     });
   }
 
+  async function resetViewport(page: import("@playwright/test").Page) {
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expect(page.getByRole("heading", { name: "List your sanctuary." }))
+      .toBeVisible({ timeout: timeouts.navigation });
+  }
+
   // ────────────────────────────────────────────────────────
   // P1 — Core visual baselines
   // ────────────────────────────────────────────────────────
@@ -76,6 +82,7 @@ test.describe("Create Listing — Visual Regression Tests", () => {
     await clp.goto();
     await disableAnimations(page);
     await page.waitForLoadState("domcontentloaded");
+    await resetViewport(page);
 
     await expect(page).toHaveScreenshot("create-listing-empty-desktop.png", {
       fullPage: true,
@@ -95,6 +102,7 @@ test.describe("Create Listing — Visual Regression Tests", () => {
     await clp.goto();
     await disableAnimations(page);
     await page.waitForLoadState("domcontentloaded");
+    await resetViewport(page);
 
     await expect(page).toHaveScreenshot("create-listing-empty-mobile.png", {
       fullPage: true,
@@ -115,6 +123,7 @@ test.describe("Create Listing — Visual Regression Tests", () => {
     await page.waitForSelector('[role="alert"], [aria-invalid="true"], .text-destructive, :invalid', { timeout: 5000 }).catch(() => {});
     await disableAnimations(page);
     await page.waitForLoadState("domcontentloaded");
+    await resetViewport(page);
 
     await expect(page).toHaveScreenshot("create-listing-errors-desktop.png", {
       fullPage: true,
@@ -137,6 +146,7 @@ test.describe("Create Listing — Visual Regression Tests", () => {
     await page.waitForSelector('[role="alert"], [aria-invalid="true"], .text-destructive, :invalid', { timeout: 5000 }).catch(() => {});
     await disableAnimations(page);
     await page.waitForLoadState("domcontentloaded");
+    await resetViewport(page);
 
     await expect(page).toHaveScreenshot("create-listing-errors-mobile.png", {
       fullPage: true,
@@ -160,6 +170,7 @@ test.describe("Create Listing — Visual Regression Tests", () => {
     const data = validData();
     await clp.fillRequiredFields(data);
     await page.waitForLoadState("domcontentloaded");
+    await resetViewport(page);
 
     // Mask the date value since it varies between runs
     const dateMask = page.locator(
@@ -182,6 +193,7 @@ test.describe("Create Listing — Visual Regression Tests", () => {
     await clp.waitForUploadComplete();
     await disableAnimations(page);
     await page.waitForLoadState("domcontentloaded");
+    await resetViewport(page);
 
     // Mask actual image content since it can render differently
     const imagePreviews = page.locator(
