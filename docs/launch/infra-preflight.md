@@ -23,6 +23,31 @@ If Postgres is unavailable locally, final launch approval remains blocked until
 Docker Desktop WSL integration, a local Postgres service, or a staging database
 with equivalent migrations and seed coverage is available.
 
+## Staging QA Data Seed
+
+Use the guarded staging seed only for non-production QA environments:
+
+```bash
+pnpm run seed:staging -- --dry-run
+STAGING_SEED_ENV=staging \
+STAGING_SEED_CONFIRM=non-production \
+STAGING_SEED_PASSWORD='<shared QA password from the vault>' \
+pnpm run seed:staging -- --apply
+```
+
+The script refuses `VERCEL_ENV=production`, refuses
+`STAGING_SEED_ENV=production`, rejects production-looking database names or
+hosts, and requires `STAGING_SEED_CONFIRM=non-production` before writing to a
+remote database. It uses canonical `@roomshare.dev` QA accounts and
+deterministic `staging-*` listing IDs so repeated runs are idempotent.
+
+After applying to staging, refresh canonical inventory/search projections and
+run the real-environment smoke:
+
+```bash
+pnpm run backfill:canonical-inventory -- --apply
+```
+
 ## Production Configuration Check
 
 - `CRON_SECRET` and `METRICS_SECRET` are strong, non-placeholder secrets.

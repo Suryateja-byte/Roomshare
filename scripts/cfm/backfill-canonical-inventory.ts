@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 import crypto from "crypto";
 import { PrismaClient, type Prisma } from "@prisma/client";
 
@@ -72,7 +74,9 @@ function parseArgs(argv: string[]): BackfillArgs {
   let limit: number | null = null;
 
   for (const arg of argv) {
-    if (arg === "--apply") {
+    if (arg === "--") {
+      continue;
+    } else if (arg === "--apply") {
       apply = true;
     } else if (arg.startsWith("--batch-size=")) {
       batchSize = parsePositiveIntArg("--batch-size", arg.split("=")[1]);
