@@ -81,7 +81,7 @@ export async function withActor<T>(
   }
 ): Promise<T> {
   const client = options?.client ?? prisma;
-  const transaction = client.$transaction as <R>(
+  const transaction = client.$transaction.bind(client) as <R>(
     fn: (tx: TransactionClient) => Promise<R>,
     options?: Record<string, unknown>
   ) => Promise<R>;

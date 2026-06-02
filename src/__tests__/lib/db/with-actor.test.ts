@@ -32,6 +32,28 @@ function makeMockClient(throwInTx?: unknown) {
 }
 
 describe("withActor — unit (mock client)", () => {
+  it("preserves the client binding when invoking $transaction", async () => {
+    const stubTx = {
+      $executeRaw: jest.fn().mockResolvedValue(0),
+    };
+    const client = {
+      bindingProbe: "expected-this",
+      $transaction: jest.fn(function (
+        this: { bindingProbe: string },
+        fn: (tx: typeof stubTx) => Promise<unknown>
+      ) {
+        if (this.bindingProbe !== "expected-this") {
+          throw new Error("$transaction lost client binding");
+        }
+        return fn(stubTx);
+      }),
+    };
+
+    await expect(
+      withActor(hostActor(), async () => "ok", { client: client as never })
+    ).resolves.toBe("ok");
+  });
+
   it("re-throws non-object errors (e.g. strings) without wrapping", async () => {
     // Covers isModerationLockedError's early-return false branch (line 27):
     // `!error || typeof error !== "object"` → return false → error is re-thrown as-is.
