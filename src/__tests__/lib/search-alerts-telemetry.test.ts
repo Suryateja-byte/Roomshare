@@ -76,6 +76,9 @@ import {
 } from "@/lib/search-alerts";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+const FUTURE_MOVE_IN_DATE = new Date(Date.now() + 30 * ONE_DAY_MS)
+  .toISOString()
+  .slice(0, 10);
 const freshLastConfirmedAt = () => new Date(Date.now() - ONE_DAY_MS);
 
 describe("search-alerts telemetry routing", () => {
@@ -176,7 +179,7 @@ describe("search-alerts telemetry routing", () => {
       {
         ...baseSavedSearch,
         filters: {
-          startDate: "2026-06-01",
+          startDate: FUTURE_MOVE_IN_DATE,
           minBudget: 500,
           maxBudget: 1500,
           where: "Brooklyn",
@@ -228,7 +231,7 @@ describe("search-alerts telemetry routing", () => {
       {
         ...baseSavedSearch,
         filters: {
-          moveInDate: "2026-06-01",
+          moveInDate: FUTURE_MOVE_IN_DATE,
           minPrice: 500,
           maxPrice: 1500,
           city: "New York",
@@ -286,7 +289,7 @@ describe("search-alerts telemetry routing", () => {
         ...baseSavedSearch,
         alertFrequency: "INSTANT" as const,
         filters: {
-          startDate: "2026-06-01",
+          startDate: FUTURE_MOVE_IN_DATE,
           minBudget: 500,
           maxBudget: 1500,
           city: "New York",
@@ -318,7 +321,7 @@ describe("search-alerts telemetry routing", () => {
         ...baseSavedSearch,
         alertFrequency: "INSTANT" as const,
         filters: {
-          moveInDate: "2026-06-01",
+          moveInDate: FUTURE_MOVE_IN_DATE,
           minPrice: 500,
           maxPrice: 1500,
           city: "New York",
