@@ -124,7 +124,8 @@ test.describe("Error & Empty State Journeys", () => {
       await page.goto("/saved");
       await page.waitForLoadState("domcontentloaded");
 
-      await expect(page.locator("#main-content, main").first()).toBeVisible({
+      const main = page.locator("main").first();
+      await expect(main).toBeVisible({
         timeout: 30000,
       });
 
@@ -136,32 +137,35 @@ test.describe("Error & Empty State Journeys", () => {
         '[data-testid*="listing"], [data-testid*="saved"]'
       );
 
-      const hasEmptyText = await emptyText
-        .isVisible({ timeout: 5000 })
-        .catch(() => false);
-      const hasSaved = (await savedCards.count().catch(() => 0)) > 0;
+      await expect(async () => {
+        const hasEmptyText = await emptyText
+          .isVisible({ timeout: 1000 })
+          .catch(() => false);
+        const hasSaved = (await savedCards.count().catch(() => 0)) > 0;
+        const pageText = (await main.textContent())?.trim() ?? "";
 
-      if (hasEmptyText) {
+        expect(
+          hasEmptyText || hasSaved || pageText.length > 10
+        ).toBeTruthy();
+      }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] });
+
+      if (await emptyText.isVisible().catch(() => false)) {
         // Verify empty state heading
         await expect(
           page.getByText(/no saved listings yet/i).first()
         ).toBeVisible();
 
         // Verify guidance text exists
-        const pageText = await page
-          .locator("#main-content, main")
-          .first()
-          .textContent();
-        expect(pageText!.length).toBeGreaterThan(20);
-      } else if (hasSaved) {
-        expect(hasSaved).toBeTruthy();
+        await expect(main).toContainText(
+          /heart icon|save it here|start exploring/i
+        );
+      } else if ((await savedCards.count().catch(() => 0)) > 0) {
+        expect(await savedCards.count()).toBeGreaterThan(0);
       } else {
         // Page loaded with some content — acceptable
-        const pageText = await page
-          .locator("#main-content, main")
-          .first()
-          .textContent();
-        expect(pageText!.length).toBeGreaterThan(10);
+        expect(((await main.textContent()) ?? "").trim().length).toBeGreaterThan(
+          10
+        );
       }
     });
   });

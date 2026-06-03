@@ -63,17 +63,22 @@ test.describe("Contact Host listing detail runtime", () => {
     await expect(page.getByText(/hosted by e2e reviewer/i).first()).toBeVisible({
       timeout: 30_000,
     });
-    await expect(
-      page.getByText(/contact host to confirm availability/i)
-    ).toBeVisible({ timeout: 45_000 });
-    await expect(page.getByTestId("availability-badge")).toBeVisible();
-    await expect(
-      page.getByText(/no booking request or hold is created from this page/i)
-    ).toBeVisible();
 
     const contactRegion = testInfo.project.name.includes("Mobile")
       ? page.getByTestId("contact-host-host-section")
       : page.getByTestId("contact-host-sidebar");
+
+    await expect(
+      contactRegion.getByText(/contact host to confirm availability/i)
+    ).toBeVisible({ timeout: 45_000 });
+    await expect(
+      contactRegion.getByTestId("availability-badge")
+    ).toBeVisible();
+    await expect(
+      contactRegion.getByText(
+        /no booking request or hold is created from this page/i
+      )
+    ).toBeVisible();
 
     await expect(contactRegion).toBeVisible();
     await expect(

@@ -366,9 +366,15 @@ test.describe("Budget URL Param Aliases", () => {
         () => false
       );
 
+      let clearedViaChip = false;
       if (chipVisible) {
-        await chip.evaluate((element) => (element as HTMLElement).click());
-      } else {
+        clearedViaChip = await chip
+          .click({ timeout: 5_000 })
+          .then(() => true)
+          .catch(() => false);
+      }
+
+      if (!clearedViaChip) {
         await openFilterModal(page);
         const clearAll = page.locator('[data-testid="filter-modal-clear-all"]');
         await expect(clearAll).toBeVisible({ timeout: 10_000 });

@@ -326,7 +326,11 @@ test.describe("30 Critical User Journey Simulations", () => {
     await page.getByLabel(/email/i).fill("nonexistent@fake.com");
     const wrongPassword =
       process.env.E2E_TEST_WRONG_PASSWORD || "WrongPassword123!";
-    await page.locator('input[name="password"]').fill(wrongPassword);
+    const loginForm = page
+      .getByTestId("login-form")
+      .filter({ visible: true })
+      .first();
+    await loginForm.locator('input[name="password"]').fill(wrongPassword);
     await page.getByRole("button", { name: /sign in|log in|login/i }).click();
 
     // Should show error or stay on login page
