@@ -389,6 +389,11 @@ async function upsertListingWithLocation(ownerId, seed) {
       availableSlots: seed.availableSlots || 1,
       openSlots: seed.openSlots ?? seed.availableSlots ?? 1,
       moveInDate: new Date(seed.moveInDate),
+      status: seed.status ?? 'ACTIVE',
+      statusReason: seed.statusReason ?? null,
+      lastConfirmedAt: seed.lastConfirmedAt
+        ? new Date(seed.lastConfirmedAt)
+        : new Date(),
       images: seed.images || DEFAULT_IMAGES,
       createdAt: new Date(seed.createdAt),
       location: {
@@ -423,6 +428,11 @@ async function upsertListingWithLocation(ownerId, seed) {
       availableSlots: seed.availableSlots || 1,
       openSlots: seed.openSlots ?? seed.availableSlots ?? 1,
       moveInDate: new Date(seed.moveInDate),
+      status: seed.status ?? 'ACTIVE',
+      statusReason: seed.statusReason ?? null,
+      lastConfirmedAt: seed.lastConfirmedAt
+        ? new Date(seed.lastConfirmedAt)
+        : new Date(),
       images: seed.images || DEFAULT_IMAGES,
       createdAt: new Date(seed.createdAt),
       location: {
@@ -1372,10 +1382,42 @@ async function main() {
         SELECT COUNT(*)::int AS count FROM listing_search_docs
       `;
       console.log(`  ✓ listing_search_docs backfilled: ${countResult[0].count} rows`);
+
+      const missionContract = await prisma.$queryRaw`
+        SELECT
+          listing_search_docs.status,
+          listing_search_docs.search_tsv @@ plainto_tsquery('english', 'Mission') AS "missionMatches",
+          (
+            "lastConfirmedAt" IS NULL
+            OR "lastConfirmedAt" > NOW() - INTERVAL '21 days'
+          ) AS "freshnessMatches"
+        FROM listing_search_docs
+        JOIN "Listing" ON "Listing".id = listing_search_docs.id
+        WHERE listing_search_docs.id = 'e2e-sf-1-sunny-mission-room'
+        LIMIT 1
+      `;
+      const missionRow = missionContract[0];
+      if (
+        !missionRow ||
+        missionRow.status !== 'ACTIVE' ||
+        missionRow.missionMatches !== true ||
+        missionRow.freshnessMatches !== true
+      ) {
+        throw new Error(
+          [
+            'E2E seed search contract failed: Sunny Mission Room must be ACTIVE, fresh, and match Mission',
+            `(got status=${missionRow?.status ?? 'missing'}, missionMatches=${missionRow?.missionMatches ?? 'missing'}, freshnessMatches=${missionRow?.freshnessMatches ?? 'missing'})`,
+          ].join(' ')
+        );
+      }
+      console.log('  ✓ Search smoke contract verified: Mission finds Sunny Mission Room');
     } else {
       console.log('  ⚠ listing_search_docs table does not exist — skipping backfill (run prisma migrate deploy first)');
     }
   } catch (err) {
+    if (err.message?.startsWith('E2E seed search contract failed:')) {
+      throw err;
+    }
     console.error('  ⚠ listing_search_docs backfill failed:', err.message);
     // Non-fatal: tests may still partially work without it
   }
