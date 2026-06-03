@@ -41,6 +41,10 @@ function expectNoHydrationFailures(failures: string[]) {
   expect(failures).toEqual([]);
 }
 
+function visibleForm(page: Page, testId: "login-form") {
+  return page.locator(`[data-testid="${testId}"]:visible`).first();
+}
+
 test.describe("Hydration console guard", () => {
   test("login renders without React hydration mismatch errors", async ({
     page,
@@ -48,14 +52,17 @@ test.describe("Hydration console guard", () => {
     const failures = captureHydrationFailures(page);
 
     await page.goto("/login");
-    const loginForm = page.getByTestId("login-form");
+    const loginForm = visibleForm(page, "login-form");
     await expect(loginForm).toBeAttached();
+    await expect(loginForm).toHaveAttribute("data-hydrated", "true", {
+      timeout: 15_000,
+    });
     await expect(loginForm).toHaveAttribute("method", "post");
     await expect(loginForm).toHaveAttribute(
       "data-turnstile-enabled",
       /^(true|false)$/
     );
-    await expect(page.locator('input[name="password"]')).toHaveAttribute(
+    await expect(loginForm.locator('input[name="password"]')).toHaveAttribute(
       "name",
       "password"
     );
