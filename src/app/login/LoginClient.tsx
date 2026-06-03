@@ -30,7 +30,11 @@ import {
 import { shouldHighlightEmailForm } from "@/lib/auth-errors";
 import { cn } from "@/lib/utils";
 
-function LoginForm() {
+interface LoginClientProps {
+  turnstileEnabled?: boolean;
+}
+
+function LoginForm({ turnstileEnabled = false }: LoginClientProps) {
   const searchParams = useSearchParams();
   const { data: existingSession } = useSession();
   const registered = searchParams.get("registered");
@@ -39,9 +43,7 @@ function LoginForm() {
   const authAlertCode =
     reason === "password_changed" ? "PasswordChanged" : urlError;
   const emailInputRef = useRef<HTMLInputElement>(null);
-  const isTurnstileEnabled = Boolean(
-    process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
-  );
+  const isTurnstileEnabled = turnstileEnabled;
 
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -203,6 +205,7 @@ function LoginForm() {
         onSubmit={handleSubmit}
         data-testid="login-form"
         data-hydrated={hasHydrated || undefined}
+        data-turnstile-enabled={isTurnstileEnabled ? "true" : "false"}
         className="flex flex-col gap-4 md:gap-0"
       >
         <AuthField
@@ -340,6 +343,8 @@ function LoginForm() {
   );
 }
 
-export default function LoginClient() {
-  return <LoginForm />;
+export default function LoginClient({
+  turnstileEnabled = false,
+}: LoginClientProps) {
+  return <LoginForm turnstileEnabled={turnstileEnabled} />;
 }
