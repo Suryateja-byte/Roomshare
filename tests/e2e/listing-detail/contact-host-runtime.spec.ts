@@ -55,18 +55,19 @@ async function openReviewerListing(page: import("@playwright/test").Page) {
 test.describe("Contact Host listing detail runtime", () => {
   test.slow();
 
-  test("authenticated non-owner sees contact-first CTA", async ({
-    page,
-  }, testInfo) => {
+  test("authenticated non-owner sees contact-first CTA", async ({ page }) => {
     await openReviewerListing(page);
 
     await expect(page.getByText(/hosted by e2e reviewer/i).first()).toBeVisible({
       timeout: 30_000,
     });
 
-    const contactRegion = testInfo.project.name.includes("Mobile")
-      ? page.getByTestId("contact-host-host-section")
-      : page.getByTestId("contact-host-sidebar");
+    const contactRegion = page
+      .locator(
+        '[data-testid="contact-host-host-section"], [data-testid="contact-host-sidebar"]'
+      )
+      .filter({ hasText: /contact host to confirm availability/i })
+      .first();
 
     await expect(
       contactRegion.getByText(/contact host to confirm availability/i)

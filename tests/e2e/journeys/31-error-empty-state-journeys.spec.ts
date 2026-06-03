@@ -180,51 +180,52 @@ test.describe("Error & Empty State Journeys", () => {
       await page.goto("/messages");
       await page.waitForLoadState("domcontentloaded");
 
-      await expect(page.locator("#main-content, main").first()).toBeVisible({
+      const main = page.locator("main").first();
+      await expect(main).toBeVisible({
         timeout: 30000,
       });
 
       // Check for real conversations before looking for empty-state copy.
       // Conversation previews can contain "No messages yet" without the page
       // itself being empty.
-      const conversationLinks = page.locator('main a[href^="/messages/"]');
-      const hasConversations =
-        (await conversationLinks.count().catch(() => 0)) > 0;
+      const conversationLinks = main.locator('a[href^="/messages/"]');
+      const emptyText = main
+        .getByText(/no conversation|no message|start chatting/i)
+        .first();
 
-      if (hasConversations) {
+      await expect(async () => {
+        const hasConversations =
+          (await conversationLinks.count().catch(() => 0)) > 0;
+        const hasEmptyText = await emptyText
+          .isVisible({ timeout: 1000 })
+          .catch(() => false);
+        const pageText = (await main.textContent())?.trim() ?? "";
+
+        expect(
+          hasConversations || hasEmptyText || pageText.length > 10
+        ).toBeTruthy();
+      }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] });
+
+      if ((await conversationLinks.count().catch(() => 0)) > 0) {
         await expect(conversationLinks.first()).toBeVisible();
         return;
       }
 
-      // Check for empty state
-      const emptyText = page
-        .getByText(/no conversation|no message|start chatting/i)
-        .first();
-
-      const hasEmptyText = await emptyText
-        .isVisible({ timeout: 5000 })
-        .catch(() => false);
-
-      if (hasEmptyText) {
+      if (await emptyText.isVisible().catch(() => false)) {
         // Verify empty state has guidance
         await expect(
-          page.getByText(/no conversation.*yet|start chatting/i).first()
+          main.getByText(/no conversation.*yet|start chatting/i).first()
         ).toBeVisible();
 
         // Verify guidance about how to start messaging
-        const pageText = await page
-          .locator("#main-content, main")
-          .first()
-          .textContent();
+        const pageText = await main.textContent();
         const hasGuidance = /contact|host|listing|browse/i.test(pageText || "");
-        expect(hasGuidance || hasEmptyText).toBeTruthy();
+        expect(hasGuidance).toBeTruthy();
       } else {
         // Page loaded with content
-        const pageText = await page
-          .locator("#main-content, main")
-          .first()
-          .textContent();
-        expect(pageText!.length).toBeGreaterThan(10);
+        expect(((await main.textContent()) ?? "").trim().length).toBeGreaterThan(
+          10
+        );
       }
     });
   });
