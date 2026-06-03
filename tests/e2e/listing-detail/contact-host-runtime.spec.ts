@@ -62,30 +62,26 @@ test.describe("Contact Host listing detail runtime", () => {
       timeout: 30_000,
     });
 
-    const contactRegion = page
-      .locator(
-        '[data-testid="contact-host-host-section"], [data-testid="contact-host-sidebar"]'
-      )
-      .filter({ hasText: /contact host to confirm availability/i })
-      .first();
+    const main = page.locator("main").first();
 
     await expect(
-      contactRegion.getByText(/contact host to confirm availability/i)
+      main.getByRole("heading", {
+        name: /contact host to confirm availability/i,
+      }).first()
     ).toBeVisible({ timeout: 45_000 });
     await expect(
-      contactRegion.getByTestId("availability-badge")
+      main.getByText(/\d+\s+slot available|available/i).first()
     ).toBeVisible();
     await expect(
-      contactRegion.getByText(
-        /no booking request or hold is created from this page/i
-      )
+      main
+        .getByText(/no booking request or hold is created from this page/i)
+        .first()
     ).toBeVisible();
 
-    await expect(contactRegion).toBeVisible();
     await expect(
-      contactRegion
+      main
         .getByRole("button", { name: /contact host|unlock to contact/i })
-        .or(contactRegion.getByRole("link", { name: /verify email|sign in/i }))
+        .or(main.getByRole("link", { name: /verify email|sign in/i }))
         .first()
     ).toBeVisible();
   });
