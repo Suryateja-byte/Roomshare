@@ -48,7 +48,13 @@ test.describe("Hydration console guard", () => {
     const failures = captureHydrationFailures(page);
 
     await page.goto("/login");
-    await expect(page.getByTestId("login-form")).toBeVisible();
+    const loginForm = page.getByTestId("login-form");
+    await expect(loginForm).toBeAttached();
+    await expect(loginForm).toHaveAttribute("method", "post");
+    await expect(loginForm).toHaveAttribute(
+      "data-turnstile-enabled",
+      /^(true|false)$/
+    );
     await expect(page.locator('input[name="password"]')).toHaveAttribute(
       "name",
       "password"
