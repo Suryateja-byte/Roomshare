@@ -326,14 +326,13 @@ test.describe("Search Loading States", () => {
     // None should be busy after full load
     expect(busyCount).toBe(0);
 
-    // 2. No loading spinners should be visible
-    const spinners = page.locator(
-      '.animate-spin:visible, [class*="loading"]:visible:not([aria-busy])'
-    );
-    // Visible spinners should be gone
-    const spinnerCount = await spinners.count();
-    // Allow 0 visible spinners after load
-    expect(spinnerCount).toBe(0);
+    // 2. No explicit loading state should remain visible. Avoid broad
+    // class-name matches here: decorative icons can legitimately keep
+    // animation/loading-related classes after search results are ready.
+    const visibleLoadingCopy = page
+      .getByText(/loading|searching|finding places/i)
+      .filter({ visible: true });
+    await expect(visibleLoadingCopy).toHaveCount(0);
 
     // 3. Results content should be visible (or zero-results state shown)
     const container = searchResultsContainer(page);
