@@ -1,11 +1,13 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import LoginPage from "@/app/login/page";
+import LoginClient from "@/app/login/LoginClient";
 
 // Mock next-auth/react
 const mockSignIn = jest.fn();
 const mockSignOut = jest.fn();
 let mockSearchParams = new URLSearchParams();
+const originalTurnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
 jest.mock("next-auth/react", () => ({
   signIn: (...args: unknown[]) => mockSignIn(...args),
@@ -41,6 +43,15 @@ describe("LoginPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSearchParams = new URLSearchParams();
+    delete process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+  });
+
+  afterAll(() => {
+    if (originalTurnstileSiteKey === undefined) {
+      delete process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+    } else {
+      process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = originalTurnstileSiteKey;
+    }
   });
 
   it("renders login form", () => {
@@ -53,6 +64,18 @@ describe("LoginPage", () => {
       "password"
     );
     expect(screen.getByTestId("login-form")).toHaveAttribute("method", "post");
+  });
+
+  it("keeps login form semantics stable when Turnstile is enabled", () => {
+    render(<LoginClient turnstileEnabled />);
+
+    const loginForm = screen.getByTestId("login-form");
+    expect(loginForm).toHaveAttribute("method", "post");
+    expect(loginForm).toHaveAttribute("data-turnstile-enabled", "true");
+    expect(screen.getByLabelText("Password")).toHaveAttribute(
+      "name",
+      "password"
+    );
   });
 
   it("renders google sign in button", () => {

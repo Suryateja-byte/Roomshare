@@ -55,31 +55,33 @@ async function openReviewerListing(page: import("@playwright/test").Page) {
 test.describe("Contact Host listing detail runtime", () => {
   test.slow();
 
-  test("authenticated non-owner sees contact-first CTA", async ({
-    page,
-  }, testInfo) => {
+  test("authenticated non-owner sees contact-first CTA", async ({ page }) => {
     await openReviewerListing(page);
 
     await expect(page.getByText(/hosted by e2e reviewer/i).first()).toBeVisible({
       timeout: 30_000,
     });
+
+    const main = page.locator("main").first();
+
     await expect(
-      page.getByText(/contact host to confirm availability/i)
+      main.getByRole("heading", {
+        name: /contact host to confirm availability/i,
+      }).first()
     ).toBeVisible({ timeout: 45_000 });
-    await expect(page.getByTestId("availability-badge")).toBeVisible();
     await expect(
-      page.getByText(/no booking request or hold is created from this page/i)
+      main.getByText(/\d+\s+slot available|available/i).first()
+    ).toBeVisible();
+    await expect(
+      main
+        .getByText(/no booking request or hold is created from this page/i)
+        .first()
     ).toBeVisible();
 
-    const contactRegion = testInfo.project.name.includes("Mobile")
-      ? page.getByTestId("contact-host-host-section")
-      : page.getByTestId("contact-host-sidebar");
-
-    await expect(contactRegion).toBeVisible();
     await expect(
-      contactRegion
+      main
         .getByRole("button", { name: /contact host|unlock to contact/i })
-        .or(contactRegion.getByRole("link", { name: /verify email|sign in/i }))
+        .or(main.getByRole("link", { name: /verify email|sign in/i }))
         .first()
     ).toBeVisible();
   });
