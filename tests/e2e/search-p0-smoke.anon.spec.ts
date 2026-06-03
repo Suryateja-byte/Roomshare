@@ -102,7 +102,7 @@ test.describe("Search P0 Smoke Suite", () => {
 
   // S02: Text query shows matching results
   test("S02: text query shows matching results", async ({ page }) => {
-    await page.goto(`/search?q=Mission&${boundsQS}`);
+    await page.goto(`/search?what=Mission&${boundsQS}`);
 
     const container = searchResultsContainer(page);
     const cards = container.locator('[data-testid="listing-card"]');
@@ -111,12 +111,12 @@ test.describe("Search P0 Smoke Suite", () => {
     const count = await cards.count();
     expect(count).toBeGreaterThanOrEqual(1);
 
-    // At least one card should contain the query text "Mission"
+    // Seed contract: Mission text search must expose the public Mission fixture.
     const allCardTexts = await cards.allTextContents();
-    const hasMission = allCardTexts.some((text) =>
-      text.toLowerCase().includes("mission")
+    const hasSunnyMissionRoom = allCardTexts.some((text) =>
+      text.toLowerCase().includes("sunny mission room")
     );
-    expect(hasMission).toBe(true);
+    expect(hasSunnyMissionRoom).toBe(true);
   });
 
   // S03: Price filter narrows results
