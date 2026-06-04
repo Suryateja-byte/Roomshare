@@ -9,6 +9,7 @@ describe("origin-guard", () => {
   beforeEach(() => {
     jest.resetModules();
     process.env = { ...ORIGINAL_ENV };
+    delete process.env.VERCEL_URL;
   });
 
   afterAll(() => {
@@ -40,6 +41,19 @@ describe("origin-guard", () => {
       const { getAllowedOrigins } = await import("@/lib/origin-guard");
       expect(getAllowedOrigins()).toEqual([]);
     });
+
+    it("adds the exact Vercel deployment origin when VERCEL_URL is set", async () => {
+      process.env.ALLOWED_ORIGINS = "https://example.com";
+      process.env.VERCEL_URL = "roomshare-random.vercel.app";
+      (process.env as any).NODE_ENV = "production";
+
+      const { getAllowedOrigins } = await import("@/lib/origin-guard");
+
+      expect(getAllowedOrigins()).toEqual([
+        "https://example.com",
+        "https://roomshare-random.vercel.app",
+      ]);
+    });
   });
 
   describe("isOriginAllowed", () => {
@@ -63,6 +77,19 @@ describe("origin-guard", () => {
       const { isOriginAllowed } = await import("@/lib/origin-guard");
       expect(isOriginAllowed(null)).toBe(false);
     });
+
+    it("allows only the exact Vercel deployment origin from VERCEL_URL", async () => {
+      delete process.env.ALLOWED_ORIGINS;
+      process.env.VERCEL_URL = "roomshare-random.vercel.app";
+      (process.env as any).NODE_ENV = "production";
+
+      const { isOriginAllowed } = await import("@/lib/origin-guard");
+
+      expect(isOriginAllowed("https://roomshare-random.vercel.app")).toBe(
+        true
+      );
+      expect(isOriginAllowed("https://other-preview.vercel.app")).toBe(false);
+    });
   });
 
   describe("getAllowedHosts", () => {
@@ -71,6 +98,19 @@ describe("origin-guard", () => {
       (process.env as any).NODE_ENV = "production";
       const { getAllowedHosts } = await import("@/lib/origin-guard");
       expect(getAllowedHosts()).toEqual(["example.com", "api.example.com"]);
+    });
+
+    it("adds the exact Vercel deployment host when VERCEL_URL is set", async () => {
+      process.env.ALLOWED_HOSTS = "example.com";
+      process.env.VERCEL_URL = "roomshare-random.vercel.app";
+      (process.env as any).NODE_ENV = "production";
+
+      const { getAllowedHosts } = await import("@/lib/origin-guard");
+
+      expect(getAllowedHosts()).toEqual([
+        "example.com",
+        "roomshare-random.vercel.app",
+      ]);
     });
   });
 
@@ -102,6 +142,18 @@ describe("origin-guard", () => {
       (process.env as any).NODE_ENV = "development";
       const { isHostAllowed } = await import("@/lib/origin-guard");
       expect(isHostAllowed("localhost")).toBe(true);
+    });
+
+    it("allows only the exact Vercel deployment host from VERCEL_URL", async () => {
+      delete process.env.ALLOWED_HOSTS;
+      process.env.VERCEL_URL = "roomshare-random.vercel.app";
+      (process.env as any).NODE_ENV = "production";
+
+      const { isHostAllowed } = await import("@/lib/origin-guard");
+
+      expect(isHostAllowed("roomshare-random.vercel.app")).toBe(true);
+      expect(isHostAllowed("roomshare-random.vercel.app:443")).toBe(true);
+      expect(isHostAllowed("other-preview.vercel.app")).toBe(false);
     });
   });
 });
