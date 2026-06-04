@@ -278,12 +278,17 @@ const nextConfig: NextConfig = {
 
 let exportedConfig = nextConfig;
 
-// Only wrap with Sentry when credentials are available (skip in CI E2E runs)
+// Only wrap with Sentry when the build plugin is explicitly enabled.
+// Runtime Sentry capture remains controlled by SENTRY_DSN in sentry.*.config.ts.
+const isSentryBuildPluginEnabled =
+  process.env.SENTRY_ENABLE_BUILD_PLUGIN === "1";
 const hasSentryCredentials = !!(
-  process.env.SENTRY_ORG && process.env.SENTRY_PROJECT
+  process.env.SENTRY_ORG &&
+  process.env.SENTRY_PROJECT &&
+  process.env.SENTRY_AUTH_TOKEN
 );
 
-if (isSentryEnabled && hasSentryCredentials) {
+if (isSentryBuildPluginEnabled && hasSentryCredentials) {
   const { withSentryConfig } = require("@sentry/nextjs");
 
   exportedConfig = withSentryConfig(nextConfig, {
