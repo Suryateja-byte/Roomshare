@@ -31,6 +31,16 @@ const markReadApiSchema = z.object({
   action: z.literal("markRead"),
 });
 
+function buildAccountSuspendedResponse(error?: string) {
+  return NextResponse.json(
+    {
+      error: error || "Account suspended",
+      code: "ACCOUNT_SUSPENDED",
+    },
+    { status: 403 }
+  );
+}
+
 function getMessageRateLimitIdentifier(
   request: Request,
   userId: string
@@ -88,6 +98,11 @@ export async function GET(request: Request) {
     }
 
     const userId = session.user.id;
+    const suspension = await checkSuspension(userId);
+    if (suspension.suspended) {
+      return buildAccountSuspendedResponse(suspension.error);
+    }
+
     const { searchParams } = new URL(request.url);
     const conversationId = searchParams.get("conversationId");
     const lastMessageId = searchParams.get("lastMessageId");
@@ -278,6 +293,10 @@ export async function POST(request: Request) {
     }
 
     const userId = session.user.id;
+    const suspension = await checkSuspension(userId);
+    if (suspension.suspended) {
+      return buildAccountSuspendedResponse(suspension.error);
+    }
 
     let body: Record<string, unknown>;
     try {
@@ -331,14 +350,6 @@ export async function POST(request: Request) {
       "/api/messages:send"
     );
     if (rateLimitResponse) return rateLimitResponse;
-
-    const suspension = await checkSuspension();
-    if (suspension.suspended) {
-      return NextResponse.json(
-        { error: suspension.error || "Account suspended" },
-        { status: 403 }
-      );
-    }
 
     const emailCheck = await checkEmailVerified();
     if (!emailCheck.verified) {

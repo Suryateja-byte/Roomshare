@@ -92,6 +92,7 @@ jest.mock("@/lib/messaging/outbound-content-guard", () => ({
 import { GET, POST } from "@/app/api/messages/route";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { checkSuspension } from "@/app/actions/suspension";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const freshLastConfirmedAt = () => new Date(Date.now() - ONE_DAY_MS);
@@ -190,6 +191,7 @@ describe("Messages Pagination (P1-03)", () => {
     (auth as jest.Mock).mockResolvedValue({
       user: { id: "user-123", email: "test@example.com" },
     });
+    (checkSuspension as jest.Mock).mockResolvedValue({ suspended: false });
     (prisma.blockedUser.findFirst as jest.Mock).mockResolvedValue(null);
     (prisma.user.findMany as jest.Mock).mockResolvedValue([
       { id: "other-user", email: "other@example.com" },
@@ -202,6 +204,30 @@ describe("Messages Pagination (P1-03)", () => {
   });
 
   describe("GET /api/messages - Messages Pagination", () => {
+    it.each([
+      "http://localhost:3000/api/messages?conversationId=conversation-abc",
+      "http://localhost:3000/api/messages?conversationId=conversation-abc&poll=1&lastMessageId=message-1",
+    ])(
+      "returns 403 for suspended users before reading conversation data from %s",
+      async (url) => {
+        (checkSuspension as jest.Mock).mockResolvedValueOnce({
+          suspended: true,
+          error: "Account suspended",
+        });
+
+        const response = await GET(createMockRequest(url));
+        const data = await response.json();
+
+        expect(response.status).toBe(403);
+        expect(data).toEqual({
+          error: "Account suspended",
+          code: "ACCOUNT_SUSPENDED",
+        });
+        expect(prisma.conversation.findUnique).not.toHaveBeenCalled();
+        expect(prisma.message.findMany).not.toHaveBeenCalled();
+      }
+    );
+
     it("returns default 20 messages when no limit specified", async () => {
       const mockMessages = generateMockMessages(25);
       (prisma.message.findMany as jest.Mock).mockResolvedValue(
@@ -420,6 +446,25 @@ describe("Messages Pagination (P1-03)", () => {
   });
 
   describe("GET /api/messages - Conversations Pagination", () => {
+    it("returns 403 for suspended users before listing conversations", async () => {
+      (checkSuspension as jest.Mock).mockResolvedValueOnce({
+        suspended: true,
+        error: "Account suspended",
+      });
+
+      const request = createMockRequest("http://localhost:3000/api/messages");
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(403);
+      expect(data).toEqual({
+        error: "Account suspended",
+        code: "ACCOUNT_SUSPENDED",
+      });
+      expect(prisma.conversation.count).not.toHaveBeenCalled();
+      expect(prisma.conversation.findMany).not.toHaveBeenCalled();
+    });
+
     it("returns default 20 conversations when no limit specified", async () => {
       const mockConversations = generateMockConversations(25);
       (prisma.conversation.count as jest.Mock).mockResolvedValue(25);

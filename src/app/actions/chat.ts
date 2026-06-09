@@ -24,6 +24,11 @@ import {
 } from "@/lib/messaging/cfm-messaging-telemetry";
 import { evaluateListingContactable } from "@/lib/messaging/listing-contactable";
 import {
+  lockListingForContact,
+  lockPhysicalUnitForContact,
+  type LockedListingRow,
+} from "@/lib/messaging/contact-locks";
+import {
   attachConsumptionToConversation,
   consumeMessageStartEntitlement,
 } from "@/lib/payments/contact-paywall";
@@ -50,6 +55,37 @@ const startConversationObjectSchema = z.object({
   clientIdempotencyKey: z.string().trim().min(1).max(200).optional(),
   unitIdentityEpochObserved: z.number().int().positive().optional(),
 });
+
+function buildSuspendedActionError(error?: string) {
+  return {
+    error: error || "Account suspended",
+    code: "ACCOUNT_SUSPENDED",
+  };
+}
+
+type LockedUserRow = {
+  id: string;
+  emailVerified: Date | null;
+  isSuspended: boolean;
+};
+
+type StartConversationTxResult =
+  | {
+      kind: "success";
+      conversationId: string;
+      path: ConversationStartPath;
+    }
+  | {
+      kind: "precondition_error";
+      error: string;
+      code?: string;
+    }
+  | {
+      kind: "paywall_error";
+      error: string;
+      code: "PAYWALL_REQUIRED" | "PAYWALL_UNAVAILABLE";
+      unitId: string | null;
+    };
 
 export async function startConversation(
   input:
@@ -106,73 +142,6 @@ export async function startConversation(
 
     const userId = session.user.id;
 
-    const listingRow = await prisma.listing.findUnique({
-      where: { id: listingId },
-      select: {
-        ownerId: true,
-        status: true,
-        statusReason: true,
-        availableSlots: true,
-        totalSlots: true,
-        openSlots: true,
-        moveInDate: true,
-        availableUntil: true,
-        minStayMonths: true,
-        lastConfirmedAt: true,
-        physicalUnitId: true,
-        owner: {
-          select: {
-            isSuspended: true,
-          },
-        },
-      },
-    });
-
-    const contactable = evaluateListingContactable(listingRow);
-    if (!contactable.ok) {
-      return { error: contactable.message, code: contactable.code };
-    }
-    const listing = contactable.listing;
-    if (listing.ownerId === userId)
-      return { error: "Cannot chat with yourself" };
-
-    if (listing.owner?.isSuspended) {
-      return {
-        error: HOST_NOT_ACCEPTING_CONTACT_MESSAGE,
-        code: "HOST_NOT_ACCEPTING_CONTACT",
-      };
-    }
-
-    let resolvedUnitIdentityEpoch: number | null = null;
-    if (unitIdentityEpochObserved && listing.physicalUnitId) {
-      const unit = await prisma.physicalUnit.findUnique({
-        where: { id: listing.physicalUnitId },
-        select: {
-          unitIdentityEpoch: true,
-          supersededByUnitId: true,
-        },
-      });
-
-      if (!unit || unit.unitIdentityEpoch !== unitIdentityEpochObserved) {
-        return {
-          error: "Please refresh this listing before contacting the host.",
-          code: "UNIT_EPOCH_STALE",
-        };
-      }
-
-      resolvedUnitIdentityEpoch = unit.unitIdentityEpoch;
-    }
-
-    // Check if either user has blocked the other
-    const { checkBlockBeforeAction } = await import("./block");
-    const blockCheck = await checkBlockBeforeAction(listing.ownerId);
-    if (!blockCheck.allowed) {
-      return {
-        error: HOST_NOT_ACCEPTING_CONTACT_MESSAGE,
-        code: "HOST_NOT_ACCEPTING_CONTACT",
-      };
-    }
-
     const isSerializationFailure = (error: unknown): boolean => {
       if (!error || typeof error !== "object") return false;
       const err = error as { code?: string; message?: string };
@@ -187,23 +156,126 @@ export async function startConversation(
     // to prevent duplicate conversations from concurrent requests (TOCTOU race).
     // One retry is enough: the winner commits, the retry acquires the same lock
     // and finds the conversation created by the winning transaction.
-    let result:
-      | { conversationId: string; path: ConversationStartPath }
-      | {
-          error: string;
-          code: "PAYWALL_REQUIRED" | "PAYWALL_UNAVAILABLE";
-          unitId: string | null;
-        }
-      | null = null;
+    let result: StartConversationTxResult | null = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         result = await prisma.$transaction(
           async (tx) => {
+            const listingRow = await lockListingForContact(tx, listingId);
+
+            const contactable =
+              evaluateListingContactable<LockedListingRow>(listingRow);
+            if (!contactable.ok) {
+              return {
+                kind: "precondition_error",
+                error: contactable.message,
+                code: contactable.code,
+              };
+            }
+
+            const listing = contactable.listing;
+            const latestOwnerId: string = listing.ownerId;
+            const latestPhysicalUnitId: string | null = listing.physicalUnitId;
+            if (latestOwnerId === userId) {
+              return {
+                kind: "precondition_error",
+                error: "Cannot chat with yourself",
+              };
+            }
+
             // Advisory lock keyed on listingId + sorted participant pair.
             // Same pair always acquires the same lock, serializing concurrent calls.
-            const sortedIds = [userId, listing.ownerId].sort().join(":");
+            const sortedIds = [userId, latestOwnerId].sort().join(":");
             const lockKey = `conv:${listingId}:${sortedIds}`;
             await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+
+            const userRows = await tx.$queryRaw<LockedUserRow[]>`
+              SELECT "id", "emailVerified", "isSuspended"
+              FROM "User"
+              WHERE "id" IN (${userId}, ${latestOwnerId})
+              ORDER BY "id" ASC
+              FOR UPDATE
+            `;
+            const usersById = new Map(userRows.map((row) => [row.id, row]));
+            const viewer = usersById.get(userId);
+            const host = usersById.get(latestOwnerId);
+
+            if (!viewer || viewer.isSuspended) {
+              return {
+                kind: "precondition_error",
+                ...buildSuspendedActionError(),
+              };
+            }
+
+            if (!viewer.emailVerified) {
+              return {
+                kind: "precondition_error",
+                error: "Please verify your email to start a conversation",
+              };
+            }
+
+            if (!host || host.isSuspended) {
+              return {
+                kind: "precondition_error",
+                error: HOST_NOT_ACCEPTING_CONTACT_MESSAGE,
+                code: "HOST_NOT_ACCEPTING_CONTACT",
+              };
+            }
+
+            let resolvedUnitIdentityEpoch: number | null = null;
+            if (latestPhysicalUnitId) {
+              const unit = await lockPhysicalUnitForContact(
+                tx,
+                latestPhysicalUnitId
+              );
+
+              if (
+                !unit ||
+                (unitIdentityEpochObserved &&
+                  unit.unitIdentityEpoch !== unitIdentityEpochObserved)
+              ) {
+                return {
+                  kind: "precondition_error",
+                  error: "Please refresh this listing before contacting the host.",
+                  code: "UNIT_EPOCH_STALE",
+                };
+              }
+
+              resolvedUnitIdentityEpoch = unitIdentityEpochObserved
+                ? unit.unitIdentityEpoch
+                : null;
+            }
+
+            try {
+              const block = await tx.blockedUser.findFirst({
+                where: {
+                  OR: [
+                    { blockerId: userId, blockedId: latestOwnerId },
+                    { blockerId: latestOwnerId, blockedId: userId },
+                  ],
+                },
+                select: { id: true },
+              });
+
+              if (block) {
+                return {
+                  kind: "precondition_error",
+                  error: HOST_NOT_ACCEPTING_CONTACT_MESSAGE,
+                  code: "HOST_NOT_ACCEPTING_CONTACT",
+                };
+              }
+            } catch (error) {
+              // Let the outer retry loop handle serialization conflicts;
+              // only genuine failures fall through to the fail-closed result.
+              if (isSerializationFailure(error)) {
+                throw error;
+              }
+              return {
+                kind: "precondition_error",
+                error: HOST_NOT_ACCEPTING_CONTACT_MESSAGE,
+                code: "HOST_NOT_ACCEPTING_CONTACT",
+              };
+            }
 
             // Check existing conversation (exclude admin-deleted, include per-user deleted for resurrection)
             const existing = await tx.conversation.findFirst({
@@ -212,7 +284,7 @@ export async function startConversation(
                 deletedAt: null,
                 AND: [
                   { participants: { some: { id: userId } } },
-                  { participants: { some: { id: listing.ownerId } } },
+                  { participants: { some: { id: latestOwnerId } } },
                 ],
               },
             });
@@ -228,7 +300,7 @@ export async function startConversation(
               await recordContactAttempt(tx, {
                 userId,
                 listingId,
-                unitId: listing.physicalUnitId,
+                unitId: latestPhysicalUnitId,
                 unitIdentityEpochObserved,
                 unitIdentityEpochResolved: resolvedUnitIdentityEpoch,
                 outcome:
@@ -239,6 +311,7 @@ export async function startConversation(
                 conversationId: existing.id,
               });
               return {
+                kind: "success",
                 conversationId: existing.id,
                 path: (clearedDeletions > 0
                   ? "resurrected"
@@ -249,7 +322,7 @@ export async function startConversation(
             const consumption = await consumeMessageStartEntitlement(tx, {
               userId,
               listingId,
-              physicalUnitId: listing.physicalUnitId,
+              physicalUnitId: latestPhysicalUnitId,
               clientIdempotencyKey,
             });
 
@@ -265,6 +338,7 @@ export async function startConversation(
                 reasonCode: consumption.code,
               });
               return {
+                kind: "paywall_error",
                 error: consumption.message,
                 code: consumption.code,
                 unitId: consumption.unitId,
@@ -275,7 +349,7 @@ export async function startConversation(
               data: {
                 listingId,
                 participants: {
-                  connect: [{ id: userId }, { id: listing.ownerId }],
+                  connect: [{ id: userId }, { id: latestOwnerId }],
                 },
               },
             });
@@ -297,6 +371,7 @@ export async function startConversation(
             });
 
             return {
+              kind: "success",
               conversationId: conversation.id,
               path: "created" as ConversationStartPath,
             };
@@ -318,7 +393,13 @@ export async function startConversation(
     }
 
     if (result) {
-      if ("error" in result) {
+      if (result.kind === "precondition_error") {
+        return result.code
+          ? { error: result.error, code: result.code }
+          : { error: result.error };
+      }
+
+      if (result.kind === "paywall_error") {
         if (result.code === "PAYWALL_UNAVAILABLE") {
           recordStartConversationPaywallUnavailable({
             userId,
@@ -434,6 +515,11 @@ export async function getConversations() {
   if (!session?.user?.id) return [];
 
   try {
+    const suspension = await checkSuspension(session.user.id);
+    if (suspension.suspended) {
+      return [];
+    }
+
     const conversations = await prisma.conversation.findMany({
       where: {
         participants: {
@@ -504,6 +590,10 @@ export async function getMessages(conversationId: string) {
 
   try {
     const userId = session.user.id;
+    const suspension = await checkSuspension(userId);
+    if (suspension.suspended) {
+      return { ...buildSuspendedActionError(suspension.error), messages: [] };
+    }
 
     // Verify participant and check both admin-delete and per-user delete
     const conversation = await getAccessibleConversation(
@@ -531,6 +621,11 @@ export async function getUnreadMessageCount() {
   if (!session?.user?.id) return 0;
 
   try {
+    const suspension = await checkSuspension(session.user.id);
+    if (suspension.suspended) {
+      return 0;
+    }
+
     const unreadCount = await prisma.message.count({
       where: {
         conversation: {
@@ -567,6 +662,11 @@ export async function markAllMessagesAsRead() {
   }
 
   try {
+    const suspension = await checkSuspension(session.user.id);
+    if (suspension.suspended) {
+      return buildSuspendedActionError(suspension.error);
+    }
+
     // Get all conversations the user is part of (excluding deleted)
     const conversations = await prisma.conversation.findMany({
       where: {
@@ -731,6 +831,11 @@ export async function setTypingStatus(
     return { error: "Unauthorized", code: "SESSION_EXPIRED" };
 
   try {
+    const suspension = await checkSuspension(session.user.id);
+    if (suspension.suspended) {
+      return buildSuspendedActionError(suspension.error);
+    }
+
     // Verify user is a participant in a non-deleted conversation (admin + per-user)
     const conversation = await prisma.conversation.findUnique({
       where: { id: conversationId },
@@ -784,6 +889,11 @@ export async function getTypingStatus(conversationId: string) {
   if (!session?.user?.id) return { typingUsers: [] };
 
   try {
+    const suspension = await checkSuspension(session.user.id);
+    if (suspension.suspended) {
+      return { typingUsers: [] };
+    }
+
     // Verify user is a participant in a non-deleted conversation (admin + per-user)
     const conversation = await prisma.conversation.findUnique({
       where: { id: conversationId },
@@ -845,6 +955,11 @@ export async function pollMessages(
     return { messages: [], typingUsers: [], hasNewMessages: false };
 
   try {
+    const suspension = await checkSuspension(session.user.id);
+    if (suspension.suspended) {
+      return { messages: [], typingUsers: [], hasNewMessages: false };
+    }
+
     // Verify user is a participant in a non-deleted conversation (admin + per-user)
     const conversation = await prisma.conversation.findUnique({
       where: { id: conversationId },
@@ -914,6 +1029,10 @@ export async function markConversationMessagesAsRead(conversationId: string) {
 
   try {
     const userId = session.user.id;
+    const suspension = await checkSuspension(userId);
+    if (suspension.suspended) {
+      return buildSuspendedActionError(suspension.error);
+    }
 
     // Verify user is a participant in a non-deleted conversation
     const conversation = await prisma.conversation.findUnique({

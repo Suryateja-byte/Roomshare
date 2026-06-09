@@ -48,16 +48,13 @@ jest.mock("@/lib/prisma", () => {
       findUnique: jest.fn(),
     },
     $transaction: jest.fn(),
+    $queryRaw: jest.fn(),
     $executeRaw: jest.fn().mockResolvedValue(undefined),
   };
   // $transaction passes mockPrisma as tx so existing assertions still work
   mockPrisma.$transaction.mockImplementation((fn: any) => fn(mockPrisma));
   return { prisma: mockPrisma };
 });
-
-jest.mock("@/app/actions/block", () => ({
-  checkBlockBeforeAction: jest.fn().mockResolvedValue({ allowed: true }),
-}));
 
 jest.mock("@/auth", () => ({
   auth: jest.fn(),
@@ -106,11 +103,11 @@ import {
   getUnreadMessageCount,
   pollMessages,
   markConversationMessagesAsRead,
+  markAllMessagesAsRead,
 } from "@/app/actions/chat";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { checkBlockBeforeAction } from "@/app/actions/block";
 
 describe("Chat Actions", () => {
   const mockSession = {
@@ -126,15 +123,42 @@ describe("Chat Actions", () => {
     (auth as jest.Mock).mockResolvedValue(mockSession);
   });
 
+  function mockCurrentUserSuspended(error?: string) {
+    (prisma.user.findUnique as jest.Mock).mockResolvedValueOnce({
+      isSuspended: true,
+    });
+    return error || "Account suspended";
+  }
+
   describe("startConversation", () => {
-    const mockListing = {
+    type StartConversationListingMock = {
+      id: string;
+      ownerId: string;
+      physicalUnitId: string | null;
+      status: "ACTIVE" | "PAUSED" | "RENTED";
+      statusReason: string | null;
+      needsMigrationReview: boolean;
+      availabilitySource: "LEGACY_BOOKING" | "HOST_MANAGED";
+      availableSlots: number;
+      totalSlots: number;
+      openSlots: number | null;
+      moveInDate: Date | null;
+      availableUntil: Date | null;
+      minStayMonths: number;
+      lastConfirmedAt: Date | null;
+      owner: {
+        isSuspended: boolean;
+      };
+    };
+
+    const mockListing: StartConversationListingMock = {
       id: "listing-123",
       ownerId: "owner-456",
       physicalUnitId: "unit-123",
-      status: "ACTIVE" as const,
+      status: "ACTIVE",
       statusReason: null,
       needsMigrationReview: false,
-      availabilitySource: "LEGACY_BOOKING" as const,
+      availabilitySource: "LEGACY_BOOKING",
       availableSlots: 1,
       totalSlots: 1,
       openSlots: 1,
@@ -147,8 +171,85 @@ describe("Chat Actions", () => {
       },
     };
 
+    type LockedUser = {
+      id: string;
+      emailVerified: Date | null;
+      isSuspended: boolean;
+    };
+
+    let lockedListing: StartConversationListingMock | null;
+    let lockedUsers: LockedUser[];
+    let lockedPhysicalUnit: {
+      unitIdentityEpoch: number;
+      supersededByUnitId: string | null;
+    } | null;
+
+    function setLockedListing(listing: StartConversationListingMock | null) {
+      lockedListing = listing;
+    }
+
+    function setLockedUsers(
+      overrides: Partial<{
+        viewer: Partial<LockedUser> | null;
+        host: Partial<LockedUser> | null;
+      }> = {}
+    ) {
+      const viewer =
+        overrides.viewer === null
+          ? null
+          : {
+              id: "user-123",
+              emailVerified: new Date(),
+              isSuspended: false,
+              ...overrides.viewer,
+            };
+      const host =
+        overrides.host === null
+          ? null
+          : {
+              id: "owner-456",
+              emailVerified: new Date(),
+              isSuspended: false,
+              ...overrides.host,
+            };
+      lockedUsers = [viewer, host]
+        .filter(Boolean)
+        .sort((a, b) => a!.id.localeCompare(b!.id)) as LockedUser[];
+    }
+
+    function setLockedPhysicalUnit(
+      unit: typeof lockedPhysicalUnit = {
+        unitIdentityEpoch: 1,
+        supersededByUnitId: null,
+      }
+    ) {
+      lockedPhysicalUnit = unit;
+    }
+
+    function installLockedQueryRawMock() {
+      (prisma.$queryRaw as jest.Mock).mockImplementation(
+        async (strings: TemplateStringsArray) => {
+          const sql = String(strings);
+          if (sql.includes('FROM "Listing"')) {
+            return lockedListing ? [lockedListing] : [];
+          }
+          if (sql.includes('FROM "User"')) {
+            return lockedUsers;
+          }
+          if (sql.includes('FROM "physical_units"')) {
+            return lockedPhysicalUnit ? [lockedPhysicalUnit] : [];
+          }
+          return [];
+        }
+      );
+    }
+
     beforeEach(() => {
       (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
+      setLockedListing(mockListing);
+      setLockedUsers();
+      setLockedPhysicalUnit();
+      installLockedQueryRawMock();
       // Mock user.findUnique for email verification check
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         id: "user-123",
@@ -179,6 +280,7 @@ describe("Chat Actions", () => {
         unitIdentityEpoch: 1,
         supersededByUnitId: null,
       });
+      (prisma.blockedUser.findFirst as jest.Mock).mockResolvedValue(null);
     });
 
     it("returns error when not authenticated", async () => {
@@ -193,7 +295,7 @@ describe("Chat Actions", () => {
     });
 
     it("returns error when listing not found", async () => {
-      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(null);
+      setLockedListing(null);
 
       const result = await startConversation("invalid-listing");
 
@@ -206,7 +308,7 @@ describe("Chat Actions", () => {
     it.each(["PAUSED", "RENTED"] as const)(
       "blocks new conversation when listing is %s with LISTING_UNAVAILABLE",
       async (status) => {
-        (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
+        setLockedListing({
           ...mockListing,
           status,
         });
@@ -222,7 +324,7 @@ describe("Chat Actions", () => {
     );
 
     it("blocks new conversation with MIGRATION_REVIEW", async () => {
-      (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
+      setLockedListing({
         ...mockListing,
         availabilitySource: "HOST_MANAGED",
         openSlots: 1,
@@ -242,7 +344,7 @@ describe("Chat Actions", () => {
     });
 
     it("returns error when trying to chat with self", async () => {
-      (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
+      setLockedListing({
         ...mockListing,
         ownerId: "user-123", // Same as session user
       });
@@ -266,6 +368,31 @@ describe("Chat Actions", () => {
           userId: "user-123",
         },
       });
+      expect(mockConsumeMessageStartEntitlement).not.toHaveBeenCalled();
+      expect(prisma.conversation.create).not.toHaveBeenCalled();
+    });
+
+    it("does not return an existing conversation when the locked latest listing is unavailable", async () => {
+      (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
+        ...mockListing,
+        status: "ACTIVE",
+      });
+      setLockedListing({
+        ...mockListing,
+        status: "PAUSED",
+      });
+      (prisma.conversation.findFirst as jest.Mock).mockResolvedValue({
+        id: "existing-conv-123",
+      });
+
+      const result = await startConversation("listing-123");
+
+      expect(result).toEqual({
+        error: "This listing is not available for new messages right now.",
+        code: "LISTING_UNAVAILABLE",
+      });
+      expect(prisma.listing.findUnique).not.toHaveBeenCalled();
+      expect(prisma.conversation.findFirst).not.toHaveBeenCalled();
       expect(mockConsumeMessageStartEntitlement).not.toHaveBeenCalled();
       expect(prisma.conversation.create).not.toHaveBeenCalled();
     });
@@ -303,9 +430,8 @@ describe("Chat Actions", () => {
     });
 
     it("returns a neutral contact response when the host has blocked the viewer", async () => {
-      (checkBlockBeforeAction as jest.Mock).mockResolvedValueOnce({
-        allowed: false,
-        message: "This user has blocked you",
+      (prisma.blockedUser.findFirst as jest.Mock).mockResolvedValueOnce({
+        id: "block-123",
       });
 
       const result = await startConversation("listing-123");
@@ -314,7 +440,7 @@ describe("Chat Actions", () => {
         error: "This host is not accepting contact right now.",
         code: "HOST_NOT_ACCEPTING_CONTACT",
       });
-      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.$transaction).toHaveBeenCalled();
       expect(
         (prisma.$executeRaw as jest.Mock).mock.calls.some((call) =>
           String(call[0]).includes("contact_attempts")
@@ -323,9 +449,8 @@ describe("Chat Actions", () => {
     });
 
     it("returns a neutral contact response when the host is suspended", async () => {
-      (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
-        ...mockListing,
-        owner: {
+      setLockedUsers({
+        host: {
           isSuspended: true,
         },
       });
@@ -336,12 +461,47 @@ describe("Chat Actions", () => {
         error: "This host is not accepting contact right now.",
         code: "HOST_NOT_ACCEPTING_CONTACT",
       });
-      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.$transaction).toHaveBeenCalled();
       expect(mockConsumeMessageStartEntitlement).not.toHaveBeenCalled();
     });
 
+    it("returns a suspended error when the locked viewer row is suspended", async () => {
+      setLockedUsers({
+        viewer: {
+          isSuspended: true,
+        },
+      });
+
+      const result = await startConversation("listing-123");
+
+      expect(result).toEqual({
+        error: "Account suspended",
+        code: "ACCOUNT_SUSPENDED",
+      });
+      expect(mockConsumeMessageStartEntitlement).not.toHaveBeenCalled();
+      expect(prisma.conversation.findFirst).not.toHaveBeenCalled();
+      expect(prisma.conversation.create).not.toHaveBeenCalled();
+    });
+
+    it("returns an email verification error when the locked viewer row is unverified", async () => {
+      setLockedUsers({
+        viewer: {
+          emailVerified: null,
+        },
+      });
+
+      const result = await startConversation("listing-123");
+
+      expect(result).toEqual({
+        error: "Please verify your email to start a conversation",
+      });
+      expect(mockConsumeMessageStartEntitlement).not.toHaveBeenCalled();
+      expect(prisma.conversation.findFirst).not.toHaveBeenCalled();
+      expect(prisma.conversation.create).not.toHaveBeenCalled();
+    });
+
     it("rejects a stale observed unit epoch before consuming contact entitlement", async () => {
-      (prisma.physicalUnit.findUnique as jest.Mock).mockResolvedValueOnce({
+      setLockedPhysicalUnit({
         unitIdentityEpoch: 2,
         supersededByUnitId: null,
       });
@@ -358,6 +518,82 @@ describe("Chat Actions", () => {
       });
       expect(mockConsumeMessageStartEntitlement).not.toHaveBeenCalled();
       expect(prisma.conversation.create).not.toHaveBeenCalled();
+    });
+
+    it("rejects a missing locked unit before consuming contact entitlement", async () => {
+      setLockedPhysicalUnit(null);
+
+      const result = await startConversation({
+        listingId: "listing-123",
+        clientIdempotencyKey: "idem-missing-unit",
+        unitIdentityEpochObserved: 1,
+      });
+
+      expect(result).toEqual({
+        error: "Please refresh this listing before contacting the host.",
+        code: "UNIT_EPOCH_STALE",
+      });
+      expect(mockConsumeMessageStartEntitlement).not.toHaveBeenCalled();
+      expect(prisma.conversation.create).not.toHaveBeenCalled();
+    });
+
+    it("fails closed when the transaction-scoped block check throws", async () => {
+      (prisma.blockedUser.findFirst as jest.Mock).mockRejectedValueOnce(
+        new Error("block lookup failed")
+      );
+
+      const result = await startConversation("listing-123");
+
+      expect(result).toEqual({
+        error: "This host is not accepting contact right now.",
+        code: "HOST_NOT_ACCEPTING_CONTACT",
+      });
+      expect(mockConsumeMessageStartEntitlement).not.toHaveBeenCalled();
+      expect(prisma.conversation.findFirst).not.toHaveBeenCalled();
+      expect(prisma.conversation.create).not.toHaveBeenCalled();
+    });
+
+    it("locks listing, then advisory key, then users before conversation lookup", async () => {
+      (prisma.conversation.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.conversation.create as jest.Mock).mockResolvedValue({
+        id: "new-conv-123",
+      });
+
+      await startConversation("listing-123");
+
+      const queryRawMock = prisma.$queryRaw as jest.Mock;
+      const executeRawMock = prisma.$executeRaw as jest.Mock;
+      const listingLockCallIndex = queryRawMock.mock.calls.findIndex((call) =>
+        String(call[0]).includes('FROM "Listing"')
+      );
+      const userLockCallIndex = queryRawMock.mock.calls.findIndex((call) =>
+        String(call[0]).includes('FROM "User"')
+      );
+      const advisoryLockCallIndex = executeRawMock.mock.calls.findIndex((call) =>
+        String(call[0]).includes("pg_advisory_xact_lock")
+      );
+
+      expect(listingLockCallIndex).toBeGreaterThanOrEqual(0);
+      expect(userLockCallIndex).toBeGreaterThanOrEqual(0);
+      expect(advisoryLockCallIndex).toBeGreaterThanOrEqual(0);
+      expect(String(queryRawMock.mock.calls[listingLockCallIndex][0])).toContain(
+        "FOR UPDATE"
+      );
+      expect(String(queryRawMock.mock.calls[userLockCallIndex][0])).toContain(
+        'ORDER BY "id" ASC'
+      );
+      expect(String(queryRawMock.mock.calls[userLockCallIndex][0])).toContain(
+        "FOR UPDATE"
+      );
+      expect(
+        queryRawMock.mock.invocationCallOrder[listingLockCallIndex]
+      ).toBeLessThan(
+        executeRawMock.mock.invocationCallOrder[advisoryLockCallIndex]
+      );
+      expect(
+        executeRawMock.mock.invocationCallOrder[advisoryLockCallIndex]
+      ).toBeLessThan(queryRawMock.mock.invocationCallOrder[userLockCallIndex]);
+      expect(prisma.conversation.findFirst).toHaveBeenCalled();
     });
 
     it("blocks new conversation when paywall enforcement requires purchase", async () => {
@@ -569,6 +805,16 @@ describe("Chat Actions", () => {
       expect(result).toEqual([]);
     });
 
+    it("returns empty array for suspended users before loading conversations", async () => {
+      mockCurrentUserSuspended();
+
+      const result = await getConversations();
+
+      expect(result).toEqual([]);
+      expect(prisma.conversation.findMany).not.toHaveBeenCalled();
+      expect(prisma.message.groupBy).not.toHaveBeenCalled();
+    });
+
     it("getConversations returns all conversations without explicit limit (C1.5)", async () => {
       (prisma.conversation.findMany as jest.Mock).mockResolvedValue([]);
       (prisma.message.groupBy as jest.Mock).mockResolvedValue([]);
@@ -666,6 +912,20 @@ describe("Chat Actions", () => {
       });
     });
 
+    it("returns suspended error before loading a conversation", async () => {
+      const error = mockCurrentUserSuspended();
+
+      const result = await getMessages("conv-123");
+
+      expect(result).toEqual({
+        error,
+        code: "ACCOUNT_SUSPENDED",
+        messages: [],
+      });
+      expect(prisma.conversation.findUnique).not.toHaveBeenCalled();
+      expect(prisma.message.findMany).not.toHaveBeenCalled();
+    });
+
     it("returns error when user is not participant", async () => {
       (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
         id: "conv-123",
@@ -698,6 +958,15 @@ describe("Chat Actions", () => {
       const result = await getUnreadMessageCount();
 
       expect(result).toBe(0);
+    });
+
+    it("returns 0 for suspended users before counting unread messages", async () => {
+      mockCurrentUserSuspended();
+
+      const result = await getUnreadMessageCount();
+
+      expect(result).toBe(0);
+      expect(prisma.message.count).not.toHaveBeenCalled();
     });
 
     it("returns count of unread messages", async () => {
@@ -764,6 +1033,21 @@ describe("Chat Actions", () => {
       expect(prisma.message.updateMany).not.toHaveBeenCalled();
     });
 
+    it("returns an empty poll result for suspended users before reading messages", async () => {
+      mockCurrentUserSuspended();
+
+      const result = await pollMessages("conv-123");
+
+      expect(result).toEqual({
+        messages: [],
+        typingUsers: [],
+        hasNewMessages: false,
+      });
+      expect(prisma.conversation.findUnique).not.toHaveBeenCalled();
+      expect(prisma.typingStatus.findMany).not.toHaveBeenCalled();
+      expect(prisma.message.findMany).not.toHaveBeenCalled();
+    });
+
     it("returns new messages without side effects", async () => {
       const newMessages = [
         {
@@ -807,6 +1091,19 @@ describe("Chat Actions", () => {
       });
     });
 
+    it("returns suspended error before marking messages as read", async () => {
+      const error = mockCurrentUserSuspended();
+
+      const result = await markConversationMessagesAsRead("conv-123");
+
+      expect(result).toEqual({
+        error,
+        code: "ACCOUNT_SUSPENDED",
+      });
+      expect(prisma.conversation.findUnique).not.toHaveBeenCalled();
+      expect(prisma.message.updateMany).not.toHaveBeenCalled();
+    });
+
     it("returns error when user is not a participant", async () => {
       (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
         ...mockConversation,
@@ -840,6 +1137,21 @@ describe("Chat Actions", () => {
       const result = await markConversationMessagesAsRead("conv-123");
 
       expect(result).toEqual({ error: "Failed to mark messages as read" });
+    });
+  });
+
+  describe("markAllMessagesAsRead", () => {
+    it("returns suspended error before finding conversations", async () => {
+      const error = mockCurrentUserSuspended();
+
+      const result = await markAllMessagesAsRead();
+
+      expect(result).toEqual({
+        error,
+        code: "ACCOUNT_SUSPENDED",
+      });
+      expect(prisma.conversation.findMany).not.toHaveBeenCalled();
+      expect(prisma.message.updateMany).not.toHaveBeenCalled();
     });
   });
 });

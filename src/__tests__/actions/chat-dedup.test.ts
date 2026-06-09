@@ -42,6 +42,7 @@ type PrismaMock = {
   listing: { findUnique: jest.Mock };
   user: { findUnique: jest.Mock };
   physicalUnit: { findUnique: jest.Mock };
+  blockedUser: { findFirst: jest.Mock };
   conversation: {
     findFirst: jest.Mock;
     create: jest.Mock;
@@ -50,6 +51,7 @@ type PrismaMock = {
     deleteMany: jest.Mock;
   };
   $transaction: jest.Mock;
+  $queryRaw: jest.Mock;
   $executeRaw: jest.Mock;
 };
 
@@ -57,6 +59,10 @@ const conversationStore: ConversationRow[] = [];
 const perUserDeletions: Array<{ conversationId: string; userId: string }> = [];
 
 let listingRow: ListingMock = makeListingRow();
+let physicalUnitRow: {
+  unitIdentityEpoch: number;
+  supersededByUnitId: string | null;
+} | null = makePhysicalUnitRow();
 
 function makeListingRow(overrides: Partial<ListingMock> = {}): ListingMock {
   return {
@@ -73,6 +79,19 @@ function makeListingRow(overrides: Partial<ListingMock> = {}): ListingMock {
     availableUntil: null,
     minStayMonths: 1,
     lastConfirmedAt: null,
+    ...overrides,
+  };
+}
+
+function makePhysicalUnitRow(
+  overrides: Partial<{
+    unitIdentityEpoch: number;
+    supersededByUnitId: string | null;
+  }> = {}
+) {
+  return {
+    unitIdentityEpoch: 1,
+    supersededByUnitId: null,
     ...overrides,
   };
 }
@@ -147,6 +166,9 @@ jest.mock("@/lib/prisma", () => {
         supersededByUnitId: null,
       }),
     },
+    blockedUser: {
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
     conversation: {
       findFirst: findFirstMock,
       create: createMock,
@@ -155,6 +177,30 @@ jest.mock("@/lib/prisma", () => {
       deleteMany: deleteManyMock,
     },
     $transaction: jest.fn(),
+    $queryRaw: jest.fn(async (strings: TemplateStringsArray) => {
+      const sql = String(strings);
+      if (sql.includes('FROM "Listing"')) {
+        return listingRow ? [listingRow] : [];
+      }
+      if (sql.includes('FROM "User"')) {
+        return [
+          {
+            id: "host-1",
+            emailVerified: new Date("2026-04-01T00:00:00.000Z"),
+            isSuspended: false,
+          },
+          {
+            id: "user-1",
+            emailVerified: new Date("2026-04-01T00:00:00.000Z"),
+            isSuspended: false,
+          },
+        ].sort((a, b) => a.id.localeCompare(b.id));
+      }
+      if (sql.includes('FROM "physical_units"')) {
+        return physicalUnitRow ? [physicalUnitRow] : [];
+      }
+      return [];
+    }),
     $executeRaw: jest.fn().mockResolvedValue(undefined),
   };
 
@@ -173,10 +219,6 @@ jest.mock("@/lib/prisma", () => {
 
   return { prisma: mockPrisma };
 });
-
-jest.mock("@/app/actions/block", () => ({
-  checkBlockBeforeAction: jest.fn().mockResolvedValue({ allowed: true }),
-}));
 
 jest.mock("@/auth", () => ({
   auth: jest.fn(),
@@ -265,9 +307,11 @@ function resetState(): void {
   perUserDeletions.length = 0;
   logCalls.length = 0;
   seedListing();
+  physicalUnitRow = makePhysicalUnitRow();
   _resetCfmMessagingTelemetryForTests();
   mockedAuth.mockResolvedValue({ user: { id: "user-1" } });
   mockedCheckRateLimit.mockResolvedValue({ success: true });
+  mockedPrisma.blockedUser.findFirst.mockResolvedValue(null);
   mockConsumeMessageStartEntitlement.mockResolvedValue({
     ok: true,
     summary: {

@@ -18,6 +18,11 @@ jest.mock("@/lib/with-rate-limit", () => ({
   withRateLimit: jest.fn().mockResolvedValue(null),
 }));
 
+jest.mock("@/app/actions/suspension", () => ({
+  checkSuspension: jest.fn().mockResolvedValue({ suspended: false }),
+  checkEmailVerified: jest.fn().mockResolvedValue({ verified: true }),
+}));
+
 jest.mock("next/server", () => ({
   NextResponse: {
     json: (data: unknown, init?: { status?: number }) => ({
@@ -31,6 +36,7 @@ jest.mock("next/server", () => ({
 import { GET } from "@/app/api/messages/route";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { checkSuspension } from "@/app/actions/suspension";
 
 const createMockRequest = () =>
   new Request("http://localhost/api/messages?view=unreadCount");
@@ -38,6 +44,7 @@ const createMockRequest = () =>
 describe("GET /api/messages?view=unreadCount", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (checkSuspension as jest.Mock).mockResolvedValue({ suspended: false });
   });
 
   it("returns unread count for authenticated user", async () => {
@@ -84,6 +91,24 @@ describe("GET /api/messages?view=unreadCount", () => {
 
     expect(response.status).toBe(401);
     expect(data).toEqual({ error: "Unauthorized" });
+    expect(prisma.message.count).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 for suspended users before counting unread messages", async () => {
+    (auth as jest.Mock).mockResolvedValue({ user: { id: "user-123" } });
+    (checkSuspension as jest.Mock).mockResolvedValueOnce({
+      suspended: true,
+      error: "Account suspended",
+    });
+
+    const response = await GET(createMockRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(data).toEqual({
+      error: "Account suspended",
+      code: "ACCOUNT_SUSPENDED",
+    });
     expect(prisma.message.count).not.toHaveBeenCalled();
   });
 

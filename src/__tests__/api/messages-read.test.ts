@@ -27,9 +27,15 @@ jest.mock("@/lib/with-rate-limit", () => ({
   withRateLimit: jest.fn().mockResolvedValue(null),
 }));
 
+jest.mock("@/app/actions/suspension", () => ({
+  checkSuspension: jest.fn().mockResolvedValue({ suspended: false }),
+  checkEmailVerified: jest.fn().mockResolvedValue({ verified: true }),
+}));
+
 import { POST } from "@/app/api/messages/route";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { checkSuspension } from "@/app/actions/suspension";
 
 describe("POST /api/messages?action=markRead", () => {
   beforeEach(() => {
@@ -37,6 +43,7 @@ describe("POST /api/messages?action=markRead", () => {
     (auth as jest.Mock).mockResolvedValue({
       user: { id: "user-123" },
     });
+    (checkSuspension as jest.Mock).mockResolvedValue({ suspended: false });
   });
 
   it("returns 401 when unauthenticated", async () => {
@@ -67,6 +74,31 @@ describe("POST /api/messages?action=markRead", () => {
     await expect(response.json()).resolves.toEqual({
       error: "Invalid input",
     });
+  });
+
+  it("returns 403 for suspended users before reading or marking messages", async () => {
+    (checkSuspension as jest.Mock).mockResolvedValueOnce({
+      suspended: true,
+      error: "Account suspended",
+    });
+
+    const response = await POST(
+      new Request("http://localhost/api/messages", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "markRead",
+          conversationId: "conv-123",
+        }),
+      })
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "Account suspended",
+      code: "ACCOUNT_SUSPENDED",
+    });
+    expect(prisma.conversation.findUnique).not.toHaveBeenCalled();
+    expect(prisma.message.updateMany).not.toHaveBeenCalled();
   });
 
   it("returns 403 when the user cannot access the conversation", async () => {
