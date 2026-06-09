@@ -7,11 +7,11 @@ on:
     branches: [main]
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '22.x'
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   lint:
@@ -244,18 +244,169 @@ jobs:
           fi
           echo "CI gate passed"
 
-  # Staging deployment gate (P1-12 fix: requires manual approval)
+  # Release secrets are optional until the GitHub Actions release pipeline is
+  # activated. While they are unconfigured, deploy jobs SKIP (not fail) and
+  # Vercel git auto-deploy remains the release path. To activate the pipeline:
+  # configure the secrets below plus PRODUCTION_MIGRATION_DATABASE_URL, then
+  # disable git auto-deploy in vercel.json (see docs/DEPLOYMENT.md).
+  check-release-secrets:
+    name: Check release secrets
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+    steps:
+      - name: Detect Vercel release secrets
+        id: check
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          STAGING_MIGRATION_DATABASE_URL: ${{ secrets.STAGING_MIGRATION_DATABASE_URL }}
+        run: |
+          if [ -n "$VERCEL_TOKEN" ] && [ -n "$VERCEL_ORG_ID" ] && [ -n "$VERCEL_PROJECT_ID" ] && [ -n "$STAGING_MIGRATION_DATABASE_URL" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Vercel release secrets not configured; skipping GitHub Actions deploys (Vercel git auto-deploy remains the release path)"
+          fi
+
+  # Staging release gate: build artifact, migrate DB, then deploy.
   deploy-staging:
     name: Deploy to Staging
     runs-on: ubuntu-latest
-    needs: [build]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [ci, check-release-secrets]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.check-release-secrets.outputs.configured == 'true'
     environment:
       name: staging
       url: https://staging.roomshare.app
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
       - uses: actions/checkout@v6
-      - name: Deploy to staging
-        run: echo "Staging deployment triggered - Vercel handles actual deployment"
-      # Vercel automatically deploys on push to main
-      # This job serves as a gate requiring manual approval in the staging environment
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+      - name: Verify staging release secrets
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          STAGING_MIGRATION_DATABASE_URL: ${{ secrets.STAGING_MIGRATION_DATABASE_URL }}
+        run: |
+          missing=0
+          for name in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID STAGING_MIGRATION_DATABASE_URL; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::$name is required for staging deployment"
+              missing=1
+            fi
+          done
+          exit "$missing"
+      - name: Pull Vercel staging environment
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel pull --yes --environment=staging --token="$VERCEL_TOKEN"
+      - name: Build Vercel staging artifact
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel build --target=staging --token="$VERCEL_TOKEN"
+      - name: Verify main is still current before staging migration
+        run: |
+          git fetch origin main --depth=1
+          remote_sha="$(git rev-parse origin/main)"
+          if [ "$GITHUB_SHA" != "$remote_sha" ]; then
+            echo "::error::Refusing to migrate staging for stale SHA $GITHUB_SHA; origin/main is $remote_sha"
+            exit 1
+          fi
+      - name: Apply staging database migrations
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_MIGRATION_DATABASE_URL }}
+        run: pnpm exec prisma migrate deploy
+      - name: Verify main is still current before staging deploy
+        run: |
+          git fetch origin main --depth=1
+          remote_sha="$(git rev-parse origin/main)"
+          if [ "$GITHUB_SHA" != "$remote_sha" ]; then
+            echo "::error::Refusing to deploy staging for stale SHA $GITHUB_SHA; origin/main is $remote_sha"
+            exit 1
+          fi
+      - name: Deploy staging prebuilt artifact
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel deploy --prebuilt --target=staging --archive=tgz --token="$VERCEL_TOKEN"
+
+  # Production release gate: staging must succeed before production approval.
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [deploy-staging]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+      url: https://roomshare.app
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+      - name: Verify production release secrets
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          PRODUCTION_MIGRATION_DATABASE_URL: ${{ secrets.PRODUCTION_MIGRATION_DATABASE_URL }}
+        run: |
+          missing=0
+          for name in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID PRODUCTION_MIGRATION_DATABASE_URL; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::$name is required for production deployment"
+              missing=1
+            fi
+          done
+          exit "$missing"
+      - name: Pull Vercel production environment
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+      - name: Build Vercel production artifact
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel build --prod --token="$VERCEL_TOKEN"
+      - name: Verify main is still current before production migration
+        run: |
+          git fetch origin main --depth=1
+          remote_sha="$(git rev-parse origin/main)"
+          if [ "$GITHUB_SHA" != "$remote_sha" ]; then
+            echo "::error::Refusing to migrate production for stale SHA $GITHUB_SHA; origin/main is $remote_sha"
+            exit 1
+          fi
+      - name: Apply production database migrations
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_MIGRATION_DATABASE_URL }}
+        run: pnpm exec prisma migrate deploy
+      - name: Verify main is still current before production deploy
+        run: |
+          git fetch origin main --depth=1
+          remote_sha="$(git rev-parse origin/main)"
+          if [ "$GITHUB_SHA" != "$remote_sha" ]; then
+            echo "::error::Refusing to deploy production for stale SHA $GITHUB_SHA; origin/main is $remote_sha"
+            exit 1
+          fi
+      - name: Deploy production prebuilt artifact
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel deploy --prebuilt --prod --archive=tgz --token="$VERCEL_TOKEN"

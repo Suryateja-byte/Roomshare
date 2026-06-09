@@ -36,7 +36,7 @@ Production deployment guide for Roomshare. Covers environment setup, local devel
 
 ### Required Tools
 
-- **Node.js** 20+
+- **Node.js** 22.x
 - **pnpm** (package manager)
 - **Docker** and **Docker Compose** (for local database)
 - **Git**
@@ -274,17 +274,52 @@ The application runs at `http://localhost:3000`.
 
 ## Vercel Deployment
 
+### Deployment Ordering
+
+Staging and production deployments are controlled by `.github/workflows/ci.yml`
+so database migrations are applied before Vercel receives the deploy command.
+
+**Activation state:** the GitHub Actions release pipeline is dormant until the
+release secrets (see table below) are configured — the `check-release-secrets`
+job makes the deploy jobs skip while they are missing, and Vercel Git
+auto-deploy remains the release path. To activate the pipeline: configure all
+release secrets, then disable Git auto-deploys for `main` and `staging` in
+`vercel.json` by adding:
+
+```json
+"git": { "deploymentEnabled": { "main": false, "staging": false } }
+```
+
+Do both steps together — disabling auto-deploy without the secrets in place
+leaves the project with no working release path.
+
+Once activated, on pushes to `main` the ordered release flow is:
+
+1. CI build and migration-validation gates pass.
+2. The `staging` GitHub environment approval releases the staging job.
+3. GitHub Actions pulls Vercel staging settings, builds a staging artifact,
+   verifies the checkout is still current `origin/main`, runs
+   `prisma migrate deploy` with `STAGING_MIGRATION_DATABASE_URL`, then deploys
+   the prebuilt artifact with `vercel deploy --target=staging`.
+4. After staging succeeds, the `production` GitHub environment approval releases
+   the production job.
+5. GitHub Actions pulls Vercel production settings, builds a production
+   artifact, verifies the checkout is still current `origin/main`, runs
+   `prisma migrate deploy` with `PRODUCTION_MIGRATION_DATABASE_URL`, then
+   deploys the prebuilt artifact with `vercel deploy --prod`.
+
 ### Build Configuration
 
-The project uses standard Next.js build settings. No custom build commands are needed.
+The project uses standard Next.js build settings. GitHub Actions invokes the
+Vercel CLI for staging and production so release ordering stays explicit.
 
 | Setting | Value |
 |---------|-------|
 | Framework | Next.js |
-| Build Command | `next build` (default) |
+| Build Command | `pnpm build` (`next build --webpack`) |
 | Install Command | `pnpm install` (runs `prisma generate` via postinstall) |
 | Output Directory | `.next` (default) |
-| Node.js Version | 20.x |
+| Node.js Version | 22.x |
 
 ### next.config.ts Features
 
@@ -306,9 +341,28 @@ The project uses standard Next.js build settings. No custom build commands are n
 - `VERCEL_GIT_COMMIT_SHA` (used for release tracking in Sentry)
 - `VERCEL_URL` (deployment URL)
 
+### GitHub Release Secrets
+
+Set these as GitHub repository or environment secrets for the release workflow:
+
+| Secret | Used by | Description |
+|--------|---------|-------------|
+| `VERCEL_TOKEN` | Staging and production | Vercel token allowed to pull, build, and deploy the Roomshare project |
+| `VERCEL_ORG_ID` | Staging and production | Vercel team/user ID for the linked project |
+| `VERCEL_PROJECT_ID` | Staging and production | Vercel project ID for Roomshare |
+| `STAGING_MIGRATION_DATABASE_URL` | Staging | Direct, non-pooled PostgreSQL URL for staging migrations |
+| `PRODUCTION_MIGRATION_DATABASE_URL` | Production | Direct, non-pooled PostgreSQL URL for production migrations |
+
+Use direct database connections for migration secrets. Runtime `DATABASE_URL`
+may use a pooled connection, but Prisma migrations must not.
+
 ### vercel.json
 
-The `vercel.json` file configures three cron jobs (see [Cron Jobs](#cron-jobs)). No other configuration overrides are needed.
+The `vercel.json` file configures cron jobs (see [Cron Jobs](#cron-jobs)).
+When the GitHub Actions release pipeline is activated, it must also disable
+Vercel Git auto-deploys for release branches (see
+[Deployment Ordering](#deployment-ordering)) so CI can run migrations before
+deployment.
 
 ### Prisma Binary Targets
 
@@ -360,11 +414,11 @@ For Supabase, use the **Direct connection** string (not the pooled connection) f
 #### Running Migrations
 
 ```bash
-# Apply all pending migrations
-npx prisma migrate deploy
+# Local or emergency manual use only. CI runs this before staging/production deploys.
+DATABASE_URL="$DIRECT_DATABASE_URL" pnpm exec prisma migrate deploy
 
 # For development (creates migration files)
-npx prisma migrate dev
+pnpm exec prisma migrate dev
 ```
 
 The PostGIS extension is enabled via the Prisma schema:
@@ -443,15 +497,19 @@ curl https://your-domain.com/api/health/ready
 
 ### Migration Verification
 
-Ensure database migrations are applied:
+Normal releases apply migrations before deployment in GitHub Actions. To inspect
+an environment manually, use the direct migration URL and check status:
 
 ```bash
-npx prisma migrate deploy
+DATABASE_URL="$DIRECT_DATABASE_URL" pnpm exec prisma migrate status
 ```
 
 ### Full Checklist
 
 - [ ] `DATABASE_URL` points to production database with PostGIS
+- [ ] Release path is coherent: either Vercel Git auto-deploy is enabled (default,
+      release secrets unset), or the GitHub Actions pipeline is fully activated
+      (all release secrets set AND auto-deploy disabled in `vercel.json`)
 - [ ] `NEXTAUTH_SECRET` is a unique, generated secret (not a placeholder)
 - [ ] `CRON_SECRET` is configured and at least 32 characters
 - [ ] Google OAuth redirect URI includes production domain

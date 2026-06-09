@@ -120,3 +120,12 @@ memory-bank/activeContext.md
 .mcp.json
 .claude/settings.local.json
 .next-wsl-backup-*
+
+# Local dev-server artifacts and tool backups
+*.pid
+*.winpid
+.codex-server-*
+.codex.dir-backup-*/
+.codex.file-backup-*
+playwright/.cache/
+tmp/

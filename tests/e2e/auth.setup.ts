@@ -103,10 +103,7 @@ setup("authenticate", async ({ page }) => {
  * Creates a separate authenticated session for admin tests
  * Uses seed credentials from scripts/seed-e2e.js
  */
-// fixme: Admin route (/admin) does not exist in current build; admin login blocks on Turnstile
-// in the E2E environment. Pagination and other tests that need "setup" project do not require
-// admin auth — only the chromium-admin project uses playwright/.auth/admin.json.
-setup.fixme("authenticate as admin", async ({ page }) => {
+setup("authenticate as admin", async ({ page }) => {
   const adminAuthFile = path.join(
     __dirname,
     "../../playwright/.auth/admin.json"

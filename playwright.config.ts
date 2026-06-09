@@ -119,6 +119,14 @@ export default defineConfig({
     {
       name: "setup",
       testMatch: /.*\.setup\.ts/,
+      grepInvert: /authenticate as admin/,
+    },
+
+    /* Setup project for admin authentication */
+    {
+      name: "setup-admin",
+      testMatch: /.*\.setup\.ts/,
+      grep: /authenticate as admin/,
     },
 
     {
@@ -187,18 +195,18 @@ export default defineConfig({
       dependencies: ["setup"],
     },
 
-    /* Admin tests — requires admin authentication.
-       Currently disabled: admin auth setup is .fixme() due to Turnstile blocking.
-       Re-enable when admin login works in CI (CRON_SECRET + Turnstile bypass). */
-    // {
-    //   name: "chromium-admin",
-    //   testMatch: /\.admin\.spec\.ts/,
-    //   use: {
-    //     ...devices["Desktop Chrome"],
-    //     storageState: "playwright/.auth/admin.json",
-    //   },
-    //   dependencies: ["setup"],
-    // },
+    /* Admin tests — requires admin authentication. */
+    {
+      name: "chromium-admin",
+      testMatch: /\.admin\.spec\.ts/,
+      fullyParallel: false,
+      workers: 1,
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: "playwright/.auth/admin.json",
+      },
+      dependencies: ["setup-admin"],
+    },
 
     /* Anonymous user tests (no auth required) */
     {

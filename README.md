@@ -146,7 +146,7 @@ public/             # Static assets, map styles, service worker
 
 ### Prerequisites
 
-- **Node.js** 20+
+- **Node.js** 22.x
 - **pnpm** (package manager)
 - **PostgreSQL** with PostGIS extension
 - **Redis** (optional -- falls back to database rate limiting)

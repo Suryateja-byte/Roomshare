@@ -41,11 +41,21 @@ Implementation work uses a phase-gated workflow coordinated by
   `Critic` approval.
 - Escalate to `Replan` if a slice fails review twice, critique feedback
   conflicts across rounds, or the requested fix would change plan assumptions.
-- Use real subagents only when the user explicitly asks for delegation or
-  subagents. Otherwise run the same stages sequentially in-thread.
+- `Workflow Orchestrator` is the managing agent. It coordinates the workflow,
+  approves normal-risk plans, and must not act as `Planning agent`,
+  `Generating agent`, or `Critic`.
+- For every implementation task, `Workflow Orchestrator` must spawn separate
+  sub-agent instances for `Planning agent`, `Generating agent`, and `Critic`.
+  These required sub-agents must be spawned sequentially, one after another, and
+  must not be replaced by in-thread role switching.
+- `Critic` is review-only, must be separate from `Generating agent`, and may
+  review only after a concrete slice artifact exists.
 - Optional helper subagents may be used only for read-only research, tests, log
   analysis, security review, or other specialist review. Never run parallel
   writers.
+- If the current platform or tool constraints prevent spawning separate
+  required sub-agents, stop before implementation and report the workflow
+  blocker rather than falling back to in-thread role switching.
 - Follow the detailed procedure in
   [`.agents/workflows/implementation-triad.md`](.agents/workflows/implementation-triad.md)
   and the reusable skill in

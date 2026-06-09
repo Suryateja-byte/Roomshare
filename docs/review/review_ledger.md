@@ -9,8 +9,8 @@ confirmed issue.
 - Audit status: `AuthAuthorizationValidationAudited`
 - Release candidate status: `NotReady`
 - Open P0 count: `0`
-- Open P1 count: `0`
-- Last updated: `2026-05-31`
+- Open P1 count: `1`
+- Last updated: `2026-06-05`
 
 ## Finding Schema
 
@@ -386,6 +386,53 @@ Allowed statuses:
   production validation. Residual retry-recovered flakes are recorded as risk,
   not accepted-risk release exceptions.
 
+### P1-PRIVACY-003 - Sentry captured raw PII-bearing exceptions without central scrubbing
+
+- Severity: P1
+- Confidence: High
+- Status: Fixed on 2026-06-05
+- Evidence: The original server Sentry `beforeSend` filter returned reportable
+  events unchanged after noise filtering, and `src/lib/api-error-handler.ts`
+  passed the original thrown `error` to `Sentry.captureException`. That meant
+  PII in exception messages, stack strings, Sentry request data, breadcrumbs,
+  contexts, tags, or `extra` could bypass the structured logger redaction path.
+- Failure scenario: An API route catches an exception containing an email,
+  phone number, street address, SQL fragment, connection string, local path, or
+  auth/query token; the API response stays generic, but Sentry receives the raw
+  exception or event payload.
+- Impact: Sensitive user or infrastructure data could be retained in Sentry,
+  increasing privacy and incident-response blast radius.
+- Fix summary: Added a pure `src/lib/privacy-redaction.ts` module with shared
+  redaction, Sentry event scrubbing, and sanitized exception helpers. `logger.ts`
+  now re-exports the shared logger-compatible helpers. Server, edge, and client
+  Sentry `beforeSend` hooks scrub reportable events; server transaction events
+  are scrubbed after health-check filtering; server and edge explicitly set
+  `sendDefaultPii: false`. `captureApiError` now sends a sanitized exception or
+  value to Sentry while keeping the original logger behavior and generic API
+  response.
+- Files changed: `src/lib/privacy-redaction.ts`, `src/lib/logger.ts`,
+  `src/lib/api-error-handler.ts`, `sentry.server.config.ts`,
+  `sentry.edge.config.ts`, `sentry.client.config.ts`,
+  `src/__tests__/lib/privacy-redaction.test.ts`,
+  `src/__tests__/lib/api-error-handler.test.ts`, and
+  `docs/review/review_ledger.md`.
+- Tests added or updated: Added focused Sentry scrubber tests for exception
+  values, request URL/query, headers, breadcrumbs, tags, extra, contexts, user
+  fields, arrays, nested data, and max-depth handling. Updated API error-handler
+  tests to assert Sentry receives sanitized copies rather than raw exceptions.
+- Commands run: `pnpm test -- src/__tests__/lib/privacy-redaction.test.ts src/__tests__/lib/api-error-handler.test.ts src/__tests__/lib/logger.test.ts --runInBand`
+  passed with 3 suites and 57 tests; `pnpm run typecheck` passed;
+  `pnpm exec prettier --check sentry.server.config.ts sentry.edge.config.ts sentry.client.config.ts src/lib/privacy-redaction.ts src/lib/logger.ts src/lib/api-error-handler.ts src/__tests__/lib/privacy-redaction.test.ts src/__tests__/lib/api-error-handler.test.ts`
+  passed.
+- Remaining risk: No live Sentry project ingest test was run. Sentry
+  project-side data scrubbing should remain enabled as defense in depth, but the
+  app-level final `beforeSend` hook now scrubs the event before delivery.
+- Adversarial re-review: Pass. The fixed path avoids sending
+  `hint.originalException`, copies and sanitizes captured API errors without
+  mutating originals, keeps existing non-actionable filters, and has focused
+  tests proving obvious PII, SQL, paths, auth/query tokens, and user fields are
+  removed from Sentry-shaped payloads.
+
 ## Deduplication Log
 
 | Candidate ID | Duplicate of | Rationale | Decision |
@@ -410,3 +457,4 @@ Fix order is determined after Phase 2 deduplication:
 | P1-SUPPLY-001  | Codex Critic | Pass    | `pnpm install --frozen-lockfile`, `pnpm why @lhci/cli fast-uri next eslint-config-next`, and `pnpm audit --audit-level high` passed after removing `@lhci/cli`, upgrading Next packages, and overriding vulnerable `fast-uri` ranges. Recheck on 2026-05-30 still exited 0. | Triage remaining low/moderate advisories as non-blocking backlog.                                                                |
 | P1-E2E-001     | Codex Critic | Pass    | User approved the production-build E2E contract on 2026-05-30. `pnpm run test:e2e:ci` now builds, starts `next start`, waits for readiness, and passed with 1026 passed, 164 skipped, 4 retry-recovered flaky tests, and exit code 0 in 35.1 minutes.                  | Track the four retry-recovered flaky tests as reliability follow-up; continue remaining `NotStarted` matrix gates before any release claim. |
 | P1-VALIDATION-001 | Codex Critic | Pass | `pnpm run test -- src/__tests__/api/upload-integration.test.ts --runInBand` passed with 22 tests; targeted Auth/AuthZ/Validation Jest run passed with 22 suites and 449 tests; `pnpm run typecheck` passed after the test-only unreachable-branch cleanup. | Continue with the separate uploads/images matrix row for storage permission and URL exposure review. |
+| P1-PRIVACY-003 | Codex Critic | Pass | Focused privacy-redaction, api-error-handler, and logger tests passed with 57 tests; `pnpm run typecheck` passed; targeted Prettier check passed on the touched Sentry/privacy files. | Keep Sentry project-side data scrubbing enabled as defense in depth; no live Sentry ingest test was run. |
