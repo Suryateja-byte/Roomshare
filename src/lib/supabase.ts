@@ -49,6 +49,51 @@ export const supabase =
 // Track whether Supabase is available
 export const isSupabaseAvailable = !!supabase;
 
+export type RealtimeAuthResult =
+  | { ok: true; expiresIn: number | null }
+  | { ok: false; status?: number; error?: string };
+
+export async function authenticateRealtimeForConversation(
+  conversationId: string
+): Promise<RealtimeAuthResult> {
+  if (!supabase) return { ok: false };
+
+  try {
+    const params = new URLSearchParams({ conversationId });
+    const response = await fetch(
+      `/api/messages/realtime-token?${params.toString()}`,
+      {
+        method: "GET",
+        cache: "no-store",
+      }
+    );
+
+    if (!response.ok) {
+      return { ok: false, status: response.status };
+    }
+
+    const payload = await response.json();
+    const token = typeof payload?.token === "string" ? payload.token : "";
+    if (!token) {
+      return { ok: false, status: 500, error: "Missing realtime token" };
+    }
+
+    const expiresIn =
+      typeof payload?.expiresIn === "number" && payload.expiresIn > 0
+        ? payload.expiresIn
+        : null;
+
+    await supabase.realtime.setAuth(token);
+    return { ok: true, expiresIn };
+  } catch (error) {
+    logWarn("Supabase realtime auth failed", {
+      conversationId,
+      error: toErrorMessage(error),
+    });
+    return { ok: false };
+  }
+}
+
 // Helper to create a chat room channel with broadcast and presence
 export function createChatChannel(
   conversationId: string
@@ -56,6 +101,7 @@ export function createChatChannel(
   if (!supabase) return null;
   return supabase.channel(`chat:${conversationId}`, {
     config: {
+      private: true,
       broadcast: { self: false },
       presence: { key: conversationId },
     },

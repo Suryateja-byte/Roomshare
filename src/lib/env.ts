@@ -123,6 +123,10 @@ const serverEnvSchema = z
 
     // Supabase service key (server-side)
     SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
+    SUPABASE_JWT_SECRET: z
+      .string()
+      .min(32, "SUPABASE_JWT_SECRET must be at least 32 characters")
+      .optional(),
 
     // Radar API (server-side, for nearby places search)
     RADAR_SECRET_KEY: z.string().optional(),

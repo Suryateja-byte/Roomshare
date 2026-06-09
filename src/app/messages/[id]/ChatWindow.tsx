@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import {
   supabase,
+  authenticateRealtimeForConversation,
   createChatChannel,
   broadcastTyping,
   trackPresence,
@@ -420,9 +421,43 @@ export default function ChatWindow({
   // Set up real-time subscription with presence and typing
   useEffect(() => {
     let pollInterval: NodeJS.Timeout | null = null;
+    let authRefreshInterval: NodeJS.Timeout | null = null;
+    let isActive = true;
 
-    if (supabase) {
+    const setupRealtime = async () => {
+      if (!supabase) {
+        setTransportMode("polling");
+        return;
+      }
+
       setTransportMode("polling");
+      const authResult =
+        await authenticateRealtimeForConversation(conversationId);
+      if (!isActive) return;
+
+      if (!authResult.ok) {
+        if (authResult.status === 401) {
+          handleSessionExpired(inputRef.current?.value ?? "");
+        }
+        return;
+      }
+
+      // The realtime JWT is short-lived; renew it before expiry or RLS will
+      // silently stop delivering rows while the channel still looks healthy.
+      // If renewal fails, drop to polling so delivery keeps working.
+      const expiresInSeconds = authResult.expiresIn ?? 300;
+      const refreshAfterMs = Math.max(expiresInSeconds - 60, 30) * 1000;
+      authRefreshInterval = setInterval(() => {
+        void (async () => {
+          const refresh =
+            await authenticateRealtimeForConversation(conversationId);
+          if (!isActive) return;
+          if (!refresh.ok) {
+            setTransportMode("polling");
+          }
+        })();
+      }, refreshAfterMs);
+
       // Create channel with broadcast and presence
       const channel = createChatChannel(conversationId);
 
@@ -442,7 +477,7 @@ export default function ChatWindow({
             (payload) => {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase realtime payload type is untyped Record
               const newMessage = payload.new as any;
-              // SECURITY: No RLS on Message table — client-side guard prevents cross-conversation bleed
+              // Defense in depth: RLS scopes realtime rows, this guard drops malformed or stale payloads.
               if (
                 !newMessage.conversationId ||
                 newMessage.conversationId !== conversationId
@@ -531,9 +566,9 @@ export default function ChatWindow({
             }
           });
       }
-    } else {
-      setTransportMode("polling");
-    }
+    };
+
+    void setupRealtime();
 
     if (!isOffline) {
       void pollForMessages();
@@ -545,11 +580,16 @@ export default function ChatWindow({
     }
 
     return () => {
+      isActive = false;
       safeRemoveChannel(channelRef.current);
+      channelRef.current = null;
       pollAbortRef.current?.abort();
       pollAbortRef.current = null;
       if (pollInterval) {
         clearInterval(pollInterval);
+      }
+      if (authRefreshInterval) {
+        clearInterval(authRefreshInterval);
       }
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);

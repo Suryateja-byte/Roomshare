@@ -28,6 +28,10 @@ export default async function ChatPage({
     redirect("/login");
   }
 
+  if (session.user.isSuspended) {
+    redirect("/");
+  }
+
   const userId = session.user.id;
 
   // Fetch conversation and messages in parallel — messages only needs `id`, not conversation result

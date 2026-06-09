@@ -5,7 +5,10 @@ import { render, screen, waitFor, act, cleanup } from "@testing-library/react";
 const mockPush = jest.fn();
 const mockSendMessage = jest.fn();
 const mockCreateChatChannel = jest.fn();
+const mockAuthenticateRealtimeForConversation = jest.fn();
 const mockSafeRemoveChannel = jest.fn();
+const mockTrackPresence = jest.fn();
+let mockSupabaseClient: unknown = null;
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -58,10 +61,14 @@ jest.mock("@/hooks/useNetworkStatus", () => ({
 }));
 
 jest.mock("@/lib/supabase", () => ({
-  supabase: null,
+  get supabase() {
+    return mockSupabaseClient;
+  },
+  authenticateRealtimeForConversation: (...args: unknown[]) =>
+    mockAuthenticateRealtimeForConversation(...args),
   createChatChannel: (...args: unknown[]) => mockCreateChatChannel(...args),
   broadcastTyping: jest.fn(),
-  trackPresence: jest.fn(),
+  trackPresence: (...args: unknown[]) => mockTrackPresence(...args),
   safeRemoveChannel: (...args: unknown[]) => mockSafeRemoveChannel(...args),
 }));
 
@@ -211,6 +218,25 @@ function buildMessage(
   };
 }
 
+type MockRealtimeChannel = {
+  on: jest.Mock;
+  presenceState: jest.Mock;
+  subscribe: jest.Mock;
+};
+
+function createMockRealtimeChannel(): MockRealtimeChannel {
+  const channel = {} as MockRealtimeChannel;
+  channel.on = jest.fn(() => channel);
+  channel.presenceState = jest.fn(() => ({}));
+  channel.subscribe = jest.fn(
+    (callback: (status: "SUBSCRIBED") => Promise<void> | void) => {
+      void callback("SUBSCRIBED");
+      return channel;
+    }
+  );
+  return channel;
+}
+
 describe("Route ChatWindow", () => {
   const fetchMock = jest.fn();
 
@@ -226,6 +252,10 @@ describe("Route ChatWindow", () => {
     jest.useFakeTimers();
     fetchMock.mockReset();
     global.fetch = fetchMock as unknown as typeof fetch;
+    mockSupabaseClient = null;
+    mockAuthenticateRealtimeForConversation.mockResolvedValue({ ok: false });
+    mockCreateChatChannel.mockReturnValue(null);
+    mockTrackPresence.mockResolvedValue(undefined);
     sessionStorage.clear();
   });
 
@@ -271,6 +301,143 @@ describe("Route ChatWindow", () => {
       "Polling for updates"
     );
     expect(screen.queryByText("Connecting...")).not.toBeInTheDocument();
+    expect(mockAuthenticateRealtimeForConversation).not.toHaveBeenCalled();
+    expect(mockCreateChatChannel).not.toHaveBeenCalled();
+  });
+
+  it("authenticates realtime before creating a private chat channel", async () => {
+    mockSupabaseClient = { realtime: {} };
+    mockAuthenticateRealtimeForConversation.mockResolvedValue({ ok: true });
+    const channel = createMockRealtimeChannel();
+    mockCreateChatChannel.mockReturnValue(channel);
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes("/api/messages?")) {
+        return createJsonResponse({ messages: [], hasNewMessages: false });
+      }
+      return createJsonResponse({ success: true, count: 0 });
+    });
+
+    render(
+      <ChatWindow
+        canLeavePrivateFeedback={false}
+        initialMessages={[]}
+        conversationId="conv-123"
+        currentUserId="user-123"
+        currentUserName="Current User"
+        listingId="listing-1"
+        listingOwnerId="owner-1"
+        listingTitle="Listing One"
+        otherUserId="other-user"
+        otherUserName="Other User"
+        otherUserImage={null}
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockAuthenticateRealtimeForConversation).toHaveBeenCalledWith(
+        "conv-123"
+      );
+    });
+    await waitFor(() => {
+      expect(mockCreateChatChannel).toHaveBeenCalledWith("conv-123");
+    });
+
+    expect(
+      mockAuthenticateRealtimeForConversation.mock.invocationCallOrder[0]
+    ).toBeLessThan(mockCreateChatChannel.mock.invocationCallOrder[0]);
+    await waitFor(() => {
+      expect(mockTrackPresence).toHaveBeenCalledWith(
+        channel,
+        "user-123",
+        "Current User"
+      );
+    });
+  });
+
+  it("falls back to polling when realtime token auth fails", async () => {
+    mockSupabaseClient = { realtime: {} };
+    mockAuthenticateRealtimeForConversation.mockResolvedValue({
+      ok: false,
+      status: 503,
+    });
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes("/api/messages?")) {
+        return createJsonResponse({ messages: [], hasNewMessages: false });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    render(
+      <ChatWindow
+        canLeavePrivateFeedback={false}
+        initialMessages={[]}
+        conversationId="conv-123"
+        currentUserId="user-123"
+        currentUserName="Current User"
+        listingId="listing-1"
+        listingOwnerId="owner-1"
+        listingTitle="Listing One"
+        otherUserId="other-user"
+        otherUserName="Other User"
+        otherUserImage={null}
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockAuthenticateRealtimeForConversation).toHaveBeenCalledWith(
+        "conv-123"
+      );
+    });
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("/api/messages?conversationId=conv-123&poll=1"),
+        expect.objectContaining({ method: "GET" })
+      );
+    });
+
+    expect(mockCreateChatChannel).not.toHaveBeenCalled();
+    expect(screen.getByTestId("connection-status")).toHaveTextContent(
+      "Polling for updates"
+    );
+  });
+
+  it("redirects to login when realtime token auth reports an expired session", async () => {
+    mockSupabaseClient = { realtime: {} };
+    mockAuthenticateRealtimeForConversation.mockResolvedValue({
+      ok: false,
+      status: 401,
+    });
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes("/api/messages?")) {
+        return createJsonResponse({ messages: [], hasNewMessages: false });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    render(
+      <ChatWindow
+        canLeavePrivateFeedback={false}
+        initialMessages={[]}
+        conversationId="conv-123"
+        currentUserId="user-123"
+        currentUserName="Current User"
+        listingId="listing-1"
+        listingOwnerId="owner-1"
+        listingTitle="Listing One"
+        otherUserId="other-user"
+        otherUserName="Other User"
+        otherUserImage={null}
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith(
+        "/login?callbackUrl=/messages/conv-123"
+      );
+    });
     expect(mockCreateChatChannel).not.toHaveBeenCalled();
   });
 

@@ -18,6 +18,10 @@ export default async function MessagesPage() {
     redirect("/login?callbackUrl=%2Fmessages");
   }
 
+  if (session.user.isSuspended) {
+    redirect("/");
+  }
+
   const conversations = await getConversations();
 
   return (

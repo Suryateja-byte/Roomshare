@@ -253,6 +253,7 @@ export const RATE_LIMITS = {
   unreadCount: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute (frequent polling)
   messagesPoll: { limit: 180, windowMs: 60 * 1000 }, // 180 per minute (3s polling across multiple tabs)
   messageRead: { limit: 120, windowMs: 60 * 1000 }, // 120 per minute (visibility/read-receipt updates)
+  realtimeToken: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute (short-lived Supabase realtime JWTs)
   toggleFavorite: { limit: 60, windowMs: 60 * 60 * 1000 }, // 60 per hour
   createReport: { limit: 10, windowMs: 24 * 60 * 60 * 1000 }, // 10 per day
   uploadDelete: { limit: 20, windowMs: 60 * 60 * 1000 }, // 20 per hour
