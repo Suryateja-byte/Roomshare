@@ -7,6 +7,7 @@
 
 import * as requestContext from "./request-context";
 import { headers } from "next/headers";
+import { redactSensitive, sanitizeErrorMessage } from "./privacy-redaction";
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -35,115 +36,6 @@ const LOG_LEVELS: Record<LogLevel, number> = {
 // Minimum log level based on environment
 const MIN_LOG_LEVEL: LogLevel =
   process.env.NODE_ENV === "production" ? "info" : "debug";
-
-// Fields to redact from logs (case-insensitive matching)
-const REDACTED_FIELDS = new Set([
-  "password",
-  "token",
-  "secret",
-  "apikey",
-  "api_key",
-  "authorization",
-  "cookie",
-  "sessiontoken",
-  "accesstoken",
-  "refreshtoken",
-  "bearer",
-  "credential",
-  "private_key",
-  "privatekey",
-  "ssn",
-  "creditcard",
-  "credit_card",
-  "cardnumber",
-  "cvv",
-  "cvc",
-]);
-
-// Patterns to redact from string values
-// P1-14 FIX: Added phone number and address patterns for comprehensive PII redaction
-const REDACT_PATTERNS: Array<{ pattern: RegExp; replacement: string }> = [
-  // JWT tokens
-  {
-    pattern: /Bearer\s+[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+/gi,
-    replacement: "[REDACTED]",
-  },
-  // Email addresses
-  {
-    pattern: /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}/g,
-    replacement: "[REDACTED]",
-  },
-  // Phone numbers - international format with country code (+1-555-123-4567)
-  {
-    pattern: /\+\d{1,3}[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}/g,
-    replacement: "[REDACTED_PHONE]",
-  },
-  // Phone numbers - US format with parentheses (555) 123-4567
-  {
-    pattern: /\(\d{3}\)\s*\d{3}[-.\s]?\d{4}/g,
-    replacement: "[REDACTED_PHONE]",
-  },
-  // Phone numbers - US format with dashes or dots 555-123-4567 or 555.123.4567
-  {
-    pattern: /\b\d{3}[-.\s]\d{3}[-.\s]\d{4}\b/g,
-    replacement: "[REDACTED_PHONE]",
-  },
-  // Street addresses - matches "123 Main Street", "456 Oak Ave", etc.
-  // Pattern: number + street name + common suffix (with optional apartment/unit)
-  {
-    pattern:
-      /\b\d+\s+[A-Za-z]+(?:\s+[A-Za-z]+)*\s+(?:Street|St|Avenue|Ave|Boulevard|Blvd|Drive|Dr|Road|Rd|Lane|Ln|Court|Ct|Circle|Cir|Way|Place|Pl|Terrace|Ter|Trail|Trl|Parkway|Pkwy|Highway|Hwy|Alley|Aly)\.?(?:\s*,?\s*(?:Apt|Apartment|Suite|Ste|Unit|#|No\.?)\s*\w+)?\b/gi,
-    replacement: "[REDACTED_ADDRESS]",
-  },
-  // Bare IPv4:port (e.g. ECONNREFUSED 192.168.1.5:5432)
-  {
-    pattern: /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?::\d{1,5})?\b/g,
-    replacement: "[REDACTED_HOST]",
-  },
-  // DB auth failure messages (e.g. "password authentication failed for user \"dbuser\"")
-  {
-    pattern:
-      /password authentication failed(?:\s+for\s+user\s+[^\s,;)}\]]+)?/gi,
-    replacement: "[REDACTED_AUTH]",
-  },
-];
-
-/**
- * Redact sensitive information from log metadata
- */
-function redactSensitive(obj: unknown, depth = 0): unknown {
-  if (depth > 10) return "[MAX_DEPTH]";
-
-  if (obj === null || obj === undefined) return obj;
-
-  if (typeof obj === "string") {
-    let result = obj;
-    // P1-14 FIX: Use custom replacement strings for different PII types
-    for (const { pattern, replacement } of REDACT_PATTERNS) {
-      result = result.replace(pattern, replacement);
-    }
-    return result;
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map((item) => redactSensitive(item, depth + 1));
-  }
-
-  if (typeof obj === "object") {
-    const redacted: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(obj)) {
-      const lowerKey = key.toLowerCase();
-      if (REDACTED_FIELDS.has(lowerKey)) {
-        redacted[key] = "[REDACTED]";
-      } else {
-        redacted[key] = redactSensitive(value, depth + 1);
-      }
-    }
-    return redacted;
-  }
-
-  return obj;
-}
 
 function shouldLog(level: LogLevel): boolean {
   return LOG_LEVELS[level] >= LOG_LEVELS[MIN_LOG_LEVEL];
@@ -426,57 +318,6 @@ export const logger = {
 };
 
 /**
- * Sanitize error messages before logging or returning to clients.
- * Strips connection strings, file paths, SQL fragments, and PII.
- */
-export function sanitizeErrorMessage(error: unknown): string {
-  if (error === null || error === undefined) return "Unknown error";
-
-  let errorName = "Error";
-  let rawMessage = "Unknown error";
-
-  if (error instanceof Error) {
-    errorName = error.constructor.name || "Error";
-    rawMessage = error.message || "Unknown error";
-  } else if (typeof error === "string") {
-    rawMessage = error;
-  } else {
-    return "Unknown error";
-  }
-
-  // Truncate to 200 chars
-  let sanitized =
-    rawMessage.length > 200
-      ? rawMessage.slice(0, 200) + "...[truncated]"
-      : rawMessage;
-
-  // Strip connection strings
-  sanitized = sanitized.replace(
-    /(?:postgres|postgresql|mysql|mongodb|redis|amqp|https?):\/\/[^\s,;)}\]]+/gi,
-    "[REDACTED_URL]"
-  );
-
-  // Strip file system paths
-  sanitized = sanitized.replace(
-    /(?:\/(?:usr|home|var|tmp|etc|app|src|node_modules)\/[^\s,;)}\]]+)|(?:[A-Z]:\\[^\s,;)}\]]+)/gi,
-    "[REDACTED_PATH]"
-  );
-
-  // Strip SQL statements — redact from DML/DDL keyword to end of statement
-  sanitized = sanitized.replace(
-    /\b(?:SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TRUNCATE|GRANT|REVOKE)\b[^]*?(?=;|\s*$)/gi,
-    "[SQL_REDACTED]"
-  );
-
-  // Run through existing REDACT_PATTERNS for PII
-  for (const { pattern, replacement } of REDACT_PATTERNS) {
-    sanitized = sanitized.replace(pattern, replacement);
-  }
-
-  return errorName !== "Error" ? `${errorName}: ${sanitized}` : sanitized;
-}
-
-/**
  * Export redaction utility for use in other modules
  */
-export { redactSensitive };
+export { redactSensitive, sanitizeErrorMessage };

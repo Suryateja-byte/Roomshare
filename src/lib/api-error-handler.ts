@@ -1,5 +1,9 @@
 import * as Sentry from "@sentry/nextjs";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
+import {
+  redactSensitive,
+  sanitizeSentryException,
+} from "@/lib/privacy-redaction";
 import { NextResponse } from "next/server";
 import { getRequestId } from "@/lib/request-context";
 
@@ -12,23 +16,26 @@ export function captureApiError(
   context: { route: string; method: string; userId?: string }
 ): NextResponse {
   const message = sanitizeErrorMessage(error);
+  const requestId = getRequestId();
 
   logger.sync.error(`API error in ${context.route}`, {
     error: message,
     method: context.method,
     userId: context.userId,
-    requestId: getRequestId(),
+    requestId,
   });
 
-  Sentry.captureException(error, {
+  const sentryContext = redactSensitive({
     tags: {
       route: context.route,
       method: context.method,
     },
     extra: {
-      requestId: getRequestId(),
+      requestId,
     },
-  });
+  }) as Parameters<typeof Sentry.captureException>[1];
+
+  Sentry.captureException(sanitizeSentryException(error), sentryContext);
 
   return NextResponse.json({ error: "Internal server error" }, { status: 500 });
 }

@@ -97,14 +97,17 @@ describe("api-error-handler", () => {
       );
     });
 
-    it("sends the exception to Sentry with tags", () => {
+    it("sends a sanitized exception to Sentry with tags", () => {
       const error = new Error("sentry test");
       const context = { route: "/api/reviews", method: "DELETE" };
 
       captureApiError(error, context);
 
       expect(Sentry.captureException).toHaveBeenCalledWith(
-        error,
+        expect.objectContaining({
+          message: "sentry test",
+          name: "Error",
+        }),
         expect.objectContaining({
           tags: {
             route: "/api/reviews",
@@ -115,6 +118,37 @@ describe("api-error-handler", () => {
           },
         })
       );
+      const [capturedError] = (Sentry.captureException as jest.Mock).mock
+        .calls[0];
+      expect(capturedError).not.toBe(error);
+    });
+
+    it("redacts PII from the Sentry exception without mutating the original error", () => {
+      const error = new TypeError(
+        "Failed for jane@example.com at 123 Main Street: SELECT email FROM users WHERE id = 1"
+      );
+      error.stack =
+        "TypeError: jane@example.com\n    at handler (/home/surya/roomshare/src/app/api/route.ts:1:1)";
+      const context = { route: "/api/register", method: "POST" };
+
+      captureApiError(error, context);
+
+      const [capturedError] = (Sentry.captureException as jest.Mock).mock
+        .calls[0];
+      expect(capturedError).toBeInstanceOf(Error);
+      expect(capturedError).not.toBe(error);
+      expect(capturedError.name).toBe("TypeError");
+
+      const serialized = JSON.stringify({
+        message: capturedError.message,
+        stack: capturedError.stack,
+      });
+      expect(serialized).not.toContain("jane@example.com");
+      expect(serialized).not.toContain("123 Main Street");
+      expect(serialized).not.toContain("SELECT email");
+      expect(serialized).not.toContain("/home/surya");
+      expect(error.message).toContain("jane@example.com");
+      expect(error.stack).toContain("/home/surya");
     });
 
     it("handles Error objects -- extracts .message for logging", () => {
@@ -166,13 +200,13 @@ describe("api-error-handler", () => {
       );
     });
 
-    it("still sends non-Error values to Sentry", () => {
+    it("still sends sanitized non-Error values to Sentry", () => {
       const context = { route: "/api/test", method: "GET" };
 
-      captureApiError("raw string", context);
+      captureApiError("raw string for jane@example.com", context);
 
       expect(Sentry.captureException).toHaveBeenCalledWith(
-        "raw string",
+        "raw string for [REDACTED]",
         expect.any(Object)
       );
     });
@@ -209,7 +243,7 @@ describe("api-error-handler", () => {
 
       expect(getRequestId).toHaveBeenCalled();
       expect(Sentry.captureException).toHaveBeenCalledWith(
-        error,
+        expect.objectContaining({ message: "context test" }),
         expect.objectContaining({
           extra: { requestId: "test-req-id-123" },
         })

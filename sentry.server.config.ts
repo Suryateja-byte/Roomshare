@@ -4,6 +4,7 @@
  */
 
 import * as Sentry from "@sentry/nextjs";
+import { scrubSentryEvent } from "./src/lib/privacy-redaction";
 
 const SENTRY_DSN = process.env.SENTRY_DSN;
 const SENTRY_ENABLED =
@@ -24,6 +25,8 @@ if (SENTRY_DSN && SENTRY_ENABLED) {
     // Profiling for performance analysis
     profilesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 0,
 
+    sendDefaultPii: false,
+
     // Filter out known non-actionable errors
     beforeSend(event, hint) {
       const error = hint.originalException;
@@ -40,7 +43,7 @@ if (SENTRY_DSN && SENTRY_ENABLED) {
         }
       }
 
-      return event;
+      return scrubSentryEvent(event);
     },
 
     // Ignore specific transactions for performance monitoring
@@ -49,7 +52,7 @@ if (SENTRY_DSN && SENTRY_ENABLED) {
       if (event.transaction?.includes("/api/health")) {
         return null;
       }
-      return event;
+      return scrubSentryEvent(event);
     },
 
     // Server-specific integrations

@@ -4,6 +4,7 @@
  */
 
 import * as Sentry from "@sentry/nextjs";
+import { scrubSentryEvent } from "./src/lib/privacy-redaction";
 
 const SENTRY_DSN = process.env.NEXT_PUBLIC_SENTRY_DSN;
 
@@ -55,7 +56,7 @@ if (SENTRY_DSN && isSentryEnabled) {
         // They can indicate real API failures and should be reported to Sentry.
       }
 
-      return event;
+      return scrubSentryEvent(event);
     },
 
     // Don't send PII in production

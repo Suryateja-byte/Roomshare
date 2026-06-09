@@ -4,6 +4,7 @@
  */
 
 import * as Sentry from "@sentry/nextjs";
+import { scrubSentryEvent } from "./src/lib/privacy-redaction";
 
 const SENTRY_DSN = process.env.SENTRY_DSN;
 const SENTRY_ENABLED =
@@ -20,6 +21,8 @@ if (SENTRY_DSN && SENTRY_ENABLED) {
 
     // Performance monitoring - sample rate for edge functions
     tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
+
+    sendDefaultPii: false,
 
     // Explicit tags for filtering in Sentry dashboard
     initialScope: {
@@ -40,7 +43,7 @@ if (SENTRY_DSN && SENTRY_ENABLED) {
         }
       }
 
-      return event;
+      return scrubSentryEvent(event);
     },
   });
 }
