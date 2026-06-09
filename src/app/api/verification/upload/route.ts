@@ -13,13 +13,12 @@ import {
   isVerificationMimeType,
   validateVerificationMagicBytes,
   VERIFICATION_DOCUMENTS_BUCKET,
+  VERIFICATION_NEW_UPLOAD_MAX_BYTES,
   VERIFICATION_UPLOAD_TTL_MS,
   type VerificationUploadKind,
 } from "@/lib/verification/storage";
 
 export const runtime = "nodejs";
-
-const MAX_VERIFICATION_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 function parseKind(
   value: FormDataEntryValue | null
@@ -75,7 +74,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    if (file.size > MAX_VERIFICATION_UPLOAD_BYTES) {
+    if (file.size > VERIFICATION_NEW_UPLOAD_MAX_BYTES) {
       return NextResponse.json(
         { error: "File too large. Maximum size is 10MB" },
         { status: 400 }

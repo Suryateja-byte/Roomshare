@@ -23,6 +23,7 @@ import {
   syncListingLifecycleProjectionInTx,
   tombstoneCanonicalInventoryInTx,
 } from "@/lib/listings/canonical-lifecycle";
+import { deleteVerificationObjects } from "@/lib/verification/storage";
 
 export interface NotificationPreferences {
   emailBookingRequests: boolean;
@@ -41,6 +42,53 @@ const DEFAULT_PREFERENCES: NotificationPreferences = {
   emailSearchAlerts: true,
   emailMarketing: false,
 };
+
+type VerificationRequestDocumentPaths = {
+  documentPath: string | null;
+  selfiePath: string | null;
+};
+
+type VerificationUploadStoragePath = {
+  storagePath: string;
+};
+
+async function deleteAccountVerificationDocuments(
+  tx: Prisma.TransactionClient,
+  userId: string
+): Promise<void> {
+  const verificationRequests = await tx.$queryRaw<
+    VerificationRequestDocumentPaths[]
+  >`
+    SELECT "documentPath", "selfiePath"
+    FROM "VerificationRequest"
+    WHERE "userId" = ${userId}
+      AND ("documentPath" IS NOT NULL OR "selfiePath" IS NOT NULL)
+    FOR UPDATE
+  `;
+
+  const verificationUploads = await tx.$queryRaw<
+    VerificationUploadStoragePath[]
+  >`
+    SELECT "storagePath"
+    FROM "VerificationUpload"
+    WHERE "userId" = ${userId}
+    FOR UPDATE
+  `;
+
+  const storagePaths = Array.from(
+    new Set(
+      [
+        ...verificationRequests.flatMap((request) => [
+          request.documentPath,
+          request.selfiePath,
+        ]),
+        ...verificationUploads.map((upload) => upload.storagePath),
+      ].filter(Boolean)
+    )
+  ) as string[];
+
+  await deleteVerificationObjects(storagePaths);
+}
 
 export async function getNotificationPreferences(): Promise<NotificationPreferences> {
   const session = await auth();
@@ -357,6 +405,8 @@ export async function deleteAccount(
       const unreportedListingIds = ownedListings
         .filter((listing) => (reportCountByListingId.get(listing.id) ?? 0) === 0)
         .map((listing) => listing.id);
+
+      await deleteAccountVerificationDocuments(tx, session.user.id);
 
       for (const listing of reportedListings) {
         await tx.listing.update({

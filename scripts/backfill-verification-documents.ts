@@ -1,10 +1,13 @@
 import { PrismaClient, type Prisma } from "@prisma/client";
 import { createClient } from "@supabase/supabase-js";
+import {
+  VERIFICATION_DOCUMENTS_BUCKET,
+  VERIFICATION_LEGACY_BACKFILL_MAX_BYTES,
+  type VerificationLegacyBackfillMimeType,
+} from "../src/lib/verification/storage-contract";
 
 let prismaClient: PrismaClient | null = null;
-const PRIVATE_BUCKET = "verification-documents";
 const DEFAULT_BATCH_SIZE = 50;
-const MAX_LEGACY_BYTES = 20 * 1024 * 1024;
 const REVIEWED_DOCUMENT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 type BackfillArgs = {
@@ -31,7 +34,7 @@ type LegacyObject = {
   bucket: string;
   objectPath: string;
   extension: string;
-  mimeType: string;
+  mimeType: VerificationLegacyBackfillMimeType;
 };
 
 type SupabaseClient = ReturnType<typeof createSupabaseClient>;
@@ -64,7 +67,7 @@ type RunBackfillOptions = {
   now?: Date;
 };
 
-const EXTENSION_TO_MIME: Record<string, string> = {
+const EXTENSION_TO_MIME: Record<string, VerificationLegacyBackfillMimeType> = {
   jpg: "image/jpeg",
   jpeg: "image/jpeg",
   png: "image/png",
@@ -182,18 +185,18 @@ async function copyLegacyObject(params: {
   }
 
   const contentLength = Number(response.headers.get("content-length") || "0");
-  if (contentLength > MAX_LEGACY_BYTES) {
+  if (contentLength > VERIFICATION_LEGACY_BACKFILL_MAX_BYTES) {
     throw new Error("Legacy object is too large");
   }
 
   const buffer = Buffer.from(await response.arrayBuffer());
-  if (buffer.length > MAX_LEGACY_BYTES) {
+  if (buffer.length > VERIFICATION_LEGACY_BACKFILL_MAX_BYTES) {
     throw new Error("Legacy object is too large");
   }
 
   const storagePath = `${params.row.userId}/legacy/${params.row.id}/${params.kind}.${legacyObject.extension}`;
   const { error } = await params.supabase.storage
-    .from(PRIVATE_BUCKET)
+    .from(VERIFICATION_DOCUMENTS_BUCKET)
     .upload(storagePath, buffer, {
       contentType: legacyObject.mimeType,
       upsert: true,

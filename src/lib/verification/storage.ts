@@ -2,19 +2,29 @@ import "server-only";
 
 import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
+import {
+  VERIFICATION_DOCUMENTS_BUCKET,
+  VERIFICATION_NEW_UPLOAD_MIME_TYPES,
+} from "./storage-contract";
 
-export const VERIFICATION_DOCUMENTS_BUCKET = "verification-documents";
+export {
+  VERIFICATION_BUCKET_ALLOWED_MIME_TYPES,
+  VERIFICATION_BUCKET_MAX_BYTES,
+  VERIFICATION_DOCUMENTS_BUCKET,
+  VERIFICATION_LEGACY_BACKFILL_MAX_BYTES,
+  VERIFICATION_LEGACY_BACKFILL_MIME_TYPES,
+  VERIFICATION_NEW_UPLOAD_MAX_BYTES,
+  VERIFICATION_NEW_UPLOAD_MIME_TYPES,
+} from "./storage-contract";
+
 export const VERIFICATION_SIGNED_URL_TTL_SECONDS = 60;
 export const VERIFICATION_UPLOAD_TTL_MS = 60 * 60 * 1000;
 export const VERIFICATION_DOCUMENT_RETENTION_DAYS = 30;
 export const VERIFICATION_DOCUMENT_RETENTION_MS =
   VERIFICATION_DOCUMENT_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
-export const VERIFICATION_ALLOWED_MIME_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-] as const;
+export const VERIFICATION_ALLOWED_MIME_TYPES =
+  VERIFICATION_NEW_UPLOAD_MIME_TYPES;
 
 export type VerificationUploadKind = "document" | "selfie";
 export type VerificationMimeType =

@@ -91,6 +91,10 @@ jest.mock("@/lib/listings/canonical-lifecycle", () => ({
   }),
 }));
 
+jest.mock("@/lib/verification/storage", () => ({
+  deleteVerificationObjects: jest.fn().mockResolvedValue(0),
+}));
+
 import {
   getNotificationPreferences,
   updateNotificationPreferences,
@@ -108,6 +112,7 @@ import {
   syncListingLifecycleProjectionInTx,
   tombstoneCanonicalInventoryInTx,
 } from "@/lib/listings/canonical-lifecycle";
+import { deleteVerificationObjects } from "@/lib/verification/storage";
 
 describe("settings actions", () => {
   const mockSession = {
@@ -137,9 +142,11 @@ describe("settings actions", () => {
         callback(prisma)
     );
     (prisma.$queryRaw as jest.Mock)
+      .mockResolvedValue([])
       .mockResolvedValueOnce([{ id: "user-123" }])
       .mockResolvedValueOnce([]);
     (prisma.report.groupBy as jest.Mock).mockResolvedValue([]);
+    (deleteVerificationObjects as jest.Mock).mockResolvedValue(0);
 
     for (const delegate of [
       prisma.account,
@@ -491,6 +498,86 @@ describe("settings actions", () => {
       expect(result.error).toBe("Failed to delete account");
     });
 
+    it("deletes private verification objects before deleting verification rows", async () => {
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        email: "test@example.com",
+        password: null,
+      });
+      (prisma.$queryRaw as jest.Mock)
+        .mockReset()
+        .mockResolvedValue([])
+        .mockResolvedValueOnce([{ id: "user-123" }])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            documentPath: "user-123/document/doc.jpg",
+            selfiePath: "user-123/selfie/selfie.jpg",
+          },
+          {
+            documentPath: null,
+            selfiePath: "user-123/selfie/backup.jpg",
+          },
+        ])
+        .mockResolvedValueOnce([
+          { storagePath: "user-123/document/staged.jpg" },
+          { storagePath: "user-123/document/doc.jpg" },
+        ]);
+
+      const result = await deleteAccount();
+
+      expect(result).toEqual({ success: true });
+      expect(deleteVerificationObjects).toHaveBeenCalledWith([
+        "user-123/document/doc.jpg",
+        "user-123/selfie/selfie.jpg",
+        "user-123/selfie/backup.jpg",
+        "user-123/document/staged.jpg",
+      ]);
+      expect(
+        (deleteVerificationObjects as jest.Mock).mock.invocationCallOrder[0]
+      ).toBeLessThan(
+        (prisma.verificationUpload.deleteMany as jest.Mock).mock
+          .invocationCallOrder[0]
+      );
+      expect(
+        (deleteVerificationObjects as jest.Mock).mock.invocationCallOrder[0]
+      ).toBeLessThan(
+        (prisma.verificationRequest.deleteMany as jest.Mock).mock
+          .invocationCallOrder[0]
+      );
+    });
+
+    it("fails closed without deleting verification rows when verification object deletion fails", async () => {
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        email: "test@example.com",
+        password: null,
+      });
+      (prisma.$queryRaw as jest.Mock)
+        .mockReset()
+        .mockResolvedValue([])
+        .mockResolvedValueOnce([{ id: "user-123" }])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            documentPath: "user-123/document/doc.jpg",
+            selfiePath: null,
+          },
+        ])
+        .mockResolvedValueOnce([]);
+      (deleteVerificationObjects as jest.Mock).mockRejectedValueOnce(
+        new Error("storage unavailable")
+      );
+
+      const result = await deleteAccount();
+
+      expect(result).toEqual({
+        success: false,
+        error: "Failed to delete account",
+      });
+      expect(prisma.verificationUpload.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.verificationRequest.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
     it("suppresses reported owner listings and preserves report evidence", async () => {
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         email: "test@example.com",
@@ -498,6 +585,7 @@ describe("settings actions", () => {
       });
       (prisma.$queryRaw as jest.Mock)
         .mockReset()
+        .mockResolvedValue([])
         .mockResolvedValueOnce([{ id: "user-123" }])
         .mockResolvedValueOnce([
           { id: "reported-listing", version: 4 },
@@ -547,6 +635,7 @@ describe("settings actions", () => {
       });
       (prisma.$queryRaw as jest.Mock)
         .mockReset()
+        .mockResolvedValue([])
         .mockResolvedValueOnce([{ id: "user-123" }])
         .mockResolvedValueOnce([
           { id: "clean-listing-1", version: 1 },

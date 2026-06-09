@@ -2,6 +2,7 @@ jest.mock("@supabase/supabase-js", () => ({
   createClient: jest.fn(),
 }));
 
+import { VERIFICATION_DOCUMENTS_BUCKET } from "@/lib/verification/storage-contract";
 import {
   buildReviewedDocumentsExpireAt,
   parseLegacyPublicUrl,
@@ -153,7 +154,9 @@ describe("backfill verification documents", () => {
         failedObjects: 0,
       })
     );
-    expect(supabase.from).toHaveBeenCalledWith("verification-documents");
+    expect(supabase.from).toHaveBeenCalledWith(
+      VERIFICATION_DOCUMENTS_BUCKET
+    );
     expect(supabase.upload).toHaveBeenCalledWith(
       "user-1/legacy/request-1/document.jpg",
       expect.any(Buffer),
