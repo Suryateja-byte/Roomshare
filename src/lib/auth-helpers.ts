@@ -9,6 +9,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { prisma } from "@/lib/prisma";
 import { getPasswordRevocationState } from "@/lib/password-revocation";
+import {
+  isPrivatePagePath,
+  isProtectedApiPath,
+  isReadOnlyPublicApiPath,
+} from "@/lib/auth-route-policy";
 
 // Re-export from standalone module for backward compatibility (auth.ts imports from here)
 export { normalizeEmail } from "./normalize-email";
@@ -29,28 +34,6 @@ const PUBLIC_PATHS = [
 ];
 
 /**
- * Protected API paths that require suspension check.
- * Write operations on these paths are blocked for suspended users.
- */
-const PROTECTED_API_PATHS = [
-  "/api/listings",
-  "/api/bookings",
-  "/api/messages",
-  "/api/reviews",
-];
-
-/**
- * Protected page paths that require suspension check.
- */
-const PROTECTED_PAGE_PATHS = ["/admin", "/dashboard", "/listings/create"];
-
-/**
- * Read-only public API endpoints.
- * GET requests to these endpoints are allowed for suspended users.
- */
-const READ_ONLY_PUBLIC_ENDPOINTS = ["/api/listings"];
-
-/**
  * Check if a pathname is a public route that doesn't need suspension check.
  * Public routes are accessible to everyone, including suspended users.
  *
@@ -60,10 +43,7 @@ const READ_ONLY_PUBLIC_ENDPOINTS = ["/api/listings"];
 export function isPublicRoute(pathname: string): boolean {
   // Protected paths take precedence over public paths
   // e.g., /listings/create is protected even though /listings is public
-  const isProtected = PROTECTED_PAGE_PATHS.some((path) => {
-    return pathname === path || pathname.startsWith(`${path}/`);
-  });
-  if (isProtected) return false;
+  if (isPrivatePagePath(pathname)) return false;
 
   return PUBLIC_PATHS.some((path) => {
     // Exact match for root
@@ -83,26 +63,14 @@ export function isReadOnlyPublicEndpoint(
 ): boolean {
   if (method !== "GET") return false;
 
-  return READ_ONLY_PUBLIC_ENDPOINTS.some((path) => {
-    return pathname === path || pathname.startsWith(`${path}/`);
-  });
+  return isReadOnlyPublicApiPath(pathname);
 }
 
 /**
  * Check if a pathname is a protected route that needs suspension check.
  */
 function isProtectedRoute(pathname: string): boolean {
-  // Check protected API paths
-  const isProtectedApi = PROTECTED_API_PATHS.some((path) => {
-    return pathname === path || pathname.startsWith(`${path}/`);
-  });
-
-  // Check protected page paths
-  const isProtectedPage = PROTECTED_PAGE_PATHS.some((path) => {
-    return pathname === path || pathname.startsWith(`${path}/`);
-  });
-
-  return isProtectedApi || isProtectedPage;
+  return isProtectedApiPath(pathname) || isPrivatePagePath(pathname);
 }
 
 function buildSuspensionBlockedResponse(): NextResponse {

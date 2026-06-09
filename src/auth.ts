@@ -11,6 +11,7 @@ import {
   AUTH_ROUTES,
   normalizeEmail,
 } from "@/lib/auth-helpers";
+import { isPrivatePagePath } from "@/lib/auth-route-policy";
 import { getPasswordRevocationState } from "@/lib/password-revocation";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 import { checkRateLimit, getClientIP, RATE_LIMITS } from "@/lib/rate-limit";
@@ -218,18 +219,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const isAdmin = !!auth?.user?.isAdmin;
       const isSuspended = auth?.user?.isSuspended === true;
 
-      const protectedPaths = [
-        "/dashboard",
-        "/bookings",
-        "/messages",
-        "/settings",
-        "/profile",
-        "/notifications",
-        "/saved",
-        "/recently-viewed",
-        "/saved-searches",
-      ];
-      const isProtected = protectedPaths.some((p) => pathname.startsWith(p));
+      const isProtected = isPrivatePagePath(pathname);
       const isAdminRoute = pathname.startsWith("/admin");
       const isOnAuth =
         pathname.startsWith("/login") || pathname.startsWith("/signup");
@@ -241,8 +231,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return true;
       }
       if (isProtected) {
-        if (isLoggedIn) return true;
-        return false;
+        if (!isLoggedIn) return false;
+        if (isSuspended) return Response.redirect(new URL("/", nextUrl));
+        return true;
       }
       if (isLoggedIn && isOnAuth) {
         return Response.redirect(new URL("/", nextUrl));

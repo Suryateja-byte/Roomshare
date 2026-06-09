@@ -180,6 +180,7 @@ describe("authorized callback — route protection", () => {
       "/saved",
       "/recently-viewed",
       "/saved-searches",
+      "/listings/create",
     ] as const;
 
     for (const path of protectedPaths) {
@@ -189,6 +190,10 @@ describe("authorized callback — route protection", () => {
 
       it(`returns false for unauthenticated user on ${path}`, () => {
         expect(authorized(buildArgs(path, null))).toBe(false);
+      });
+
+      it(`redirects suspended user to / on ${path}`, () => {
+        expectRedirectToRoot(authorized, path, { isSuspended: true });
       });
     }
 
@@ -200,6 +205,9 @@ describe("authorized callback — route protection", () => {
     it("protects sub-paths like /messages/inbox", () => {
       expect(authorized(buildArgs("/messages/inbox", null))).toBe(false);
       expect(authorized(buildArgs("/messages/inbox", {}))).toBe(true);
+      expectRedirectToRoot(authorized, "/messages/inbox", {
+        isSuspended: true,
+      });
     });
 
     it("protects sub-paths like /settings/notifications", () => {

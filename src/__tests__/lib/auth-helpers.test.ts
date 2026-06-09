@@ -109,6 +109,8 @@ describe("isPublicRoute", () => {
 
   it("returns false for unknown paths", () => {
     expect(isPublicRoute("/admin")).toBe(false);
+    expect(isPublicRoute("/messages")).toBe(false);
+    expect(isPublicRoute("/messages/conv-123")).toBe(false);
     expect(isPublicRoute("/profile")).toBe(false);
     expect(isPublicRoute("/settings")).toBe(false);
   });
@@ -324,7 +326,20 @@ describe("checkSuspension", () => {
     }
   );
 
-  it.each(["/dashboard", "/listings/create"])(
+  it.each([
+    "/admin",
+    "/dashboard",
+    "/bookings",
+    "/messages",
+    "/messages/conv-123",
+    "/settings",
+    "/profile",
+    "/notifications",
+    "/saved",
+    "/recently-viewed",
+    "/saved-searches",
+    "/listings/create",
+  ])(
     "blocks access to protected page %s for suspended users",
     async (path) => {
       (getToken as jest.Mock).mockResolvedValue({

@@ -1,4 +1,5 @@
 import type { NextAuthConfig } from "next-auth";
+import { isPrivatePagePath } from "@/lib/auth-route-policy";
 
 export const authConfig = {
   pages: {
@@ -17,18 +18,7 @@ export const authConfig = {
       const isAdmin = !!auth?.user?.isAdmin;
       const isSuspended = auth?.user?.isSuspended === true;
 
-      const protectedPaths = [
-        "/dashboard",
-        "/bookings",
-        "/messages",
-        "/settings",
-        "/profile",
-        "/notifications",
-        "/saved",
-        "/recently-viewed",
-        "/saved-searches",
-      ];
-      const isProtected = protectedPaths.some((p) => pathname.startsWith(p));
+      const isProtected = isPrivatePagePath(pathname);
       const isAdminRoute = pathname.startsWith("/admin");
       const isOnAuth =
         pathname.startsWith("/login") || pathname.startsWith("/signup");
@@ -40,8 +30,9 @@ export const authConfig = {
         return true;
       }
       if (isProtected) {
-        if (isLoggedIn) return true;
-        return false;
+        if (!isLoggedIn) return false;
+        if (isSuspended) return Response.redirect(new URL("/", nextUrl));
+        return true;
       }
       if (isLoggedIn && isOnAuth) {
         return Response.redirect(new URL("/", nextUrl));
