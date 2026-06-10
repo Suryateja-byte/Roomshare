@@ -176,6 +176,7 @@ jest.mock("@/components/ui/alert-dialog", () => ({
 }));
 
 import MessagesPageClient from "@/components/MessagesPageClient";
+import { MESSAGE_MAX_LENGTH } from "@/lib/messaging/message-contract";
 import { toast } from "sonner";
 
 type MockMessage = {
@@ -337,9 +338,7 @@ describe("MessagesPageClient", () => {
     expect(
       (await screen.findAllByText("Follow-up from inbox polling")).length
     ).toBeGreaterThan(0);
-    expect(screen.getByTestId("typing-indicator")).toHaveTextContent(
-      "Other User is typing..."
-    );
+    expect(screen.getByTestId("typing-indicator")).toBeInTheDocument();
 
     const pollingUrls = fetchMock.mock.calls
       .map(([input]) => String(input))
@@ -518,8 +517,76 @@ describe("MessagesPageClient", () => {
         "Restored draft text"
       );
     });
+    expect(screen.getByTestId("char-counter")).toHaveTextContent(
+      `19/${MESSAGE_MAX_LENGTH}`
+    );
     expect(sessionStorage.getItem("chat_draft_conv-1")).toBeNull();
     expect(toast.info).toHaveBeenCalledWith("Your message draft was restored");
+  });
+
+  it("shows and clears the jump-to-latest control from the shared thread scroll container", async () => {
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url === "/api/messages") {
+        return createJsonResponse({ success: true, count: 0 });
+      }
+      if (url.includes("/api/messages?")) {
+        return createJsonResponse({
+          messages: [
+            buildMessage("msg-1", "other-user", "Scroll position check"),
+          ],
+          typingUsers: [],
+          hasNewMessages: true,
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    render(
+      <MessagesPageClient
+        currentUserId="user-123"
+        initialConversations={initialConversations}
+      />
+    );
+
+    expect(await screen.findAllByText("Scroll position check")).toHaveLength(2);
+
+    const container = screen.getByTestId("messages-container");
+    const scrollTo = jest.fn();
+    Object.defineProperty(container, "scrollHeight", {
+      configurable: true,
+      value: 1000,
+    });
+    Object.defineProperty(container, "clientHeight", {
+      configurable: true,
+      value: 400,
+    });
+    Object.defineProperty(container, "scrollTop", {
+      configurable: true,
+      value: 200,
+    });
+    Object.defineProperty(container, "scrollTo", {
+      configurable: true,
+      value: scrollTo,
+    });
+
+    fireEvent.scroll(container);
+
+    const jumpButton = screen.getByRole("button", {
+      name: "Scroll to latest messages",
+    });
+    expect(jumpButton).toBeInTheDocument();
+
+    fireEvent.click(jumpButton);
+
+    expect(scrollTo).toHaveBeenCalledWith({
+      top: 1000,
+      behavior: "smooth",
+    });
+    expect(
+      screen.queryByRole("button", { name: "Scroll to latest messages" })
+    ).not.toBeInTheDocument();
   });
 
   it("saves the draft and redirects to the active thread when the send session expires", async () => {

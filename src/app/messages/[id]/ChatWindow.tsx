@@ -15,18 +15,12 @@ import { blockUser, unblockUser } from "@/app/actions/block";
 import PrivateFeedbackDialog from "@/components/PrivateFeedbackDialog";
 import { useRouter } from "next/navigation";
 import {
-  Send,
-  Loader2,
-  Check,
-  CheckCheck,
   ArrowLeft,
   MessageSquare,
   MoreVertical,
   Ban,
   ShieldOff,
   WifiOff,
-  AlertCircle,
-  RotateCw,
 } from "lucide-react";
 import UserAvatar from "@/components/UserAvatar";
 import { useDebouncedCallback } from "use-debounce";
@@ -34,8 +28,10 @@ import { useBlockStatus } from "@/hooks/useBlockStatus";
 import { useRateLimitHandler } from "@/hooks/useRateLimitHandler";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import RateLimitCountdown from "@/components/RateLimitCountdown";
-import CharacterCounter from "@/components/CharacterCounter";
 import BlockedConversationBanner from "@/components/chat/BlockedConversationBanner";
+import { MessageThread } from "@/components/messages";
+import { mergeIncomingMessage } from "@/lib/message-merge";
+import { MESSAGE_MAX_LENGTH } from "@/lib/messaging/message-contract";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,12 +58,11 @@ type Message = {
   read?: boolean;
   failed?: boolean;
   sender?: {
+    id?: string;
     name: string | null;
     image: string | null;
-  };
+  } | null;
 };
-
-const MESSAGE_MAX_LENGTH = 500;
 
 interface ChatWindowProps {
   canLeavePrivateFeedback: boolean;
@@ -119,9 +114,9 @@ export default function ChatWindow({
     useState(false);
   const [isBlocking, setIsBlocking] = useState(false);
   const [isUnblocking, setIsUnblocking] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<Message[]>(initialMessages);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const inputValueRef = useRef("");
   const channelRef = useRef<RealtimeChannel | null>(null);
   const pollAbortRef = useRef<AbortController | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -210,14 +205,13 @@ export default function ChatWindow({
     }
   };
 
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, []);
-
   useEffect(() => {
     messagesRef.current = messages;
-    scrollToBottom();
-  }, [messages, scrollToBottom]);
+  }, [messages]);
+
+  useEffect(() => {
+    inputValueRef.current = input;
+  }, [input]);
 
   useEffect(() => {
     transportModeRef.current = transportMode;
@@ -320,10 +314,10 @@ export default function ChatWindow({
   }, 2000);
 
   // Handle input change with typing indicator
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInput(e.target.value);
+  const handleInputChange = (value: string) => {
+    setInput(value);
 
-    if (e.target.value && !isTyping) {
+    if (value && !isTyping) {
       setIsTyping(true);
       if (channelRef.current && transportMode === "realtime") {
         broadcastTyping(
@@ -362,7 +356,7 @@ export default function ChatWindow({
       });
 
       if (response.status === 401) {
-        handleSessionExpired(inputRef.current?.value ?? "");
+        handleSessionExpired(inputRef.current?.value ?? inputValueRef.current);
         return;
       }
 
@@ -376,20 +370,14 @@ export default function ChatWindow({
         : [];
       if (result.length > 0) {
         setMessages((prev) => {
-          const existingIds = new Set(prev.map((m) => m.id));
-          const newMessages = result.filter(
-            (msg: Message) => !existingIds.has(msg.id)
+          const merged = result.reduce(
+            (acc, message) =>
+              mergeIncomingMessage(acc, message, currentUserId),
+            prev
           );
-          if (newMessages.length === 0) return prev;
-          const combined = [...prev, ...newMessages];
-          const unique = combined.reduce((acc: Message[], curr) => {
-            if (!acc.some((m) => m.id === curr.id)) {
-              acc.push(curr);
-            }
-            return acc;
-          }, []);
+          if (merged === prev) return prev;
           lastMessageIdRef.current = result[result.length - 1]?.id || null;
-          return unique.sort(
+          return [...merged].sort(
             (a, b) =>
               new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
           );
@@ -437,7 +425,7 @@ export default function ChatWindow({
 
       if (!authResult.ok) {
         if (authResult.status === 401) {
-          handleSessionExpired(inputRef.current?.value ?? "");
+          handleSessionExpired(inputRef.current?.value ?? inputValueRef.current);
         }
         return;
       }
@@ -475,26 +463,34 @@ export default function ChatWindow({
               filter: `conversationId=eq.${conversationId}`,
             },
             (payload) => {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase realtime payload type is untyped Record
-              const newMessage = payload.new as any;
+              const newMessage = payload.new as Partial<Message> & {
+                conversationId?: string;
+                createdAt: string | Date;
+              };
               // Defense in depth: RLS scopes realtime rows, this guard drops malformed or stale payloads.
               if (
                 !newMessage.conversationId ||
                 newMessage.conversationId !== conversationId
               )
                 return;
-              newMessage.createdAt = new Date(newMessage.createdAt);
-              lastMessageIdRef.current = newMessage.id;
+              const incomingMessage = {
+                ...newMessage,
+                createdAt: new Date(newMessage.createdAt),
+              } as Message;
+              lastMessageIdRef.current = incomingMessage.id;
 
               setMessages((prev) => {
-                if (prev.some((m) => m.id === newMessage.id)) return prev;
-                return [...prev, newMessage];
+                return mergeIncomingMessage(
+                  prev,
+                  incomingMessage,
+                  currentUserId
+                );
               });
 
               // Clear typing indicator when message received
-              if (newMessage.senderId !== currentUserId) {
+              if (incomingMessage.senderId !== currentUserId) {
                 setOtherUserTyping(false);
-                void markConversationRead(newMessage.id);
+                void markConversationRead(incomingMessage.id);
               }
             }
           )
@@ -599,6 +595,7 @@ export default function ChatWindow({
     conversationId,
     currentUserId,
     currentUserName,
+    handleSessionExpired,
     isOffline,
     markConversationRead,
     pollForMessages,
@@ -618,9 +615,7 @@ export default function ChatWindow({
       document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [markConversationRead]);
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const handleSend = async () => {
     // Block sending when offline
     if (isOffline) {
       toast.error("You are offline. Please check your connection.");
@@ -680,11 +675,10 @@ export default function ChatWindow({
         return;
       }
 
-      // Replace optimistic message with real one
       setMessages((prev) =>
-        prev.map((m) =>
-          m.id === optimisticId ? { ...result, sender: m.sender } : m
-        )
+        mergeIncomingMessage(prev, result as Message, currentUserId, {
+          optimisticMessageId: optimisticId,
+        })
       );
       lastMessageIdRef.current = result.id;
     } catch (_error) {
@@ -736,11 +730,10 @@ export default function ChatWindow({
         return;
       }
 
-      // Success - replace with real message
       setMessages((prev) =>
-        prev.map((m) =>
-          m.id === failedId ? { ...result, sender: m.sender } : m
-        )
+        mergeIncomingMessage(prev, result as Message, currentUserId, {
+          optimisticMessageId: failedId,
+        })
       );
       lastMessageIdRef.current = result.id;
       toast.success("Message sent");
@@ -760,40 +753,25 @@ export default function ChatWindow({
     setMessages((prev) => prev.filter((m) => m.id !== messageId));
   };
 
-  // Group messages by date
-  const groupedMessages = messages.reduce(
-    (groups: { [key: string]: Message[] }, msg) => {
-      const date = new Date(msg.createdAt).toLocaleDateString("en-US", {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      });
-      if (!groups[date]) {
-        groups[date] = [];
-      }
-      groups[date].push(msg);
-      return groups;
-    },
-    {}
-  );
-
-  // Get status text
+  // Peer-status line under the name; empty string renders nothing.
   const getStatusText = () => {
     if (otherUserTyping) {
       return "typing...";
     }
     if (isOffline) {
-      return "Offline";
+      return "You're offline";
     }
     if (transportMode === "realtime" && isOnline) {
       return "Online";
     }
-    if (transportMode === "realtime") {
-      return "Offline";
-    }
-    return "Polling for updates";
+    return "";
   };
+
+  const statusText = isBlocked
+    ? blockStatus === "blocker"
+      ? "Blocked"
+      : "You are blocked"
+    : getStatusText();
 
   return (
     <div
@@ -833,22 +811,18 @@ export default function ChatWindow({
           >
             {otherUserName || "Chat"}
           </h3>
-          <p
-            data-testid="connection-status"
-            className={`text-xs ${
-              isBlocked
-                ? "text-on-surface-variant"
-                : otherUserTyping
+          {statusText ? (
+            <p
+              data-testid="connection-status"
+              className={`text-xs ${
+                !isBlocked && otherUserTyping
                   ? "text-green-600 font-medium"
                   : "text-on-surface-variant"
-            }`}
-          >
-            {isBlocked
-              ? blockStatus === "blocker"
-                ? "Blocked"
-                : "You are blocked"
-              : getStatusText()}
-          </p>
+              }`}
+            >
+              {statusText}
+            </p>
+          ) : null}
         </div>
 
         {/* Block/Unblock Menu */}
@@ -928,208 +902,63 @@ export default function ChatWindow({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Messages */}
-      <div
-        data-testid="messages-container"
-        className="flex-1 overflow-y-auto px-6 pt-4 pb-6"
-      >
-        {Object.entries(groupedMessages).map(([date, msgs]) => (
-          <div key={date}>
-            {/* Date separator */}
-            <div className="flex items-center justify-center my-4">
-              <div className="px-3 py-1 bg-surface-container-high rounded-full text-xs text-on-surface-variant">
-                {date}
-              </div>
-            </div>
-
-            {/* Messages for this date */}
-            <div className="space-y-3">
-              {msgs.map((msg, index) => {
-                const isMe = msg.senderId === currentUserId;
-                const showAvatar =
-                  !isMe &&
-                  (index === 0 || msgs[index - 1]?.senderId !== msg.senderId);
-                const isOptimistic = msg.id.startsWith("opt-");
-
-                return (
-                  <div
-                    key={msg.id}
-                    className={`flex items-end gap-2 ${isMe ? "justify-end" : "justify-start"}`}
-                  >
-                    {!isMe && showAvatar ? (
-                      <UserAvatar
-                        image={msg.sender?.image || otherUserImage}
-                        name={msg.sender?.name || otherUserName}
-                        className="w-8 h-8"
-                      />
-                    ) : !isMe ? (
-                      <div className="w-8" />
-                    ) : null}
-
-                    <div
-                      data-testid={
-                        msg.failed ? "failed-message" : "message-bubble"
-                      }
-                      className={`max-w-[70%] rounded-2xl px-4 py-2.5 ${
-                        isMe
-                          ? msg.failed
-                            ? "bg-red-900/80 text-white rounded-br-md border-2 border-red-500"
-                            : "bg-primary text-on-primary rounded-br-md"
-                          : "bg-surface-container-high text-on-surface rounded-bl-md"
-                      } ${isOptimistic && !msg.failed ? "opacity-70" : ""}`}
-                    >
-                      <p className="text-sm leading-relaxed">{msg.content}</p>
-                      <div
-                        className={`flex items-center gap-1 mt-1 ${isMe ? "justify-end" : ""}`}
-                      >
-                        <span
-                          className={`text-xs ${isMe ? (msg.failed ? "text-red-300" : "text-on-surface-variant/60") : "text-on-surface-variant/60"}`}
-                        >
-                          {new Date(msg.createdAt).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
+      <MessageThread
+        messages={messages}
+        currentUserId={currentUserId}
+        otherUserName={otherUserName}
+        otherUserImage={otherUserImage}
+        otherUserTyping={otherUserTyping}
+        autoAnchor
+        onRetryMessage={handleRetry}
+        onDeleteFailedMessage={handleDeleteFailed}
+        retryFailedDisabled={isSending || isOffline}
+        retryTestId="retry-button"
+        footer={
+          isBlocked ? (
+            <BlockedConversationBanner
+              blockStatus={blockStatus}
+              otherUserName={otherUserName}
+              onUnblock={blockStatus === "blocker" ? handleUnblock : undefined}
+              isUnblocking={isUnblocking}
+            />
+          ) : undefined
+        }
+        composer={
+          isBlocked
+            ? undefined
+            : {
+                value: input,
+                onChange: handleInputChange,
+                onSubmit: handleSend,
+                inputRef,
+                submitDisabled: isRateLimited || isOffline,
+                isSending,
+                isOffline,
+                maxLength: MESSAGE_MAX_LENGTH,
+                inputTestId: "message-input",
+                submitTestId: "send-button",
+                counterTestId: "char-counter",
+                before: (
+                  <>
+                    {isOffline && (
+                      <div className="flex items-center gap-2 rounded-lg bg-surface-container-high p-2 text-sm text-on-surface-variant">
+                        <WifiOff className="h-4 w-4 flex-shrink-0" />
+                        <span>
+                          You&apos;re offline. Reconnect to send messages.
                         </span>
-                        {isMe && (
-                          <span
-                            className={
-                              msg.failed
-                                ? "text-red-400"
-                                : "text-on-surface-variant/60"
-                            }
-                          >
-                            {msg.failed ? (
-                              <AlertCircle className="w-3 h-3" />
-                            ) : isOptimistic ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : msg.read ? (
-                              <CheckCheck className="w-3 h-3 text-blue-400" />
-                            ) : (
-                              <Check className="w-3 h-3" />
-                            )}
-                          </span>
-                        )}
                       </div>
-                      {/* Failed message actions */}
-                      {msg.failed && (
-                        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-red-400/30">
-                          <button
-                            data-testid="retry-button"
-                            onClick={() => handleRetry(msg)}
-                            disabled={isSending || isOffline}
-                            className="flex items-center gap-1 text-xs text-white hover:text-red-200 disabled:opacity-60 transition-colors"
-                          >
-                            <RotateCw className="w-3 h-3" />
-                            Retry
-                          </button>
-                          <span className="text-red-400/50">|</span>
-                          <button
-                            onClick={() => handleDeleteFailed(msg.id)}
-                            className="text-xs text-white hover:text-red-200 transition-colors"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-
-        {/* Typing indicator */}
-        {otherUserTyping && (
-          <div
-            data-testid="typing-indicator"
-            className="flex items-center gap-2 mt-3"
-          >
-            <UserAvatar
-              image={otherUserImage}
-              name={otherUserName}
-              className="w-8 h-8"
-            />
-            <div className="bg-surface-container-high rounded-2xl rounded-bl-md px-4 py-3">
-              <div className="flex gap-1">
-                <span
-                  className="w-2 h-2 bg-on-surface-variant rounded-full animate-bounce"
-                  style={{ animationDelay: "0ms" }}
-                />
-                <span
-                  className="w-2 h-2 bg-on-surface-variant rounded-full animate-bounce"
-                  style={{ animationDelay: "150ms" }}
-                />
-                <span
-                  className="w-2 h-2 bg-on-surface-variant rounded-full animate-bounce"
-                  style={{ animationDelay: "300ms" }}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input or Blocked Banner */}
-      {isBlocked ? (
-        <BlockedConversationBanner
-          blockStatus={blockStatus}
-          otherUserName={otherUserName}
-          onUnblock={blockStatus === "blocker" ? handleUnblock : undefined}
-          isUnblocking={isUnblocking}
-        />
-      ) : (
-        <div className="px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] bg-surface-container-lowest space-y-2">
-          {/* Offline banner */}
-          {isOffline && (
-            <div className="flex items-center gap-2 p-2 rounded-lg bg-surface-container-high text-sm text-on-surface-variant">
-              <WifiOff className="w-4 h-4 flex-shrink-0" />
-              <span>You&apos;re offline. Reconnect to send messages.</span>
-            </div>
-          )}
-          {/* Rate limit countdown */}
-          {isRateLimited && (
-            <RateLimitCountdown
-              retryAfterSeconds={retryAfter}
-              onRetryReady={resetRateLimit}
-            />
-          )}
-          <form onSubmit={handleSend} className="flex items-center gap-3">
-            <input
-              ref={inputRef}
-              type="text"
-              data-testid="message-input"
-              value={input}
-              onChange={handleInputChange}
-              placeholder={
-                isOffline ? "You're offline..." : "Type a message..."
+                    )}
+                    {isRateLimited && (
+                      <RateLimitCountdown
+                        retryAfterSeconds={retryAfter}
+                        onRetryReady={resetRateLimit}
+                      />
+                    )}
+                  </>
+                ),
               }
-              maxLength={MESSAGE_MAX_LENGTH}
-              className="flex-1 bg-surface-container-high border-0 rounded-full px-5 py-3 text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 transition-all"
-              disabled={isSending}
-            />
-            <button
-              type="submit"
-              data-testid="send-button"
-              disabled={
-                !input.trim() || isSending || isRateLimited || isOffline
-              }
-              className="w-11 h-11 bg-primary text-on-primary rounded-full flex items-center justify-center hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed transition-all active:scale-95"
-            >
-              {isSending ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <Send className="w-5 h-5" />
-              )}
-            </button>
-          </form>
-          {input.length > 0 && (
-            <CharacterCounter current={input.length} max={MESSAGE_MAX_LENGTH} />
-          )}
-        </div>
-      )}
+        }
+      />
     </div>
   );
 }

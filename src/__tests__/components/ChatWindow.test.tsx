@@ -1,6 +1,13 @@
 import type { ReactNode } from "react";
 import "@testing-library/jest-dom";
-import { render, screen, waitFor, act, cleanup } from "@testing-library/react";
+import {
+  render,
+  screen,
+  waitFor,
+  act,
+  cleanup,
+  fireEvent,
+} from "@testing-library/react";
 
 const mockPush = jest.fn();
 const mockSendMessage = jest.fn();
@@ -222,11 +229,20 @@ type MockRealtimeChannel = {
   on: jest.Mock;
   presenceState: jest.Mock;
   subscribe: jest.Mock;
+  emitPostgresInsert: (payload: { new: Record<string, unknown> }) => void;
 };
 
 function createMockRealtimeChannel(): MockRealtimeChannel {
   const channel = {} as MockRealtimeChannel;
-  channel.on = jest.fn(() => channel);
+  let postgresInsertHandler:
+    | ((payload: { new: Record<string, unknown> }) => void)
+    | null = null;
+  channel.on = jest.fn((event: string, _filter, callback) => {
+    if (event === "postgres_changes") {
+      postgresInsertHandler = callback;
+    }
+    return channel;
+  });
   channel.presenceState = jest.fn(() => ({}));
   channel.subscribe = jest.fn(
     (callback: (status: "SUBSCRIBED") => Promise<void> | void) => {
@@ -234,6 +250,12 @@ function createMockRealtimeChannel(): MockRealtimeChannel {
       return channel;
     }
   );
+  channel.emitPostgresInsert = (payload) => {
+    if (!postgresInsertHandler) {
+      throw new Error("postgres_changes handler was not registered");
+    }
+    postgresInsertHandler(payload);
+  };
   return channel;
 }
 
@@ -297,9 +319,7 @@ describe("Route ChatWindow", () => {
       );
     });
 
-    expect(screen.getByTestId("connection-status")).toHaveTextContent(
-      "Polling for updates"
-    );
+    expect(screen.queryByTestId("connection-status")).not.toBeInTheDocument();
     expect(screen.queryByText("Connecting...")).not.toBeInTheDocument();
     expect(mockAuthenticateRealtimeForConversation).not.toHaveBeenCalled();
     expect(mockCreateChatChannel).not.toHaveBeenCalled();
@@ -355,6 +375,86 @@ describe("Route ChatWindow", () => {
     });
   });
 
+  it("replaces own optimistic message when realtime echo arrives before send resolves", async () => {
+    mockSupabaseClient = { realtime: {} };
+    mockAuthenticateRealtimeForConversation.mockResolvedValue({ ok: true });
+    const channel = createMockRealtimeChannel();
+    mockCreateChatChannel.mockReturnValue(channel);
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes("/api/messages?")) {
+        return createJsonResponse({ messages: [], hasNewMessages: false });
+      }
+      return createJsonResponse({ success: true, count: 0 });
+    });
+
+    let resolveSend:
+      | ((message: MockMessage & { read: boolean }) => void)
+      | undefined;
+    mockSendMessage.mockReturnValue(
+      new Promise((resolve) => {
+        resolveSend = resolve;
+      })
+    );
+
+    render(
+      <ChatWindow
+        canLeavePrivateFeedback={false}
+        initialMessages={[]}
+        conversationId="conv-123"
+        currentUserId="user-123"
+        currentUserName="Current User"
+        listingId="listing-1"
+        listingOwnerId="owner-1"
+        listingTitle="Listing One"
+        otherUserId="other-user"
+        otherUserName="Other User"
+        otherUserImage={null}
+      />
+    );
+
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(mockCreateChatChannel).toHaveBeenCalledWith("conv-123");
+
+    fireEvent.change(screen.getByTestId("message-input"), {
+      target: { value: "Realtime echo body" },
+    });
+    fireEvent.click(screen.getByTestId("send-button"));
+
+    expect(screen.getByText("Realtime echo body")).toBeInTheDocument();
+    expect(screen.getAllByTestId("message-bubble")).toHaveLength(1);
+
+    act(() => {
+      channel.emitPostgresInsert({
+        new: {
+          id: "msg-realtime-echo",
+          conversationId: "conv-123",
+          content: "Realtime echo body",
+          senderId: "user-123",
+          createdAt: new Date().toISOString(),
+          read: false,
+        },
+      });
+    });
+
+    expect(screen.getAllByText("Realtime echo body")).toHaveLength(1);
+    expect(screen.getAllByTestId("message-bubble")).toHaveLength(1);
+
+    resolveSend?.({
+      id: "msg-realtime-echo",
+      content: "Realtime echo body",
+      senderId: "user-123",
+      createdAt: new Date(),
+      read: false,
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(screen.getAllByText("Realtime echo body")).toHaveLength(1);
+    expect(screen.getAllByTestId("message-bubble")).toHaveLength(1);
+  });
+
   it("falls back to polling when realtime token auth fails", async () => {
     mockSupabaseClient = { realtime: {} };
     mockAuthenticateRealtimeForConversation.mockResolvedValue({
@@ -398,9 +498,7 @@ describe("Route ChatWindow", () => {
     });
 
     expect(mockCreateChatChannel).not.toHaveBeenCalled();
-    expect(screen.getByTestId("connection-status")).toHaveTextContent(
-      "Polling for updates"
-    );
+    expect(screen.queryByTestId("connection-status")).not.toBeInTheDocument();
   });
 
   it("redirects to login when realtime token auth reports an expired session", async () => {
@@ -618,5 +716,73 @@ describe("Route ChatWindow", () => {
     backButton.click();
 
     expect(mockPush).toHaveBeenCalledWith("/messages");
+  });
+
+  it("preserves the route failed-message retry test hook through the shared thread", async () => {
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes("/api/messages?")) {
+        return createJsonResponse({ messages: [], hasNewMessages: false });
+      }
+      return createJsonResponse({ success: true, count: 0 });
+    });
+
+    render(
+      <ChatWindow
+        canLeavePrivateFeedback={false}
+        initialMessages={[
+          {
+            id: "opt-failed",
+            senderId: "user-123",
+            content: "Failed body",
+            createdAt: new Date("2026-03-06T12:00:00.000Z"),
+            failed: true,
+          },
+        ]}
+        conversationId="conv-123"
+        currentUserId="user-123"
+        currentUserName="Current User"
+        listingId="listing-1"
+        listingOwnerId="owner-1"
+        listingTitle="Listing One"
+        otherUserId="other-user"
+        otherUserName="Other User"
+        otherUserImage={null}
+      />
+    );
+
+    expect(await screen.findByTestId("retry-button")).toBeInTheDocument();
+  });
+
+  it("preserves the route character counter test hook through the shared composer", async () => {
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes("/api/messages?")) {
+        return createJsonResponse({ messages: [], hasNewMessages: false });
+      }
+      return createJsonResponse({ success: true, count: 0 });
+    });
+
+    render(
+      <ChatWindow
+        canLeavePrivateFeedback={false}
+        initialMessages={[]}
+        conversationId="conv-123"
+        currentUserId="user-123"
+        currentUserName="Current User"
+        listingId="listing-1"
+        listingOwnerId="owner-1"
+        listingTitle="Listing One"
+        otherUserId="other-user"
+        otherUserName="Other User"
+        otherUserImage={null}
+      />
+    );
+
+    fireEvent.change(await screen.findByTestId("message-input"), {
+      target: { value: "hello" },
+    });
+
+    expect(screen.getByTestId("char-counter")).toHaveTextContent("5/2000");
   });
 });

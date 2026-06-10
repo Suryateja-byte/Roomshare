@@ -114,18 +114,24 @@ export default async function ChatPage({
   }
 
   return (
-    <ChatWindow
-      canLeavePrivateFeedback={canLeavePrivateFeedback}
-      initialMessages={messages}
-      conversationId={id}
-      currentUserId={userId}
-      currentUserName={currentParticipant?.name || session.user.name || "User"}
-      listingId={conversation.listing.id}
-      listingOwnerId={conversation.listing.ownerId}
-      listingTitle={conversation.listing.title}
-      otherUserId={otherParticipant?.id || ""}
-      otherUserName={otherParticipant?.name || "User"}
-      otherUserImage={otherParticipant?.image}
-    />
+    // Bounded viewport height so the message list (not the document) is the
+    // scroll boundary — pins the composer and enables scroll anchoring.
+    <div className="h-dvh">
+      <ChatWindow
+        canLeavePrivateFeedback={canLeavePrivateFeedback}
+        initialMessages={messages}
+        conversationId={id}
+        currentUserId={userId}
+        currentUserName={
+          currentParticipant?.name || session.user.name || "User"
+        }
+        listingId={conversation.listing.id}
+        listingOwnerId={conversation.listing.ownerId}
+        listingTitle={conversation.listing.title}
+        otherUserId={otherParticipant?.id || ""}
+        otherUserName={otherParticipant?.name || "User"}
+        otherUserImage={otherParticipant?.image}
+      />
+    </div>
   );
 }
