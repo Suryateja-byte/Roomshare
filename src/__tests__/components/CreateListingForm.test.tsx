@@ -780,6 +780,43 @@ describe("CreateListingForm", () => {
 
       expect(fetchSpy).toHaveBeenCalledTimes(1);
     });
+
+    it("keeps publish disabled and ignores repeated submit after success", async () => {
+      render(<CreateListingForm />);
+      fillRequiredFields();
+      fireEvent.click(screen.getByTestId("add-success-image"));
+      const publishButton = await screen.findByRole("button", {
+        name: /publish with 1 photo/i,
+      });
+
+      submitForm();
+
+      await waitFor(() => {
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+      });
+      await waitFor(() => {
+        expect(toast.success).toHaveBeenCalledWith(
+          "Listing published successfully!",
+          expect.any(Object)
+        );
+      });
+      await waitFor(() => {
+        expect(publishButton).toBeDisabled();
+      });
+
+      const [, firstOptions] = fetchSpy.mock.calls[0];
+      const firstIdempotencyKey =
+        firstOptions.headers["X-Idempotency-Key"];
+
+      submitForm();
+      fireEvent.click(publishButton);
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(firstIdempotencyKey).toBeDefined();
+      expect(fetchSpy.mock.calls[0][1].headers["X-Idempotency-Key"]).toBe(
+        firstIdempotencyKey
+      );
+    });
   });
 
   describe("partial upload dialog", () => {
