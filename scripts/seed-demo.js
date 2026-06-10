@@ -104,8 +104,8 @@ const DEMO_LISTINGS = [
     roomType: 'Private Room',
     lat: 37.7598, lng: -122.4148,
     address: '3200 18th St', city: 'San Francisco', state: 'CA', zip: '94110',
-    amenities: ['Wifi', 'Furnished', 'Kitchen', 'Washer', 'Dryer', 'Backyard'],
-    houseRules: ['No Smoking', 'Pets welcome with deposit', 'Quiet hours 11pm–8am'],
+    amenities: ['Wifi', 'Furnished', 'Kitchen', 'Washer', 'Dryer'],
+    houseRules: ['Pets allowed'],
     leaseDuration: '6 months',
     minStayMonths: 6,
     moveInDate: daysFromNow(14),
@@ -123,8 +123,8 @@ const DEMO_LISTINGS = [
     roomType: 'Private Room',
     lat: 37.7762, lng: -122.4244,
     address: '420 Hayes St', city: 'San Francisco', state: 'CA', zip: '94102',
-    amenities: ['Wifi', 'Furnished', 'AC', 'Washer', 'Dryer', 'Dishwasher'],
-    houseRules: ['No Smoking', 'No Pets', 'Guests allowed on weekends'],
+    amenities: ['Wifi', 'Furnished', 'AC', 'Washer', 'Dryer'],
+    houseRules: ['Guests allowed'],
     leaseDuration: '6 months',
     minStayMonths: 6,
     moveInDate: daysFromNow(21),
@@ -142,8 +142,8 @@ const DEMO_LISTINGS = [
     roomType: 'Private Room',
     lat: 37.7503, lng: -122.4338,
     address: '1340 Church St', city: 'San Francisco', state: 'CA', zip: '94114',
-    amenities: ['Wifi', 'Furnished', 'Kitchen', 'Garden', 'Parking', 'Washer'],
-    houseRules: ['No Smoking', 'Pets allowed', 'Guests with notice'],
+    amenities: ['Wifi', 'Furnished', 'Kitchen', 'Parking', 'Washer'],
+    houseRules: ['Pets allowed', 'Guests allowed'],
     leaseDuration: '12 months',
     minStayMonths: 6,
     moveInDate: daysFromNow(10),
@@ -161,8 +161,8 @@ const DEMO_LISTINGS = [
     roomType: 'Entire Place',
     lat: 37.7539, lng: -122.5041,
     address: '1970 Judah St', city: 'San Francisco', state: 'CA', zip: '94122',
-    amenities: ['Wifi', 'Furnished', 'Kitchen', 'AC', 'Bike Storage', 'Laundry in Building'],
-    houseRules: ['No Smoking', 'No Pets', 'Couples welcome'],
+    amenities: ['Wifi', 'Furnished', 'Kitchen', 'AC', 'Washer', 'Dryer'],
+    houseRules: ['Couples allowed'],
     leaseDuration: '12 months',
     minStayMonths: 8,
     moveInDate: daysFromNow(30),
@@ -180,8 +180,8 @@ const DEMO_LISTINGS = [
     roomType: 'Private Room',
     lat: 37.7799, lng: -122.4703,
     address: '740 Clement St', city: 'San Francisco', state: 'CA', zip: '94118',
-    amenities: ['Wifi', 'Furnished', 'Kitchen', 'Gym Access'],
-    houseRules: ['No Smoking', 'Quiet hours 10pm–8am', 'Guests by arrangement'],
+    amenities: ['Wifi', 'Furnished', 'Kitchen', 'Gym'],
+    houseRules: ['Guests allowed'],
     leaseDuration: 'Month-to-month',
     minStayMonths: 3,
     moveInDate: daysFromNow(7),
@@ -199,8 +199,8 @@ const DEMO_LISTINGS = [
     roomType: 'Private Room',
     lat: 37.7786, lng: -122.3953,
     address: '488 Brannan St', city: 'San Francisco', state: 'CA', zip: '94107',
-    amenities: ['Wifi', 'Furnished', 'AC', 'Gym', 'Rooftop Deck', 'Parking'],
-    houseRules: ['No Smoking', 'No Pets', 'No parties'],
+    amenities: ['Wifi', 'Furnished', 'AC', 'Gym', 'Parking'],
+    houseRules: [],
     leaseDuration: '6 months',
     minStayMonths: 6,
     moveInDate: daysFromNow(20),
@@ -219,7 +219,7 @@ const DEMO_LISTINGS = [
     lat: 37.7612, lng: -122.4351,
     address: '520 Castro St', city: 'San Francisco', state: 'CA', zip: '94114',
     amenities: ['Wifi', 'Furnished', 'Kitchen', 'Washer', 'Dryer'],
-    houseRules: ['Guests welcome', 'Couples OK', 'No Smoking'],
+    houseRules: ['Guests allowed', 'Couples allowed'],
     leaseDuration: '3 months',
     minStayMonths: 3,
     moveInDate: daysFromNow(15),
@@ -237,8 +237,8 @@ const DEMO_LISTINGS = [
     roomType: 'Entire Place',
     lat: 37.7449, lng: -122.4153,
     address: '310 Cortland Ave', city: 'San Francisco', state: 'CA', zip: '94110',
-    amenities: ['Wifi', 'Furnished', 'Kitchenette', 'Private Patio', 'Washer'],
-    houseRules: ['No Smoking', 'Pets welcome', 'Long-term preferred'],
+    amenities: ['Wifi', 'Furnished', 'Kitchen', 'Washer'],
+    houseRules: ['Pets allowed'],
     leaseDuration: '12 months',
     minStayMonths: 8,
     moveInDate: daysFromNow(45),
@@ -256,8 +256,8 @@ const DEMO_LISTINGS = [
     roomType: 'Shared Room',
     lat: 37.7618, lng: -122.4601,
     address: '915 Irving St', city: 'San Francisco', state: 'CA', zip: '94122',
-    amenities: ['Wifi', 'Kitchen', 'Laundry in Building', 'Bike Storage'],
-    houseRules: ['No Smoking', 'Quiet hours 10pm–8am'],
+    amenities: ['Wifi', 'Kitchen', 'Washer', 'Dryer'],
+    houseRules: [],
     leaseDuration: 'Month-to-month',
     minStayMonths: 1,
     moveInDate: daysFromNow(5),
@@ -275,8 +275,8 @@ const DEMO_LISTINGS = [
     roomType: 'Private Room',
     lat: 37.7930, lng: -122.4126,
     address: '1050 California St', city: 'San Francisco', state: 'CA', zip: '94108',
-    amenities: ['Wifi', 'Furnished', 'AC', 'Doorman Building', 'Elevator'],
-    houseRules: ['No Smoking', 'No Pets', 'Quiet hours 10pm–8am'],
+    amenities: ['Wifi', 'Furnished', 'AC'],
+    houseRules: [],
     leaseDuration: '6 months',
     minStayMonths: 6,
     moveInDate: daysFromNow(28),
@@ -296,8 +296,8 @@ const DEMO_LISTINGS = [
     roomType: 'Private Room',
     lat: 47.6221, lng: -122.3219,
     address: '1500 E Olive Way', city: 'Seattle', state: 'WA', zip: '98122',
-    amenities: ['Wifi', 'Furnished', 'Kitchen', 'Washer', 'Dryer', 'Rooftop Access'],
-    houseRules: ['No Smoking', 'Pets welcome', 'Guests OK'],
+    amenities: ['Wifi', 'Furnished', 'Kitchen', 'Washer', 'Dryer'],
+    houseRules: ['Pets allowed', 'Guests allowed'],
     leaseDuration: '6 months',
     minStayMonths: 3,
     moveInDate: daysFromNow(18),
@@ -315,8 +315,8 @@ const DEMO_LISTINGS = [
     roomType: 'Private Room',
     lat: 47.6685, lng: -122.3835,
     address: '5600 22nd Ave NW', city: 'Seattle', state: 'WA', zip: '98107',
-    amenities: ['Wifi', 'Furnished', 'Kitchen', 'Garden', 'Bike Storage', 'Parking'],
-    houseRules: ['No Smoking', 'No Pets', 'Quiet weeknights'],
+    amenities: ['Wifi', 'Furnished', 'Kitchen', 'Parking'],
+    houseRules: [],
     leaseDuration: '12 months',
     minStayMonths: 6,
     moveInDate: daysFromNow(25),
@@ -334,8 +334,8 @@ const DEMO_LISTINGS = [
     roomType: 'Entire Place',
     lat: 47.6512, lng: -122.3497,
     address: '3500 Fremont Ave N', city: 'Seattle', state: 'WA', zip: '98103',
-    amenities: ['Wifi', 'Furnished', 'Kitchen', 'AC', 'Bike Storage'],
-    houseRules: ['No Smoking', 'No Pets', 'Couples welcome'],
+    amenities: ['Wifi', 'Furnished', 'Kitchen', 'AC'],
+    houseRules: ['Couples allowed'],
     leaseDuration: '6 months',
     minStayMonths: 5,
     moveInDate: daysFromNow(35),
@@ -353,14 +353,45 @@ const DEMO_LISTINGS = [
     roomType: 'Private Room',
     lat: 47.6373, lng: -122.3564,
     address: '400 Ward St', city: 'Seattle', state: 'WA', zip: '98109',
-    amenities: ['Wifi', 'Furnished', 'Kitchen', 'Rooftop Deck', 'Parking', 'AC'],
-    houseRules: ['No Smoking', 'Pets with approval', 'Quiet hours 11pm–8am'],
+    amenities: ['Wifi', 'Furnished', 'Kitchen', 'Parking', 'AC'],
+    houseRules: ['Pets allowed'],
     leaseDuration: '6 months',
     minStayMonths: 4,
     moveInDate: daysFromNow(22),
     images: ROOM_PHOTOS.sunnyLoft,
   },
 ];
+
+// ---------------------------------------------------------------------------
+// Contract guard — keep in sync with VALID_AMENITIES / VALID_HOUSE_RULES in
+// src/lib/filter-schema.ts. The listings API enforces these allowlists on
+// every create/save, so non-canonical seed values make seeded listings
+// un-editable in the UI (PATCH 400 "Invalid amenity value") and invisible to
+// amenity/house-rule filters. Fails fast at script start, before any writes.
+// ---------------------------------------------------------------------------
+const VALID_AMENITIES = [
+  'Wifi', 'AC', 'Parking', 'Washer', 'Dryer', 'Kitchen', 'Gym', 'Pool', 'Furnished',
+];
+const VALID_HOUSE_RULES = [
+  'Pets allowed', 'Smoking allowed', 'Couples allowed', 'Guests allowed',
+];
+
+for (const listing of DEMO_LISTINGS) {
+  for (const amenity of listing.amenities || []) {
+    if (!VALID_AMENITIES.includes(amenity)) {
+      throw new Error(
+        `seed-demo: listing "${listing.id}" has non-canonical amenity "${amenity}" — must be one of VALID_AMENITIES (src/lib/filter-schema.ts)`
+      );
+    }
+  }
+  for (const rule of listing.houseRules || []) {
+    if (!VALID_HOUSE_RULES.includes(rule)) {
+      throw new Error(
+        `seed-demo: listing "${listing.id}" has non-canonical house rule "${rule}" — must be one of VALID_HOUSE_RULES (src/lib/filter-schema.ts)`
+      );
+    }
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Copied verbatim from seed-e2e.js — identical logic, identical SQL shape
@@ -451,7 +482,7 @@ async function upsertListingWithLocation(ownerId, seed) {
       price: seed.price,
       roomType: seed.roomType,
       amenities: seed.amenities || ['Wifi', 'Furnished', 'Kitchen'],
-      houseRules: seed.houseRules || ['No Smoking'],
+      houseRules: seed.houseRules || [],
       householdLanguages: ['en'],
       leaseDuration: seed.leaseDuration || '6 months',
       minStayMonths: seed.minStayMonths || 3,
@@ -488,7 +519,7 @@ async function upsertListingWithLocation(ownerId, seed) {
       price: seed.price,
       roomType: seed.roomType,
       amenities: seed.amenities || ['Wifi', 'Furnished', 'Kitchen'],
-      houseRules: seed.houseRules || ['No Smoking'],
+      houseRules: seed.houseRules || [],
       householdLanguages: ['en'],
       leaseDuration: seed.leaseDuration || '6 months',
       minStayMonths: seed.minStayMonths || 3,
