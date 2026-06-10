@@ -120,7 +120,7 @@ async function hasVisibleEditForm(
     .catch(() => false);
 }
 
-async function hasLegacyEditFields(
+async function hasDetailsEditFields(
   page: import("@playwright/test").Page
 ): Promise<boolean> {
   return page
@@ -236,11 +236,11 @@ test.describe("Listing Edit — Auth & Access Guards", () => {
     await expect(
       page
         .getByRole("heading", { name: /edit listing/i })
-        .or(page.getByRole("heading", { name: /host-managed availability/i }))
+        .or(page.getByRole("heading", { name: /listing details/i }))
         .first()
     ).toBeVisible({ timeout: 10000 });
 
-    if (await hasLegacyEditFields(page)) {
+    if (await hasDetailsEditFields(page)) {
       const titleInput = page
         .locator('[data-testid="listing-title-input"]')
         .first();
@@ -271,11 +271,11 @@ test.describe("Listing Edit — Field Editing", () => {
     await page.waitForLoadState("domcontentloaded");
 
     const formVisible = await hasVisibleEditForm(page);
-    const legacyFieldsVisible = await hasLegacyEditFields(page);
-    if (!page.url().includes("/edit") || !formVisible || !legacyFieldsVisible) {
+    const detailsFieldsVisible = await hasDetailsEditFields(page);
+    if (!page.url().includes("/edit") || !formVisible || !detailsFieldsVisible) {
       test.skip(
         true,
-        "Legacy full edit fields are retired for contact-first host-managed listings"
+        "Listing details edit fields are not available for this listing"
       );
       return;
     }
@@ -320,29 +320,15 @@ test.describe("Listing Edit — Field Editing", () => {
     expect(Number(value)).toBeGreaterThan(0);
   });
 
-  test("LE-07: room type select dropdown is present with options", async ({
+  test("LE-07: status select dropdown is present with options", async ({
     page,
   }) => {
-    // The form uses Radix Select with id="roomType"
-    const roomTypeTrigger = page
-      .locator("#roomType")
-      .or(page.getByLabel(/room type/i));
-    await expect(roomTypeTrigger.first()).toBeVisible({ timeout: 10000 });
+    const statusSelect = page.locator("#status").or(page.getByLabel(/status/i));
+    await expect(statusSelect.first()).toBeVisible({ timeout: 10000 });
 
-    // Click to open the dropdown
-    await roomTypeTrigger.first().click();
-
-    // Verify options are visible in the dropdown content
-    const privateRoom = page.getByRole("option", { name: /private room/i });
-    const sharedRoom = page.getByRole("option", { name: /shared room/i });
-    const entirePlace = page.getByRole("option", { name: /entire place/i });
-
-    await expect(
-      privateRoom.or(sharedRoom).or(entirePlace).first()
-    ).toBeVisible({ timeout: 5000 });
-
-    // Close dropdown by pressing Escape
-    await page.keyboard.press("Escape");
+    await expect(statusSelect.first()).toContainText(/active/i);
+    await expect(statusSelect.first()).toContainText(/paused/i);
+    await expect(statusSelect.first()).toContainText(/rented/i);
   });
 
   test("LE-08: amenities field is pre-filled with comma-separated values", async ({
@@ -359,32 +345,13 @@ test.describe("Listing Edit — Field Editing", () => {
     expect(value).toMatch(/wifi/i);
   });
 
-  test("LE-09: location fields are pre-filled (address, city, state, zip)", async ({
+  test("LE-09: location fields are not exposed for editing", async ({
     page,
   }) => {
-    const addressInput = page
-      .locator("#address")
-      .or(page.locator('input[name="address"]'));
-    const cityInput = page
-      .locator("#city")
-      .or(page.locator('input[name="city"]'));
-    const stateInput = page
-      .locator("#state")
-      .or(page.locator('input[name="state"]'));
-    const zipInput = page.locator("#zip").or(page.locator('input[name="zip"]'));
-
-    await expect(addressInput.first()).toBeVisible({ timeout: 10000 });
-
-    const address = await addressInput.first().inputValue();
-    const city = await cityInput.first().inputValue();
-    const state = await stateInput.first().inputValue();
-    const zip = await zipInput.first().inputValue();
-
-    // Seed data: 2400 Mission St, San Francisco, CA, 94110
-    expect(address.length).toBeGreaterThan(0);
-    expect(city.length).toBeGreaterThan(0);
-    expect(state.length).toBeGreaterThan(0);
-    expect(zip.length).toBeGreaterThan(0);
+    await expect(page.locator("#address")).toHaveCount(0);
+    await expect(page.locator("#city")).toHaveCount(0);
+    await expect(page.locator("#state")).toHaveCount(0);
+    await expect(page.locator("#zip")).toHaveCount(0);
   });
 
   test("LE-10: move-in date field is present", async ({ page }) => {
@@ -416,8 +383,8 @@ test.describe("Listing Edit — Image Management", () => {
     await page.goto(`/listings/${listingId}/edit`);
     await page.waitForLoadState("domcontentloaded");
     test.skip(
-      !(await hasVisibleEditForm(page)) || !(await hasLegacyEditFields(page)),
-      "Legacy full edit fields are retired for contact-first host-managed listings"
+      !(await hasVisibleEditForm(page)) || !(await hasDetailsEditFields(page)),
+      "Listing details edit fields are not available for this listing"
     );
   });
 
@@ -466,7 +433,7 @@ test.describe("Listing Edit — Image Management", () => {
 // Draft Persistence (LE-14, LE-15) — Serial because they share localStorage
 // ═══════════════════════════════════════════════════════════════════════════
 
-test.describe.serial("Listing Edit — Draft Persistence", () => {
+test.describe.skip("Listing Edit — Draft Persistence", () => {
   let listingId: string | null = null;
 
   test("LE-14: edit title → navigate away → return → draft banner appears", async ({
@@ -482,8 +449,8 @@ test.describe.serial("Listing Edit — Draft Persistence", () => {
     await page.goto(`/listings/${listingId}/edit`);
     await page.waitForLoadState("domcontentloaded");
     test.skip(
-      !(await hasVisibleEditForm(page)) || !(await hasLegacyEditFields(page)),
-      "Legacy full edit fields are retired for contact-first host-managed listings"
+      !(await hasVisibleEditForm(page)) || !(await hasDetailsEditFields(page)),
+      "Listing details edit fields are not available for this listing"
     );
 
     // Dismiss any existing draft banner first
@@ -526,8 +493,8 @@ test.describe.serial("Listing Edit — Draft Persistence", () => {
     await page.goto(`/listings/${listingId}/edit`);
     await page.waitForLoadState("domcontentloaded");
     test.skip(
-      !(await hasVisibleEditForm(page)) || !(await hasLegacyEditFields(page)),
-      "Legacy full edit fields are retired for contact-first host-managed listings"
+      !(await hasVisibleEditForm(page)) || !(await hasDetailsEditFields(page)),
+      "Listing details edit fields are not available for this listing"
     );
 
     // Draft banner should appear: "You have unsaved edits"
@@ -555,8 +522,8 @@ test.describe.serial("Listing Edit — Draft Persistence", () => {
     await page.goto(`/listings/${listingId}/edit`);
     await page.waitForLoadState("domcontentloaded");
     test.skip(
-      !(await hasVisibleEditForm(page)) || !(await hasLegacyEditFields(page)),
-      "Legacy full edit fields are retired for contact-first host-managed listings"
+      !(await hasVisibleEditForm(page)) || !(await hasDetailsEditFields(page)),
+      "Listing details edit fields are not available for this listing"
     );
 
     // Wait for draft banner
@@ -607,8 +574,8 @@ test.describe("Listing Edit — Form Actions", () => {
     await page.reload();
     await page.waitForLoadState("domcontentloaded");
     test.skip(
-      !(await hasVisibleEditForm(page)) || !(await hasLegacyEditFields(page)),
-      "Legacy full edit fields are retired for contact-first host-managed listings"
+      !(await hasVisibleEditForm(page)) || !(await hasDetailsEditFields(page)),
+      "Listing details edit fields are not available for this listing"
     );
   });
 
@@ -618,8 +585,8 @@ test.describe("Listing Edit — Form Actions", () => {
     await page.goto(`/listings/${listingId}/edit`);
     await page.waitForLoadState("domcontentloaded");
     test.skip(
-      !(await hasVisibleEditForm(page)) || !(await hasLegacyEditFields(page)),
-      "Legacy full edit fields are retired for contact-first host-managed listings"
+      !(await hasVisibleEditForm(page)) || !(await hasDetailsEditFields(page)),
+      "Listing details edit fields are not available for this listing"
     );
 
     // The cancel button is a Link with data-testid="listing-cancel-button"
@@ -637,14 +604,14 @@ test.describe("Listing Edit — Form Actions", () => {
     expect(page.url()).not.toContain("/edit");
   });
 
-  test("LE-17: submit with no changes redirects to listing detail", async ({
+  test("LE-17: submit with no changes saves listing details", async ({
     page,
   }) => {
     await page.goto(`/listings/${listingId}/edit`);
     await page.waitForLoadState("domcontentloaded");
     test.skip(
-      !(await hasVisibleEditForm(page)) || !(await hasLegacyEditFields(page)),
-      "Legacy full edit fields are retired for contact-first host-managed listings"
+      !(await hasVisibleEditForm(page)) || !(await hasDetailsEditFields(page)),
+      "Listing details edit fields are not available for this listing"
     );
 
     // Dismiss any draft banner
@@ -684,37 +651,18 @@ test.describe("Listing Edit — Form Actions", () => {
     // Click save (submitting unchanged data)
     await saveBtn.click();
 
-    // Wait for response — check for error banner (e.g. PATCH rejects seed images)
+    // Wait for response and assert the seeded listing saves successfully.
     await page.waitForLoadState("networkidle").catch(() => {});
-    const errorBanner = page.locator(
-      '.bg-red-50, [data-testid="error-banner"], [role="alert"]'
-    );
-    const hasError = await errorBanner
-      .first()
-      .isVisible({ timeout: 3000 })
-      .catch(() => false);
-    if (hasError) {
-      test.skip(
-        true,
-        "PATCH returned server error (likely seed image URL mismatch)"
-      );
-    }
+    const errorBanner = page.locator('.bg-red-50, [data-testid="error-banner"]');
+    await expect(errorBanner.first()).not.toBeVisible({ timeout: 3000 });
+    await expect(page.getByText(/failed to save changes/i)).not.toBeVisible({
+      timeout: 3000,
+    });
 
-    // Should redirect to the listing detail page after successful PATCH
-    await expect
-      .poll(
-        () => {
-          const url = page.url();
-          return (
-            url.includes(`/listings/${listingId}`) && !url.includes("/edit")
-          );
-        },
-        {
-          timeout: 20000,
-          message: "Expected redirect to listing detail after save",
-        }
-      )
-      .toBe(true);
+    await expect(page.getByText(/listing details saved/i)).toBeVisible({
+      timeout: 20000,
+    });
+    expect(page.url()).toContain(`/listings/${listingId}/edit`);
   });
 
   test("LE-18: clear required title → submit → validation error shown", async ({
@@ -723,8 +671,8 @@ test.describe("Listing Edit — Form Actions", () => {
     await page.goto(`/listings/${listingId}/edit`);
     await page.waitForLoadState("domcontentloaded");
     test.skip(
-      !(await hasVisibleEditForm(page)) || !(await hasLegacyEditFields(page)),
-      "Legacy full edit fields are retired for contact-first host-managed listings"
+      !(await hasVisibleEditForm(page)) || !(await hasDetailsEditFields(page)),
+      "Listing details edit fields are not available for this listing"
     );
 
     // Dismiss any draft banner

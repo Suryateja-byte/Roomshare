@@ -18,7 +18,7 @@ export default function Loading() {
         <Skeleton variant="rounded" height={48} className="mb-6" />
 
         {/* Form Card */}
-        <div className="bg-card rounded-lg border border-border p-6 space-y-8">
+        <div className="bg-surface-container-lowest rounded-lg border border-outline-variant/20 p-6 space-y-8">
           {/* Basic Info Section */}
           <div className="space-y-4">
             <Skeleton variant="text" width={120} height={24} className="mb-4" />
@@ -45,7 +45,7 @@ export default function Loading() {
           </div>
 
           {/* Pricing Section */}
-          <div className="space-y-4 border-t border-border pt-6">
+          <div className="space-y-4 border-t border-outline-variant/20 pt-6">
             <Skeleton variant="text" width={100} height={24} className="mb-4" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -70,7 +70,7 @@ export default function Loading() {
           </div>
 
           {/* Photos Section */}
-          <div className="space-y-4 border-t border-border pt-6">
+          <div className="space-y-4 border-t border-outline-variant/20 pt-6">
             <Skeleton variant="text" width={80} height={24} className="mb-4" />
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {Array.from({ length: 4 }).map((_, i) => (
@@ -81,51 +81,40 @@ export default function Loading() {
           </div>
 
           {/* Amenities Section */}
-          <div className="space-y-4 border-t border-border pt-6">
+          <div className="space-y-4 border-t border-outline-variant/20 pt-6">
             <Skeleton variant="text" width={100} height={24} className="mb-4" />
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {Array.from({ length: 9 }).map((_, i) => (
-                <Skeleton key={i} variant="rounded" height={40} />
-              ))}
-            </div>
+            <Skeleton variant="rounded" height={40} />
           </div>
 
-          {/* Location Section */}
-          <div className="space-y-4 border-t border-border pt-6">
-            <Skeleton variant="text" width={80} height={24} className="mb-4" />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Skeleton
-                  variant="text"
-                  width={80}
-                  height={16}
-                  className="mb-2"
-                />
-                <Skeleton variant="rounded" height={40} />
+          {/* Availability & Status Section */}
+          <div className="space-y-4 border-t border-outline-variant/20 pt-6">
+            <Skeleton variant="text" width={160} height={24} className="mb-4" />
+            {Array.from({ length: 3 }).map((_, row) => (
+              <div key={row} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Skeleton
+                    variant="text"
+                    width={100}
+                    height={16}
+                    className="mb-2"
+                  />
+                  <Skeleton variant="rounded" height={40} />
+                </div>
+                <div>
+                  <Skeleton
+                    variant="text"
+                    width={120}
+                    height={16}
+                    className="mb-2"
+                  />
+                  <Skeleton variant="rounded" height={40} />
+                </div>
               </div>
-              <div>
-                <Skeleton
-                  variant="text"
-                  width={60}
-                  height={16}
-                  className="mb-2"
-                />
-                <Skeleton variant="rounded" height={40} />
-              </div>
-            </div>
-            <div>
-              <Skeleton
-                variant="text"
-                width={100}
-                height={16}
-                className="mb-2"
-              />
-              <Skeleton variant="rounded" height={40} />
-            </div>
+            ))}
           </div>
 
           {/* Submit Buttons */}
-          <div className="flex gap-4 pt-6 border-t border-border">
+          <div className="flex gap-4 pt-6 border-t border-outline-variant/20">
             <Skeleton variant="rounded" width={120} height={44} />
             <Skeleton variant="rounded" height={44} className="flex-1" />
           </div>
