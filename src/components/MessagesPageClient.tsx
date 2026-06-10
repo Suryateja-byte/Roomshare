@@ -1,13 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Search,
-  Send,
   ArrowLeft,
   MoreVertical,
-  Paperclip,
-  AlertCircle,
   Ban,
   ShieldOff,
   WifiOff,
@@ -17,7 +14,6 @@ import {
   Trash2,
   ArrowDown,
 } from "lucide-react";
-import CharacterCounter from "@/components/CharacterCounter";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { toast } from "sonner";
 import {
@@ -30,9 +26,12 @@ import { blockUser, unblockUser } from "@/app/actions/block";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import UserAvatar from "@/components/UserAvatar";
+import { MessageThread } from "@/components/messages";
 import { useBlockStatus } from "@/hooks/useBlockStatus";
 import BlockedConversationBanner from "@/components/chat/BlockedConversationBanner";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { mergeIncomingMessage } from "@/lib/message-merge";
+import { MESSAGE_MAX_LENGTH } from "@/lib/messaging/message-contract";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,8 +48,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-
-const MESSAGE_MAX_LENGTH = 1000;
 
 interface TypingUser {
   id: string;
@@ -69,7 +66,7 @@ interface Message {
   senderId: string;
   createdAt: Date | string;
   read?: boolean;
-  status?: "sending" | "sent" | "failed";
+  failed?: boolean;
   sender?: {
     id: string;
     name: string | null;
@@ -451,20 +448,23 @@ export default function MessagesPageClient({
           return;
         }
 
-        const existingIds = new Set(
-          messagesRef.current.map((message) => message.id)
-        );
-        const newMessages = fetchedMessages.filter(
-          (message: Message) => !existingIds.has(message.id)
+        const previousMessages = messagesRef.current;
+        const mergedMessages = fetchedMessages.reduce(
+          (acc, message) => mergeIncomingMessage(acc, message, currentUserId),
+          previousMessages
         );
 
-        if (newMessages.length === 0) {
+        if (mergedMessages === previousMessages) {
           return;
         }
 
-        const updatedMessages = [...messagesRef.current, ...newMessages].sort(
+        const updatedMessages = [...mergedMessages].sort(
           (a, b) =>
             new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
+
+        const previousIds = new Set(
+          previousMessages.map((message) => message.id)
         );
         messagesRef.current = updatedMessages;
         setMsgs(updatedMessages);
@@ -476,9 +476,13 @@ export default function MessagesPageClient({
         }
 
         const latestIncomingMessageId =
-          [...newMessages]
+          [...fetchedMessages]
             .reverse()
-            .find((message) => message.senderId !== currentUserId)?.id ?? null;
+            .find(
+              (message) =>
+                message.senderId !== currentUserId &&
+                !previousIds.has(message.id)
+            )?.id ?? null;
         await markConversationRead(activeId, latestIncomingMessageId);
       } catch (_error) {
         if (!isAbortError(_error)) {
@@ -594,8 +598,7 @@ export default function MessagesPageClient({
     };
   }, [activeId, isTyping]);
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSend = async () => {
     if (!input.trim() || !activeId) return;
 
     // Block if offline
@@ -631,7 +634,6 @@ export default function MessagesPageClient({
       content,
       senderId: currentUserId,
       createdAt: new Date(),
-      status: "sending",
     };
     setMsgs((prev) => [...prev, optimisticMessage]);
 
@@ -648,7 +650,7 @@ export default function MessagesPageClient({
       // Mark message as failed for other errors
       setMsgs((prev) =>
         prev.map((m) =>
-          m.id === optimisticId ? { ...m, status: "failed" } : m
+          m.id === optimisticId ? { ...m, failed: true } : m
         )
       );
       toast.error("Failed to send message. Tap to retry.");
@@ -656,12 +658,15 @@ export default function MessagesPageClient({
     }
 
     // Success - replace optimistic message with sent message
-    const sentMessage = result;
+    const sentMessage = result as Message;
     setMsgs((prev) =>
-      prev.map((m) =>
-        m.id === optimisticId
-          ? { ...sentMessage, sender: undefined, status: "sent" as const }
-          : m
+      mergeIncomingMessage(
+        prev,
+        { ...sentMessage, sender: sentMessage.sender ?? undefined },
+        currentUserId,
+        {
+          optimisticMessageId: optimisticId,
+        }
       )
     );
     lastMsgIdRef.current = sentMessage.id;
@@ -686,22 +691,15 @@ export default function MessagesPageClient({
     );
   };
 
-  const handleRetry = async (failedMessageId: string, content: string) => {
+  const handleRetry = async (failedMessage: Message) => {
     if (!activeId) return;
 
-    // Remove failed message
-    setMsgs((prev) => prev.filter((m) => m.id !== failedMessageId));
-
-    // Create new optimistic message and retry
-    const newOptimisticId = "opt-" + Date.now();
-    const optimisticMessage: Message = {
-      id: newOptimisticId,
-      content,
-      senderId: currentUserId,
-      createdAt: new Date(),
-      status: "sending",
-    };
-    setMsgs((prev) => [...prev, optimisticMessage]);
+    const content = failedMessage.content;
+    setMsgs((prev) =>
+      prev.map((m) =>
+        m.id === failedMessage.id ? { ...m, failed: false } : m
+      )
+    );
 
     const result = await sendMessage(activeId, content);
 
@@ -709,14 +707,14 @@ export default function MessagesPageClient({
     if ("error" in result) {
       // Handle session expiry
       if (result.code === "SESSION_EXPIRED") {
-        handleSessionExpired(activeId, content, newOptimisticId);
+        handleSessionExpired(activeId, content, failedMessage.id);
         return;
       }
 
       // Mark message as failed for other errors
       setMsgs((prev) =>
         prev.map((m) =>
-          m.id === newOptimisticId ? { ...m, status: "failed" } : m
+          m.id === failedMessage.id ? { ...m, failed: true } : m
         )
       );
       toast.error("Failed to send message. Tap to retry.");
@@ -724,12 +722,15 @@ export default function MessagesPageClient({
     }
 
     // Success - replace optimistic message with sent message
-    const sentMessage = result;
+    const sentMessage = result as Message;
     setMsgs((prev) =>
-      prev.map((m) =>
-        m.id === newOptimisticId
-          ? { ...sentMessage, sender: undefined, status: "sent" as const }
-          : m
+      mergeIncomingMessage(
+        prev,
+        { ...sentMessage, sender: sentMessage.sender ?? undefined },
+        currentUserId,
+        {
+          optimisticMessageId: failedMessage.id,
+        }
       )
     );
     lastMsgIdRef.current = sentMessage.id;
@@ -752,6 +753,10 @@ export default function MessagesPageClient({
             new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
         )
     );
+  };
+
+  const handleDeleteFailed = (messageId: string) => {
+    setMsgs((prev) => prev.filter((m) => m.id !== messageId));
   };
 
   const shouldUseDesktopInPageSelection = () => {
@@ -1121,13 +1126,31 @@ export default function MessagesPageClient({
               </AlertDialogContent>
             </AlertDialog>
 
-            {/* Messages */}
-            <div
-              ref={messagesContainerRef}
-              data-testid="messages-container"
-              className="flex-1 overflow-y-auto p-6 space-y-4 relative"
-              onScroll={(e) => {
-                const target = e.target as HTMLDivElement;
+            <MessageThread
+              messages={loadingMessages ? [] : msgs}
+              currentUserId={currentUserId}
+              otherUserName={otherParticipant?.name}
+              otherUserImage={otherParticipant?.image}
+              otherUserTyping={typingUsers.length > 0}
+              messagesEndRef={messagesEndRef}
+              messagesContainerRef={messagesContainerRef}
+              messagesClassName="p-6"
+              messagesBefore={
+                loadingMessages ? (
+                  <div
+                    className="flex justify-center p-4"
+                    role="status"
+                    aria-label="Loading messages"
+                  >
+                    <div
+                      className="h-6 w-6 animate-spin rounded-full border-b-2 border-outline-variant/20"
+                      aria-hidden="true"
+                    />
+                  </div>
+                ) : null
+              }
+              onMessagesScroll={(event) => {
+                const target = event.currentTarget;
                 const isNearBottom =
                   target.scrollHeight - target.scrollTop - target.clientHeight <
                   100;
@@ -1135,190 +1158,62 @@ export default function MessagesPageClient({
                   !isNearBottom && target.scrollHeight > target.clientHeight
                 );
               }}
-            >
-              {loadingMessages ? (
-                <div
-                  className="flex justify-center p-4"
-                  role="status"
-                  aria-label="Loading messages"
-                >
-                  <div
-                    className="animate-spin rounded-full h-6 w-6 border-b-2 border-outline-variant/20"
-                    aria-hidden="true"
-                  ></div>
-                </div>
-              ) : (
-                msgs.map((m) => (
-                  <div
-                    key={m.id}
-                    className={`flex ${m.senderId === currentUserId ? "justify-end" : "justify-start"}`}
-                  >
-                    <div
-                      data-testid={
-                        m.status === "failed"
-                          ? "failed-message"
-                          : "message-bubble"
-                      }
-                      onClick={
-                        m.status === "failed"
-                          ? () => handleRetry(m.id, m.content)
-                          : undefined
-                      }
-                      className={`
-                                                max-w-[70%] px-5 py-2.5 text-sm leading-relaxed shadow-ambient-sm
-                                                ${
-                                                  m.senderId === currentUserId
-                                                    ? "bg-on-surface text-white rounded-2xl rounded-tr-sm"
-                                                    : "bg-surface-container-high text-on-surface rounded-2xl rounded-tl-sm"
-                                                }
-                                                ${m.status === "sending" ? "opacity-70" : ""}
-                                                ${
-                                                  m.status === "failed"
-                                                    ? "!bg-red-100 !text-red-900 border-2 border-red-500 cursor-pointer hover:border-red-600"
-                                                    : ""
-                                                }
-                                            `}
-                    >
-                      {m.content}
-                      {m.status === "failed" && (
-                        <div
-                          data-testid="retry-button"
-                          className="flex items-center gap-1 mt-2 text-red-600 text-xs"
-                        >
-                          <AlertCircle className="w-3 h-3" />
-                          <span>Failed to send. Tap to retry</span>
+              onRetryMessage={handleRetry}
+              onDeleteFailedMessage={handleDeleteFailed}
+              retryTestId="retry-button"
+              retryFailedDisabled={isOffline}
+              footer={
+                isBlocked ? (
+                  <BlockedConversationBanner
+                    blockStatus={blockStatus}
+                    otherUserName={otherParticipant?.name || undefined}
+                    onUnblock={
+                      blockStatus === "blocker" ? handleUnblock : undefined
+                    }
+                    isUnblocking={isUnblocking}
+                  />
+                ) : undefined
+              }
+              composer={
+                isBlocked
+                  ? undefined
+                  : {
+                      value: input,
+                      onChange: handleInputChange,
+                      onSubmit: handleSend,
+                      submitDisabled: isOffline,
+                      isOffline,
+                      maxLength: MESSAGE_MAX_LENGTH,
+                      inputTestId: "message-input",
+                      submitTestId: "send-button",
+                      counterTestId: "char-counter",
+                      before: isOffline ? (
+                        <div className="flex items-center gap-2 rounded-xl bg-surface-container-high px-4 py-2 text-sm text-on-surface-variant">
+                          <WifiOff className="h-4 w-4" />
+                          <span>
+                            You&apos;re offline. Reconnect to send messages.
+                          </span>
                         </div>
-                      )}
-                      {/* Read receipt indicator for sent messages */}
-                      {m.senderId === currentUserId &&
-                        m.status !== "failed" &&
-                        m.status !== "sending" && (
-                          <div
-                            className={`flex items-center justify-end gap-1 mt-1 text-xs ${m.read ? "text-blue-400" : "text-white/50"}`}
-                          >
-                            <CheckCheck className="w-3 h-3" />
-                            <span>{m.read ? "Read" : "Delivered"}</span>
-                          </div>
-                        )}
-                    </div>
-                  </div>
-                ))
-              )}
-
-              {/* Typing Indicator */}
-              {typingUsers.length > 0 && (
-                <div
-                  data-testid="typing-indicator"
-                  className="flex items-center gap-2 text-sm text-on-surface-variant"
-                >
-                  <div className="flex gap-1">
-                    <span
-                      className="w-2 h-2 bg-surface-container-high rounded-full animate-bounce"
-                      style={{ animationDelay: "0ms" }}
-                    />
-                    <span
-                      className="w-2 h-2 bg-surface-container-high rounded-full animate-bounce"
-                      style={{ animationDelay: "150ms" }}
-                    />
-                    <span
-                      className="w-2 h-2 bg-surface-container-high rounded-full animate-bounce"
-                      style={{ animationDelay: "300ms" }}
-                    />
-                  </div>
-                  <span>
-                    {typingUsers.map((u) => u.name || "Someone").join(", ")}{" "}
-                    {typingUsers.length === 1 ? "is" : "are"} typing...
-                  </span>
-                </div>
-              )}
-
-              <div ref={messagesEndRef} />
-
-              {/* Scroll to Latest Button */}
-              {showScrollToBottom && (
-                <button
-                  onClick={() => {
-                    messagesContainerRef.current?.scrollTo({
-                      top: messagesContainerRef.current.scrollHeight,
-                      behavior: "smooth",
-                    });
-                    setShowScrollToBottom(false);
-                  }}
-                  className="fixed bottom-28 right-8 z-10 flex items-center gap-2 px-4 py-2 bg-on-surface text-white rounded-full shadow-ambient hover:bg-on-surface transition-all animate-in fade-in slide-in-from-bottom-2 duration-200"
-                  aria-label="Scroll to latest messages"
-                >
-                  <ArrowDown className="w-4 h-4" />
-                  <span className="text-sm font-medium">New messages</span>
-                </button>
-              )}
-            </div>
-
-            {/* Input or Blocked Banner */}
-            {isBlocked ? (
-              <BlockedConversationBanner
-                blockStatus={blockStatus}
-                otherUserName={otherParticipant?.name || undefined}
-                onUnblock={
-                  blockStatus === "blocker" ? handleUnblock : undefined
-                }
-                isUnblocking={isUnblocking}
-              />
-            ) : (
-              <div className="p-4 md:p-6 space-y-2">
-                {/* Offline Banner */}
-                {isOffline && (
-                  <div className="px-4 py-2 bg-surface-container-high rounded-xl flex items-center gap-2 text-sm text-on-surface-variant">
-                    <WifiOff className="w-4 h-4" />
-                    <span>
-                      You&apos;re offline. Reconnect to send messages.
-                    </span>
-                  </div>
-                )}
-                <form
-                  onSubmit={handleSend}
-                  className="flex items-end gap-2 bg-surface-canvas p-2 rounded-[2rem] border border-outline-variant/20 focus-within:bg-surface-container-lowest focus-within:shadow-ambient transition-all"
-                >
-                  <button
-                    type="button"
-                    onClick={() =>
-                      toast.info("Attachments coming soon!", {
-                        description:
-                          "File sharing feature is currently in development.",
-                      })
+                      ) : null,
                     }
-                    className="min-w-[44px] min-h-[44px] flex items-center justify-center text-on-surface-variant hover:text-on-surface-variant"
-                    aria-label="Attachments coming soon"
-                  >
-                    <Paperclip className="w-5 h-5" />
-                  </button>
-                  <input
-                    data-testid="message-input"
-                    value={input}
-                    onChange={(e) => handleInputChange(e.target.value)}
-                    placeholder={
-                      isOffline ? "You're offline..." : "Type a message..."
-                    }
-                    maxLength={MESSAGE_MAX_LENGTH}
-                    className="flex-1 bg-transparent border-none outline-none py-3 px-2 text-on-surface placeholder:text-on-surface-variant"
-                  />
-                  <button
-                    type="submit"
-                    data-testid="send-button"
-                    disabled={!input.trim() || isOffline}
-                    className="min-w-[44px] min-h-[44px] bg-on-surface text-white rounded-full flex items-center justify-center hover:bg-on-surface disabled:opacity-60 transition-all"
-                    aria-label="Send message"
-                  >
-                    <Send className="w-4 h-4 ml-0.5" />
-                  </button>
-                </form>
-                {/* Character counter - show when user is typing */}
-                {input.length > 0 && (
-                  <CharacterCounter
-                    current={input.length}
-                    max={MESSAGE_MAX_LENGTH}
-                  />
-                )}
-              </div>
+              }
+            />
+
+            {showScrollToBottom && (
+              <button
+                onClick={() => {
+                  messagesContainerRef.current?.scrollTo({
+                    top: messagesContainerRef.current.scrollHeight,
+                    behavior: "smooth",
+                  });
+                  setShowScrollToBottom(false);
+                }}
+                className="fixed bottom-28 right-8 z-10 flex items-center gap-2 rounded-full bg-on-surface px-4 py-2 text-white shadow-ambient transition-all animate-in fade-in slide-in-from-bottom-2 duration-200 hover:bg-on-surface"
+                aria-label="Scroll to latest messages"
+              >
+                <ArrowDown className="w-4 h-4" />
+                <span className="text-sm font-medium">New messages</span>
+              </button>
             )}
           </>
         ) : (
