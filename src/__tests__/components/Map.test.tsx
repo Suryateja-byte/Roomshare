@@ -1335,8 +1335,8 @@ describe("Map Component", () => {
       expect(pricePill).toHaveClass(
         "bg-surface-container-lowest/96",
         "text-on-surface",
-        "border-primary/25",
-        "shadow-[0_14px_34px_-12px_rgba(27,28,25,0.36),0_0_0_3px_rgba(255,250,247,0.9)]"
+        "border-on-surface/15",
+        "shadow-[0_8px_24px_-10px_rgba(27,28,25,0.28)]"
       );
     });
 
@@ -1350,13 +1350,15 @@ describe("Map Component", () => {
       const markerPin = screen.getByTestId("map-pin-primary-listing-1");
       const pricePill = within(markerPin).getByText("$1,200");
 
+      // Viewed pills mute to on-surface-variant (#4a4941 on #eae8e3 = 7.39:1,
+      // comfortably above WCAG AA) while staying visually distinct from unviewed.
       expect(pricePill).toHaveClass(
         "bg-surface-container-high",
-        "text-on-surface",
-        "border-outline-variant/20",
-        "shadow-[0_10px_26px_-14px_rgba(27,28,25,0.3),0_0_0_3px_rgba(255,250,247,0.82)]"
+        "text-on-surface-variant",
+        "border-outline-variant/40",
+        "shadow-[0_6px_18px_-10px_rgba(27,28,25,0.22)]"
       );
-      expect(pricePill).not.toHaveClass("text-on-surface-variant");
+      expect(pricePill).not.toHaveClass("text-on-surface");
     });
 
     it("uses strong contrast for active price marker pills", async () => {
@@ -1384,8 +1386,12 @@ describe("Map Component", () => {
       const dimmedPin = screen.getByTestId("map-pin-primary-listing-3");
 
       expect(dimmedPin).toHaveAttribute("data-focus-state", "dimmed");
-      expect(dimmedPin).toHaveClass("opacity-85", "z-0");
-      expect(dimmedPin).not.toHaveClass("opacity-60");
+      // Dimmed = transient state while a sibling is hovered. At 60% element
+      // opacity the ink-on-white pill still blends to ≈4.9:1 against the
+      // paper basemap (above WCAG AA 4.5:1) while making the hovered pill
+      // unambiguous.
+      expect(dimmedPin).toHaveClass("opacity-60", "z-0");
+      expect(dimmedPin).not.toHaveClass("opacity-85");
       expect(within(dimmedPin).getByText("$900")).toHaveClass(
         "text-on-surface"
       );

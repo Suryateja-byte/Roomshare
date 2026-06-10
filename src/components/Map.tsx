@@ -69,6 +69,7 @@ import {
   MAP_FETCH_MAX_LNG_SPAN,
 } from "@/lib/constants";
 import { groupExactMapListingClones } from "@/lib/maps/marker-utils";
+import { CLUSTER_THEME } from "@/lib/maps/map-theme";
 import {
   patchMapPrototypeAddLayer,
   sanitizeStyleSpecification,
@@ -400,12 +401,6 @@ export interface MapComponentProps {
   suppressEmptyState?: boolean;
 }
 
-// Mapbox Layer Colors - Synced with Tailwind Zinc Palette
-const MAP_COLORS = {
-  zinc900: "#18181b",
-  white: "#ffffff",
-  zinc800: "#27272a",
-};
 
 type DesktopPopupAnchor =
   | "top"
@@ -671,13 +666,6 @@ function getPopupAdjustmentDelta(
   return { deltaX, deltaY };
 }
 
-// Price bucket colors for cluster rings, tuned to the warm RoomShare palette.
-const CLUSTER_RING_COLORS = {
-  affordable: "#6f7f46", // < $800/mo avg
-  mid: "#c08a2f", // $800-$1500/mo avg
-  premium: "#9a4027", // > $1500/mo avg
-};
-
 // Shared cluster radius expression
 const clusterRadiusExpr = [
   "step",
@@ -691,49 +679,44 @@ const clusterRadiusExpr = [
   40, // 40px radius for 100+ points
 ] as const;
 
-// Price-colored outer ring for clusters (rendered behind main cluster circle)
+// Soft shadow halo beneath cluster chips (GL has no box-shadow; radius is
+// cluster radius + 5). Replaces the former price-bucket ring — an
+// undiscoverable encoding that read as noise; price lives on the pills.
 const clusterRingLayer: LayerProps = {
   id: "cluster-ring",
   type: "circle",
   filter: ["has", "point_count"],
   paint: {
-    "circle-color": "transparent",
+    "circle-color": CLUSTER_THEME.halo.color,
+    "circle-opacity": CLUSTER_THEME.halo.opacity,
+    "circle-blur": CLUSTER_THEME.halo.blur,
+    "circle-translate": [...CLUSTER_THEME.halo.translate],
     "circle-radius": [
       "step",
       ["get", "point_count"],
-      24,
+      25,
       10,
-      29,
+      30,
       50,
-      36,
+      37,
       100,
-      44,
+      45,
     ],
-    "circle-stroke-width": 3,
-    "circle-stroke-color": [
-      "step",
-      ["/", ["get", "priceSum"], ["get", "point_count"]],
-      CLUSTER_RING_COLORS.affordable,
-      800,
-      CLUSTER_RING_COLORS.mid,
-      1500,
-      CLUSTER_RING_COLORS.premium,
-    ],
-    "circle-stroke-opacity": 0.82,
   },
 };
 
-// Cluster layer - circles for grouped markers
+// Cluster layer — "Paper chip" circles for grouped markers
 // Note: No 'source' property - Layer inherits from parent Source component
 const clusterLayer: LayerProps = {
   id: "clusters",
   type: "circle",
   filter: ["has", "point_count"],
   paint: {
-    "circle-color": "#1b1c19",
+    "circle-color": CLUSTER_THEME.light.fill,
     "circle-radius": clusterRadiusExpr as unknown as number,
-    "circle-stroke-width": 3,
-    "circle-stroke-color": MAP_COLORS.white,
+    "circle-stroke-width": CLUSTER_THEME.light.strokeWidth,
+    "circle-stroke-color": CLUSTER_THEME.light.stroke,
+    "circle-stroke-opacity": CLUSTER_THEME.light.strokeOpacity,
   },
 };
 
@@ -743,10 +726,11 @@ const clusterLayerDark: LayerProps = {
   type: "circle",
   filter: ["has", "point_count"],
   paint: {
-    "circle-color": MAP_COLORS.white,
+    "circle-color": CLUSTER_THEME.dark.fill,
     "circle-radius": clusterRadiusExpr as unknown as number,
-    "circle-stroke-width": 3,
-    "circle-stroke-color": MAP_COLORS.zinc900,
+    "circle-stroke-width": CLUSTER_THEME.dark.strokeWidth,
+    "circle-stroke-color": CLUSTER_THEME.dark.stroke,
+    "circle-stroke-opacity": CLUSTER_THEME.dark.strokeOpacity,
   },
 };
 
@@ -770,7 +754,7 @@ function getClusterCountLayer(textScale: number): LayerProps {
       "text-font": ["Noto Sans Bold"],
       "text-size": Math.round(14 * textScale),
     },
-    paint: { "text-color": MAP_COLORS.white },
+    paint: { "text-color": CLUSTER_THEME.light.countText },
   };
 }
 
@@ -784,7 +768,7 @@ function getClusterCountLayerDark(textScale: number): LayerProps {
       "text-font": ["Noto Sans Bold"],
       "text-size": Math.round(14 * textScale),
     },
-    paint: { "text-color": MAP_COLORS.zinc900 },
+    paint: { "text-color": CLUSTER_THEME.dark.countText },
   };
 }
 
@@ -847,7 +831,7 @@ const MarkerPinContent = React.memo(function MarkerPinContent({
           className={cn(
             "h-3 w-3 rounded-full shadow-ambient transition-transform duration-200",
             isViewed
-              ? "bg-surface-container-highest ring-2 ring-primary/25"
+              ? "bg-[#8a8475] ring-2 ring-surface-container-lowest"
               : "bg-on-surface ring-2 ring-surface-container-lowest shadow-ambient",
             "group-hover/marker:scale-125"
           )}
@@ -861,13 +845,13 @@ const MarkerPinContent = React.memo(function MarkerPinContent({
     <m.div layout className="relative">
       <div
         className={cn(
-          "flex items-center justify-center rounded-full border border-primary/25 bg-surface-container-lowest/96 px-4 py-2 font-display text-sm font-semibold text-on-surface shadow-[0_14px_34px_-12px_rgba(27,28,25,0.36),0_0_0_3px_rgba(255,250,247,0.9)] transition-all duration-300 group-hover/marker:z-10 group-hover/marker:scale-110 group-hover/marker:border-primary/30 group-hover/marker:bg-gradient-to-br group-hover/marker:from-primary group-hover/marker:to-primary-container group-hover/marker:text-on-primary",
+          "flex items-center justify-center rounded-full border border-on-surface/15 bg-surface-container-lowest/96 px-4 py-2 font-display text-sm font-semibold text-on-surface shadow-[0_8px_24px_-10px_rgba(27,28,25,0.28)] transition-all duration-300 group-hover/marker:z-10 group-hover/marker:scale-110 group-hover/marker:border-primary/30 group-hover/marker:bg-gradient-to-br group-hover/marker:from-primary group-hover/marker:to-primary-container group-hover/marker:text-on-primary",
           (isHovered || isActive) &&
-            "z-20 scale-[1.15] border-primary/30 bg-gradient-to-br from-primary to-primary-container text-on-primary shadow-[0_16px_36px_-10px_rgba(154,64,39,0.5),0_0_0_4px_rgba(255,250,247,0.88)]",
+            "z-20 scale-[1.15] border-primary/30 bg-gradient-to-br from-primary to-primary-container text-on-primary shadow-[0_16px_36px_-10px_rgba(154,64,39,0.45),0_0_0_2px_#ffffff]",
           isViewed &&
             !isHovered &&
             !isActive &&
-            "border-outline-variant/20 bg-surface-container-high text-on-surface shadow-[0_10px_26px_-14px_rgba(27,28,25,0.3),0_0_0_3px_rgba(255,250,247,0.82)]"
+            "border-outline-variant/40 bg-surface-container-high text-on-surface-variant shadow-[0_6px_18px_-10px_rgba(27,28,25,0.22)]"
         )}
       >
         {formatPrice(price)}
@@ -994,7 +978,7 @@ const MapMarkerItem = React.memo(function MapMarkerItem({
           "transition-all duration-200 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)]",
           isHovered && "scale-[1.15] z-50",
           isActive && !isHovered && "z-40",
-          isDimmed && "z-0 opacity-85",
+          isDimmed && "z-0 opacity-60",
           isKeyboardFocused && "z-50"
         )}
         data-listing-id={listingId}
@@ -1038,10 +1022,10 @@ const MapMarkerItem = React.memo(function MapMarkerItem({
             )}
           />
         )}
-        {/* Keyboard focus halo - neutral shadow without a bright accent border */}
+        {/* Keyboard focus ring - two-tone (paper gap + terracotta) for WCAG 2.4.7 visibility */}
         {isKeyboardFocused && (
           <div
-            className="absolute -inset-2 rounded-full pointer-events-none shadow-[0_14px_32px_rgba(27,28,25,0.14)]"
+            className="absolute -inset-2 rounded-full pointer-events-none shadow-[0_0_0_2px_#fbf9f4,0_0_0_4px_#9a4027]"
             aria-hidden="true"
           />
         )}
