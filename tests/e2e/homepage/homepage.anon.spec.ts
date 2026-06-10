@@ -83,9 +83,17 @@ test.describe("Homepage — Anonymous User", () => {
     page,
   }) => {
     test.slow();
-    const section = page.locator('[data-testid="featured-listings-section"]');
-    await section.waitFor({ state: "attached", timeout: 20_000 });
-    await section.scrollIntoViewIfNeeded();
+    // Content and empty variants carry distinct testids; exactly one renders.
+    const section = page
+      .locator('[data-testid="featured-listings-section"]')
+      .or(page.locator('[data-testid="featured-listings-empty"]'))
+      .first();
+    await expect(section).toBeVisible({ timeout: 20_000 });
+    // Hydration can replace the section node between resolve and scroll —
+    // retry the scroll instead of holding a single element handle.
+    await expect(async () => {
+      await section.scrollIntoViewIfNeeded();
+    }).toPass({ timeout: 20_000 });
 
     await expect(
       section
