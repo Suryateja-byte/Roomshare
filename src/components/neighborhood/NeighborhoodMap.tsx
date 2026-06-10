@@ -23,6 +23,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { MapPin } from "lucide-react";
 import { getWalkabilityRings, formatDistance } from "@/lib/geo/distance";
+import { CLUSTER_THEME, MAP_BRAND } from "@/lib/maps/map-theme";
 import type { POI } from "@/lib/places/types";
 import { fixMarkerWrapperRole } from "@/components/map/fixMarkerA11y";
 
@@ -45,16 +46,17 @@ interface NeighborhoodMapProps {
   className?: string;
 }
 
-// Cluster layer styles
+// Cluster layer styles — "Paper chip" family, matching the search map
 const clusterLayer: LayerProps = {
   id: "poi-clusters",
   type: "circle",
   filter: ["has", "point_count"],
   paint: {
-    "circle-color": "#ef4444", // red-500
+    "circle-color": CLUSTER_THEME.light.fill,
     "circle-radius": ["step", ["get", "point_count"], 18, 5, 22, 10, 26],
-    "circle-stroke-width": 2,
-    "circle-stroke-color": "#ffffff",
+    "circle-stroke-width": CLUSTER_THEME.light.strokeWidth,
+    "circle-stroke-color": CLUSTER_THEME.light.stroke,
+    "circle-stroke-opacity": CLUSTER_THEME.light.strokeOpacity,
   },
 };
 
@@ -63,10 +65,11 @@ const clusterLayerDark: LayerProps = {
   type: "circle",
   filter: ["has", "point_count"],
   paint: {
-    "circle-color": "#f87171", // red-400
+    "circle-color": CLUSTER_THEME.dark.fill,
     "circle-radius": ["step", ["get", "point_count"], 18, 5, 22, 10, 26],
-    "circle-stroke-width": 2,
-    "circle-stroke-color": "#18181b",
+    "circle-stroke-width": CLUSTER_THEME.dark.strokeWidth,
+    "circle-stroke-color": CLUSTER_THEME.dark.stroke,
+    "circle-stroke-opacity": CLUSTER_THEME.dark.strokeOpacity,
   },
 };
 
@@ -79,7 +82,7 @@ const clusterCountLayer: LayerProps = {
     "text-font": ["Noto Sans Regular"],
     "text-size": 12,
   },
-  paint: { "text-color": "#ffffff" },
+  paint: { "text-color": CLUSTER_THEME.light.countText },
 };
 
 const clusterCountLayerDark: LayerProps = {
@@ -91,7 +94,7 @@ const clusterCountLayerDark: LayerProps = {
     "text-font": ["Noto Sans Regular"],
     "text-size": 12,
   },
-  paint: { "text-color": "#18181b" },
+  paint: { "text-color": CLUSTER_THEME.dark.countText },
 };
 
 const unclusteredPoiLayer: LayerProps = {
@@ -102,10 +105,10 @@ const unclusteredPoiLayer: LayerProps = {
     "circle-color": [
       "case",
       ["boolean", ["get", "isSelected"], false],
-      "#9a4027",
+      MAP_BRAND.primary,
       ["boolean", ["get", "isHovered"], false],
-      "#9a4027",
-      "#ef4444",
+      MAP_BRAND.primary,
+      MAP_BRAND.white,
     ],
     "circle-radius": [
       "case",
@@ -118,7 +121,16 @@ const unclusteredPoiLayer: LayerProps = {
       6,
     ],
     "circle-stroke-width": 2,
-    "circle-stroke-color": "#ffffff",
+    "circle-stroke-color": [
+      "case",
+      [
+        "any",
+        ["boolean", ["get", "isSelected"], false],
+        ["boolean", ["get", "isHovered"], false],
+      ],
+      MAP_BRAND.white,
+      MAP_BRAND.inkVariant,
+    ],
   },
 };
 
@@ -130,10 +142,10 @@ const unclusteredPoiLayerDark: LayerProps = {
     "circle-color": [
       "case",
       ["boolean", ["get", "isSelected"], false],
-      "#f5ebe3",
+      MAP_BRAND.primaryContainer,
       ["boolean", ["get", "isHovered"], false],
-      "#f5ebe3",
-      "#f87171",
+      MAP_BRAND.primaryContainer,
+      MAP_BRAND.canvas,
     ],
     "circle-radius": [
       "case",
@@ -146,11 +158,23 @@ const unclusteredPoiLayerDark: LayerProps = {
       6,
     ],
     "circle-stroke-width": 2,
-    "circle-stroke-color": "#18181b",
+    "circle-stroke-color": [
+      "case",
+      [
+        "any",
+        ["boolean", ["get", "isSelected"], false],
+        ["boolean", ["get", "isHovered"], false],
+      ],
+      MAP_BRAND.white,
+      MAP_BRAND.ink,
+    ],
   },
 };
 
-// Walkability ring layer styles
+// Walkability ring layer styles — ordinal distance re-mapped to brand
+// tokens (success/warning/destructive); the concentric ring radius is the
+// CVD-safe channel, color is reinforcement. line-dasharray cannot vary
+// per-feature in MapLibre, so all rings share one dash pattern.
 const walkabilityRingLayer: LayerProps = {
   id: "walkability-rings",
   type: "line",
@@ -159,12 +183,12 @@ const walkabilityRingLayer: LayerProps = {
       "match",
       ["get", "minutes"],
       5,
-      "#22c55e", // green-500
+      MAP_BRAND.success,
       10,
-      "#eab308", // yellow-500
+      MAP_BRAND.warning,
       15,
-      "#f97316", // orange-500
-      "#94a3b8", // slate-400 default
+      MAP_BRAND.destructive,
+      "#6e6a5e", // warm gray default
     ],
     "line-width": 2,
     "line-dasharray": [4, 2],
@@ -187,15 +211,15 @@ const walkabilityRingLabelLayer: LayerProps = {
       "match",
       ["get", "minutes"],
       5,
-      "#16a34a", // green-600
+      "#236330", // success, darkened for 11px label contrast
       10,
-      "#ca8a04", // yellow-600
+      "#8f4207", // warning, darkened
       15,
-      "#ea580c", // orange-600
-      "#64748b", // slate-500 default
+      "#9a2c18", // destructive, darkened
+      "#57544a", // warm gray default
     ],
     "text-halo-color": "#ffffff",
-    "text-halo-width": 1,
+    "text-halo-width": 1.2,
   },
 };
 
@@ -459,7 +483,7 @@ export function NeighborhoodMap({
         mapStyle={
           isDarkMode
             ? "/map-styles/liberty-dark.json"
-            : "https://tiles.openfreemap.org/styles/liberty"
+            : "/map-styles/liberty-paper.json"
         }
       >
         {/* Walkability rings */}
@@ -526,7 +550,7 @@ export function NeighborhoodMap({
                 ${
                   selectedPlaceId === poi.placeId
                     ? "bg-primary ring-2 ring-primary/30"
-                    : "bg-red-500"
+                    : "bg-on-surface"
                 }
               `}
               role="button"

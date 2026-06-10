@@ -107,73 +107,78 @@ export interface CategoryColorConfig {
   markerBorder: string;
 }
 
+// Brand-token category palette (hex values mirror globals.css @theme).
+// White marker chips with a semantic accent border match the search map's
+// "Paper chips" family; each category keeps a distinct, conventional hue:
+// food=success green, dining=destructive red, medical=info blue,
+// fuel=warning amber, shopping=tertiary brown, fitness=primary terracotta.
 export const CATEGORY_COLORS: Record<string, CategoryColorConfig> = {
   "food-grocery": {
-    bg: "bg-orange-50",
-    icon: "text-orange-600",
-    accent: "bg-orange-500",
-    markerBg: "#fff7ed",
-    markerBorder: "#ea580c",
+    bg: "bg-success/10",
+    icon: "text-success",
+    accent: "bg-success",
+    markerBg: "#ffffff",
+    markerBorder: "#2d7a3a",
   },
   // Supermarket (valid Radar API category, same colors as grocery)
   supermarket: {
-    bg: "bg-orange-50",
-    icon: "text-orange-600",
-    accent: "bg-orange-500",
-    markerBg: "#fff7ed",
-    markerBorder: "#ea580c",
+    bg: "bg-success/10",
+    icon: "text-success",
+    accent: "bg-success",
+    markerBg: "#ffffff",
+    markerBorder: "#2d7a3a",
   },
   // Restaurants (valid Radar API category)
   restaurant: {
-    bg: "bg-rose-50",
-    icon: "text-rose-600",
-    accent: "bg-rose-500",
-    markerBg: "#fff1f2",
-    markerBorder: "#e11d48",
+    bg: "bg-destructive/10",
+    icon: "text-destructive",
+    accent: "bg-destructive",
+    markerBg: "#ffffff",
+    markerBorder: "#c4321c",
   },
   // Food & Beverage (valid Radar API category, same colors as restaurant)
   "food-beverage": {
-    bg: "bg-rose-50",
-    icon: "text-rose-600",
-    accent: "bg-rose-500",
-    markerBg: "#fff1f2",
-    markerBorder: "#e11d48",
+    bg: "bg-destructive/10",
+    icon: "text-destructive",
+    accent: "bg-destructive",
+    markerBg: "#ffffff",
+    markerBorder: "#c4321c",
   },
   "shopping-retail": {
-    bg: "bg-purple-50",
-    icon: "text-purple-600",
-    accent: "bg-purple-500",
-    markerBg: "#faf5ff",
-    markerBorder: "#9333ea",
+    bg: "bg-tertiary/10",
+    icon: "text-tertiary",
+    accent: "bg-tertiary",
+    markerBg: "#ffffff",
+    markerBorder: "#904917",
   },
   // Gas stations (valid Radar API category)
   "gas-station": {
-    bg: "bg-amber-50",
-    icon: "text-amber-600",
-    accent: "bg-amber-500",
-    markerBg: "#fffbeb",
-    markerBorder: "#d97706",
+    bg: "bg-warning/10",
+    icon: "text-warning",
+    accent: "bg-warning",
+    markerBg: "#ffffff",
+    markerBorder: "#b45309",
   },
   gym: {
     bg: "bg-primary/10",
     icon: "text-primary",
     accent: "bg-primary",
-    markerBg: "#f5ebe3",
+    markerBg: "#ffffff",
     markerBorder: "#9a4027",
   },
   "medical-health": {
-    bg: "bg-emerald-50",
-    icon: "text-emerald-600",
-    accent: "bg-emerald-500",
-    markerBg: "#ecfdf5",
-    markerBorder: "#059669",
+    bg: "bg-info/10",
+    icon: "text-info",
+    accent: "bg-info",
+    markerBg: "#ffffff",
+    markerBorder: "#1e6fa0",
   },
   pharmacy: {
-    bg: "bg-emerald-50",
-    icon: "text-emerald-600",
-    accent: "bg-emerald-500",
-    markerBg: "#ecfdf5",
-    markerBorder: "#059669",
+    bg: "bg-info/10",
+    icon: "text-info",
+    accent: "bg-info",
+    markerBg: "#ffffff",
+    markerBorder: "#1e6fa0",
   },
   // Fallback for unknown categories
   default: {
