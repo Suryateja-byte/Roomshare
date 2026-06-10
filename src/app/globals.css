@@ -105,28 +105,6 @@
     /* === LAYOUT === */
     --header-height: 80px;
 
-    /* === SEMANTIC ALIASES (shadcn compat) === */
-    --background: var(--color-surface-canvas);
-    --foreground: var(--color-on-surface);
-    --card: var(--color-surface-container-lowest);
-    --card-foreground: var(--color-on-surface);
-    --popover: var(--color-surface-container-lowest);
-    --popover-foreground: var(--color-on-surface);
-    --primary: var(--color-primary);
-    --primary-foreground: var(--color-on-primary);
-    --secondary: var(--color-surface-container-high);
-    --secondary-foreground: var(--color-on-surface);
-    --muted: var(--color-surface-container-high);
-    --muted-foreground: var(--color-on-surface-variant);
-    --accent: var(--color-tertiary);
-    --accent-foreground: var(--color-on-primary);
-    --accent-subtle: #f5ebe3;
-    --accent-muted: #edd8c8;
-    --destructive: var(--color-destructive);
-    --border: var(--color-outline-variant);
-    --input: var(--color-outline-variant);
-    --ring: var(--color-primary);
-
     color-scheme: light;
   }
 

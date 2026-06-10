@@ -45,8 +45,8 @@ const NeighborhoodMap = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="w-full h-64 bg-muted/50 rounded-xl animate-pulse flex items-center justify-center">
-        <span className="text-sm text-muted-foreground">Loading map...</span>
+      <div className="w-full h-64 bg-surface-container-high/50 rounded-xl animate-pulse flex items-center justify-center">
+        <span className="text-sm text-on-surface-variant">Loading map...</span>
       </div>
     ),
   }
@@ -61,7 +61,7 @@ const NearbyPlacesCard = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="w-full h-48 bg-muted/50 rounded-xl animate-pulse" />
+      <div className="w-full h-48 bg-surface-container-high/50 rounded-xl animate-pulse" />
     ),
   }
 );
@@ -222,7 +222,7 @@ export function NeighborhoodModule({
           <span>{error}</span>
           <button
             onClick={handleRetry}
-            className="shrink-0 px-3 py-1.5 text-xs font-medium bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 transition-colors"
+            className="shrink-0 px-3 py-1.5 text-xs font-medium bg-destructive text-on-primary rounded-md hover:bg-destructive/90 transition-colors"
             aria-label="Retry search"
           >
             Retry
@@ -317,7 +317,7 @@ export function NeighborhoodModule({
       )}
 
       {/* Google Places Attribution - required by ToS */}
-      <div className="text-xs text-muted-foreground">
+      <div className="text-xs text-on-surface-variant">
         <gmp-place-attribution></gmp-place-attribution>
       </div>
     </div>

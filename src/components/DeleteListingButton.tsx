@@ -139,7 +139,7 @@ export default function DeleteListingButton({
           </div>
         )}
 
-        <p className="text-sm text-center text-muted-foreground">
+        <p className="text-sm text-center text-on-surface-variant">
           Are you sure? This action cannot be undone.
         </p>
 
