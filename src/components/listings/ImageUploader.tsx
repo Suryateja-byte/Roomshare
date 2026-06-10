@@ -207,8 +207,12 @@ export default function ImageUploader({
       URL.revokeObjectURL(imageToRemove.previewUrl);
     }
 
-    // Fire-and-forget: delete from Supabase storage (best effort)
-    if (imageToRemove?.uploadedUrl) {
+    // Best-effort storage cleanup, ONLY for images uploaded this session
+    // (`file` present). Images from initialImages belong to a saved listing;
+    // the server deletes those after a successful save by diffing the
+    // listing's image list — deleting them here would break the live listing
+    // if the user abandons the edit.
+    if (imageToRemove?.file && imageToRemove.uploadedUrl) {
       const match = imageToRemove.uploadedUrl.match(
         /\/storage\/v1\/object\/public\/images\/(.+)$/
       );
@@ -218,7 +222,7 @@ export default function ImageUploader({
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ path: storagePath }),
-        }).catch(() => {}); // Best effort
+        }).catch(() => {});
       }
     }
 

@@ -7,7 +7,7 @@
  *   - Object URLs are revoked on cleanup
  */
 
-import { render, act } from "@testing-library/react";
+import { render, act, fireEvent, screen, waitFor } from "@testing-library/react";
 import ImageUploader from "@/components/listings/ImageUploader";
 
 // ---------------------------------------------------------------------------
@@ -70,6 +70,86 @@ function createTestFile(name = "test.jpg", size = 1024): File {
 // ---------------------------------------------------------------------------
 
 describe("ImageUploader — abort / unmount safety", () => {
+  it("does not delete uploaded images immediately when they are removed", async () => {
+    const onImagesChange = jest.fn();
+    const removedUrl =
+      "https://example.supabase.co/storage/v1/object/public/images/listings/user-1/removed.jpg";
+    const remainingUrl =
+      "https://example.supabase.co/storage/v1/object/public/images/listings/user-1/remaining.jpg";
+
+    render(
+      <ImageUploader
+        initialImages={[removedUrl, remainingUrl]}
+        onImagesChange={onImagesChange}
+        uploadToCloud={true}
+      />
+    );
+
+    await waitFor(() => expect(onImagesChange).toHaveBeenCalled());
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Remove image" })[0]);
+
+    await waitFor(() => {
+      const lastImages =
+        onImagesChange.mock.calls[onImagesChange.mock.calls.length - 1]?.[0];
+      expect(lastImages).toHaveLength(1);
+      expect(lastImages[0].uploadedUrl).toBe(remainingUrl);
+    });
+
+    expect(global.fetch).not.toHaveBeenCalledWith(
+      "/api/upload",
+      expect.objectContaining({ method: "DELETE" })
+    );
+  });
+
+  it("deletes storage for a session-uploaded image when it is removed", async () => {
+    const onImagesChange = jest.fn();
+    const sessionUrl =
+      "https://example.supabase.co/storage/v1/object/public/images/listings/user-1/session.jpg";
+
+    render(
+      <ImageUploader onImagesChange={onImagesChange} uploadToCloud={true} />
+    );
+
+    const fileInput = document.querySelector(
+      'input[type="file"]'
+    ) as HTMLInputElement;
+    const file = createTestFile("session.jpg");
+
+    await act(async () => {
+      Object.defineProperty(fileInput, "files", {
+        value: [file],
+        configurable: true,
+      });
+      fileInput.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    // Complete the upload
+    await act(async () => {
+      fetchResolvers[0].resolve({
+        ok: true,
+        json: async () => ({ url: sessionUrl }),
+      } as Response);
+    });
+
+    await waitFor(() => {
+      const lastImages =
+        onImagesChange.mock.calls[onImagesChange.mock.calls.length - 1]?.[0];
+      expect(lastImages?.[0]?.uploadedUrl).toBe(sessionUrl);
+      expect(lastImages?.[0]?.isUploading).toBeFalsy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove image" }));
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/upload",
+      expect.objectContaining({
+        method: "DELETE",
+        body: JSON.stringify({ path: "listings/user-1/session.jpg" }),
+      })
+    );
+  });
+
   it("aborts in-flight uploads when component unmounts", async () => {
     const onImagesChange = jest.fn();
     const { unmount } = render(
