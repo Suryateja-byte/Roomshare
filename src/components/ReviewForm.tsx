@@ -338,7 +338,7 @@ export default function ReviewForm({
                 onChange={(e) => setComment(e.target.value)}
                 maxLength={COMMENT_MAX_LENGTH}
                 rows={3}
-                className="w-full px-4 py-3 bg-surface-container-lowest border border-outline-variant/20 rounded-xl text-on-surface placeholder:text-on-surface-variant"
+                className="w-full px-4 py-3 bg-surface-container-lowest border border-outline-variant/20 rounded-xl text-on-surface placeholder:text-on-surface-variant focus:outline-none focus-visible:outline-none focus-visible:border-primary/35 focus-visible:ring-2 focus-visible:ring-primary/30"
                 placeholder="Update your review..."
                 aria-describedby={error ? "review-edit-error" : undefined}
                 aria-invalid={!!error}
@@ -576,7 +576,7 @@ export default function ReviewForm({
           placeholder="Share your experience..."
           aria-label="Write your review"
           maxLength={COMMENT_MAX_LENGTH}
-          className="w-full min-h-[100px] p-3 rounded-lg border border-outline-variant/20 focus:outline-none resize-y bg-surface-container-lowest text-on-surface placeholder:text-on-surface-variant"
+          className="w-full min-h-[100px] p-3 rounded-lg border border-outline-variant/20 focus:outline-none focus-visible:outline-none focus-visible:border-primary/35 focus-visible:ring-2 focus-visible:ring-primary/30 resize-y bg-surface-container-lowest text-on-surface placeholder:text-on-surface-variant"
           disabled={isSubmitting}
           aria-describedby={error ? "review-form-error" : undefined}
           aria-invalid={!!error}
