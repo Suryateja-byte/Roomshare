@@ -199,14 +199,14 @@ export default function VerificationForm() {
             type="file"
             accept="image/jpeg,image/png,image/webp"
             onChange={handleDocumentUpload}
-            className="hidden"
+            className="peer sr-only"
             id="document-upload"
             aria-describedby={error ? "verification-form-error" : undefined}
             aria-invalid={!!error}
           />
           <label
             htmlFor="document-upload"
-            className={`flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-lg cursor-pointer transition-all ${
+            className={`flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-lg cursor-pointer transition-all peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-primary/30 peer-focus-visible:ring-offset-2 ${
               documentUpload
                 ? "border-green-500 bg-green-50"
                 : "border-outline-variant/30 hover:border-outline-variant/50 bg-surface-container-high"
@@ -262,12 +262,12 @@ export default function VerificationForm() {
             type="file"
             accept="image/jpeg,image/png,image/webp"
             onChange={handleSelfieUpload}
-            className="hidden"
+            className="peer sr-only"
             id="selfie-upload"
           />
           <label
             htmlFor="selfie-upload"
-            className={`flex items-center gap-4 w-full p-4 border-2 border-dashed rounded-lg cursor-pointer transition-all ${
+            className={`flex items-center gap-4 w-full p-4 border-2 border-dashed rounded-lg cursor-pointer transition-all peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-primary/30 peer-focus-visible:ring-offset-2 ${
               selfieUpload
                 ? "border-green-500 bg-green-50"
                 : "border-outline-variant/30 hover:border-outline-variant/50 bg-surface-container-high"
