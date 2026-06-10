@@ -70,6 +70,7 @@ import {
 } from "@/lib/constants";
 import { groupExactMapListingClones } from "@/lib/maps/marker-utils";
 import { CLUSTER_THEME } from "@/lib/maps/map-theme";
+import { shouldShowEmptyState } from "@/lib/maps/map-view-state";
 import {
   patchMapPrototypeAddLayer,
   sanitizeStyleSpecification,
@@ -399,6 +400,14 @@ export interface MapComponentProps {
    * @default false
    */
   suppressEmptyState?: boolean;
+
+  /**
+   * The last map-data fetch failed or timed out (the wrapper is showing an
+   * error banner). Gates the empty state so a failed fetch never presents
+   * as "No listings in this area".
+   * @default false
+   */
+  hasFetchError?: boolean;
 }
 
 
@@ -1098,6 +1107,7 @@ export default function MapComponent({
   selectionPresentation = "popup",
   disableAutoFit = false,
   suppressEmptyState = false,
+  hasFetchError = false,
 }: MapComponentProps) {
   // --- Controlled vs Uncontrolled View State ---
   // When viewState prop is provided, map runs in controlled mode
@@ -3359,13 +3369,15 @@ export default function MapComponent({
   const canShowMobileEmptyState =
     mobileResultsState !== "positive" &&
     (mobileResultsState === "zero" || hasSearchBoundsInUrl || hasUserMoved);
-  const hasConfirmedEmptyViewport =
-    isMapLoaded &&
-    isMapInitialized &&
-    !areTilesLoading &&
-    !isSearching &&
-    !suppressEmptyState &&
-    listings.length === 0;
+  const hasConfirmedEmptyViewport = shouldShowEmptyState({
+    isMapLoaded,
+    isMapInitialized,
+    areTilesLoading,
+    isSearching,
+    suppressEmptyState,
+    hasFetchError,
+    listingsCount: listings.length,
+  });
   const mobileMapStatus = useMemo<MobileMapStatus | null>(() => {
     if (
       isPhoneViewport !== true ||

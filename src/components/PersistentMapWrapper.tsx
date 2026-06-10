@@ -295,7 +295,9 @@ function MapErrorBanner({
     <div
       role="alert"
       aria-live="polite"
-      className="absolute top-4 left-4 right-4 z-50 bg-amber-50 border border-outline-variant/20 rounded-lg p-3 flex items-center justify-between gap-2"
+      // right-20 keeps the Retry button clear of the floating map controls
+      // (fullscreen/tools stack at top-right intercepts clicks at right-4)
+      className="absolute top-4 left-4 right-20 z-50 bg-amber-50 border border-outline-variant/20 rounded-lg p-3 flex items-center justify-between gap-2"
     >
       <span className="text-sm text-amber-700 block">{message}</span>
       <button
@@ -1248,6 +1250,7 @@ export default function PersistentMapWrapper({
           <LazyDynamicMap
             listings={stableEffectiveListings}
             suppressEmptyState={Boolean(infoMessage)}
+            hasFetchError={Boolean(error)}
             selectionPresentation={isDesktop === false ? "preview" : "popup"}
           />
         </Suspense>

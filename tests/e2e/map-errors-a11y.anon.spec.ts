@@ -61,8 +61,10 @@ test.describe("Map Error States and Accessibility", () => {
   ) {
     await page.waitForLoadState("domcontentloaded");
 
-    // Wait for map panel to render
-    const hideMapButton = page.getByRole("button", { name: /hide map/i });
+    // Wait for map panel to render (button is named "Hide results map")
+    const hideMapButton = page.getByRole("button", {
+      name: /hide (results )?map/i,
+    });
     await expect(hideMapButton).toBeVisible({ timeout: timeouts.navigation });
 
     // Wait for loading to complete
@@ -305,6 +307,49 @@ test.describe("Map Error States and Accessibility", () => {
 
       // Should have no critical JavaScript errors
       expect(criticalErrors).toHaveLength(0);
+    });
+
+    // REGRESSION (observed live 2026-06-10): a failed/timed-out map-listings
+    // fetch left listings=[] and the map showed BOTH the error banner AND the
+    // "No listings in this area" empty state while the list pane had results.
+    // The empty state is now gated on hasFetchError (map-view-state.ts).
+    test(`${tags.anon} 10.6 - Fetch failure shows error banner, never the empty state`, async ({
+      page,
+    }) => {
+      let failRequests = true;
+      await page.route("**/api/map-listings*", async (route) => {
+        if (failRequests) {
+          await route.fulfill({
+            status: 500,
+            contentType: "application/json",
+            body: JSON.stringify({ error: "Internal server error" }),
+          });
+        } else {
+          await route.fallback();
+        }
+      });
+
+      await page.goto(SEARCH_URL);
+
+      // Error banner with Retry appears
+      await waitForMapError(page, /server error|failed|try again/i);
+      const retryButton = page.getByRole("button", { name: /^retry$/i });
+      await expect(retryButton).toBeVisible();
+
+      // The map must NOT claim the area is empty while the fetch is failing
+      await expect(page.getByText(/No listings in this area/i)).toHaveCount(0);
+      await expect(page.getByText(/No places in this area/i)).toHaveCount(0);
+
+      // Recovery: let requests through and retry
+      failRequests = false;
+      await retryButton.click();
+
+      // Banner clears once the refetch succeeds
+      await expect(
+        page.getByRole("alert").filter({ hasText: /server error|failed/i })
+      ).toHaveCount(0, { timeout: timeouts.action });
+      // And the empty state still doesn't appear (SF bounds have seeded listings)
+      await expect(page.getByText(/No listings in this area/i)).toHaveCount(0);
     });
   });
 
