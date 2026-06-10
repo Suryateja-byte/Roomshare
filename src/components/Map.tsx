@@ -4191,10 +4191,7 @@ export default function MapComponent({
         />
 
         {/* Privacy circles — translucent ~200m radius around listings */}
-        <PrivacyCircle
-          listings={privacyCircleListings}
-          isDarkMode={isDarkMode}
-        />
+        <PrivacyCircle listings={privacyCircleListings} />
 
         {/* Clustering Source and Layers - Layer nested inside Source inherits source automatically */}
         {useClustering && (

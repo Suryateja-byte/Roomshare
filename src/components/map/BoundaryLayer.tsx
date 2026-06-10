@@ -10,6 +10,7 @@ import { Source, Layer } from "react-map-gl/maplibre";
 import type { LayerProps } from "react-map-gl/maplibre";
 import { useEffect, useState, useMemo, useRef } from "react";
 import { searchBoundary } from "@/lib/geocoding/nominatim";
+import { BOUNDARY_THEME } from "@/lib/maps/map-theme";
 
 interface BoundaryLayerProps {
   /** Search query text (e.g. "Mission District, SF") */
@@ -32,8 +33,8 @@ function getBoundaryFillLayer(isDarkMode: boolean): LayerProps {
     id: "boundary-fill",
     type: "fill",
     paint: {
-      "fill-color": "#4a4941", // on-surface-variant
-      "fill-opacity": 0.08,
+      "fill-color": BOUNDARY_THEME.fill,
+      "fill-opacity": BOUNDARY_THEME.fillOpacity,
     },
   };
 }
@@ -43,10 +44,10 @@ function getBoundaryLineLayer(isDarkMode: boolean): LayerProps {
     id: "boundary-line",
     type: "line",
     paint: {
-      "line-color": "#4a4941", // on-surface-variant
-      "line-width": 1.5,
-      "line-opacity": 0.3,
-      "line-dasharray": [4, 2],
+      "line-color": BOUNDARY_THEME.line,
+      "line-width": BOUNDARY_THEME.lineWidth,
+      "line-opacity": BOUNDARY_THEME.lineOpacity,
+      "line-dasharray": [...BOUNDARY_THEME.dasharray],
     },
   };
 }

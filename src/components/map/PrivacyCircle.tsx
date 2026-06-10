@@ -11,6 +11,7 @@
 import { Source, Layer } from "react-map-gl/maplibre";
 import type { LayerProps } from "react-map-gl/maplibre";
 import { useMemo } from "react";
+import { MAP_BRAND } from "@/lib/maps/map-theme";
 
 interface PrivacyCircleProps {
   /** Listings to render privacy circles for */
@@ -18,75 +19,64 @@ interface PrivacyCircleProps {
     id: string;
     location: { lat: number; lng: number };
   }>;
-  /** Whether dark mode is active */
-  isDarkMode: boolean;
 }
 
-function getCircleLayer(isDarkMode: boolean): LayerProps {
-  const fillColor = isDarkMode ? "#93c5fd" : "#2563eb";
-  const strokeColor = isDarkMode ? "#bfdbfe" : "#1d4ed8";
+// Terracotta halo — the approximate-location hint IS listing information,
+// so it shares the listing accent at whisper opacity (single light theme).
+const CIRCLE_LAYER: LayerProps = {
+  id: "privacy-circles",
+  type: "circle",
+  paint: {
+    "circle-radius": [
+      "interpolate",
+      ["exponential", 2],
+      ["zoom"],
+      10,
+      1,
+      12,
+      3,
+      14,
+      10,
+      15,
+      18,
+      16,
+      28,
+      17,
+      38,
+      18,
+      48,
+    ],
+    "circle-color": MAP_BRAND.primary,
+    "circle-opacity": [
+      "interpolate",
+      ["linear"],
+      ["zoom"],
+      10,
+      0.06,
+      12,
+      0.08,
+      14,
+      0.07,
+      16,
+      0.05,
+      18,
+      0.04,
+    ],
+    "circle-stroke-width": 1,
+    "circle-stroke-color": MAP_BRAND.primary,
+    "circle-stroke-opacity": [
+      "interpolate",
+      ["linear"],
+      ["zoom"],
+      10,
+      0.16,
+      18,
+      0.08,
+    ],
+  },
+};
 
-  return {
-    id: "privacy-circles",
-    type: "circle",
-    paint: {
-      "circle-radius": [
-        "interpolate",
-        ["exponential", 2],
-        ["zoom"],
-        10,
-        1,
-        12,
-        3,
-        14,
-        10,
-        15,
-        18,
-        16,
-        28,
-        17,
-        38,
-        18,
-        48,
-      ],
-      "circle-color": fillColor,
-      "circle-opacity": [
-        "interpolate",
-        ["linear"],
-        ["zoom"],
-        10,
-        0.1,
-        12,
-        0.12,
-        14,
-        0.1,
-        16,
-        0.08,
-        18,
-        0.05,
-      ],
-      "circle-stroke-width": 1,
-      "circle-stroke-color": strokeColor,
-      "circle-stroke-opacity": [
-        "interpolate",
-        ["linear"],
-        ["zoom"],
-        10,
-        0.2,
-        12,
-        0.2,
-        14,
-        0.18,
-        16,
-        0.14,
-        18,
-        0.1,
-      ],
-    },
-  };
-}
-
-export function PrivacyCircle({ listings, isDarkMode }: PrivacyCircleProps) {
+export function PrivacyCircle({ listings }: PrivacyCircleProps) {
   const geojson = useMemo(
     () => ({
       type: "FeatureCollection" as const,
@@ -102,13 +92,11 @@ export function PrivacyCircle({ listings, isDarkMode }: PrivacyCircleProps) {
     [listings]
   );
 
-  const layer = useMemo(() => getCircleLayer(isDarkMode), [isDarkMode]);
-
   if (listings.length === 0) return null;
 
   return (
     <Source id="privacy-circles" type="geojson" data={geojson}>
-      <Layer {...layer} />
+      <Layer {...CIRCLE_LAYER} />
     </Source>
   );
 }

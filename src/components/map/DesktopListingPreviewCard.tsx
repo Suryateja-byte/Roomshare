@@ -144,7 +144,7 @@ export default function DesktopListingPreviewCard({
             className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold shadow-ambient-sm ${
               availabilityPresentation.state === "available" ||
               availabilityPresentation.state === "partial"
-                ? "bg-[#6f7f46] text-white"
+                ? "bg-success text-white"
                 : "bg-on-surface text-white"
             }`}
           >
