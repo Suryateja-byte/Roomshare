@@ -6,6 +6,11 @@
 
 import type { RefObject } from "react";
 import { useEffect, useCallback, useState } from "react";
+import {
+  TRANSIT_LAYERS,
+  LANDMARK_LAYERS,
+  PARK_LAYERS,
+} from "@/lib/maps/map-style-contract";
 
 interface POILayerProps {
   /** Reference to the Mapbox map instance */
@@ -16,22 +21,6 @@ interface POILayerProps {
   /** Currently active categories */
   activeCategories: Set<POICategory>;
 }
-
-// OpenMapTiles (Liberty style) layer IDs for POI categories
-const TRANSIT_LAYERS = [
-  "poi_transit",
-  "road_transit_rail",
-  "road_transit_rail_hatching",
-];
-
-const LANDMARK_LAYERS = ["poi_r1", "poi_r7", "poi_r20"];
-
-const PARK_LAYERS = [
-  "park",
-  "park_outline",
-  "landcover_wood",
-  "landcover_grass",
-];
 
 export type POICategory = "transit" | "landmarks" | "parks";
 
