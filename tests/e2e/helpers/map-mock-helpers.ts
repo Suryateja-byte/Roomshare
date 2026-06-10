@@ -110,8 +110,8 @@ export async function mockMapTileRequests(page: Page): Promise<void> {
     });
   });
 
-  // --- Local dark-mode style JSON ---
-  await page.route("**/map-styles/liberty-dark.json", async (route) => {
+  // --- Local vendored style JSON (liberty-paper light + liberty-dark) ---
+  await page.route("**/map-styles/*.json", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",

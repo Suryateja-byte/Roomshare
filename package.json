@@ -36,6 +36,7 @@
     "seed:e2e": "node scripts/seed-e2e.js",
     "seed:staging": "node scripts/seed-staging.js",
     "backfill:canonical-inventory": "ts-node scripts/cfm/backfill-canonical-inventory.ts",
+    "map:style:generate": "ts-node --compilerOptions '{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' scripts/generate-map-style.ts",
     "test:e2e": "pnpm run seed:e2e && playwright test",
     "test:e2e:ci": "node scripts/run-playwright-e2e-ci.mjs",
     "test:e2e:ui": "playwright test --ui",
