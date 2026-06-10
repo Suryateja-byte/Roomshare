@@ -12,6 +12,7 @@ import {
   userCanAccessConversation,
 } from "@/lib/messages";
 import { sendConversationMessage } from "@/lib/messaging/send-conversation-message";
+import { MESSAGE_MAX_LENGTH } from "@/lib/messaging/message-contract";
 import { getClientIP } from "@/lib/rate-limit";
 import {
   parsePaginationParams,
@@ -22,7 +23,7 @@ import { z } from "zod";
 
 const sendMessageApiSchema = z.object({
   conversationId: z.string().trim().min(1).max(100),
-  content: z.string().trim().min(1).max(2000),
+  content: z.string().trim().min(1).max(MESSAGE_MAX_LENGTH),
   action: z.string().max(20).optional(),
 });
 
