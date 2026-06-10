@@ -188,9 +188,9 @@ export function PlaceDetailsPanel({
             >
               {poi.name}
             </h2>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
+            <div className="flex items-center gap-2 text-sm text-on-surface-variant mt-0.5">
               {poi.distanceMiles !== undefined && (
-                <span className="font-medium text-foreground">
+                <span className="font-medium text-on-surface">
                   {formatDistance(poi.distanceMiles)}
                 </span>
               )}
@@ -243,7 +243,7 @@ export function PlaceDetailsPanel({
         </div>
 
         {/* Footer actions */}
-        <div className="p-4 border-t bg-muted/30">
+        <div className="p-4 border-t bg-surface-container-high/30">
           <div className="flex gap-2">
             <Button
               variant="outline"

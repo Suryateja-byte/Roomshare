@@ -101,10 +101,10 @@ export function ProUpgradeCTA({
                 <span className="font-semibold text-lg">Pro Feature</span>
               </div>
 
-              <p className="text-sm text-muted-foreground mb-3">
+              <p className="text-sm text-on-surface-variant mb-3">
                 Unlock the interactive map with{" "}
                 {placeCount > 0 ? (
-                  <span className="font-medium text-foreground">
+                  <span className="font-medium text-on-surface">
                     {placeCount} nearby places
                   </span>
                 ) : (
@@ -113,7 +113,7 @@ export function ProUpgradeCTA({
                 , exact walking distances, and walkability rings.
               </p>
 
-              <div className="space-y-2 text-xs text-muted-foreground mb-4">
+              <div className="space-y-2 text-xs text-on-surface-variant mb-4">
                 <div className="flex items-center gap-2">
                   <CheckIcon className="h-3.5 w-3.5 text-green-500" />
                   <span>Interactive map with POI pins</span>

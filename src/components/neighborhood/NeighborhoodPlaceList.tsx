@@ -117,7 +117,7 @@ export function NeighborhoodPlaceList({
 
   if (pois.length === 0) {
     return (
-      <div className={`text-center py-8 text-muted-foreground ${className}`}>
+      <div className={`text-center py-8 text-on-surface-variant ${className}`}>
         <p>No places found in this area.</p>
       </div>
     );
@@ -192,8 +192,8 @@ function PlaceCard({
       className={`
         cursor-pointer transition-all duration-150
         ${isSelected ? "ring-2 ring-primary bg-primary/5" : ""}
-        ${isHovered && !isSelected ? "bg-muted/50" : ""}
-        hover:bg-muted/50
+        ${isHovered && !isSelected ? "bg-surface-container-high/50" : ""}
+        hover:bg-surface-container-high/50
       `}
       role="option"
       id={`place-${poi.placeId}`}
@@ -217,7 +217,7 @@ function PlaceCard({
           <div className="flex-1 min-w-0">
             {/* Name */}
             <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-muted-foreground w-5 shrink-0">
+              <span className="text-xs font-medium text-on-surface-variant w-5 shrink-0">
                 {index + 1}.
               </span>
               <h4 className="font-medium text-sm truncate" title={name}>
@@ -228,7 +228,7 @@ function PlaceCard({
             {/* Type and badges */}
             <div className="flex items-center gap-2 mt-1 ml-7">
               {formattedType && (
-                <span className="text-xs text-muted-foreground truncate">
+                <span className="text-xs text-on-surface-variant truncate">
                   {formattedType}
                 </span>
               )}
@@ -246,7 +246,7 @@ function PlaceCard({
             {rating && (
               <div className="flex items-center gap-1 mt-1 ml-7">
                 <StarIcon className="h-3 w-3 text-yellow-500" />
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-on-surface-variant">
                   {rating.toFixed(1)}
                   {userRatingsTotal && (
                     <span className="opacity-70">
@@ -261,7 +261,7 @@ function PlaceCard({
             {/* Address (truncated) */}
             {address && (
               <p
-                className="text-xs text-muted-foreground/70 truncate mt-1 ml-7"
+                className="text-xs text-on-surface-variant/70 truncate mt-1 ml-7"
                 title={address}
               >
                 {address}
@@ -277,7 +277,7 @@ function PlaceCard({
               </div>
             )}
             {walkMins !== undefined && (
-              <div className="text-xs text-muted-foreground flex items-center justify-end gap-1">
+              <div className="text-xs text-on-surface-variant flex items-center justify-end gap-1">
                 <WalkIcon className="h-3 w-3" />~{walkMins} min
               </div>
             )}
@@ -295,14 +295,14 @@ function PlaceCardSkeleton() {
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1">
             <div className="flex items-center gap-2">
-              <div className="h-4 w-4 bg-muted rounded" />
-              <div className="h-4 w-32 bg-muted rounded" />
+              <div className="h-4 w-4 bg-surface-container-high rounded" />
+              <div className="h-4 w-32 bg-surface-container-high rounded" />
             </div>
-            <div className="h-3 w-20 bg-muted rounded mt-2 ml-6" />
+            <div className="h-3 w-20 bg-surface-container-high rounded mt-2 ml-6" />
           </div>
           <div className="text-right">
-            <div className="h-4 w-12 bg-muted rounded" />
-            <div className="h-3 w-16 bg-muted rounded mt-1" />
+            <div className="h-4 w-12 bg-surface-container-high rounded" />
+            <div className="h-3 w-16 bg-surface-container-high rounded mt-1" />
           </div>
         </div>
       </CardContent>

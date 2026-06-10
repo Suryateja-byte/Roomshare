@@ -23,13 +23,13 @@ export function ContextBar({ meta, isLoading, queryText }: ContextBarProps) {
   if (isLoading) {
     return (
       <div
-        className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-lg animate-pulse"
+        className="flex items-center gap-2 px-3 py-2 bg-surface-container-high/50 rounded-lg animate-pulse"
         role="status"
         aria-label="Loading search results"
       >
-        <div className="h-4 w-24 bg-muted rounded" />
-        <div className="h-4 w-1 bg-muted-foreground/20 rounded" />
-        <div className="h-4 w-32 bg-muted rounded" />
+        <div className="h-4 w-24 bg-surface-container-high rounded" />
+        <div className="h-4 w-1 bg-on-surface-variant/20 rounded" />
+        <div className="h-4 w-32 bg-surface-container-high rounded" />
       </div>
     );
   }
@@ -45,17 +45,17 @@ export function ContextBar({ meta, isLoading, queryText }: ContextBarProps) {
 
   return (
     <div
-      className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 bg-muted/50 rounded-lg text-sm text-muted-foreground"
+      className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 bg-surface-container-high/50 rounded-lg text-sm text-on-surface-variant"
       role="region"
       aria-label="Search results summary"
       aria-live="polite"
     >
       {/* Result count */}
-      <span className="font-medium text-foreground">
+      <span className="font-medium text-on-surface">
         {resultCount} {resultCount === 1 ? "place" : "places"} found
       </span>
 
-      <span className="text-muted-foreground/40" aria-hidden="true">
+      <span className="text-on-surface-variant/40" aria-hidden="true">
         •
       </span>
 
@@ -64,7 +64,7 @@ export function ContextBar({ meta, isLoading, queryText }: ContextBarProps) {
 
       {resultCount > 0 && (
         <>
-          <span className="text-muted-foreground/40" aria-hidden="true">
+          <span className="text-on-surface-variant/40" aria-hidden="true">
             •
           </span>
 
@@ -79,7 +79,7 @@ export function ContextBar({ meta, isLoading, queryText }: ContextBarProps) {
             )}
           </span>
 
-          <span className="text-muted-foreground/40" aria-hidden="true">
+          <span className="text-on-surface-variant/40" aria-hidden="true">
             •
           </span>
 
@@ -95,7 +95,7 @@ export function ContextBar({ meta, isLoading, queryText }: ContextBarProps) {
       {queryText && (
         <>
           <span
-            className="text-muted-foreground/40 hidden sm:inline"
+            className="text-on-surface-variant/40 hidden sm:inline"
             aria-hidden="true"
           >
             •
