@@ -70,7 +70,7 @@ export default function FeaturedListingsClient({
   if (!listings || listings.length === 0) {
     return (
       <section
-        data-testid="featured-listings-section"
+        data-testid="featured-listings-empty"
         className="bg-surface-canvas py-20 md:py-28"
       >
         <div className="container">

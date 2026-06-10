@@ -116,10 +116,12 @@ test.describe("J31: Edit Listing and Verify", () => {
     await openSlotsField.first().clear();
     await openSlotsField.first().fill(String(updatedOpenSlots));
 
-    // Step 5: Save and verify the versioned availability PATCH succeeds
+    // Step 5: Save and verify the versioned availability PATCH succeeds.
+    // The edit page has two forms (details + availability); slots live in the
+    // availability form, so target its submit button specifically.
     const saveBtn = page
-      .getByRole("button", { name: /save|update|submit/i })
-      .or(page.locator('button[type="submit"]'));
+      .getByTestId("listing-availability-save-button")
+      .or(page.getByRole("button", { name: /save availability/i }));
     await expect(saveBtn.first()).toBeVisible({ timeout: 10000 });
 
     const updateResponse = page.waitForResponse(
@@ -218,9 +220,11 @@ test.describe("J32: Pause and Unpause Listing", () => {
     const statusSelect = page
       .locator('select[name="status"], select#status')
       .first();
+    // Status lives in the availability form; the generic /save/ match would
+    // resolve to the details form's "Save Details" button first.
     const saveBtn = page
-      .getByRole("button", { name: /save|update|submit/i })
-      .or(page.locator('button[type="submit"]'))
+      .getByTestId("listing-availability-save-button")
+      .or(page.getByRole("button", { name: /save availability/i }))
       .first();
     const editForm = page.locator('[data-testid="edit-listing-form"]').first();
 

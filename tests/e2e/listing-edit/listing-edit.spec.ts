@@ -394,11 +394,14 @@ test.describe("Listing Edit — Image Management", () => {
     const photosSection = page.getByText(/photos/i).first();
     await expect(photosSection).toBeVisible({ timeout: 10000 });
 
-    // Images should be rendered (either as img tags or background images)
-    const images = page
+    // Images should be rendered (either as img tags or background images).
+    // Scope to the edit form — an unscoped img[src*="unsplash"] matches the
+    // navbar avatar, which is hidden inside the collapsed menu on mobile.
+    const editForm = page.getByTestId("edit-listing-form");
+    const images = editForm
       .locator('img[src*="unsplash"]')
-      .or(page.locator('img[src*="supabase"]'))
-      .or(page.locator('[data-testid="image-preview"]'));
+      .or(editForm.locator('img[src*="supabase"]'))
+      .or(editForm.locator('[data-testid="image-preview"]'));
 
     // At least 1 image should be visible (seed data has 2)
     await expect(images.first()).toBeVisible({ timeout: 10000 });
