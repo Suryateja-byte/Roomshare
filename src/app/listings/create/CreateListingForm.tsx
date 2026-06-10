@@ -558,6 +558,7 @@ export default function CreateListingForm({
 
   // Core submit logic extracted to avoid fake event creation (M-U5)
   const executeSubmit = async (forceSubmit = false) => {
+    if (submitSucceededRef.current) return;
     if (isSubmittingRef.current) return;
 
     setError("");
@@ -735,8 +736,10 @@ export default function CreateListingForm({
         err instanceof Error ? err.message : "An unexpected error occurred";
       showError(message);
     } finally {
-      setLoading(false);
-      isSubmittingRef.current = false;
+      if (!submitSucceededRef.current) {
+        setLoading(false);
+        isSubmittingRef.current = false;
+      }
     }
   };
 
