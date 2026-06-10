@@ -19,13 +19,19 @@ tests/e2e/helpers/map-mock-helpers.ts, package.json; delete tests/e2e/map-style.
 - Client-only styling — no DB/auth/PII. Glyph 404s if text-font mutated (generator forbids); upstream drift (vendored artifact + contract check); e2e mock bypass (fix glob same slice); visual baseline churn (1 baseline, eyeball + commit)
 
 ## Slices
-- [ ] S1 Foundations: map-theme.ts, map-style-contract.ts, style-sanitize.ts (pure move out of Map.tsx), POILayer imports contract; sanitize unit tests → lint/typecheck/jest + dev smoke
-- [ ] S2 Generator + vendored liberty-paper.json + Map.tsx local-first swap + map-mock-helpers glob + artifact contract test + delete dead map-style spec → idempotence + e2e map-loading/map-features + POI toggle check
-- [ ] S3 Paper-chip restyle (cluster layers, ring removal, MarkerPinContent, focus ring, dimmed) → jest + targeted e2e + visual baseline regen + axe
-- [ ] S4 Error-aware empty state (map-view-state.ts + hasFetchError prop + wrapper wiring) + unit matrix + e2e 500-route regression
-- [ ] S5 Peripherals (PrivacyCircle, UserMarker, BoundaryLayer, preview-card badge)
-- [ ] S6 Other surfaces (NearbyPlacesMap, CATEGORY_COLORS, NeighborhoodMap incl. walkability)
-- [ ] Final verification: full gates + before/after screenshot gallery (desktop 1440 / mobile 390, z9/z12/z15)
+- [x] S1 Foundations (commit b8a006c9): map-theme.ts, map-style-contract.ts, style-sanitize.ts, POILayer imports contract; 14 sanitize unit tests
+- [x] S2 Generator + vendored liberty-paper.json + local-first swap + mock glob + artifact test + dead spec deleted (commit c60fbca8); generator idempotent (identical sha256 twice)
+- [x] S3 Paper-chip restyle (commit deef7e2b); 3 class assertions updated in-slice with contrast math
+- [x] S4 Error-aware empty state (commit after deef7e2b): map-view-state.ts + hasFetchError + e2e 10.6; also fixed Retry button click-blocked by fullscreen control + stale waitForMapError locator
+- [x] S5 Peripherals: privacy→terracotta, boundary→terracotta whisper, drop-pin→ink, badge→bg-success
+- [x] S6 Other surfaces: nearby+neighborhood on liberty-paper; CATEGORY_COLORS→brand tokens; walkability→success/warning/destructive
+- [x] Final verification (see below)
 
 ## Results + verification story
-(fill as slices complete)
+- FULL jest suite: 7,748 passed / 0 failed (495 suites). Lint 0 errors, typecheck clean after every slice.
+- E2E (chromium-anon, live server): map-loading + map-features 16✓; map-markers + map-interactions + map-errors-a11y (incl. new 10.6 regression + axe) 21✓ + 7✓; search-map-list-sync 28✓.
+- Live visual verification (Playwright MCP, real tiles): paper basemap at city/district/street zooms; white cluster chips w/ halo; terracotta selected pill; preview card w/ success badge; mobile 390 bottom-sheet view. Gallery: /tmp/roomshare-map-review/ (before: map-*/crop-*, after: after-*).
+- The original bug reproduced live (dev cold-compile timeout) and the fix held: error banner + Retry, NO false "No listings in this area"; Retry recovered to markers.
+- Visual baselines: stale popup baseline removed (its test self-skips in this env — markers don't render under mocked tiles; next successful run auto-writes a fresh one); flaky auto-created baselines discarded.
+- Incident: a parallel session's git reset --hard orphaned S1/S2 (recovered via reflog cherry-pick by that session) and wiped S3's uncommitted tree (redone from context, committed immediately). Lesson recorded in tasks/lessons.md (2026-06-10).
+- Deviations from plan, documented in commits: dark layer variants kept+themed instead of deleted (consistency w/ S3, smaller diff); walkability dash-density channel dropped (MapLibre line-dasharray is not data-driven; concentric radius already encodes ordinal); CATEGORY_COLORS mapping adjusted for two palette collisions (grocery orange not emerald; gym already primary).
