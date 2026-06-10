@@ -91,6 +91,16 @@ function buildSuspensionBlockedResponse(): NextResponse {
 function buildPasswordChangedRedirectResponse(
   request: NextRequest
 ): NextResponse {
+  // Only full document navigations get redirected. Fetches and server-action
+  // POSTs receive 401 JSON so client flows (e.g. ChatWindow draft preservation
+  // on session expiry) can handle the transition gracefully instead of being
+  // yanked to /login mid-interaction.
+  if (request.headers.get("sec-fetch-dest") !== "document") {
+    return NextResponse.json(
+      { error: "Session expired", code: "SESSION_EXPIRED" },
+      { status: 401 }
+    );
+  }
   const loginUrl = new URL("/login", request.nextUrl.origin);
   loginUrl.searchParams.set("reason", "password_changed");
   return NextResponse.redirect(loginUrl);

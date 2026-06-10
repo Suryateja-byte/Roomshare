@@ -42,13 +42,20 @@ import {
 import { getToken } from "next-auth/jwt";
 import { prisma } from "@/lib/prisma";
 
-// Helper to create a minimal mock NextRequest
+// Helper to create a minimal mock NextRequest.
+// Defaults to a document navigation (sec-fetch-dest: document) — pass
+// fetchDest: "empty" to simulate fetch/server-action subrequests.
 function createMockRequest(
   pathname: string,
   method = "GET",
-  origin = "http://localhost:3000"
+  origin = "http://localhost:3000",
+  fetchDest = "document"
 ) {
-  return { nextUrl: { pathname, origin }, method } as any;
+  return {
+    nextUrl: { pathname, origin },
+    method,
+    headers: new Map([["sec-fetch-dest", fetchDest]]),
+  } as any;
 }
 
 // ── isPublicRoute ──
@@ -413,6 +420,20 @@ describe("checkSuspension", () => {
     expect(result!.headers.get("location")).toBe(
       "http://localhost:3000/login?reason=password_changed"
     );
+  });
+
+  it("returns 401 JSON instead of redirecting for non-document requests after password change", async () => {
+    (getToken as jest.Mock).mockResolvedValue({
+      sub: "user-123",
+      passwordInvalidated: true,
+    });
+
+    const result = await checkSuspension(
+      createMockRequest("/messages/conv-1", "POST", "http://localhost:3000", "empty")
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe(401);
   });
 
   it("redirects immediately when passwordChangedAt is newer than authTime", async () => {
