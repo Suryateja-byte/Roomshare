@@ -10,3 +10,9 @@
 - Detection signal: `planner-cfm1002` caller-grep sweep plus runtime telemetry audit at `HEAD b6b4e0b8`.
 - Root cause: planning from a pre-dependency snapshot instead of re-grepping the live branch before proposing deletions.
 - Prevention rule: cleanup tickets must re-grep callers at merge `HEAD` and confirm telemetry is actually observable from the branch or dashboard before proposing bulk deletion.
+
+- Date: 2026-06-10
+- Mistake / failure mode: after a rebase-merge of PR #142, ran `git reset --hard origin/main` on local `main` assuming it held only the PR's commits — but two map-theme commits (47f1d880, 38130f0a) had been added from a parallel session during the CI wait, and the reset moved `main` past them.
+- Detection signal: a pre-reset `git diff origin/main main --stat` printed 13 files / +7967 lines where an empty diff was expected; `git reflog` identified the orphaned commits.
+- Root cause: assumed exclusive ownership of the local working copy across a ~40-minute CI wait; ran a destructive ref move without first checking `git log origin/main..main` for unexpected local-only commits.
+- Prevention rule: before any `git reset --hard` / branch -f on a shared local clone, list local-only commits (`git log --oneline @{u}..`) and abort if any commit is not one you authored this session. Recovery: cherry-pick from reflog, verify with `git diff <old-tip> HEAD` for byte-identical trees.
