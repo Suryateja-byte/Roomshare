@@ -22,7 +22,19 @@ export async function createPGlitePhase08Fixture(): Promise<Phase08Fixture> {
     base.pg as unknown as { exec: (sql: string) => Promise<void> }
   ).exec.bind(base.pg);
 
-  await pgExec(fs.readFileSync(PHASE08_MIGRATION, "utf8"));
+  // The phase02 base fixture may already apply this migration (the outbox
+  // retention tests need the fanout columns); applying it twice fails on its
+  // non-idempotent ADD CONSTRAINT statements.
+  const applied = await base.query<{ exists: boolean }>(
+    `SELECT EXISTS (
+       SELECT 1 FROM information_schema.columns
+       WHERE table_name = 'cache_invalidations'
+         AND column_name = 'fanout_status'
+     ) AS "exists"`
+  );
+  if (!applied[0]?.exists) {
+    await pgExec(fs.readFileSync(PHASE08_MIGRATION, "utf8"));
+  }
 
   return base;
 }
