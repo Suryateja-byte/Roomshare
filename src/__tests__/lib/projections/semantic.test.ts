@@ -262,6 +262,44 @@ describe("Phase 03 semantic projection", () => {
     expect(semanticRows.find((row) => row.inventoryId === inventoryId)?.sourceVersion).toBe(BigInt(5));
   });
 
+  it("does not re-publish an inventory hidden after the source read (H3)", async () => {
+    const { unitId, inventoryId } = await seedInventory();
+    await projectFilterRows(unitId, inventoryId);
+
+    // Moderator pause commits between the ISP source read and the embed
+    // publish: the inventory is hidden but the ISP row hasn't been swept yet.
+    await fixture.query(
+      `UPDATE listing_inventories SET publish_status = 'PAUSED' WHERE id = $1`,
+      [inventoryId]
+    );
+
+    const result = await withTx((tx) =>
+      rebuildSemanticInventoryProjection(
+        tx,
+        {
+          unitId,
+          inventoryId,
+          sourceVersion: BigInt(1),
+          unitIdentityEpoch: 1,
+          embeddingVersion: "v-h3",
+        },
+        { generateEmbedding: async () => [0.1, 0.2, 0.3] }
+      )
+    );
+
+    expect(result.updated).toBe(false);
+    expect(result.skippedStale).toBe(true);
+
+    // Inventory stays hidden; the semantic row written in-tx was retracted
+    const inventory = await getInventoryStatus(inventoryId);
+    expect(inventory.publishStatus).toBe("PAUSED");
+
+    const semanticRows = await fixture.getSemanticInventoryProjections();
+    expect(
+      semanticRows.find((row) => row.inventoryId === inventoryId)
+    ).toBeUndefined();
+  });
+
   it("skips stale EMBED_NEEDED when filter projection is already newer", async () => {
     const { unitId, inventoryId } = await seedInventory();
     await projectFilterRows(unitId, inventoryId, BigInt(5));

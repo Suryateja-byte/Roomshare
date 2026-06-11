@@ -304,14 +304,34 @@ export async function rebuildSemanticInventoryProjection(
 
   const updated = updatedCount > 0;
   if (updated) {
-    await tx.$executeRaw`
+    // Only promote from non-hidden states: a concurrent moderator/host hide
+    // (PAUSED/SUPPRESSED/ARCHIVED) committed after the PUBLISHED source read
+    // above must not be overwritten back to PUBLISHED (H3 ghost update).
+    const statusRows = await tx.$executeRaw`
       UPDATE listing_inventories
       SET publish_status = 'PUBLISHED',
           last_embedded_version = ${embeddingVersion},
           last_published_version = ${input.sourceVersion}::BIGINT,
           updated_at = NOW()
       WHERE id = ${input.inventoryId}
+        AND publish_status IN ('PENDING_EMBEDDING', 'PUBLISHED', 'STALE_PUBLISHED')
     `;
+    if (statusRows === 0) {
+      // The hide won the race. Retract the semantic row written in this tx —
+      // committing it would re-expose a hidden listing. DELETE matches the
+      // tombstone fan-out idiom (tombstoneSemanticProjectionRows).
+      await tx.$executeRaw`
+        DELETE FROM semantic_inventory_projection
+        WHERE inventory_id = ${input.inventoryId}
+          AND embedding_version = ${embeddingVersion}
+      `;
+      return {
+        updated: false,
+        skippedStale: true,
+        embeddingVersion,
+        sanitizedContentHash,
+      };
+    }
   }
 
   return {
