@@ -334,7 +334,10 @@ export function ServiceWorkerRegistration({
 
         console.log("[SW] Service Worker registered successfully");
       } catch (error) {
-        console.error("[SW] Service Worker registration failed:", error);
+        // Non-fatal by design: registration is expected to fail in private
+        // windows, automation contexts (Playwright blocks SWs), and older
+        // browsers — the app fully works without the SW. warn, not error.
+        console.warn("[SW] Service Worker registration failed:", error);
       }
     };
 

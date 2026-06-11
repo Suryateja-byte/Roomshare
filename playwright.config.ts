@@ -89,6 +89,12 @@ export default defineConfig({
     /* Base URL from environment variable */
     baseURL: process.env.E2E_BASE_URL || "http://localhost:3000",
 
+    /* Block service workers: sw.js handles same-origin fetches (/api/*,
+       static assets) inside the worker, which BYPASSES page.route() mocks —
+       in CI production builds this made network mocking silently
+       ineffective (dev never registers the SW, hiding the difference). */
+    serviceWorkers: "block",
+
     /* Collect trace when retrying the failed test */
     trace: "on-first-retry",
 
