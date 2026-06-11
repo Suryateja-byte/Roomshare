@@ -366,6 +366,9 @@ export async function updateListingStatus(
           ownerId: string;
           version: number;
           statusReason: string | null;
+          openSlots: number | null;
+          availableSlots: number | null;
+          totalSlots: number | null;
         }>
       >`
         SELECT
@@ -374,7 +377,10 @@ export async function updateListingStatus(
           title,
           "ownerId",
           version,
-          "statusReason"
+          "statusReason",
+          "openSlots",
+          "availableSlots",
+          "totalSlots"
         FROM "Listing"
         WHERE id = ${listingId}
         FOR UPDATE
@@ -398,6 +404,18 @@ export async function updateListingStatus(
             "This listing is moderation-locked. Use Unsuppress Listing to restore it.",
           code: "LISTING_REQUIRES_UNSUPPRESS",
           lockReason,
+        } as const;
+      }
+
+      // No-empty-listings rule: a listing with zero effective open slots can
+      // never be ACTIVE (same fallback chain as the canonical sync — legacy
+      // rows keep their count in availableSlots).
+      const effectiveOpenSlots =
+        listing.openSlots ?? listing.availableSlots ?? listing.totalSlots;
+      if (status === "ACTIVE" && (effectiveOpenSlots ?? 0) <= 0) {
+        return {
+          error: "This listing has no open slots and cannot be set to active.",
+          code: "ACTIVE_REQUIRES_OPEN_SLOTS",
         } as const;
       }
 

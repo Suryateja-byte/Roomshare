@@ -1,3 +1,38 @@
+# M1 no-empty-listings bypass fix — (2026-06-11)
+
+## Problem
+
+The "a listing can never be ACTIVE with 0 open slots" rule was enforced in
+`recoverHostManagedListing` and the host availability PATCH, but BOTH `updateListingStatus`
+functions (host: `src/app/actions/listing-status.ts`; admin: `src/app/actions/admin.ts`)
+skipped it — a host could toggle an empty listing back to ACTIVE (ghost listing).
+
+## Fix
+
+- Host action: added the guard after the freshness-recovery check, using the system-wide
+  effective-slots chain `openSlots ?? availableSlots ?? totalSlots` (legacy rows keep their
+  count in availableSlots with openSlots null — a bare `openSlots ?? 0` would have wrongly
+  blocked legacy reactivation). Reuses the existing error code
+  `HOST_MANAGED_ACTIVE_REQUIRES_OPEN_SLOTS` and message from recoverHostManagedListing.
+- Admin action: locked SELECT now also fetches the slot columns; same chain guard
+  (fail-closed `?? 0`) with code `ACTIVE_REQUIRES_OPEN_SLOTS`. Placed after the
+  moderation-lock check. Guard is ACTIVE-only — pausing/renting an empty listing still works.
+
+## Known remaining gap (NOT in M1 scope, flagged for follow-up)
+
+`unsuppressListing` (admin.ts) restores moderation-locked listings to ACTIVE without a slots
+check — same ghost-listing class via the moderation-restore path.
+
+## Results + verification story
+
+- 7 new regression tests: host-managed 0-slot reject, legacy effective-slots reject,
+  openSlots=0-authoritative (chain precedence), PAUSED/RENTED still allowed on empty listings
+  (both actions), admin reject + legacy reject + pause-allowed.
+- `pnpm lint` 0 errors; `pnpm typecheck` clean; action/security/integration/component suites
+  175/175; full `pnpm test` 500/500 suites, 7814 passed, 0 failed.
+
+---
+
 # H4 unit-projection version-ordering fix — (2026-06-11)
 
 ## Problem

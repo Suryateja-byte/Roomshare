@@ -166,6 +166,21 @@ export async function updateListingStatus(
           } as const;
         }
 
+        // No-empty-listings rule: legacy rows keep their count in
+        // availableSlots (openSlots null), so use the same effective-slots
+        // chain as the canonical sync.
+        const effectiveOpenSlots =
+          currentListing.openSlots ??
+          currentListing.availableSlots ??
+          currentListing.totalSlots;
+        if (status === "ACTIVE" && effectiveOpenSlots <= 0) {
+          return {
+            error:
+              "Active host-managed listings require at least one open slot.",
+            code: "HOST_MANAGED_ACTIVE_REQUIRES_OPEN_SLOTS",
+          } as const;
+        }
+
         const nextStatusReason = resolveHostStatusReason({
           status,
           currentStatusReason: currentListing.statusReason,

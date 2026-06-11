@@ -427,6 +427,92 @@ describe("listing-status actions", () => {
       });
     });
 
+    describe("no-empty-listings rule (M1)", () => {
+      it("rejects ACTIVE when a host-managed listing has zero open slots", async () => {
+        (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
+          makeLockedListingRow({
+            availabilitySource: "HOST_MANAGED",
+            status: "PAUSED",
+            statusReason: "HOST_PAUSED",
+            openSlots: 0,
+            availableSlots: 0,
+          }),
+        ]);
+
+        const result = await updateListingStatus("listing-123", "ACTIVE", 3);
+
+        expect(result).toEqual({
+          error: "Active host-managed listings require at least one open slot.",
+          code: "HOST_MANAGED_ACTIVE_REQUIRES_OPEN_SLOTS",
+        });
+        expect(mockTx.listing.update).not.toHaveBeenCalled();
+        expect(syncListingLifecycleProjectionInTx).not.toHaveBeenCalled();
+      });
+
+      it("rejects ACTIVE when a legacy listing has zero effective slots (openSlots null)", async () => {
+        (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
+          makeLockedListingRow({
+            status: "RENTED",
+            openSlots: null,
+            availableSlots: 0,
+          }),
+        ]);
+
+        const result = await updateListingStatus("listing-123", "ACTIVE", 3);
+
+        expect(result).toEqual({
+          error: "Active host-managed listings require at least one open slot.",
+          code: "HOST_MANAGED_ACTIVE_REQUIRES_OPEN_SLOTS",
+        });
+        expect(mockTx.listing.update).not.toHaveBeenCalled();
+      });
+
+      it("openSlots=0 is authoritative even when availableSlots is positive", async () => {
+        (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
+          makeLockedListingRow({
+            availabilitySource: "HOST_MANAGED",
+            status: "PAUSED",
+            statusReason: "HOST_PAUSED",
+            openSlots: 0,
+            availableSlots: 2,
+          }),
+        ]);
+
+        const result = await updateListingStatus("listing-123", "ACTIVE", 3);
+
+        expect(result).toMatchObject({
+          code: "HOST_MANAGED_ACTIVE_REQUIRES_OPEN_SLOTS",
+        });
+        expect(mockTx.listing.update).not.toHaveBeenCalled();
+      });
+
+      it("still allows pausing or renting an empty listing", async () => {
+        (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
+          makeLockedListingRow({
+            availabilitySource: "HOST_MANAGED",
+            status: "ACTIVE",
+            openSlots: 0,
+            availableSlots: 0,
+          }),
+        ]);
+        (mockTx.listing.update as jest.Mock).mockResolvedValue({});
+
+        const paused = await updateListingStatus("listing-123", "PAUSED", 3);
+        expect(paused.success).toBe(true);
+
+        (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
+          makeLockedListingRow({
+            availabilitySource: "HOST_MANAGED",
+            status: "ACTIVE",
+            openSlots: 0,
+            availableSlots: 0,
+          }),
+        ]);
+        const rented = await updateListingStatus("listing-123", "RENTED", 3);
+        expect(rented.success).toBe(true);
+      });
+    });
+
     describe("error handling", () => {
       it("returns error on database failure", async () => {
         (mockTx.$queryRaw as jest.Mock).mockResolvedValue([

@@ -684,6 +684,54 @@ describe("admin actions", () => {
 
       expect(result.success).toBe(true);
     });
+
+    it("rejects ACTIVE when the listing has zero open slots (M1)", async () => {
+      const { update } = mockListingStatusTx({
+        ...makeStatusListing(),
+        availabilitySource: "HOST_MANAGED",
+        status: "PAUSED",
+        openSlots: 0,
+        availableSlots: 0,
+      });
+
+      const result = await updateListingStatus("listing-123", "ACTIVE", 7);
+
+      expect(result).toEqual({
+        error: "This listing has no open slots and cannot be set to active.",
+        code: "ACTIVE_REQUIRES_OPEN_SLOTS",
+      });
+      expect(update).not.toHaveBeenCalled();
+      expect(syncListingLifecycleProjectionInTx).not.toHaveBeenCalled();
+    });
+
+    it("rejects ACTIVE for legacy rows with zero effective slots (M1)", async () => {
+      const { update } = mockListingStatusTx({
+        ...makeStatusListing(),
+        status: "RENTED",
+        openSlots: null,
+        availableSlots: 0,
+      });
+
+      const result = await updateListingStatus("listing-123", "ACTIVE", 7);
+
+      expect(result).toMatchObject({ code: "ACTIVE_REQUIRES_OPEN_SLOTS" });
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it("still pauses an empty listing (guard is ACTIVE-only)", async () => {
+      const { update } = mockListingStatusTx({
+        ...makeStatusListing(),
+        availabilitySource: "HOST_MANAGED",
+        openSlots: 0,
+        availableSlots: 0,
+      });
+      (logAdminAction as jest.Mock).mockResolvedValue({});
+
+      const result = await updateListingStatus("listing-123", "PAUSED", 7);
+
+      expect(result.success).toBe(true);
+      expect(update).toHaveBeenCalled();
+    });
   });
 
   describe("unsuppressListing", () => {
