@@ -2,9 +2,12 @@ import "server-only";
 
 import type { ActorContext, TransactionClient } from "@/lib/db/with-actor";
 import { setActorContext } from "@/lib/db/with-actor";
+import { isPhase01CanonicalWritesEnabled } from "@/lib/flags/phase01";
+import { isKillSwitchActive } from "@/lib/flags/phase02";
 import type { RawAddressInput } from "@/lib/identity/canonical-address";
 import { resolveOrCreateUnit } from "@/lib/identity/resolve-or-create-unit";
 import { isPublicSearchBlockedStatusReason } from "@/lib/listings/moderation-write-lock";
+import { logger } from "@/lib/logger";
 import { appendOutboxEvent } from "@/lib/outbox/append";
 import type { ProjectionCoordinates } from "@/lib/projections/public-geocode";
 import { rebuildInventorySearchProjection } from "@/lib/projections/inventory-projection";
@@ -217,15 +220,50 @@ function coerceSourceVersion(value: number | string | bigint): bigint {
   return typeof value === "bigint" ? value : BigInt(value);
 }
 
-export async function syncCanonicalListingInventory(
-  tx: TransactionClient,
-  input: SyncCanonicalListingInventoryInput
-): Promise<{
+export type SyncCanonicalListingInventorySkipped = {
+  skipped: true;
+  reason: "phase01_flag_off";
+};
+
+export type SyncCanonicalListingInventoryStaleSkipped = {
+  skipped: true;
+  reason: "stale_source_version";
+  inventoryId: string;
+  currentPublishStatus: string;
+  currentSourceVersion: bigint;
+};
+
+export type SyncCanonicalListingInventorySynced = {
+  skipped?: false;
   unitId: string;
   inventoryId: string;
   publishStatus: CanonicalPublishStatus;
   sourceVersion: bigint;
-}> {
+};
+
+export type SyncCanonicalListingInventoryResult =
+  | SyncCanonicalListingInventorySkipped
+  | SyncCanonicalListingInventoryStaleSkipped
+  | SyncCanonicalListingInventorySynced;
+
+export async function syncCanonicalListingInventory(
+  tx: TransactionClient,
+  input: SyncCanonicalListingInventoryInput
+): Promise<SyncCanonicalListingInventoryResult> {
+  if (!isPhase01CanonicalWritesEnabled()) {
+    // Emergency stop (FEATURE_PHASE01_CANONICAL_WRITES=false): skip all
+    // canonical-pipeline writes (unit resolve, inventory upsert, outbox
+    // appends, inline projection rebuilds). The host listing write and
+    // search-doc dirty marking happen outside this function and are
+    // unaffected. See docs/migration/cfm-phase01-emergency-stop.md.
+    logger.sync.info("cfm.canonical.phase01_writes_skipped_count", {
+      reason: "flag_off",
+      seam: "syncCanonicalListingInventory",
+      listingId: input.listing.id,
+    });
+    return { skipped: true, reason: "phase01_flag_off" };
+  }
+
   const listing = input.listing;
   const roomCategory = classifyRoomCategory({
     roomType: listing.roomType,
@@ -410,14 +448,42 @@ export async function syncCanonicalListingInventory(
       supersedes_unit_ids             = EXCLUDED.supersedes_unit_ids,
       superseded_by_unit_id           = EXCLUDED.superseded_by_unit_id,
       updated_at                      = NOW()
+    WHERE EXCLUDED.source_version >= listing_inventories.source_version
     RETURNING id, unit_id, unit_identity_epoch_written_at, publish_status, source_version
   `;
 
   const upserted = upsertedRows[0];
   if (!upserted) {
-    throw new CanonicalInventorySyncError(
-      "Canonical inventory upsert returned no row"
-    );
+    // Stale write: a newer writer (e.g. a moderator pause/suppress) already
+    // committed a higher source_version. Skip ALL fan-out — the newer writer
+    // owns the canonical state and has already done its own fan-out.
+    const currentRows = await tx.$queryRaw<
+      { publish_status: string; source_version: bigint | number | string }[]
+    >`
+      SELECT publish_status, source_version
+      FROM listing_inventories
+      WHERE id = ${listing.id}
+      LIMIT 1
+    `;
+    const current = currentRows[0];
+    if (!current) {
+      throw new CanonicalInventorySyncError(
+        "Canonical inventory upsert returned no row"
+      );
+    }
+    logger.sync.warn("cfm.canonical.stale_sync_skipped_count", {
+      listingId: listing.id,
+      attemptedSourceVersion: sourceVersion.toString(),
+      currentSourceVersion: String(current.source_version),
+      currentPublishStatus: current.publish_status,
+    });
+    return {
+      skipped: true,
+      reason: "stale_source_version",
+      inventoryId: listing.id,
+      currentPublishStatus: current.publish_status,
+      currentSourceVersion: coerceSourceVersion(current.source_version),
+    };
   }
 
   if (previous && previous.unit_id !== unit.unitId) {
@@ -453,13 +519,23 @@ export async function syncCanonicalListingInventory(
       priority: 100,
     });
 
-    await rebuildInventorySearchProjection(tx, {
-      unitId: unit.unitId,
-      inventoryId: listing.id,
-      sourceVersion: eventSourceVersion,
-      unitIdentityEpoch: eventUnitEpoch,
-    });
-    await rebuildUnitPublicProjection(tx, unit.unitId, eventUnitEpoch);
+    if (!isKillSwitchActive("disable_new_publication")) {
+      await rebuildInventorySearchProjection(tx, {
+        unitId: unit.unitId,
+        inventoryId: listing.id,
+        sourceVersion: eventSourceVersion,
+        unitIdentityEpoch: eventUnitEpoch,
+      });
+      await rebuildUnitPublicProjection(tx, unit.unitId, eventUnitEpoch);
+    } else {
+      // Kill switch means "stop publishing new data" — the INVENTORY_UPSERTED
+      // event above is still appended, so the drain converges the projections
+      // once the switch lifts. Tombstone/hide paths are deliberately ungated.
+      logger.sync.info("cfm.canonical.inline_rebuild_skipped_count", {
+        reason: "kill_switch_disable_new_publication",
+        listingId: listing.id,
+      });
+    }
   } else {
     await handleTombstone(tx, {
       unitId: unit.unitId,

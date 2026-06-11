@@ -235,3 +235,237 @@ describe("resolveCanonicalPublishStatus", () => {
     expect(mockHandleTombstone).not.toHaveBeenCalled();
   });
 });
+
+describe("syncCanonicalListingInventory gating (H2)", () => {
+  const VISIBLE_INPUT = {
+    listing: {
+      id: "listing-1",
+      physicalUnitId: "unit-1",
+      price: 700,
+      roomType: "Shared Room",
+      totalSlots: 1,
+      openSlots: 1,
+      moveInDate: new Date("2026-07-01T00:00:00.000Z"),
+      status: "ACTIVE",
+      version: 7,
+    },
+    address: {
+      address: "1 Main St",
+      city: "San Francisco",
+      state: "CA",
+      zip: "94102",
+    },
+    actor: { role: "host", id: "user-1" } as const,
+  };
+
+  function makeVisibleTx() {
+    return {
+      $queryRaw: jest
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            id: "listing-1",
+            unit_id: "unit-1",
+            unit_identity_epoch_written_at: 1,
+            publish_status: "PENDING_PROJECTION",
+            source_version: 7,
+          },
+        ]),
+      listing: {
+        update: jest.fn().mockResolvedValue(undefined),
+      },
+    };
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    delete process.env.FEATURE_PHASE01_CANONICAL_WRITES;
+    delete process.env.KILL_SWITCH_DISABLE_NEW_PUBLICATION;
+    mockResolveOrCreateUnit.mockResolvedValue({
+      unitId: "unit-1",
+      unitIdentityEpoch: 1,
+      geocodeStatus: "COMPLETE",
+      canonicalizerVersion: "v1",
+      canonicalAddressHash: "hash-1",
+    });
+  });
+
+  afterAll(() => {
+    delete process.env.FEATURE_PHASE01_CANONICAL_WRITES;
+    delete process.env.KILL_SWITCH_DISABLE_NEW_PUBLICATION;
+  });
+
+  it("skips all canonical writes when the phase01 emergency stop is pulled", async () => {
+    process.env.FEATURE_PHASE01_CANONICAL_WRITES = "false";
+    const untouchableTx = new Proxy(
+      {},
+      {
+        get(_target, prop) {
+          throw new Error(
+            `tx.${String(prop)} accessed during phase01 skip — no DB work allowed`
+          );
+        },
+      }
+    );
+
+    await expect(
+      syncCanonicalListingInventory(untouchableTx as never, VISIBLE_INPUT)
+    ).resolves.toEqual({ skipped: true, reason: "phase01_flag_off" });
+
+    expect(mockResolveOrCreateUnit).not.toHaveBeenCalled();
+    expect(mockAppendOutboxEvent).not.toHaveBeenCalled();
+    expect(mockRebuildInventorySearchProjection).not.toHaveBeenCalled();
+    expect(mockRebuildUnitPublicProjection).not.toHaveBeenCalled();
+    expect(mockHandleTombstone).not.toHaveBeenCalled();
+  });
+
+  it("still appends the outbox event but skips inline rebuilds when disable_new_publication is on", async () => {
+    process.env.KILL_SWITCH_DISABLE_NEW_PUBLICATION = "true";
+    const tx = makeVisibleTx();
+
+    await expect(
+      syncCanonicalListingInventory(tx as never, VISIBLE_INPUT)
+    ).resolves.toMatchObject({
+      inventoryId: "listing-1",
+      publishStatus: "PENDING_PROJECTION",
+    });
+
+    expect(mockAppendOutboxEvent).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({ kind: "INVENTORY_UPSERTED" })
+    );
+    expect(mockRebuildInventorySearchProjection).not.toHaveBeenCalled();
+    expect(mockRebuildUnitPublicProjection).not.toHaveBeenCalled();
+  });
+
+  it("runs both inline rebuilds when the kill switch is off", async () => {
+    const tx = makeVisibleTx();
+
+    await syncCanonicalListingInventory(tx as never, VISIBLE_INPUT);
+
+    expect(mockAppendOutboxEvent).toHaveBeenCalledTimes(1);
+    expect(mockRebuildInventorySearchProjection).toHaveBeenCalledTimes(1);
+    expect(mockRebuildUnitPublicProjection).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("syncCanonicalListingInventory stale-write guard (H3)", () => {
+  const STALE_INPUT = {
+    listing: {
+      id: "listing-1",
+      physicalUnitId: "unit-1",
+      price: 700,
+      roomType: "Shared Room",
+      totalSlots: 1,
+      openSlots: 1,
+      moveInDate: new Date("2026-07-01T00:00:00.000Z"),
+      status: "ACTIVE",
+      version: 5,
+    },
+    address: {
+      address: "1 Main St",
+      city: "San Francisco",
+      state: "CA",
+      zip: "94102",
+    },
+    actor: { role: "host", id: "user-1" } as const,
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    delete process.env.FEATURE_PHASE01_CANONICAL_WRITES;
+    delete process.env.KILL_SWITCH_DISABLE_NEW_PUBLICATION;
+    mockResolveOrCreateUnit.mockResolvedValue({
+      unitId: "unit-1",
+      unitIdentityEpoch: 1,
+      geocodeStatus: "COMPLETE",
+      canonicalizerVersion: "v1",
+      canonicalAddressHash: "hash-1",
+    });
+  });
+
+  it("skips all fan-out when the upsert is rejected as stale (moderator pause won the race)", async () => {
+    const tx = {
+      $queryRaw: jest
+        .fn()
+        // previous-row read: a moderator already wrote a newer version
+        .mockResolvedValueOnce([
+          {
+            unit_id: "unit-1",
+            unit_identity_epoch_written_at: 1,
+            source_version: 9,
+          },
+        ])
+        // guarded upsert rejects: empty RETURNING
+        .mockResolvedValueOnce([])
+        // current-state re-read for the skip result
+        .mockResolvedValueOnce([
+          { publish_status: "PAUSED", source_version: 9 },
+        ]),
+      listing: {
+        update: jest.fn().mockResolvedValue(undefined),
+      },
+    };
+
+    await expect(
+      syncCanonicalListingInventory(tx as never, STALE_INPUT)
+    ).resolves.toEqual({
+      skipped: true,
+      reason: "stale_source_version",
+      inventoryId: "listing-1",
+      currentPublishStatus: "PAUSED",
+      currentSourceVersion: BigInt(9),
+    });
+
+    expect(mockAppendOutboxEvent).not.toHaveBeenCalled();
+    expect(mockHandleTombstone).not.toHaveBeenCalled();
+    expect(mockRebuildInventorySearchProjection).not.toHaveBeenCalled();
+    expect(mockRebuildUnitPublicProjection).not.toHaveBeenCalled();
+  });
+
+  it("applies an equal-version retry exactly as before (idempotent)", async () => {
+    const tx = {
+      $queryRaw: jest
+        .fn()
+        .mockResolvedValueOnce([
+          {
+            unit_id: "unit-1",
+            unit_identity_epoch_written_at: 1,
+            source_version: 5,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: "listing-1",
+            unit_id: "unit-1",
+            unit_identity_epoch_written_at: 1,
+            publish_status: "PENDING_PROJECTION",
+            source_version: 5,
+          },
+        ]),
+      listing: {
+        update: jest.fn().mockResolvedValue(undefined),
+      },
+    };
+
+    await expect(
+      syncCanonicalListingInventory(tx as never, STALE_INPUT)
+    ).resolves.toMatchObject({
+      inventoryId: "listing-1",
+      publishStatus: "PENDING_PROJECTION",
+      sourceVersion: BigInt(5),
+    });
+
+    expect(mockAppendOutboxEvent).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        kind: "INVENTORY_UPSERTED",
+        aggregateId: "listing-1",
+        sourceVersion: BigInt(5),
+      })
+    );
+    expect(mockRebuildInventorySearchProjection).toHaveBeenCalledTimes(1);
+    expect(mockRebuildUnitPublicProjection).toHaveBeenCalledTimes(1);
+  });
+});
