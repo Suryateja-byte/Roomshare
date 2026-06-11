@@ -222,7 +222,7 @@ function EditorialListingCard({
     <article
       data-testid="listing-card"
       data-listing-id={listing.id}
-      className={`group col-span-1 min-w-0 ${big ? "md:col-span-6" : "md:col-span-3"}`}
+      className={`group col-span-1 min-w-0 ${big ? "md:col-span-12 lg:col-span-6" : "md:col-span-6 lg:col-span-3"}`}
     >
       <div
         className={`relative overflow-hidden rounded-[1.125rem] bg-surface-container-high ${
@@ -248,7 +248,7 @@ function EditorialListingCard({
           {tags.map((tag) => (
             <span
               key={tag}
-              className="min-w-0 truncate rounded-full bg-surface-canvas/95 px-3 py-1.5 text-[0.68rem] font-bold uppercase tracking-[0.08em] text-on-surface shadow-ambient-sm backdrop-blur"
+              className="shrink-0 rounded-full bg-surface-canvas/95 px-3 py-1.5 text-[0.68rem] font-bold uppercase tracking-[0.08em] text-on-surface shadow-ambient-sm backdrop-blur"
             >
               {tag}
             </span>
@@ -280,10 +280,10 @@ function EditorialListingCard({
 
       <div className="min-w-0 pt-4">
         <div className="flex min-w-0 items-baseline justify-between gap-4">
-          <h3 className="line-clamp-1 min-w-0 text-base font-semibold text-on-surface">
+          <h3 className="min-w-0 text-base font-semibold text-on-surface">
             <Link
               href={`/listings/${listing.id}`}
-              className="inline-flex min-h-8 min-w-0 items-center hover:underline"
+              className="line-clamp-1 py-1 hover:underline"
             >
               {listing.title}
             </Link>
