@@ -30,7 +30,8 @@ export default function MainLayout({
   return (
     <main
       id="main-content"
-      className={`flex-grow${noPadding ? "" : " pt-16 md:pt-20"}`}
+      tabIndex={-1}
+      className={`flex-grow focus-visible:outline-none${noPadding ? "" : " pt-16 md:pt-20"}`}
     >
       {children}
     </main>
