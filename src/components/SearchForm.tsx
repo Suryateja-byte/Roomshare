@@ -1012,7 +1012,7 @@ export default function SearchForm({
                   onBlur={handleFieldBlur}
                   placeholder="Describe your ideal room"
                   className={cn(
-                    "w-full bg-transparent border-none focus:ring-0 focus:outline-none",
+                    "w-full bg-transparent border-none rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40",
                     isHome
                       ? "rounded-md px-1 py-1 -ml-1 text-[16px] text-on-surface placeholder:text-on-surface-variant transition-colors focus:bg-surface-canvas md:-ml-0 md:px-0 md:py-0 md:text-base md:font-medium md:focus:bg-transparent"
                       : "p-0 text-[16px] md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant"
@@ -1258,7 +1258,7 @@ export default function SearchForm({
                 onBlur={handleFieldBlur}
                 placeholder="Min"
                 className={cn(
-                  "w-full bg-transparent border-none appearance-none focus:ring-0 focus:outline-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+                  "w-full bg-transparent border-none rounded-md appearance-none focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40 [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
                   isHome
                     ? "rounded-md px-1 py-1 -ml-1 text-[16px] text-on-surface placeholder:text-on-surface-variant transition-colors focus:bg-surface-canvas md:-ml-0 md:px-0 md:py-0 md:text-base md:font-medium md:focus:bg-transparent"
                     : "p-0 text-[16px] md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant"
@@ -1297,7 +1297,7 @@ export default function SearchForm({
                 onBlur={handleFieldBlur}
                 placeholder="Max"
                 className={cn(
-                  "w-full bg-transparent border-none appearance-none focus:ring-0 focus:outline-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+                  "w-full bg-transparent border-none rounded-md appearance-none focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40 [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
                   isHome
                     ? "rounded-md px-1 py-1 -ml-1 text-[16px] text-on-surface placeholder:text-on-surface-variant transition-colors focus:bg-surface-canvas md:-ml-0 md:px-0 md:py-0 md:text-base md:font-medium md:focus:bg-transparent"
                     : "p-0 text-[16px] md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant"
