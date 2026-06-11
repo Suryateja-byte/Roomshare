@@ -66,7 +66,7 @@ test.describe("Home A11y: search input focus indicators", () => {
     "search-budget-max",
   ];
 
-  test("hero search inputs show a visible focus-visible ring", async ({
+  test("hero search inputs show a visible focus indicator on their field cell", async ({
     page,
   }) => {
     await gotoHome(page);
@@ -74,28 +74,48 @@ test.describe("Home A11y: search input focus indicators", () => {
     await page.waitForSelector("#search-what", { timeout: 30000 });
 
     for (const id of INPUT_IDS) {
-      // Land on the input via keyboard so :focus-visible applies
-      await page.locator(`#${id}`).focus();
-      await page.keyboard.press("Shift+Tab");
-      await page.keyboard.press("Tab");
-
-      const state = await page.evaluate(() => {
-        const el = document.activeElement as HTMLElement;
-        return {
-          id: el.id,
-          focusVisible: el.matches(":focus-visible"),
-          boxShadow: getComputedStyle(el).boxShadow,
-        };
-      });
-
-      expect(state.id, `keyboard tab should land on #${id}`).toBe(id);
-      expect(state.focusVisible, `#${id} should match :focus-visible`).toBe(
-        true
-      );
-      expect(
-        state.boxShadow,
-        `#${id} should have a visible ring (box-shadow)`
-      ).not.toBe("none");
+      // The indicator lives on the field-cell wrapper (a hairline ring +
+      // tint driven by React focus state), not on the input itself — text
+      // inputs match :focus-visible on mouse click too, so an input-level
+      // ring would flash for pointer users. Focus state only updates once
+      // the lazy SearchForm has hydrated, so poll the focus + check.
+      await expect
+        .poll(
+          async () => {
+            await page.locator(`#${id}`).focus();
+            return page.evaluate(() => {
+              const el = document.activeElement as HTMLElement;
+              // Walk up to the field cell, stopping before the <form>
+              // (the form has its own focus-within shadow).
+              let node: HTMLElement | null = el;
+              for (let depth = 0; node && depth < 5; depth++) {
+                if (node.tagName === "FORM") break;
+                const shadow = getComputedStyle(node).boxShadow;
+                if (shadow !== "none") {
+                  // A real ring entry has a non-transparent color (may
+                  // compute as oklab/rgb) AND a non-zero length component.
+                  const entries = shadow.split(/,(?![^(]*\))/);
+                  const visible = entries.some((entry) => {
+                    const color =
+                      entry.match(/(rgba?|oklab|oklch|color)\([^)]*\)/)?.[0] ??
+                      "";
+                    if (!color || color === "rgba(0, 0, 0, 0)") return false;
+                    const lengths = entry.match(/-?\d+(\.\d+)?px/g) ?? [];
+                    return lengths.some((l) => parseFloat(l) !== 0);
+                  });
+                  if (visible) return el.id;
+                }
+                node = node.parentElement;
+              }
+              return "no-ring:" + el.id;
+            });
+          },
+          {
+            timeout: 10000,
+            message: `#${id}'s field cell should show the focus ring`,
+          }
+        )
+        .toBe(id);
     }
   });
 });

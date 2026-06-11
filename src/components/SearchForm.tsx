@@ -917,9 +917,12 @@ export default function SearchForm({
 
   const getFieldStateClasses = (field: "what" | "where" | "budget") => {
     if (isHome) {
+      // The focused-cell tint + hairline ring is the focus indicator for these
+      // inputs (text inputs match :focus-visible on mouse click too, so an
+      // input-level ring would show for pointer users and read as a stray border).
       return cn(
         focusedField === field &&
-          "rounded-2xl bg-surface-canvas/72 md:bg-surface-canvas/46"
+          "rounded-2xl bg-surface-canvas/72 ring-1 ring-inset ring-primary/35 md:bg-surface-canvas/46"
       );
     }
 
@@ -1012,7 +1015,7 @@ export default function SearchForm({
                   onBlur={handleFieldBlur}
                   placeholder="Describe your ideal room"
                   className={cn(
-                    "w-full bg-transparent border-none rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40",
+                    "w-full bg-transparent border-none focus:outline-none focus:ring-0",
                     isHome
                       ? "rounded-md px-1 py-1 -ml-1 text-[16px] text-on-surface placeholder:text-on-surface-variant transition-colors focus:bg-surface-canvas md:-ml-0 md:px-0 md:py-0 md:text-base md:font-medium md:focus:bg-transparent"
                       : "p-0 text-[16px] md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant"
@@ -1258,7 +1261,7 @@ export default function SearchForm({
                 onBlur={handleFieldBlur}
                 placeholder="Min"
                 className={cn(
-                  "w-full bg-transparent border-none rounded-md appearance-none focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40 [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+                  "w-full bg-transparent border-none appearance-none focus:outline-none focus:ring-0 [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
                   isHome
                     ? "rounded-md px-1 py-1 -ml-1 text-[16px] text-on-surface placeholder:text-on-surface-variant transition-colors focus:bg-surface-canvas md:-ml-0 md:px-0 md:py-0 md:text-base md:font-medium md:focus:bg-transparent"
                     : "p-0 text-[16px] md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant"
@@ -1297,7 +1300,7 @@ export default function SearchForm({
                 onBlur={handleFieldBlur}
                 placeholder="Max"
                 className={cn(
-                  "w-full bg-transparent border-none rounded-md appearance-none focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40 [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+                  "w-full bg-transparent border-none appearance-none focus:outline-none focus:ring-0 [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
                   isHome
                     ? "rounded-md px-1 py-1 -ml-1 text-[16px] text-on-surface placeholder:text-on-surface-variant transition-colors focus:bg-surface-canvas md:-ml-0 md:px-0 md:py-0 md:text-base md:font-medium md:focus:bg-transparent"
                     : "p-0 text-[16px] md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant"

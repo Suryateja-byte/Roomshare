@@ -822,7 +822,7 @@ export default function LocationSearchInput({
           onCompositionEnd={handleCompositionEnd}
           placeholder={placeholder}
           className={cn(
-            "h-full w-full min-w-0 bg-transparent border-none rounded-md p-0 pr-8 text-base text-on-surface placeholder:text-on-surface-variant focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40 md:text-sm truncate",
+            "h-full w-full min-w-0 bg-transparent border-none p-0 pr-8 text-base text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-0 md:text-sm truncate",
             inputClassName
           )}
           autoFocus={autoFocus}
