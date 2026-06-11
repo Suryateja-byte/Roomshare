@@ -187,6 +187,7 @@ describe("rebuildInventorySearchProjection()", () => {
 
     expect(staleResult.skippedStale).toBe(true);
     expect(staleResult.updated).toBe(false);
+    expect(staleResult.skipReason).toBe("stale_version");
 
     // ISP row should still have version=5
     const rows = await fixture.getInventorySearchProjections();
@@ -218,6 +219,12 @@ describe("rebuildInventorySearchProjection()", () => {
 
     expect(result.updated).toBe(true);
     expect(result.skippedStale).toBe(false);
+
+    // The publish transition must also survive the replay (idempotent CAS)
+    const rows = await fixture.query(
+      `SELECT publish_status FROM listing_inventories WHERE id = '${invId}'`
+    );
+    expect(rows[0].publish_status).toBe("PUBLISHED");
   });
 
   it("returns skippedStale=true when inventory does not exist", async () => {
@@ -280,5 +287,129 @@ describe("rebuildInventorySearchProjection()", () => {
     const rows = await fixture.getInventorySearchProjections();
     const row = rows.find((r) => r.inventoryId === invId);
     expect(row!.projectionEpoch).toBe(BigInt(42));
+  });
+});
+
+describe("H3 ghost-update guards", () => {
+  async function expectNoProjectionRow(invId: string): Promise<void> {
+    const rows = await fixture.getInventorySearchProjections();
+    expect(rows.find((r) => r.inventoryId === invId)).toBeUndefined();
+  }
+
+  async function getPublishStatus(invId: string): Promise<string> {
+    const rows = await fixture.query(
+      `SELECT publish_status FROM listing_inventories WHERE id = '${invId}'`
+    );
+    return rows[0].publish_status as string;
+  }
+
+  it.each(["PAUSED", "SUPPRESSED", "ARCHIVED"] as const)(
+    "skips a stale event against a %s inventory without writing a projection row",
+    async (hiddenStatus) => {
+      const { unitId, invId } = await seedInventory({
+        publishStatus: hiddenStatus,
+        sourceVersion: BigInt(6),
+      });
+
+      const result = await withTx((tx) =>
+        rebuildInventorySearchProjection(tx, {
+          unitId,
+          inventoryId: invId,
+          sourceVersion: BigInt(5),
+          unitIdentityEpoch: 1,
+        })
+      );
+
+      expect(result.updated).toBe(false);
+      expect(result.skippedStale).toBe(true);
+      expect(result.skipReason).toBe("hidden_status");
+      await expectNoProjectionRow(invId);
+      expect(await getPublishStatus(invId)).toBe(hiddenStatus);
+    }
+  );
+
+  it("does not recreate a tombstone-deleted projection row (H3 interleaving)", async () => {
+    const { unitId, invId } = await seedInventory({
+      publishStatus: "PENDING_PROJECTION",
+      sourceVersion: BigInt(5),
+    });
+
+    // Event published normally first
+    const first = await withTx((tx) =>
+      rebuildInventorySearchProjection(tx, {
+        unitId,
+        inventoryId: invId,
+        sourceVersion: BigInt(5),
+        unitIdentityEpoch: 1,
+      })
+    );
+    expect(first.updated).toBe(true);
+
+    // Moderator pause commits: hides the inventory and tombstones the projection
+    await fixture.query(
+      `UPDATE listing_inventories SET publish_status = 'PAUSED', source_version = 6 WHERE id = $1`,
+      [invId]
+    );
+    await fixture.query(
+      `DELETE FROM inventory_search_projection WHERE inventory_id = $1`,
+      [invId]
+    );
+
+    // A stale/replayed event must not resurrect the listing
+    const replay = await withTx((tx) =>
+      rebuildInventorySearchProjection(tx, {
+        unitId,
+        inventoryId: invId,
+        sourceVersion: BigInt(5),
+        unitIdentityEpoch: 1,
+      })
+    );
+
+    expect(replay.updated).toBe(false);
+    expect(replay.skipReason).toBe("hidden_status");
+    await expectNoProjectionRow(invId);
+    expect(await getPublishStatus(invId)).toBe("PAUSED");
+  });
+
+  it("allows a legitimate re-publish after the host unpauses", async () => {
+    const { unitId, invId } = await seedInventory({
+      publishStatus: "PAUSED",
+      sourceVersion: BigInt(6),
+    });
+
+    // Stale event while paused: skipped
+    const whilePaused = await withTx((tx) =>
+      rebuildInventorySearchProjection(tx, {
+        unitId,
+        inventoryId: invId,
+        sourceVersion: BigInt(5),
+        unitIdentityEpoch: 1,
+      })
+    );
+    expect(whilePaused.skipReason).toBe("hidden_status");
+
+    // Host unpauses → canonical sync sets PENDING_PROJECTION at a newer version
+    await fixture.query(
+      `UPDATE listing_inventories SET publish_status = 'PENDING_PROJECTION', source_version = 7 WHERE id = $1`,
+      [invId]
+    );
+
+    const republish = await withTx((tx) =>
+      rebuildInventorySearchProjection(tx, {
+        unitId,
+        inventoryId: invId,
+        sourceVersion: BigInt(7),
+        unitIdentityEpoch: 1,
+      })
+    );
+
+    expect(republish.updated).toBe(true);
+    expect(republish.targetStatus).toBe("PUBLISHED");
+    expect(await getPublishStatus(invId)).toBe("PUBLISHED");
+
+    const rows = await fixture.getInventorySearchProjections();
+    const row = rows.find((r) => r.inventoryId === invId);
+    expect(row).toBeDefined();
+    expect(row!.sourceVersion).toBe(BigInt(7));
   });
 });

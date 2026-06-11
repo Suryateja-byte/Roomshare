@@ -9,6 +9,7 @@
 import type { TransactionClient } from "@/lib/db/with-actor";
 import { features } from "@/lib/env";
 import { appendOutboxEvent } from "@/lib/outbox/append";
+import { isHiddenStatus } from "@/lib/projections/publish-states";
 import type { PublishState } from "@/lib/projections/publish-states";
 import { currentProjectionEpoch } from "@/lib/projections/epoch";
 
@@ -22,6 +23,11 @@ export interface InventoryProjectionInput {
 export interface InventoryProjectionResult {
   updated: boolean;
   skippedStale: boolean;
+  skipReason?:
+    | "missing_inventory"
+    | "stale_version"
+    | "hidden_status"
+    | "status_changed";
   targetStatus: PublishState;
 }
 
@@ -110,12 +116,30 @@ export async function rebuildInventorySearchProjection(
     WHERE id = ${inventoryId}
       AND unit_id = ${unitId}
     LIMIT 1
+    FOR UPDATE
   `;
   const inventory = inventories[0] ?? null;
 
   if (!inventory) {
     // Inventory deleted — treat as stale (tombstone handler covers actual deletion)
-    return { updated: false, skippedStale: true, targetStatus: "ARCHIVED" };
+    return {
+      updated: false,
+      skippedStale: true,
+      skipReason: "missing_inventory",
+      targetStatus: "ARCHIVED",
+    };
+  }
+
+  if (isHiddenStatus(inventory.publish_status)) {
+    // A moderator/host hide (PAUSED/SUPPRESSED/ARCHIVED) owns this inventory:
+    // its tombstone already deleted the projection row, and recreating it here
+    // would re-expose a hidden listing (H3 ghost update). Skip entirely.
+    return {
+      updated: false,
+      skippedStale: true,
+      skipReason: "hidden_status",
+      targetStatus: inventory.publish_status as PublishState,
+    };
   }
 
   // Fetch physical unit for location fields via raw SQL to avoid type issues
@@ -218,29 +242,56 @@ export async function rebuildInventorySearchProjection(
   `;
 
   const updated = updatedCount > 0;
-  const skippedStale = !updated;
 
-  if (updated && targetStatus === "PENDING_EMBEDDING") {
-    await tx.$executeRaw`
+  if (!updated) {
+    return {
+      updated: false,
+      skippedStale: true,
+      skipReason: "stale_version",
+      targetStatus,
+    };
+  }
+
+  // The publish_status writes below CAS on the status read under FOR UPDATE:
+  // a 0-row result means a concurrent writer changed it (unreachable while the
+  // row lock is held; defensive for future callers that read without locking —
+  // note the projection upsert above has already run in that branch).
+  if (targetStatus === "PENDING_EMBEDDING") {
+    const statusRows = await tx.$executeRaw`
       UPDATE listing_inventories
       SET publish_status = ${targetStatus},
           updated_at     = NOW()
       WHERE id = ${inventoryId}
+        AND publish_status = ${inventory.publish_status}
     `;
+    if (statusRows === 0) {
+      return {
+        updated: false,
+        skippedStale: true,
+        skipReason: "status_changed",
+        targetStatus,
+      };
+    }
     await enqueueEmbedNeededIfAbsent(tx, input);
-  } else if (
-    updated &&
-    (targetStatus === "PUBLISHED" || targetStatus === "STALE_PUBLISHED")
-  ) {
+  } else if (targetStatus === "PUBLISHED" || targetStatus === "STALE_PUBLISHED") {
     // Record that this source_version was successfully published
-    await tx.$executeRaw`
+    const statusRows = await tx.$executeRaw`
       UPDATE listing_inventories
       SET publish_status        = ${targetStatus},
           last_published_version = ${sourceVersion}::BIGINT,
           updated_at            = NOW()
       WHERE id = ${inventoryId}
+        AND publish_status = ${inventory.publish_status}
     `;
+    if (statusRows === 0) {
+      return {
+        updated: false,
+        skippedStale: true,
+        skipReason: "status_changed",
+        targetStatus,
+      };
+    }
   }
 
-  return { updated, skippedStale, targetStatus };
+  return { updated: true, skippedStale: false, targetStatus };
 }

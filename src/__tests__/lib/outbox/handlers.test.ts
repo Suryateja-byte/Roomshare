@@ -226,6 +226,41 @@ describe("HANDLERS.INVENTORY_UPSERTED", () => {
     );
     expect(result.outcome).toBe("stale_skipped");
   });
+
+  it("returns stale_skipped and re-publishes nothing when the inventory was paused after the event was appended (H3)", async () => {
+    const unitId = `u-h3-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const invId = await seedUnitAndInventory(unitId);
+
+    // Moderator pause commits between event append and drain pickup
+    await fixture.query(
+      `UPDATE listing_inventories SET publish_status = 'PAUSED', source_version = 2 WHERE id = '${invId}'`
+    );
+
+    const event = makeEvent({
+      kind: "INVENTORY_UPSERTED",
+      aggregateId: invId,
+      payload: { unitId },
+      sourceVersion: BigInt(1),
+    });
+    const result = await withTx((tx) =>
+      HANDLERS.INVENTORY_UPSERTED(tx, event)
+    );
+
+    expect(result.outcome).toBe("stale_skipped");
+
+    const ispRows = await fixture.getInventorySearchProjections();
+    expect(ispRows.find((row) => row.inventoryId === invId)).toBeUndefined();
+
+    const ciRows = await fixture.getCacheInvalidations();
+    expect(
+      ciRows.find((row) => row.unitId === unitId && row.reason === "REPUBLISH")
+    ).toBeUndefined();
+
+    const statusRows = await fixture.query(
+      `SELECT publish_status FROM listing_inventories WHERE id = '${invId}'`
+    );
+    expect(statusRows[0].publish_status).toBe("PAUSED");
+  });
 });
 
 describe("HANDLERS.CACHE_INVALIDATE", () => {
