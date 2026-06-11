@@ -1,3 +1,47 @@
+# H4 unit-projection version-ordering fix — (2026-06-11)
+
+## Problem
+
+`rebuildUnitPublicProjection` guarded its upsert with
+`WHERE stored.source_version <= MAX(isp.source_version)`. Inventory source_versions are
+independent per-inventory counters (each derives from its own Listing.version), so the
+cross-inventory MAX is not a valid ordering token: deleting the highest-versioned inventory
+makes every later rebuild compute a lower MAX, the guard rejects forever, and the unit row is
+frozen with the deleted room's data (count, from_price, representative all stale).
+
+## Fix (`src/lib/projections/unit-projection.ts`)
+
+- Serialize rebuilds per unit with `pg_advisory_xact_lock(hashtext('p2:unitproj:' || unitId))`
+  taken BEFORE the aggregate read (callers lock inventory rows first → acquisition order is
+  rows → unit lock everywhere, no deadlock; lock releases at commit). Each rebuild then
+  aggregates the latest committed state, so the upsert applies unconditionally.
+- Dropped the `WHERE source_version <=` guard and `GREATEST()` from both upsert variants;
+  stored `source_version` is now informational (MAX of current aggregate, may regress).
+- Deliberately did NOT use `acquireXactLock()` — its `SET LOCAL lock_timeout='5s'` would leak
+  into the caller's whole transaction (inline canonical-sync path).
+- Tombstone's own per-inventory guard untouched (same-counter comparison — valid).
+
+## Invariants
+
+1. unit_public_projection is a pure aggregate of current visible ISP rows; per-unit advisory
+   lock makes read-aggregate-write critical sections strictly sequential.
+2. Cross-inventory source_versions are never compared for ordering decisions.
+3. unit source_version may regress on inventory deletion (metadata only); the search read
+   path computes `GREATEST(upp.source_version, MAX(isp.source_version))` per query — unaffected.
+
+## Results + verification story
+
+- 3 new regression tests (unit-projection.test.ts): exact H4 scenario (delete max-version
+  room → unit row regroups to remaining room), not-stuck-in-the-past (subsequent lower-version
+  updates apply), and end-to-end handleTombstone regroup. Renamed the GREATEST test to match
+  the new semantics.
+- `pnpm lint` 0 errors (22 pre-existing warnings, none in touched files); `pnpm typecheck` clean.
+- Projections + outbox + phase02 integration suites (read-path isolation, tombstone fast lane):
+  165/165 green. Full `pnpm test`: 500/500 suites, 7807 passed, 0 failed.
+- No schema change; rollback = revert commit.
+
+---
+
 # H3 ghost-update race fix — plan (2026-06-11)
 
 Full plan: /home/surya/.claude/plans/fix-this-h3-ghost-dynamic-snowflake.md

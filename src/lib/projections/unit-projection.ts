@@ -32,20 +32,34 @@ async function hasPhase04UnitProjectionColumns(
   return Boolean(rows[0]?.has_phase04_columns);
 }
 
+const UNIT_PROJECTION_LOCK_PREFIX = "p2:unitproj:";
+
 /**
  * Rebuild (or delete) the unit_public_projection row for the given unit.
  *
  * Groups all `inventory_search_projection` rows in ('PUBLISHED', 'STALE_PUBLISHED')
  * status for this unit and epoch into a single summary row.
  *
- * On conflict (unit_id, unit_identity_epoch), updates only if the incoming
- * source_version is >= the stored one (GREATEST prevents regressing).
+ * Ordering: inventory source_versions are independent per-inventory counters,
+ * so MAX(source_version) across a unit's inventories is NOT a valid staleness
+ * token — deleting the highest-versioned inventory would make every later
+ * rebuild look "stale" and freeze the unit row (H4). Instead, rebuilds are
+ * serialized per unit with a transaction-scoped advisory lock taken BEFORE the
+ * aggregate read: each rebuild then aggregates the latest committed inventory
+ * state and the upsert applies unconditionally. The stored source_version is
+ * informational (max version in the aggregate) and may regress on deletion.
  */
 export async function rebuildUnitPublicProjection(
   tx: TransactionClient,
   unitId: string,
   unitIdentityEpoch: number
 ): Promise<UnitProjectionResult> {
+  // Per-unit mutex (released at commit/rollback). Callers lock inventory rows
+  // before calling this, so acquisition order is rows -> unit lock everywhere.
+  await tx.$executeRaw`
+    SELECT pg_advisory_xact_lock(hashtext(${`${UNIT_PROJECTION_LOCK_PREFIX}${unitId}`}))
+  `;
+
   // Aggregate published inventory rows for this unit+epoch
   const rows = await tx.$queryRaw<
       {
@@ -168,10 +182,9 @@ export async function rebuildUnitPublicProjection(
       display_subtitle            = EXCLUDED.display_subtitle,
       hero_image_url              = EXCLUDED.hero_image_url,
       payload_version             = EXCLUDED.payload_version,
-      source_version              = GREATEST(unit_public_projection.source_version, EXCLUDED.source_version),
+      source_version              = EXCLUDED.source_version,
       projection_epoch            = EXCLUDED.projection_epoch,
       updated_at                  = NOW()
-    WHERE unit_public_projection.source_version <= EXCLUDED.source_version
   `
     : await tx.$executeRaw`
     INSERT INTO unit_public_projection (
@@ -198,10 +211,9 @@ export async function rebuildUnitPublicProjection(
       earliest_available_from     = EXCLUDED.earliest_available_from,
       matching_inventory_count    = EXCLUDED.matching_inventory_count,
       coarse_availability_badges  = EXCLUDED.coarse_availability_badges,
-      source_version              = GREATEST(unit_public_projection.source_version, EXCLUDED.source_version),
+      source_version              = EXCLUDED.source_version,
       projection_epoch            = EXCLUDED.projection_epoch,
       updated_at                  = NOW()
-    WHERE unit_public_projection.source_version <= EXCLUDED.source_version
   `;
 
   return {
