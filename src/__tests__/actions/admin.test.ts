@@ -743,6 +743,9 @@ describe("admin actions", () => {
         ownerId: string;
         version: number;
         statusReason: string | null;
+        openSlots: number | null;
+        availableSlots: number | null;
+        totalSlots: number | null;
       }> = {}
     ) {
       return {
@@ -752,6 +755,9 @@ describe("admin actions", () => {
         ownerId: "owner-123",
         version: 7,
         statusReason: "SUPPRESSED",
+        openSlots: null,
+        availableSlots: 2,
+        totalSlots: 2,
         ...overrides,
       };
     }
@@ -835,6 +841,61 @@ describe("admin actions", () => {
       });
       expect(update).not.toHaveBeenCalled();
       expect(syncListingLifecycleProjectionInTx).not.toHaveBeenCalled();
+    });
+
+    it("restores an empty listing to PAUSED, not ACTIVE (no-empty-listings rule)", async () => {
+      const { update } = mockUnsuppressTx({
+        ...makeUnsuppressListing(),
+        openSlots: 0,
+        availableSlots: 0,
+      });
+      (logAdminAction as jest.Mock).mockResolvedValue({});
+
+      const result = await unsuppressListing("listing-123", 7);
+
+      expect(result).toEqual({
+        success: true,
+        status: "PAUSED",
+        statusReason: null,
+        version: 8,
+      });
+      expect(update).toHaveBeenCalledWith({
+        where: { id: "listing-123" },
+        data: {
+          status: "PAUSED",
+          statusReason: null,
+          version: 8,
+        },
+      });
+      expect(logAdminAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "LISTING_RESTORED",
+          details: expect.objectContaining({
+            newStatus: "PAUSED",
+            newStatusReason: null,
+            restoredLockReason: "SUPPRESSED",
+          }),
+        })
+      );
+    });
+
+    it("restores legacy rows with zero effective slots to PAUSED", async () => {
+      const { update } = mockUnsuppressTx({
+        ...makeUnsuppressListing(),
+        statusReason: "ADMIN_PAUSED",
+        openSlots: null,
+        availableSlots: 0,
+      });
+      (logAdminAction as jest.Mock).mockResolvedValue({});
+
+      const result = await unsuppressListing("listing-123", 7);
+
+      expect(result).toMatchObject({ success: true, status: "PAUSED" });
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: "PAUSED", statusReason: null }),
+        })
+      );
     });
   });
 

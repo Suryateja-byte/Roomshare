@@ -527,6 +527,9 @@ export async function unsuppressListing(
           ownerId: string;
           version: number;
           statusReason: string | null;
+          openSlots: number | null;
+          availableSlots: number | null;
+          totalSlots: number | null;
         }>
       >`
         SELECT
@@ -535,7 +538,10 @@ export async function unsuppressListing(
           title,
           "ownerId",
           version,
-          "statusReason"
+          "statusReason",
+          "openSlots",
+          "availableSlots",
+          "totalSlots"
         FROM "Listing"
         WHERE id = ${listingId}
         FOR UPDATE
@@ -560,11 +566,19 @@ export async function unsuppressListing(
         } as const;
       }
 
+      // No-empty-listings rule: unsuppress always releases the moderation
+      // hold, but an empty listing is restored to PAUSED (the host adds
+      // slots, then reactivates) instead of becoming a ghost ACTIVE listing.
+      const effectiveOpenSlots =
+        listing.openSlots ?? listing.availableSlots ?? listing.totalSlots;
+      const nextStatus: ListingStatus =
+        (effectiveOpenSlots ?? 0) > 0 ? "ACTIVE" : "PAUSED";
+
       const nextVersion = listing.version + 1;
       await tx.listing.update({
         where: { id: listingId },
         data: {
-          status: "ACTIVE",
+          status: nextStatus,
           statusReason: null,
           version: nextVersion,
         },
@@ -583,7 +597,7 @@ export async function unsuppressListing(
         previousStatus: listing.status,
         previousStatusReason: listing.statusReason,
         lockReason,
-        status: "ACTIVE" as const,
+        status: nextStatus,
         statusReason: null,
         version: nextVersion,
       } as const;

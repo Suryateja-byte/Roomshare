@@ -169,14 +169,17 @@ export default function ListingList({
     try {
       const result = await unsuppressListing(listingId, expectedVersion);
       if (result.success) {
+        // Empty listings are restored to PAUSED, not ACTIVE — mirror the server
+        const restoredStatus = result.status ?? "ACTIVE";
         setListings((prev) =>
           prev.flatMap((l) => {
             if (l.id !== listingId) return [l];
-            if (currentStatus !== "all" && currentStatus !== "ACTIVE") return [];
+            if (currentStatus !== "all" && currentStatus !== restoredStatus)
+              return [];
             return [
               {
                 ...l,
-                status: "ACTIVE",
+                status: restoredStatus,
                 statusReason: null,
                 version:
                   typeof result.version === "number"

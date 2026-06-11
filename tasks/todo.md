@@ -18,10 +18,15 @@ skipped it — a host could toggle an empty listing back to ACTIVE (ghost listin
   (fail-closed `?? 0`) with code `ACTIVE_REQUIRES_OPEN_SLOTS`. Placed after the
   moderation-lock check. Guard is ACTIVE-only — pausing/renting an empty listing still works.
 
-## Known remaining gap (NOT in M1 scope, flagged for follow-up)
+## Known remaining gap — CLOSED in follow-up commit
 
-`unsuppressListing` (admin.ts) restores moderation-locked listings to ACTIVE without a slots
-check — same ghost-listing class via the moderation-restore path.
+`unsuppressListing` (admin.ts) restored moderation-locked listings to ACTIVE without a slots
+check. Fixed: unsuppress always releases the moderation hold, but an empty listing (same
+effective-slots chain) is restored to PAUSED instead of ACTIVE — rejecting outright would
+deadlock the listing (the host cannot edit a moderation-locked listing to add slots). The
+admin UI (`ListingList.tsx` handleUnsuppress) now mirrors the returned status instead of
+hardcoding ACTIVE. Tests: empty → PAUSED (host-managed + legacy), audit logs PAUSED;
+existing restore-to-ACTIVE tests green via factory slot defaults. Full suite 7816 passed.
 
 ## Results + verification story
 
