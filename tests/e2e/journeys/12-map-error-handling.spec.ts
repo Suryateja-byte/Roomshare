@@ -28,6 +28,14 @@ import {
 } from "../helpers";
 import type { Page } from "@playwright/test";
 import { isMapAvailable } from "../helpers/sync-helpers";
+import { mockMapTileRequests } from "../helpers/map-mock-helpers";
+
+// Deterministic basemap network: OpenFreeMap throttles CI runner IPs, which
+// surfaces as image-decode/style console errors these zero-console-error
+// tests would catch as false positives.
+test.beforeEach(async ({ page }) => {
+  await mockMapTileRequests(page);
+});
 
 async function gotoSearchViewport(page: Page, url: string) {
   await page.goto(url, { waitUntil: "domcontentloaded" }).catch((error) => {

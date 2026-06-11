@@ -12,6 +12,13 @@ import {
   SF_BOUNDS,
   searchResultsContainer,
 } from "../helpers";
+import { mockMapTileRequests } from "../helpers/map-mock-helpers";
+
+// Deterministic basemap network — OpenFreeMap throttles CI runner IPs
+// (image-decode/style console errors otherwise leak into assertions).
+test.beforeEach(async ({ page }) => {
+  await mockMapTileRequests(page);
+});
 
 test.describe("Search V2 UI Integration", () => {
   test.beforeEach(async () => {

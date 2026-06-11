@@ -22,6 +22,13 @@ import {
   selectors,
   waitForMapReady,
 } from "./helpers/test-utils";
+import { mockMapTileRequests } from "./helpers/map-mock-helpers";
+
+// Deterministic basemap network — OpenFreeMap throttles CI runner IPs
+// (image-decode/style console errors otherwise leak into assertions).
+test.beforeEach(async ({ page }) => {
+  await mockMapTileRequests(page);
+});
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 const SEARCH_URL = `/search?${boundsQS}`;
