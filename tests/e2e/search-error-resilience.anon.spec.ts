@@ -770,6 +770,12 @@ test.describe("Group 4: Error Boundary", () => {
 // Group 5: Network Resilience
 // ---------------------------------------------------------------------------
 test.describe("Group 5: Network Resilience", () => {
+  // The global config blocks service workers so route mocks stay reliable
+  // (see playwright.config.ts). This group tests the app's REAL offline
+  // behavior, whose offline-fallback page is served by the service worker —
+  // so it opts back in. No route mocks are used in this group.
+  test.use({ serviceWorkers: "allow" });
+
   test(`${tags.anon} ${tags.offline} 5.1 - Offline mode shows error or offline indicator`, async ({
     page,
     network,
