@@ -1,3 +1,65 @@
+# H3 ghost-update race fix — plan (2026-06-11)
+
+Full plan: /home/surya/.claude/plans/fix-this-h3-ghost-dynamic-snowflake.md
+
+## Goal + acceptance criteria
+
+- A moderator PAUSE/BAN (PAUSED/SUPPRESSED/ARCHIVED) can never be overwritten back to a
+  publishable state by a background recompute (outbox INVENTORY_UPSERTED / EMBED_NEEDED
+  handlers, canonical sync).
+- Background handlers never recreate the `inventory_search_projection` row for a hidden inventory.
+- Stale writes are logged no-ops; equal-version idempotent replays still apply; legitimate
+  unpause → re-publish still works.
+- Zero regressions: full lib/projections + lib/outbox + lib/listings suites green, plus
+  daily-maintenance + listings-host-managed-patch (in-flight retention work untouched).
+
+## Checklist
+
+- [x] Site 1: `src/lib/projections/inventory-projection.ts` — FOR UPDATE read, hidden-status
+      early skip (isHiddenStatus), CAS-guarded publish_status UPDATEs, `skipReason` in result
+- [x] Tests A1–A8 (inventory-projection.test.ts) + B9 (handlers.test.ts) → suites green
+- [x] Commit 1: 520f95ac
+- [x] Site 2: `src/lib/listings/canonical-inventory.ts` — `EXCLUDED.source_version >= current`
+      guard on ON CONFLICT DO UPDATE, stale-skip branch + warn log + result type
+- [x] Tests C10–C11 (canonical-inventory.test.ts, append-only) + D12–D13 (new guard test file)
+- [x] Commit 2: 70e2ff89 (also carries the in-tree pending H2 emergency-stop gating for this
+      module — entangled in the same file, noted in the commit message)
+- [x] Site 3: `src/lib/projections/semantic.ts` — status-guarded publish + semantic-row retraction
+- [x] Test E14 (semantic.test.ts)
+- [x] Commit 3: 646f49ec
+- [x] Verify: lint, typecheck, full affected suites, then full `pnpm test`
+- [x] Results + verification story below
+
+## Risks
+
+- State-transition/race logic (auth/state domain): guards must fail CLOSED (stay hidden), never open.
+- Working tree has uncommitted homepage + outbox-retention work — edits confined to
+  non-overlapping hunks; do not touch drain.ts/handlers.ts/daily-maintenance.
+
+## Results + verification story
+
+All three ghost-write sites are guarded; a hidden inventory (PAUSED/SUPPRESSED/ARCHIVED) can
+no longer be flipped back to a publishable state by a background recompute, and the
+tombstone-deleted `inventory_search_projection` row is never recreated by a stale event.
+Guards fail closed (worst case: listing stays hidden, surfaced via
+`cfm.canonical.stale_sync_skipped_count` warn log). No schema changes; rollback = revert commits.
+
+Verification (all on 2026-06-11):
+- `pnpm lint` — 0 errors; 22 pre-existing warnings, none in touched files.
+- `pnpm typecheck` — clean.
+- Targeted suites: inventory-projection (14), handlers (34), lib/listings (33, incl. new
+  canonical-inventory-guard.test.ts on real PGlite SQL), semantic (14) — all green.
+- Adjacency: daily-maintenance + listings-host-managed-patch suites green (no interaction
+  with in-flight retention work).
+- Full `pnpm test`: 500/500 suites, 7804 passed, 0 failed (8 pre-existing skips).
+
+Found-and-fixed along the way (commit 3a7b96b5): phase08/phase09 schema suites were red
+*before* this task — the in-flight retention work added the phase08 migration to the phase02
+fixture list, so the phase08+ fixture chains applied it twice (non-idempotent ADD CONSTRAINT).
+The phase08 fixture now skips application when `fanout_status` already exists.
+
+---
+
 # Homepage HIGH-issue fixes — plan (2026-06-11)
 
 (previous tasks: full-site UI review → superseded by homepage deep review, see tasks/ui-review-homepage-2026-06-10.md; map restyle completed cc203aff..e3d5fdc9)
