@@ -2,6 +2,7 @@
 
 import React, { Suspense, lazy } from "react";
 import { useSession } from "next-auth/react";
+import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -91,15 +92,24 @@ function HeroSection() {
     >
       <div
         aria-hidden="true"
-        className="home-hero-photo absolute inset-0 bg-[url('/images/home/hero-living-room.png')] bg-cover bg-[63%_top] opacity-45 md:bg-[center_right] md:opacity-100"
-      />
+        className="home-hero-photo absolute inset-0"
+      >
+        <Image
+          src="/images/home/hero-living-room.png"
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover object-[63%_top] md:object-[center_right]"
+        />
+      </div>
       <div
         aria-hidden="true"
-        className="home-hero-wash absolute inset-0 bg-[linear-gradient(180deg,rgb(251_249_244/0.97)_0%,rgb(251_249_244/0.91)_48%,rgb(251_249_244/0.84)_100%)] md:bg-[linear-gradient(90deg,rgb(251_249_244/0.98)_0%,rgb(251_249_244/0.93)_31%,rgb(251_249_244/0.68)_48%,rgb(251_249_244/0.16)_70%,rgb(251_249_244/0.03)_100%)]"
+        className="home-hero-wash absolute inset-0 bg-[linear-gradient(180deg,rgb(251_249_244/0.97)_0%,rgb(251_249_244/0.92)_40%,rgb(251_249_244/0.7)_58%,rgb(251_249_244/0.22)_80%,rgb(251_249_244/0.05)_100%)] md:bg-[linear-gradient(90deg,rgb(251_249_244/0.98)_0%,rgb(251_249_244/0.93)_31%,rgb(251_249_244/0.68)_48%,rgb(251_249_244/0.16)_70%,rgb(251_249_244/0.03)_100%)]"
       />
 
       <div className="home-hero-frame relative z-10 flex w-full flex-1 flex-col justify-start">
-        <div className="w-full">
+        <div className="flex w-full flex-1 flex-col md:block">
           <div className="grid items-start gap-4 md:grid-cols-[minmax(0,0.56fr)_minmax(0,0.44fr)] md:gap-8 lg:gap-12">
             <div className="max-w-[34rem] md:max-w-[46rem] lg:max-w-[52rem]">
               <div className="animate-editorial-rise mb-3 inline-flex items-center gap-2 text-micro-label text-primary md:mb-4">
@@ -151,6 +161,12 @@ function HeroSection() {
             <div className="hidden md:block" aria-hidden="true" />
           </div>
 
+          {/* Mobile only: distribute the tall-viewport slack between the text
+              block and the search card (collapses to zero on short phones) —
+              small capped breath above the card, the rest below it where the
+              photo shows through. */}
+          <div className="max-h-14 flex-1 md:hidden" aria-hidden="true" />
+
           <div
             className="home-hero-search-row animate-editorial-rise mt-5 w-full md:mt-8 lg:mt-9"
             style={{ animationDelay: "280ms" }}
@@ -171,6 +187,8 @@ function HeroSection() {
           <div className="home-hero-auth mt-4 md:mt-5">
             <AuthCTA />
           </div>
+
+          <div className="flex-[4] md:hidden" aria-hidden="true" />
         </div>
       </div>
     </section>
@@ -749,7 +767,16 @@ function FinalCTA() {
             </div>
 
             <div className="rotate-2 rounded-[1.25rem] bg-surface-container-lowest p-3 text-on-surface shadow-[0_30px_60px_-20px_rgb(0_0_0/0.22)]">
-              <div className="aspect-[4/3] rounded-2xl bg-[url('/images/home/hero-living-room.png')] bg-cover bg-center" />
+              <div className="relative aspect-[4/3] overflow-hidden rounded-2xl">
+                <Image
+                  src="/images/home/hero-living-room.png"
+                  alt=""
+                  fill
+                  loading="lazy"
+                  sizes="(max-width: 1023px) 90vw, 33vw"
+                  className="object-cover"
+                />
+              </div>
               <div className="p-4">
                 <div className="mb-3 flex items-center justify-between text-[0.65rem] uppercase tracking-[0.14em] text-on-surface-variant">
                   <span>Dispatch from</span>
