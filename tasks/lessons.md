@@ -16,3 +16,10 @@
 - Detection signal: a pre-reset `git diff origin/main main --stat` printed 13 files / +7967 lines where an empty diff was expected; `git reflog` identified the orphaned commits.
 - Root cause: assumed exclusive ownership of the local working copy across a ~40-minute CI wait; ran a destructive ref move without first checking `git log origin/main..main` for unexpected local-only commits.
 - Prevention rule: before any `git reset --hard` / branch -f on a shared local clone, list local-only commits (`git log --oneline @{u}..`) and abort if any commit is not one you authored this session. Recovery: cherry-pick from reflog, verify with `git diff <old-tip> HEAD` for byte-identical trees.
+
+- Date: 2026-06-11
+- Mistake / failure mode: Wrote a Tailwind-class-shaped token with a url arbitrary value (the bg utility joined to a bracketed url value) into tasks/todo.md; Tailwind v4 auto source-detection scans all non-gitignored text files (including tasks/*.md), generated a background-image url declaration, and webpack failed the whole build with "Module not found: Can't resolve './…'" — homepage 500'd. Happened TWICE: the results write-up quoting the offending token re-broke the build the same way.
+- Detection signal: dev server 500/404 on every route; build error pointing at globals.css:4:1 with a truncated-looking './…' path that existed nowhere in the CSS.
+- Root cause: Tailwind v4 content scanning treats documentation prose as class candidates; url() arbitrary values trigger webpack module resolution.
+- Prevention rule: in markdown/docs inside the repo, never write class-shaped tokens containing url(...) — describe them in prose instead. If quoting classes is unavoidable, break the token (space after the bracket) or put the doc in a gitignored location.
+- Follow-up: todo.md and this lessons entry both de-fanged (prose only, no quotable token). When documenting this class of bug, never paste the literal token anywhere Tailwind scans.
