@@ -915,6 +915,18 @@ export default function SearchForm({
       ? "px-3 py-2 sm:py-2.5 md:px-5 md:py-4 lg:px-6 lg:py-5"
       : "px-4 py-2 md:px-6 md:py-2.5";
 
+  // Clicking a cell's dead space focuses its input. Clicks on real controls
+  // (the inputs themselves, clear/locate buttons, dropdown items) keep their
+  // native behavior — without this guard a click on the Max input would
+  // bubble up and yank focus back to Min.
+  const focusCellInput = (
+    event: React.MouseEvent<HTMLDivElement>,
+    inputId: string
+  ) => {
+    if ((event.target as HTMLElement).closest("input, button, a")) return;
+    document.getElementById(inputId)?.focus();
+  };
+
   const getFieldStateClasses = (field: "what" | "where" | "budget") => {
     if (isHome) {
       // The focused-cell tint + hairline ring is the focus indicator for these
@@ -922,7 +934,7 @@ export default function SearchForm({
       // input-level ring would show for pointer users and read as a stray border).
       return cn(
         focusedField === field &&
-          "rounded-2xl bg-surface-canvas/72 ring-1 ring-inset ring-primary/35 md:bg-surface-canvas/46"
+          "rounded-[1.125rem] bg-surface-canvas/72 ring-1 ring-inset ring-primary/50 md:bg-primary/[0.045]"
       );
     }
 
@@ -965,9 +977,10 @@ export default function SearchForm({
           <>
             <div
               style={getFieldFlex("what")}
+              onClick={(e) => focusCellInput(e, "search-what")}
               className={cn(
                 "w-full flex-col relative overflow-hidden whitespace-nowrap transition-opacity duration-300",
-                isHome ? "hidden lg:flex" : "hidden lg:flex",
+                isHome ? "hidden cursor-text md:justify-center lg:flex" : "hidden lg:flex",
                 fieldPaddingClasses,
                 getFieldStateClasses("what")
               )}
@@ -975,13 +988,9 @@ export default function SearchForm({
               <label
                 htmlFor="search-what"
                 className={cn(
-                  "transition-opacity duration-200",
                   isHome
                     ? "mb-2.5 flex items-center text-[11px] font-bold uppercase tracking-[0.2em] leading-none text-primary md:mb-1 md:gap-1.5 md:text-xs md:tracking-[0.15em]"
-                    : "mb-1 flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.15em] text-primary",
-                  focusedField !== null &&
-                    focusedField !== "what" &&
-                    "md:opacity-0"
+                    : "mb-1 flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.15em] text-primary"
                 )}
               >
                 <Sparkles
@@ -1043,8 +1052,11 @@ export default function SearchForm({
             <div
               className={cn(
                 isHome
-                  ? "hidden self-center bg-on-surface/10 lg:my-0 lg:block lg:h-14 lg:w-px"
-                  : "mx-0 my-1 hidden h-1.5 w-full rounded-full bg-surface-container-high/70 lg:mx-1 lg:my-0 lg:block lg:h-8 lg:w-1.5"
+                  ? "hidden self-center bg-on-surface/10 transition-opacity duration-200 lg:my-0 lg:block lg:h-14 lg:w-px"
+                  : "mx-0 my-1 hidden h-1.5 w-full rounded-full bg-surface-container-high/70 lg:mx-1 lg:my-0 lg:block lg:h-8 lg:w-1.5",
+                isHome &&
+                  (focusedField === "what" || focusedField === "where") &&
+                  "lg:opacity-0"
               )}
               aria-hidden="true"
             ></div>
@@ -1054,9 +1066,10 @@ export default function SearchForm({
         {/* Location Input with Autocomplete - Airbnb-style stacked layout */}
         <div
           style={getFieldFlex("where")}
+          onClick={(e) => focusCellInput(e, "search-location")}
           className={cn(
             "w-full flex flex-col relative group/input overflow-hidden whitespace-nowrap transition-opacity duration-300",
-            isHome && "overflow-visible md:overflow-hidden",
+            isHome && "cursor-text overflow-visible md:justify-center md:overflow-hidden",
             fieldPaddingClasses,
             getFieldStateClasses("where")
           )}
@@ -1065,13 +1078,9 @@ export default function SearchForm({
             <label
               htmlFor="search-location"
               className={cn(
-                "transition-opacity duration-200",
                 isHome
                   ? "mb-2.5 ml-1 text-[11px] font-bold uppercase tracking-[0.2em] leading-none text-on-surface-variant md:mb-1 md:ml-0 md:text-xs md:tracking-[0.15em]"
-                  : "mb-1 text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant",
-                focusedField !== null &&
-                  focusedField !== "where" &&
-                  "md:opacity-0"
+                  : "mb-1 text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant"
               )}
             >
               Where
@@ -1115,11 +1124,7 @@ export default function SearchForm({
                   isUserTypingLocationRef.current = false;
                 }, 500);
               }}
-              placeholder={
-                focusedField && focusedField !== "where"
-                  ? "City or area"
-                  : "Search destinations"
-              }
+              placeholder="Search destinations"
               className="min-w-0 flex-1"
               inputClassName={
                 isHome
@@ -1209,8 +1214,11 @@ export default function SearchForm({
         <div
           className={cn(
             isHome
-              ? "my-0 h-px w-[calc(100%-1rem)] self-center bg-on-surface/10 md:mx-1 md:my-0 md:h-14 md:w-px"
-              : "mx-0 my-1 h-1.5 w-full rounded-full bg-surface-container-high/70 md:mx-1 md:my-0 md:h-8 md:w-1.5"
+              ? "my-0 h-px w-[calc(100%-1rem)] self-center bg-on-surface/10 transition-opacity duration-200 md:mx-1 md:my-0 md:h-14 md:w-px"
+              : "mx-0 my-1 h-1.5 w-full rounded-full bg-surface-container-high/70 md:mx-1 md:my-0 md:h-8 md:w-1.5",
+            isHome &&
+              (focusedField === "where" || focusedField === "budget") &&
+              "md:opacity-0"
           )}
           aria-hidden="true"
         ></div>
@@ -1218,8 +1226,10 @@ export default function SearchForm({
         {/* Price Range Input - Airbnb-style stacked layout */}
         <div
           style={getFieldFlex("budget")}
+          onClick={(e) => focusCellInput(e, "search-budget-min")}
           className={cn(
             "w-full flex flex-col overflow-hidden whitespace-nowrap transition-opacity duration-300",
+            isHome && "cursor-text md:justify-center",
             fieldPaddingClasses,
             getFieldStateClasses("budget")
           )}
@@ -1227,13 +1237,9 @@ export default function SearchForm({
           {!isCompact && (
             <label
               className={cn(
-                "transition-opacity duration-200",
                 isHome
                   ? "mb-2.5 ml-1 text-[11px] font-bold uppercase tracking-[0.2em] leading-none text-on-surface-variant md:mb-1 md:ml-0 md:text-xs md:tracking-[0.15em]"
-                  : "mb-1 text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant",
-                focusedField !== null &&
-                  focusedField !== "budget" &&
-                  "md:opacity-0"
+                  : "mb-1 text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant"
               )}
             >
               Budget
@@ -1429,7 +1435,7 @@ export default function SearchForm({
           className={cn(
             "border border-outline-variant/20 bg-amber-50 text-sm text-amber-800 flex gap-2",
             isHome
-              ? "mt-3 items-start rounded-2xl px-4 py-3 shadow-ambient-sm md:pointer-events-none md:absolute md:left-0 md:right-0 md:top-full md:mx-auto md:mt-2 md:max-w-5xl md:items-center md:rounded-xl md:px-4 md:py-2 md:z-40 md:shadow-ambient"
+              ? "mt-3 items-start rounded-2xl px-4 py-3 shadow-ambient-sm md:absolute md:left-1/2 md:right-auto md:top-full md:mt-2 md:w-max md:max-w-xl md:-translate-x-1/2 md:items-center md:rounded-full md:px-5 md:py-2 md:z-50 md:shadow-ambient"
               : "absolute left-0 right-0 top-full mt-2 mx-auto max-w-5xl items-center rounded-xl px-4 py-2 pointer-events-none z-40 shadow-ambient"
           )}
         >

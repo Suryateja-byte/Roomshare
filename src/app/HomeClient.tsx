@@ -167,8 +167,11 @@ function HeroSection() {
               photo shows through. */}
           <div className="max-h-14 flex-1 md:hidden" aria-hidden="true" />
 
+          {/* relative z-20: the entrance animation creates a stacking context per
+              row; the search row must layer above the auth row so the location
+              warning chip isn't painted under the auth CTA. */}
           <div
-            className="home-hero-search-row animate-editorial-rise mt-5 w-full md:mt-8 lg:mt-9"
+            className="home-hero-search-row animate-editorial-rise relative z-20 mt-5 w-full md:mt-8 lg:mt-9"
             style={{ animationDelay: "280ms" }}
           >
             <SearchFormErrorBoundary>
