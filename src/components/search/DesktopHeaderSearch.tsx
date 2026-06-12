@@ -5,194 +5,75 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
-  useMemo,
   useRef,
   useState,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Search } from "lucide-react";
-import { toast } from "sonner";
-import LocationSearchInput from "@/components/LocationSearchInput";
-import { Button } from "@/components/ui/button";
-import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
-import { useRecentSearches } from "@/hooks/useRecentSearches";
-import { getPriceParam } from "@/lib/search-params";
-import { cn } from "@/lib/utils";
 import {
-  buildSearchIntentParams,
-  readSearchIntentState,
-  type SearchLocationSelection,
-} from "@/lib/search/search-intent";
-import { resolveTypedSearchLocation } from "@/lib/search/typed-location-resolver";
-import {
-  applySearchQueryChange,
-  buildCanonicalSearchUrl,
-  normalizeSearchQuery,
-} from "@/lib/search/search-query";
-import {
-  MAP_FLY_TO_EVENT,
-  type MapFlyToEventDetail,
-} from "@/lib/search/map-fly-to";
+  SearchBar,
+  SearchBarScrim,
+  SearchBarSummary,
+  useSearchBarState,
+  useSearchSubmit,
+  type SearchBarFieldId,
+} from "@/components/search/SearchBar";
 import { validateMoveInDate } from "@/lib/search/search-dates";
 
 export interface DesktopHeaderSearchHandle {
-  openAndFocus: (field?: "where" | "vibe") => void;
+  openAndFocus: (field?: "where" | "vibe" | "what" | "budget") => void;
 }
 
 interface DesktopHeaderSearchProps {
   collapsed: boolean;
 }
 
-const LOCATION_INPUT_ID = "desktop-header-search-location";
-const VIBE_INPUT_ID = "desktop-header-search-vibe";
-const MIN_BUDGET_INPUT_ID = "search-budget-min";
-const MAX_BUDGET_INPUT_ID = "search-budget-max";
+const FIELD_INPUT_IDS: Record<SearchBarFieldId, string> = {
+  where: "search-location",
+  what: "search-what",
+  budget: "search-budget-min",
+};
 
-function focusInput(field: "where" | "vibe") {
-  const element = document.getElementById(
-    field === "where" ? LOCATION_INPUT_ID : VIBE_INPUT_ID
-  );
+function focusField(field: SearchBarFieldId) {
+  const element =
+    document.getElementById(FIELD_INPUT_IDS[field]) ??
+    // The What field is env-gated; fall back to the location input.
+    document.getElementById(FIELD_INPUT_IDS.where);
   if (element instanceof HTMLElement) {
     element.focus();
   }
 }
 
+/**
+ * Search-page header search: the shared SearchBar pill, plus the header-only
+ * chrome — a same-height collapsed summary with segment deep-links, a page
+ * scrim while editing from the collapsed state, and outside-click/Escape
+ * collapse with Esc layering (an open autocomplete popup closes first).
+ */
 export const DesktopHeaderSearch = forwardRef<
   DesktopHeaderSearchHandle,
   DesktopHeaderSearchProps
 >(function DesktopHeaderSearch({ collapsed }, ref) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const transitionContext = useSearchTransitionSafe();
-  const { recentSearches } = useRecentSearches();
-  const containerRef = useRef<HTMLDivElement>(null);
-  const minPriceInputRef = useRef<HTMLInputElement | null>(null);
-  const maxPriceInputRef = useRef<HTMLInputElement | null>(null);
   const searchParamsString = searchParams.toString();
-  const intentState = useMemo(
-    () => readSearchIntentState(new URLSearchParams(searchParamsString)),
-    [searchParamsString]
-  );
-
+  const containerRef = useRef<HTMLDivElement>(null);
   const [isEditingCollapsedState, setIsEditingCollapsedState] = useState(false);
-  const [location, setLocation] = useState(intentState.locationInput);
-  const [vibe, setVibe] = useState(intentState.vibeInput);
-  const [selectedLocation, setSelectedLocation] =
-    useState<SearchLocationSelection | null>(intentState.selectedLocation);
-  const [isResolvingTypedLocation, setIsResolvingTypedLocation] =
-    useState(false);
-  const [minPrice, setMinPrice] = useState(() => {
-    const parsed = getPriceParam(
-      new URLSearchParams(searchParamsString),
-      "min"
-    );
-    return parsed !== undefined ? String(parsed) : "";
-  });
-  const [maxPrice, setMaxPrice] = useState(() => {
-    const parsed = getPriceParam(
-      new URLSearchParams(searchParamsString),
-      "max"
-    );
-    return parsed !== undefined ? String(parsed) : "";
-  });
 
-  const [focusedField, setFocusedField] = useState<"where" | "vibe" | "budget" | null>(null);
-  const [hoveredField, setHoveredField] = useState<"where" | "vibe" | "budget" | null>(null);
-  const focusBlurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const state = useSearchBarState();
+  const collapsedRef = useRef(collapsed);
+  collapsedRef.current = collapsed;
 
-  const handleFieldFocus = useCallback((field: "where" | "vibe" | "budget") => {
-    if (focusBlurTimeoutRef.current) clearTimeout(focusBlurTimeoutRef.current);
-    setFocusedField(field);
-  }, []);
+  const { handleSubmit, isSearching, isResolvingTypedLocation } =
+    useSearchSubmit({
+      state,
+      onBeforeNavigate: () => {
+        if (collapsedRef.current) {
+          setIsEditingCollapsedState(false);
+        }
+      },
+    });
 
-  const handleFieldBlur = useCallback(() => {
-    focusBlurTimeoutRef.current = setTimeout(() => setFocusedField(null), 150);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (focusBlurTimeoutRef.current) clearTimeout(focusBlurTimeoutRef.current);
-    };
-  }, []);
-
-  const getFieldStateClasses = (field: "where" | "vibe" | "budget") => {
-    if (focusedField === field) {
-      return "md:bg-on-surface/[0.035] md:rounded-full opacity-100";
-    }
-
-    return cn(
-      focusedField !== null ? "opacity-50" : "opacity-100",
-      focusedField === null && "md:hover:bg-on-surface/[0.02] md:hover:rounded-full"
-    );
-  };
-
-  const hideDivider1 =
-    focusedField === "where" ||
-    focusedField === "vibe" ||
-    hoveredField === "where" ||
-    hoveredField === "vibe";
-
-  const hideDivider2 =
-    focusedField === "vibe" ||
-    focusedField === "budget" ||
-    hoveredField === "vibe" ||
-    hoveredField === "budget";
-
-  const handleMinPriceValueChange = useCallback((value: string) => {
-    setMinPrice(value);
-  }, []);
-
-  const handleMaxPriceValueChange = useCallback((value: string) => {
-    setMaxPrice(value);
-  }, []);
-
-  const locationFallbackItems = useMemo(
-    () =>
-      recentSearches
-        .filter((search) => search.coords)
-        .map((search) => ({
-          id: search.id,
-          primaryText: search.location,
-          secondaryText: "Recent search",
-          onSelect: () => {
-            setLocation(search.location);
-            setSelectedLocation({
-              lat: search.coords!.lat,
-              lng: search.coords!.lng,
-              bounds: search.coords!.bounds,
-            });
-          },
-        })),
-    [recentSearches]
-  );
-
-  const isInlineEditorVisible = !collapsed || isEditingCollapsedState;
-
-  const syncFromSearchParams = useCallback(() => {
-    const nextState = readSearchIntentState(
-      new URLSearchParams(searchParamsString)
-    );
-    setLocation(nextState.locationInput);
-    setVibe(nextState.vibeInput);
-    setSelectedLocation(nextState.selectedLocation);
-    setMinPrice(
-      getPriceParam(new URLSearchParams(searchParamsString), "min") !==
-        undefined
-        ? String(getPriceParam(new URLSearchParams(searchParamsString), "min"))
-        : ""
-    );
-    setMaxPrice(
-      getPriceParam(new URLSearchParams(searchParamsString), "max") !==
-        undefined
-        ? String(getPriceParam(new URLSearchParams(searchParamsString), "max"))
-        : ""
-    );
-  }, [searchParamsString]);
-
-  useEffect(() => {
-    syncFromSearchParams();
-  }, [syncFromSearchParams]);
-
+  // Mount-time scrub of an invalid moveInDate in the URL.
   useEffect(() => {
     const rawMoveInDate = searchParams.get("moveInDate");
     const validated = validateMoveInDate(rawMoveInDate);
@@ -215,10 +96,18 @@ export const DesktopHeaderSearch = forwardRef<
   }, [collapsed]);
 
   const collapseEditor = useCallback(() => {
-    if (!collapsed) return;
-    syncFromSearchParams();
+    if (!collapsedRef.current) return;
+    state.resetFromUrl();
     setIsEditingCollapsedState(false);
-  }, [collapsed, syncFromSearchParams]);
+    // Return focus to the summary pill so keyboard users aren't dropped.
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        containerRef.current
+          ?.querySelector<HTMLElement>('[aria-label="Expand search form"]')
+          ?.focus();
+      });
+    });
+  }, [state]);
 
   useEffect(() => {
     if (!collapsed || !isEditingCollapsedState) return;
@@ -237,9 +126,13 @@ export const DesktopHeaderSearch = forwardRef<
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        collapseEditor();
+      if (event.key !== "Escape") return;
+      // Esc layering: a visible autocomplete popup consumes the first Escape;
+      // only a second one collapses the editor.
+      if (document.querySelector("[data-location-search-popup='true']")) {
+        return;
       }
+      collapseEditor();
     };
 
     document.addEventListener("mousedown", handlePointerDown);
@@ -251,391 +144,40 @@ export const DesktopHeaderSearch = forwardRef<
     };
   }, [collapseEditor, collapsed, isEditingCollapsedState]);
 
-  const openAndFocus = useCallback((field: "where" | "vibe" = "where") => {
-    setIsEditingCollapsedState(true);
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => focusInput(field));
-    });
-  }, []);
-
-  useImperativeHandle(
-    ref,
-    () => ({
-      openAndFocus,
-    }),
-    [openAndFocus]
-  );
-
-  const handleSummaryClick = useCallback(() => {
-    openAndFocus("where");
-  }, [openAndFocus]);
-
-  const handleLocationChange = useCallback((value: string) => {
-    setLocation(value);
-    setSelectedLocation(null);
-  }, []);
-
-  const handleLocationSelect = useCallback(
-    (nextLocation: {
-      name: string;
-      lat: number;
-      lng: number;
-      bbox?: [number, number, number, number];
-    }) => {
-      setLocation(nextLocation.name);
-      setSelectedLocation({
-        lat: nextLocation.lat,
-        lng: nextLocation.lng,
-        bounds: nextLocation.bbox,
+  const openAndFocus = useCallback(
+    (field: "where" | "vibe" | "what" | "budget" = "where") => {
+      setIsEditingCollapsedState(true);
+      const resolved: SearchBarFieldId = field === "vibe" ? "what" : field;
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => focusField(resolved));
       });
     },
     []
   );
 
-  const navigateToSearch = useCallback(
-    (searchUrl: string) => {
-      if (transitionContext) {
-        transitionContext.navigateWithTransition(searchUrl, {
-          reason: "search-submit",
-        });
-      } else {
-        router.push(searchUrl);
-      }
-    },
-    [router, transitionContext]
-  );
+  useImperativeHandle(ref, () => ({ openAndFocus }), [openAndFocus]);
 
-  const handleSubmit = useCallback(
-    async (event: React.FormEvent) => {
-      event.preventDefault();
-
-      let nextLocationLabel = location;
-      let nextSelectedLocation = selectedLocation;
-
-      if (location.trim().length > 2 && !nextSelectedLocation) {
-        if (isResolvingTypedLocation) {
-          return;
-        }
-
-        setIsResolvingTypedLocation(true);
-        try {
-          const resolvedLocation = await resolveTypedSearchLocation(location);
-          if (!resolvedLocation) {
-            toast.error("Select a location from the dropdown suggestions.");
-            focusInput("where");
-            return;
-          }
-
-          nextLocationLabel = resolvedLocation.label;
-          nextSelectedLocation = resolvedLocation.selection;
-          setLocation(resolvedLocation.label);
-          setSelectedLocation(resolvedLocation.selection);
-        } finally {
-          setIsResolvingTypedLocation(false);
-        }
-      }
-
-      const searchUrlParams = buildSearchIntentParams(
-        new URLSearchParams(searchParamsString),
-        {
-          location: nextLocationLabel,
-          vibe,
-          selectedLocation: nextSelectedLocation,
-        }
-      );
-
-      const liveMinPrice = minPriceInputRef.current?.value ?? minPrice;
-      const liveMaxPrice = maxPriceInputRef.current?.value ?? maxPrice;
-
-      let finalMinPrice = liveMinPrice ? parseFloat(liveMinPrice) : null;
-      let finalMaxPrice = liveMaxPrice ? parseFloat(liveMaxPrice) : null;
-
-      if (finalMinPrice !== null && !Number.isFinite(finalMinPrice)) {
-        finalMinPrice = null;
-      }
-      if (finalMaxPrice !== null && !Number.isFinite(finalMaxPrice)) {
-        finalMaxPrice = null;
-      }
-      if (finalMinPrice !== null && finalMinPrice < 0) {
-        finalMinPrice = 0;
-      }
-      if (finalMaxPrice !== null && finalMaxPrice < 0) {
-        finalMaxPrice = 0;
-      }
-      if (
-        finalMinPrice !== null &&
-        finalMaxPrice !== null &&
-        finalMinPrice > finalMaxPrice
-      ) {
-        [finalMinPrice, finalMaxPrice] = [finalMaxPrice, finalMinPrice];
-      }
-      // CFM-604: canonical-on-write guarantee — must go through buildCanonicalSearchUrl.
-      const searchUrl = buildCanonicalSearchUrl(
-        applySearchQueryChange(
-          normalizeSearchQuery(searchUrlParams),
-          "filter",
-          {
-            minPrice: finalMinPrice ?? undefined,
-            maxPrice: finalMaxPrice ?? undefined,
-          }
-        )
-      );
-
-      if (nextSelectedLocation) {
-        window.dispatchEvent(
-          new CustomEvent<MapFlyToEventDetail>(MAP_FLY_TO_EVENT, {
-            detail: {
-              lat: nextSelectedLocation.lat,
-              lng: nextSelectedLocation.lng,
-              bbox: nextSelectedLocation.bounds,
-              zoom: 13,
-            },
-          })
-        );
-      }
-
-      if (collapsed) {
-        setIsEditingCollapsedState(false);
-      }
-
-      navigateToSearch(searchUrl);
-    },
-    [
-      collapsed,
-      isResolvingTypedLocation,
-      location,
-      maxPrice,
-      minPrice,
-      navigateToSearch,
-      searchParamsString,
-      selectedLocation,
-      vibe,
-    ]
-  );
-
-  if (!isInlineEditorVisible) {
-    return (
-      <button
-        type="button"
-        onClick={handleSummaryClick}
-        data-testid="desktop-header-search-summary"
-        className="mx-auto flex h-[64px] w-full max-w-[760px] items-center rounded-[1.5rem] border border-outline-variant/20 bg-surface-container-lowest/92 p-2.5 shadow-ghost backdrop-blur-[20px] transition-all duration-300 hover:bg-surface-container-lowest focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
-      >
-        <div className="flex flex-1 items-center divide-x divide-outline-variant/25 px-4 text-left">
-          <div className="min-w-0 flex-1 pr-5">
-            <p className="mb-0.5 text-[10px] font-bold uppercase tracking-normal text-on-surface-variant">
-              Where
-            </p>
-            <p className="truncate text-base font-semibold text-on-surface">
-              {intentState.locationSummary}
-            </p>
-          </div>
-          <div className="min-w-0 flex-1 pl-5">
-            <p className="mb-0.5 text-[10px] font-bold uppercase tracking-normal text-on-surface-variant">
-              Vibe
-            </p>
-            <p className="truncate text-base font-semibold text-on-surface">
-              {intentState.vibeSummary}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--color-primary),var(--color-primary-container))] text-surface-canvas shadow-[0_14px_34px_-16px_rgba(154,64,39,0.7)]">
-          <Search className="h-4 w-4 text-surface-canvas" />
-        </div>
-      </button>
-    );
-  }
+  const isInlineEditorVisible = !collapsed || isEditingCollapsedState;
+  const scrimVisible = collapsed && isEditingCollapsedState;
 
   return (
     <div ref={containerRef} className="mx-auto w-full max-w-[1120px]">
-      <form
-        onSubmit={handleSubmit}
-        data-testid="desktop-header-search-form"
-        className={cn(
-          "flex w-full items-center border border-outline-variant/20 bg-surface-container-lowest/94 shadow-ghost backdrop-blur-[20px] transition-all duration-300 hover:bg-surface-container-lowest focus-within:border-primary/35 focus-within:shadow-ambient",
-          collapsed ? "rounded-[1.5rem] p-2" : "rounded-[1.625rem] p-2.5"
-        )}
-        role="search"
-        aria-label="Search listings"
-      >
-        <div className="grid flex-1 grid-cols-[minmax(130px,1fr)_minmax(110px,0.75fr)_minmax(180px,0.95fr)] items-center px-2 lg:grid-cols-[minmax(220px,1.15fr)_minmax(180px,0.95fr)_minmax(270px,0.85fr)] lg:px-3">
-          <div
-            onClick={(e) => {
-              if ((e.target as HTMLElement).closest("input, button, a")) return;
-              document.getElementById(LOCATION_INPUT_ID)?.focus();
-            }}
-            onMouseEnter={() => setHoveredField("where")}
-            onMouseLeave={() => setHoveredField(null)}
-            className={cn(
-              "min-w-0 px-3 py-1.5 lg:px-4 transition-all duration-200 cursor-text",
-              hideDivider1
-                ? "shadow-[inset_0_0_0_rgba(220,193,185,0)]"
-                : "shadow-[inset_-1px_0_0_rgba(220,193,185,0.18)]",
-              getFieldStateClasses("where")
-            )}
-          >
-            <label
-              htmlFor={LOCATION_INPUT_ID}
-              className="mb-1 block text-[10px] font-bold uppercase tracking-normal text-on-surface-variant"
-            >
-              Where
-            </label>
-            <LocationSearchInput
-              id={LOCATION_INPUT_ID}
-              value={location}
-              onChange={handleLocationChange}
-              onLocationSelect={handleLocationSelect}
-              fallbackItems={locationFallbackItems}
-              onFocus={() => handleFieldFocus("where")}
-              onBlur={handleFieldBlur}
-              placeholder={
-                selectedLocation && location.length === 0
-                  ? "Selected area"
-                  : "Search destinations"
-              }
-              className="w-full"
-              inputClassName="text-sm font-semibold text-on-surface placeholder:text-on-surface-variant/50 lg:text-base"
-            />
-          </div>
-
-          <div
-            onClick={(e) => {
-              if ((e.target as HTMLElement).closest("input, button, a")) return;
-              document.getElementById(VIBE_INPUT_ID)?.focus();
-            }}
-            onMouseEnter={() => setHoveredField("vibe")}
-            onMouseLeave={() => setHoveredField(null)}
-            className={cn(
-              "min-w-0 px-3 py-1.5 lg:px-4 transition-all duration-200 cursor-text",
-              hideDivider2
-                ? "shadow-[inset_0_0_0_rgba(220,193,185,0)]"
-                : "shadow-[inset_-1px_0_0_rgba(220,193,185,0.18)]",
-              getFieldStateClasses("vibe")
-            )}
-          >
-            <label
-              htmlFor={VIBE_INPUT_ID}
-              className="mb-1 block text-[10px] font-bold uppercase tracking-normal text-on-surface-variant"
-            >
-              Vibe
-            </label>
-            <input
-              id={VIBE_INPUT_ID}
-              type="text"
-              value={vibe}
-              onChange={(event) => setVibe(event.target.value)}
-              onFocus={() => handleFieldFocus("vibe")}
-              onBlur={handleFieldBlur}
-              placeholder="Any vibe"
-              className="w-full bg-transparent border-none p-0 text-sm font-semibold text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-0 lg:text-base"
-              autoComplete="off"
-            />
-          </div>
-
-          <div
-            onClick={(e) => {
-              if ((e.target as HTMLElement).closest("input, button, a")) return;
-              document.getElementById(MIN_BUDGET_INPUT_ID)?.focus();
-            }}
-            onMouseEnter={() => setHoveredField("budget")}
-            onMouseLeave={() => setHoveredField(null)}
-            className={cn(
-              "min-w-0 px-3 py-1.5 lg:px-4 transition-all duration-200 cursor-text",
-              getFieldStateClasses("budget")
-            )}
-          >
-            <label
-              htmlFor={MIN_BUDGET_INPUT_ID}
-              className="mb-1 block text-[10px] font-bold uppercase tracking-normal text-on-surface-variant"
-            >
-              Budget
-            </label>
-            <div className="flex items-center gap-2 text-sm">
-              <div className="flex h-9 min-w-0 flex-1 items-center gap-1 rounded-full bg-surface-canvas px-3 shadow-[inset_0_0_0_1px_rgba(220,193,185,0.22)]">
-                <span
-                  className={cn(
-                    "text-sm font-semibold transition-colors duration-200",
-                    minPrice ? "text-on-surface" : "text-on-surface-variant/50"
-                  )}
-                >
-                  $
-                </span>
-                <input
-                  ref={minPriceInputRef}
-                  id={MIN_BUDGET_INPUT_ID}
-                  aria-label="Minimum budget"
-                  type="number"
-                  inputMode="numeric"
-                  min="0"
-                  step="50"
-                  value={minPrice}
-                  onChange={(event) =>
-                    handleMinPriceValueChange(event.currentTarget.value)
-                  }
-                  onInput={(event) =>
-                    handleMinPriceValueChange(event.currentTarget.value)
-                  }
-                  onBlur={(event) => {
-                    handleMinPriceValueChange(event.currentTarget.value);
-                    handleFieldBlur();
-                  }}
-                  onFocus={() => handleFieldFocus("budget")}
-                  placeholder="Min"
-                  className="w-full bg-transparent border-none p-0 text-sm font-semibold text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-0 [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                />
-              </div>
-              <span className="text-on-surface-variant">-</span>
-              <div className="flex h-9 min-w-0 flex-1 items-center gap-1 rounded-full bg-surface-canvas px-3 shadow-[inset_0_0_0_1px_rgba(220,193,185,0.22)]">
-                <span
-                  className={cn(
-                    "text-sm font-semibold transition-colors duration-200",
-                    maxPrice ? "text-on-surface" : "text-on-surface-variant/50"
-                  )}
-                >
-                  $
-                </span>
-                <input
-                  ref={maxPriceInputRef}
-                  id={MAX_BUDGET_INPUT_ID}
-                  aria-label="Maximum budget"
-                  type="number"
-                  inputMode="numeric"
-                  min="0"
-                  step="50"
-                  value={maxPrice}
-                  onChange={(event) =>
-                    handleMaxPriceValueChange(event.currentTarget.value)
-                  }
-                  onInput={(event) =>
-                    handleMaxPriceValueChange(event.currentTarget.value)
-                  }
-                  onBlur={(event) => {
-                    handleMaxPriceValueChange(event.currentTarget.value);
-                    handleFieldBlur();
-                  }}
-                  onFocus={() => handleFieldFocus("budget")}
-                  placeholder="Max"
-                  className="w-full bg-transparent border-none p-0 text-sm font-semibold text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-0 [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <Button
-          type="submit"
-          size="icon"
-          className={cn(
-            "shrink-0 rounded-full bg-[linear-gradient(135deg,var(--color-primary),var(--color-primary-container))] text-surface-canvas shadow-[0_16px_34px_-16px_rgba(154,64,39,0.72)] transition-transform hover:brightness-105 active:scale-[0.97]",
-            collapsed ? "h-11 w-11" : "h-14 w-14"
-          )}
-          aria-label="Search"
-          disabled={isResolvingTypedLocation}
-        >
-          <Search className={cn(collapsed ? "h-4 w-4" : "h-5 w-5")} />
-        </Button>
-      </form>
+      <SearchBarScrim visible={scrimVisible} onDismiss={collapseEditor} />
+      {isInlineEditorVisible ? (
+        <SearchBar
+          state={state}
+          onSubmit={handleSubmit}
+          isSearching={isSearching}
+          submitDisabled={isResolvingTypedLocation}
+          formTestId="desktop-header-search-form"
+        />
+      ) : (
+        <SearchBarSummary
+          testId="desktop-header-search-summary"
+          semanticSearchEnabled={state.semanticSearchEnabled}
+          onSegmentClick={openAndFocus}
+        />
+      )}
     </div>
   );
 });

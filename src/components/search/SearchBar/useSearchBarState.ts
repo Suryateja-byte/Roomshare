@@ -84,6 +84,9 @@ export interface SearchBarState {
   recentFallbackItems: LocationSearchFallbackItem[];
   clearRecentSearches: () => void;
   saveRecentSearch: ReturnType<typeof useRecentSearches>["saveRecentSearch"];
+
+  /** Discard unsaved edits by re-reading everything from the current URL. */
+  resetFromUrl: () => void;
 }
 
 function priceFromParams(
@@ -272,6 +275,23 @@ export function useSearchBarState(
     [recentSearches]
   );
 
+  const externalBudgetRef = useRef(externalBudget);
+  externalBudgetRef.current = externalBudget;
+
+  const resetFromUrl = useCallback(() => {
+    const nextIntentState = readSearchIntentState(
+      new URLSearchParams(searchParamsString)
+    );
+    isUserTypingLocationRef.current = false;
+    setLocation(nextIntentState.locationInput);
+    setWhat(nextIntentState.vibeInput);
+    setSelectedLocation(nextIntentState.selectedLocation);
+    if (!externalBudgetRef.current) {
+      setInternalMinPrice(priceFromParams(searchParamsString, "min"));
+      setInternalMaxPrice(priceFromParams(searchParamsString, "max"));
+    }
+  }, [searchParamsString]);
+
   const setLocationInputFocusedStable = useCallback(
     (focused: boolean) => {
       setLocationInputFocused(focused);
@@ -324,5 +344,6 @@ export function useSearchBarState(
     recentFallbackItems,
     clearRecentSearches,
     saveRecentSearch,
+    resetFromUrl,
   };
 }

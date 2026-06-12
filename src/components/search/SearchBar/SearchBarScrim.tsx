@@ -20,6 +20,8 @@ export function SearchBarScrim({ visible, onDismiss }: SearchBarScrimProps) {
   return createPortal(
     <div
       aria-hidden="true"
+      data-testid="search-bar-scrim"
+      data-visible={visible || undefined}
       onMouseDown={onDismiss}
       className={cn(
         "fixed inset-0 z-[1050] bg-on-surface/25 backdrop-blur-[2px]",
