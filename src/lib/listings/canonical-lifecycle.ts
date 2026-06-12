@@ -1,7 +1,9 @@
 import "server-only";
 
 import type { ActorContext, TransactionClient } from "@/lib/db/with-actor";
+import { isPhase01CanonicalWritesEnabled } from "@/lib/flags/phase01";
 import { syncCanonicalListingInventory } from "@/lib/listings/canonical-inventory";
+import { logger } from "@/lib/logger";
 import type { TombstoneReason } from "@/lib/projections/tombstone";
 import { handleTombstone } from "@/lib/projections/tombstone";
 
@@ -83,6 +85,18 @@ export async function syncListingLifecycleProjectionInTx(
   listingId: string,
   actor: ActorContext
 ) {
+  if (!isPhase01CanonicalWritesEnabled()) {
+    // Emergency stop (FEATURE_PHASE01_CANONICAL_WRITES=false): skip the
+    // canonical lifecycle projection sync entirely. Deletion-driven teardown
+    // (tombstoneCanonicalInventoryInTx) is deliberately NOT gated.
+    logger.sync.info("cfm.canonical.phase01_writes_skipped_count", {
+      reason: "flag_off",
+      seam: "syncListingLifecycleProjectionInTx",
+      listingId,
+    });
+    return { action: "skipped_flag_off" } as const;
+  }
+
   const listing = await tx.listing.findUnique({
     where: { id: listingId },
     select: {

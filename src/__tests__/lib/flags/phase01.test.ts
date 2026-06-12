@@ -21,14 +21,27 @@ describe("phase01 flags", () => {
     expect(isPhase01CanonicalWritesEnabled()).toBe(true);
   });
 
-  it("defaults canonical writes to false in production", async () => {
+  it("defaults canonical writes to true in production (emergency stop, not cutover)", async () => {
     setNodeEnv("production");
     const { isPhase01CanonicalWritesEnabled } = await import("@/lib/flags/phase01");
-    expect(isPhase01CanonicalWritesEnabled()).toBe(false);
+    expect(isPhase01CanonicalWritesEnabled()).toBe(true);
   });
 
   it("reads FEATURE_PHASE01_CANONICAL_WRITES", async () => {
     process.env.FEATURE_PHASE01_CANONICAL_WRITES = "true";
+    const { isPhase01CanonicalWritesEnabled } = await import("@/lib/flags/phase01");
+    expect(isPhase01CanonicalWritesEnabled()).toBe(true);
+  });
+
+  it("halts canonical writes only on the explicit string 'false'", async () => {
+    setNodeEnv("production");
+    process.env.FEATURE_PHASE01_CANONICAL_WRITES = "false";
+    const { isPhase01CanonicalWritesEnabled } = await import("@/lib/flags/phase01");
+    expect(isPhase01CanonicalWritesEnabled()).toBe(false);
+  });
+
+  it("treats unrecognized values as enabled (fail-open emergency stop)", async () => {
+    process.env.FEATURE_PHASE01_CANONICAL_WRITES = "off";
     const { isPhase01CanonicalWritesEnabled } = await import("@/lib/flags/phase01");
     expect(isPhase01CanonicalWritesEnabled()).toBe(true);
   });

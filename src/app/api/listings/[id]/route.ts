@@ -1124,7 +1124,9 @@ export async function PATCH(
             ok: true,
             updatedListing: {
               ...updatedListing,
-              physicalUnitId: canonicalSync.unitId,
+              physicalUnitId: canonicalSync.skipped
+                ? updatedListing.physicalUnitId
+                : canonicalSync.unitId,
             },
           } as const;
         });

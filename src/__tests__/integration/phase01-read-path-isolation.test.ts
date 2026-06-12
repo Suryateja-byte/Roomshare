@@ -93,10 +93,15 @@ describe("Phase 01 read-path isolation", () => {
     expect(offending).toEqual([]);
   });
 
-  it("keeps isPhase01CanonicalWritesEnabled uncoupled from production callers", () => {
+  it("keeps isPhase01CanonicalWritesEnabled scoped to the two producer seams (emergency stop)", () => {
+    // H2 (2026-06-11): the flag became a live emergency stop, consulted at
+    // exactly the two canonical producer seams. Any additional caller should
+    // be a deliberate decision — extend this allowlist consciously.
     const hits = findMatches("isPhase01CanonicalWritesEnabled");
     const allowed = new Set([
       "src/lib/flags/phase01.ts",
+      "src/lib/listings/canonical-inventory.ts",
+      "src/lib/listings/canonical-lifecycle.ts",
       "src/__tests__/integration/phase01-read-path-isolation.test.ts",
       "src/__tests__/lib/flags/phase01.test.ts",
     ]);

@@ -655,4 +655,37 @@ describe("PATCH /api/listings/[id] contact-first availability contract", () => {
     );
     expect(update.mock.calls[0][0].data).not.toHaveProperty("physicalUnitId");
   });
+
+  it("survives a phase01 canonical-sync skip: PATCH succeeds, physicalUnitId falls back, dirty mark still fires (H2)", async () => {
+    (syncCanonicalListingInventory as jest.Mock).mockResolvedValue({
+      skipped: true,
+      reason: "phase01_flag_off",
+    });
+    mockTransaction({
+      updateResult: {
+        ...listing,
+        title: "Updated Title",
+        physicalUnitId: "unit-stored",
+      },
+    });
+
+    const response = await PATCH(
+      new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify(validPatchPayload()),
+      }),
+      { params: Promise.resolve({ id: "listing-abc" }) }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    // Sync skipped — the response keeps the stored linkage instead of a
+    // canonicalSync.unitId that does not exist on the skip result.
+    expect(body.physicalUnitId).toBe("unit-stored");
+    expect(markListingDirtyInTx).toHaveBeenCalledWith(
+      expect.any(Object),
+      "listing-abc",
+      "listing_updated"
+    );
+  });
 });

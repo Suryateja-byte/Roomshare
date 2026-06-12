@@ -801,7 +801,10 @@ export const features = {
     );
   },
   get phase01CanonicalWrites() {
-    return phaseCutoverDefault(process.env.FEATURE_PHASE01_CANONICAL_WRITES);
+    // Emergency stop, not a cutover flag: canonical dark writes default ON in
+    // every environment (matching the always-on behavior shipped to date).
+    // Set FEATURE_PHASE01_CANONICAL_WRITES=false to halt canonical writes.
+    return process.env.FEATURE_PHASE01_CANONICAL_WRITES !== "false";
   },
   // Phase 02: projection writes master gate
   get phase02ProjectionWrites() {
