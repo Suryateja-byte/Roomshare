@@ -64,7 +64,17 @@ const PHASE02_MIGRATION_SQL_FILES = [
   ),
   path.join(
     MIGRATIONS_DIR,
+    "20260508000000_phase08_client_cache_coherence",
+    "migration.sql"
+  ),
+  path.join(
+    MIGRATIONS_DIR,
     "20260511000000_canonical_inventory_invariants",
+    "migration.sql"
+  ),
+  path.join(
+    MIGRATIONS_DIR,
+    "20260611000000_outbox_terminal_cleanup_index",
     "migration.sql"
   ),
 ];
@@ -150,6 +160,9 @@ export interface Phase02Fixture extends PGliteFixture {
     priority?: number;
     status?: string;
     nextAttemptAt?: Date;
+    createdAt?: Date;
+    updatedAt?: Date;
+    dlqReason?: string;
   }): Promise<string>;
 }
 
@@ -472,8 +485,8 @@ export async function createPGlitePhase02Fixture(): Promise<Phase02Fixture> {
       `INSERT INTO outbox_events (
          id, aggregate_type, aggregate_id, kind, payload,
          source_version, unit_identity_epoch, priority, status,
-         next_attempt_at, created_at, updated_at
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW(),NOW())`,
+         next_attempt_at, dlq_reason, created_at, updated_at
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,COALESCE($12,NOW()),COALESCE($13,NOW()))`,
       [
         id,
         opts.aggregateType ?? "PHYSICAL_UNIT",
@@ -485,6 +498,9 @@ export async function createPGlitePhase02Fixture(): Promise<Phase02Fixture> {
         opts.priority ?? 100,
         opts.status ?? "PENDING",
         opts.nextAttemptAt ?? new Date(),
+        opts.dlqReason ?? null,
+        opts.createdAt ?? null,
+        opts.updatedAt ?? null,
       ]
     );
     return id;

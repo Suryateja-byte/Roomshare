@@ -38,6 +38,11 @@ import { validateCronAuth } from "@/lib/cron-auth";
 import { headers } from "next/headers";
 import { isPhase02ProjectionWritesEnabled } from "@/lib/flags/phase02";
 import { drainOutboxOnce } from "@/lib/outbox/drain";
+import {
+  cleanupConsumedCacheInvalidationsOnce,
+  cleanupTerminalOutboxEventsOnce,
+  compactSupersededOutboxEventsOnce,
+} from "@/lib/outbox/retention";
 import { cleanupExpiredVerificationDocumentsOnce } from "@/lib/verification/retention";
 
 interface TaskResult {
@@ -265,6 +270,19 @@ export async function GET(request: NextRequest) {
       return result;
     });
 
+    // H2: bound outbox growth. Deliberately NOT gated on phase02 — producers
+    // append in prod where the drain is skipped, so retention and compaction
+    // must run regardless.
+    await runTask(results, "outbox-retention", async () => {
+      const terminal = await cleanupTerminalOutboxEventsOnce();
+      const compaction = await compactSupersededOutboxEventsOnce();
+      const cacheInvalidations = await cleanupConsumedCacheInvalidationsOnce();
+      return { terminal, compaction, cacheInvalidations } as unknown as Record<
+        string,
+        unknown
+      >;
+    });
+
     await runDelegatedTask(
       results,
       "search-alerts",
@@ -306,6 +324,7 @@ export async function GET(request: NextRequest) {
       "cleanup-verification-documents",
       "outside_daily_window"
     );
+    markSkippedTask(results, "outbox-retention", "outside_daily_window");
     markSkippedTask(results, "search-alerts", "outside_daily_window");
     markSkippedTask(results, "freshness-reminders", "outside_daily_window");
     markSkippedTask(results, "stale-auto-pause", "outside_daily_window");

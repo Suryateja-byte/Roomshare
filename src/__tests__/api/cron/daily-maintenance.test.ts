@@ -33,6 +33,12 @@ jest.mock("@/lib/retry", () => ({
   withRetry: jest.fn((fn: () => Promise<unknown>) => fn()),
 }));
 
+jest.mock("@/lib/outbox/retention", () => ({
+  cleanupTerminalOutboxEventsOnce: jest.fn(),
+  compactSupersededOutboxEventsOnce: jest.fn(),
+  cleanupConsumedCacheInvalidationsOnce: jest.fn(),
+}));
+
 jest.mock("next/headers", () => ({
   headers: jest.fn(async () => new Headers({ host: "localhost:3000" })),
 }));
@@ -53,6 +59,11 @@ jest.mock("next/server", () => ({
 import { GET } from "@/app/api/cron/daily-maintenance/route";
 import { validateCronAuth } from "@/lib/cron-auth";
 import { features } from "@/lib/env";
+import {
+  cleanupConsumedCacheInvalidationsOnce,
+  cleanupTerminalOutboxEventsOnce,
+  compactSupersededOutboxEventsOnce,
+} from "@/lib/outbox/retention";
 import { prisma } from "@/lib/prisma";
 
 const fetchMock = jest.fn();
@@ -81,6 +92,26 @@ describe("GET /api/cron/daily-maintenance", () => {
     fetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({ success: true }),
+    });
+    (cleanupTerminalOutboxEventsOnce as jest.Mock).mockResolvedValue({
+      deletedCompleted: 1,
+      deletedDlq: 0,
+      batches: 1,
+      truncated: false,
+      elapsedMs: 5,
+    });
+    (compactSupersededOutboxEventsOnce as jest.Mock).mockResolvedValue({
+      deletedSuperseded: 2,
+      byKind: { INVENTORY_UPSERTED: 2 },
+      batches: 1,
+      truncated: false,
+      elapsedMs: 5,
+    });
+    (cleanupConsumedCacheInvalidationsOnce as jest.Mock).mockResolvedValue({
+      deleted: 1,
+      batches: 1,
+      truncated: false,
+      elapsedMs: 5,
     });
     process.env.CRON_SECRET = "cron-secret-32-characters-long!!";
   });
@@ -140,5 +171,53 @@ describe("GET /api/cron/daily-maintenance", () => {
         }),
       ])
     );
+  });
+
+  it("runs outbox retention inside the daily window even when the drain is phase02-disabled (H2)", async () => {
+    jest.setSystemTime(new Date("2026-04-17T09:03:00.000Z"));
+
+    const response = await GET(createRequest() as any);
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    // The drain is gated off (features.phase02ProjectionWrites is undefined
+    // in the env mock), but retention must run regardless — that's the point.
+    expect(payload.tasks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          task: "outbox-drain",
+          skipped: true,
+          detail: { skipped: true, reason: "phase02_disabled" },
+        }),
+        expect.objectContaining({
+          task: "outbox-retention",
+          success: true,
+        }),
+      ])
+    );
+    expect(cleanupTerminalOutboxEventsOnce).toHaveBeenCalledTimes(1);
+    expect(compactSupersededOutboxEventsOnce).toHaveBeenCalledTimes(1);
+    expect(cleanupConsumedCacheInvalidationsOnce).toHaveBeenCalledTimes(1);
+  });
+
+  it("marks outbox retention skipped outside the daily window", async () => {
+    jest.setSystemTime(new Date("2026-04-17T15:00:00.000Z"));
+
+    const response = await GET(createRequest() as any);
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.tasks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          task: "outbox-retention",
+          skipped: true,
+          detail: { skipped: true, reason: "outside_daily_window" },
+        }),
+      ])
+    );
+    expect(cleanupTerminalOutboxEventsOnce).not.toHaveBeenCalled();
+    expect(compactSupersededOutboxEventsOnce).not.toHaveBeenCalled();
+    expect(cleanupConsumedCacheInvalidationsOnce).not.toHaveBeenCalled();
   });
 });

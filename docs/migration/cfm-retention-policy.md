@@ -175,6 +175,32 @@ Specifically:
 
 ---
 
+## 8.5 Operational Queue Retention (`outbox_events`, `cache_invalidations`)
+
+These two tables are **operational queues**, not historical evidence, and are
+explicitly NOT part of the §2 no-drop list. `audit_events` remains the durable
+audit trail and stays append-only. Row-level TTLs (enforced by
+`src/lib/outbox/retention.ts` via the `outbox-retention` task in the
+daily-maintenance cron):
+
+| Table | Predicate | TTL |
+|---|---|---|
+| `outbox_events` | `status = 'COMPLETED'` | 7 days after terminal update |
+| `outbox_events` | `status = 'DLQ'` | 30 days after terminal update |
+| `outbox_events` | superseded `PENDING` rows (compaction) | immediate — only the newest row per `(aggregate_type, aggregate_id, kind)` is kept, for allowlisted kinds only |
+| `cache_invalidations` | `consumed_at IS NOT NULL AND fanout_status IN ('DELIVERED','SKIPPED','FAILED')` | 7 days after enqueue |
+
+Compaction allowlist: `INVENTORY_UPSERTED`, `UNIT_UPSERTED` (pure
+state-rebuild triggers; handlers re-read current state and stale-skip).
+**Never compacted or deleted while non-terminal**: `PAYMENT_WEBHOOK`,
+`ALERT_MATCH`/`ALERT_DELIVER`, `IDENTITY_MUTATION`, `CACHE_INVALIDATE`
+(payload references a unique `cache_invalidations` row), `GEOCODE_NEEDED`/
+`EMBED_NEEDED` (dedupe at append time). Rows with `status` `PENDING` or
+`IN_FLIGHT` are never aged out — they represent undelivered work (payments,
+alert deliveries).
+
+---
+
 ## 9. Review Checklist (for reviewers of CFM-phase PRs)
 
 - [ ] Migration SQL contains no `DROP TABLE|DROP COLUMN|DROP TYPE|DROP VALUE|DELETE FROM` against any structure in §2.
@@ -191,3 +217,4 @@ A failing row here is blocking.
 | Date | Change |
 |---|---|
 | 2026-04-16 | Initial retention policy (CFM-1003). Codifies no-drop list, cascade-rule preservation, GDPR posture, and reviewer checklist. |
+| 2026-06-11 | §8.5 added (H2 fix): operational queue retention for `outbox_events` (COMPLETED 7d, DLQ 30d, superseded-PENDING compaction allowlist) and `cache_invalidations` (terminal 7d). Carved out of the no-drop list as operational, not historical, data. |
