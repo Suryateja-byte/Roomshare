@@ -113,8 +113,11 @@ test.describe("Search release gate", () => {
     await gotoSearchPage(page, DEFAULT_SCENARIO);
     await waitForSearchResolution(page);
 
+    // Unified SearchBar (2026-06-12) renamed the header placeholder from
+    // "Search destinations" to "Search city or area"; accept both so the
+    // spec stays valid across branches.
     const destinationInput = page
-      .getByPlaceholder(/search destinations/i)
+      .getByPlaceholder(/search destinations|search city or area/i)
       .filter({ visible: true })
       .first();
     await expect(destinationInput).toBeVisible({ timeout: 15_000 });
