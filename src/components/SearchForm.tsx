@@ -93,7 +93,7 @@ const SUGGESTION_TYPE_TO_PENDING_KEYS: Record<
 };
 
 const HOME_SEARCH_INPUT_CLASSES =
-  "rounded-md px-1 py-1 -ml-1 text-[16px] text-on-surface caret-primary placeholder-shown:caret-transparent placeholder:text-on-surface-variant/55 transition-colors focus:placeholder:text-on-surface-variant/40 md:-ml-0 md:px-0 md:py-0 md:text-base md:font-medium";
+  "rounded-md pl-1 pr-8 py-1 -ml-1 text-[16px] text-on-surface caret-primary placeholder-shown:caret-transparent placeholder:text-on-surface-variant/55 transition-colors focus:placeholder:text-on-surface-variant/40 md:-ml-0 md:pl-0 md:pr-8 md:py-0 md:text-base md:font-medium";
 
 /**
  * Validate a move-in date string. Returns the date if valid (today or future, within 2 years),
@@ -191,6 +191,7 @@ export default function SearchForm({
   const [focusedField, setFocusedField] = useState<
     "what" | "where" | "budget" | null
   >(null);
+  const [hoveredField, setHoveredField] = useState<"what" | "where" | "budget" | null>(null);
   const focusBlurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
@@ -925,17 +926,33 @@ export default function SearchForm({
       // inputs (text inputs match :focus-visible on mouse click too, so an
       // input-level ring would show for pointer users and read as a stray border).
       return cn(
-        focusedField === field &&
-          "rounded-[1.125rem] bg-surface-canvas/55 ring-1 ring-inset ring-primary/30 md:bg-primary/[0.035]"
+        focusedField === field
+          ? "rounded-[1.125rem] bg-surface-canvas/55 ring-1 ring-inset ring-primary/30 md:bg-primary/[0.035]"
+          : "md:hover:bg-on-surface/[0.025] md:hover:rounded-[1.125rem]"
       );
     }
 
-    return focusedField === field
-      ? "md:bg-surface-container-lowest/[0.03] md:rounded-2xl opacity-100"
-      : focusedField !== null
-        ? "opacity-50"
-        : "opacity-100";
+    if (focusedField === field) {
+      return "md:bg-on-surface/[0.035] md:rounded-full opacity-100";
+    }
+
+    return cn(
+      focusedField !== null ? "opacity-50" : "opacity-100",
+      focusedField === null && "md:hover:bg-on-surface/[0.02] md:hover:rounded-full"
+    );
   };
+
+  const hideDivider1 =
+    focusedField === "what" ||
+    focusedField === "where" ||
+    hoveredField === "what" ||
+    hoveredField === "where";
+
+  const hideDivider2 =
+    focusedField === "where" ||
+    focusedField === "budget" ||
+    hoveredField === "where" ||
+    hoveredField === "budget";
 
   // CLS fix: min-h matches Suspense fallback in SearchHeaderWrapper.tsx
   return (
@@ -970,6 +987,8 @@ export default function SearchForm({
             <div
               style={getFieldFlex("what")}
               onClick={(e) => focusCellInput(e, "search-what")}
+              onMouseEnter={() => setHoveredField("what")}
+              onMouseLeave={() => setHoveredField(null)}
               className={cn(
                 "w-full flex-col relative overflow-hidden whitespace-nowrap transition-opacity duration-300",
                 isHome ? "hidden cursor-text md:justify-center lg:flex" : "hidden lg:flex",
@@ -1019,7 +1038,7 @@ export default function SearchForm({
                     "w-full bg-transparent border-none focus:outline-none focus:ring-0",
                     isHome
                       ? HOME_SEARCH_INPUT_CLASSES
-                      : "p-0 text-[16px] md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant"
+                      : "p-0 text-[16px] md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant/50"
                   )}
                   autoComplete="off"
                 />
@@ -1044,11 +1063,10 @@ export default function SearchForm({
             <div
               className={cn(
                 isHome
-                  ? "hidden self-center bg-on-surface/10 transition-opacity duration-200 lg:my-0 lg:block lg:h-14 lg:w-px"
+                  ? "hidden self-center bg-on-surface/10 lg:my-0 lg:block lg:h-14 lg:w-px"
                   : "mx-0 my-1 hidden h-1.5 w-full rounded-full bg-surface-container-high/70 lg:mx-1 lg:my-0 lg:block lg:h-8 lg:w-1.5",
-                isHome &&
-                  (focusedField === "what" || focusedField === "where") &&
-                  "lg:opacity-0"
+                "transition-opacity duration-200",
+                hideDivider1 ? "lg:opacity-0" : "lg:opacity-100"
               )}
               aria-hidden="true"
             ></div>
@@ -1059,6 +1077,8 @@ export default function SearchForm({
         <div
           style={getFieldFlex("where")}
           onClick={(e) => focusCellInput(e, "search-location")}
+          onMouseEnter={() => setHoveredField("where")}
+          onMouseLeave={() => setHoveredField(null)}
           className={cn(
             "w-full flex flex-col relative group/input overflow-hidden whitespace-nowrap transition-opacity duration-300",
             isHome && "cursor-text overflow-visible md:justify-center md:overflow-hidden",
@@ -1117,7 +1137,7 @@ export default function SearchForm({
               inputClassName={
                 isHome
                   ? HOME_SEARCH_INPUT_CLASSES
-                  : "text-[16px] md:text-sm"
+                  : "text-[16px] md:text-sm placeholder:text-on-surface-variant/50"
               }
             />
             <button
@@ -1162,11 +1182,10 @@ export default function SearchForm({
         <div
           className={cn(
             isHome
-              ? "my-0 h-px w-[calc(100%-1rem)] self-center bg-on-surface/10 transition-opacity duration-200 md:mx-1 md:my-0 md:h-14 md:w-px"
+              ? "my-0 h-px w-[calc(100%-1rem)] self-center bg-on-surface/10 md:mx-1 md:my-0 md:h-14 md:w-px"
               : "mx-0 my-1 h-1.5 w-full rounded-full bg-surface-container-high/70 md:mx-1 md:my-0 md:h-8 md:w-1.5",
-            isHome &&
-              (focusedField === "where" || focusedField === "budget") &&
-              "md:opacity-0"
+            "transition-opacity duration-200",
+            hideDivider2 ? "md:opacity-0" : "md:opacity-100"
           )}
           aria-hidden="true"
         ></div>
@@ -1175,6 +1194,8 @@ export default function SearchForm({
         <div
           style={getFieldFlex("budget")}
           onClick={(e) => focusCellInput(e, "search-budget-min")}
+          onMouseEnter={() => setHoveredField("budget")}
+          onMouseLeave={() => setHoveredField(null)}
           className={cn(
             "w-full flex flex-col overflow-hidden whitespace-nowrap transition-opacity duration-300",
             isHome && "cursor-text md:justify-center",
@@ -1197,9 +1218,11 @@ export default function SearchForm({
             <div className="flex min-w-0 flex-1 items-center gap-1">
               <span
                 className={cn(
-                  "text-on-surface-variant text-xs",
-                  isHome &&
-                    "text-base font-normal text-on-surface-variant md:text-xs"
+                  "transition-colors duration-200",
+                  minPrice ? "text-on-surface" : "text-on-surface-variant/50",
+                  isHome
+                    ? "text-[16px] font-normal md:text-base md:font-medium"
+                    : "text-[16px] font-normal md:text-sm md:font-medium"
                 )}
               >
                 $
@@ -1214,12 +1237,12 @@ export default function SearchForm({
                 onChange={(e) => setPending({ minPrice: e.target.value })}
                 onFocus={() => handleFieldFocus("budget")}
                 onBlur={handleFieldBlur}
-                placeholder="800"
+                placeholder="Min"
                 className={cn(
                   "w-full bg-transparent border-none appearance-none focus:outline-none focus:ring-0 [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
                   isHome
                     ? HOME_SEARCH_INPUT_CLASSES
-                    : "p-0 text-[16px] md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant"
+                    : "p-0 text-[16px] md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant/50"
                 )}
                 min="0"
                 step="50"
@@ -1237,9 +1260,11 @@ export default function SearchForm({
             <div className="flex min-w-0 flex-1 items-center gap-1">
               <span
                 className={cn(
-                  "text-on-surface-variant text-xs",
-                  isHome &&
-                    "text-base font-normal text-on-surface-variant md:text-xs"
+                  "transition-colors duration-200",
+                  maxPrice ? "text-on-surface" : "text-on-surface-variant/50",
+                  isHome
+                    ? "text-[16px] font-normal md:text-base md:font-medium"
+                    : "text-[16px] font-normal md:text-sm md:font-medium"
                 )}
               >
                 $
@@ -1254,12 +1279,12 @@ export default function SearchForm({
                 onChange={(e) => setPending({ maxPrice: e.target.value })}
                 onFocus={() => handleFieldFocus("budget")}
                 onBlur={handleFieldBlur}
-                placeholder="1500"
+                placeholder="Max"
                 className={cn(
                   "w-full bg-transparent border-none appearance-none focus:outline-none focus:ring-0 [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
                   isHome
                     ? HOME_SEARCH_INPUT_CLASSES
-                    : "p-0 text-[16px] md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant"
+                    : "p-0 text-[16px] md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant/50"
                 )}
                 min="0"
                 step="50"
