@@ -74,10 +74,18 @@ test.describe("Home A11y: search input focus indicators", () => {
     page,
   }) => {
     await gotoHome(page);
-    // SearchForm is lazy-loaded; wait for it
-    await page.waitForSelector("#search-what", { timeout: 30000 });
+    // SearchForm is lazy-loaded; wait for it. #search-location always renders;
+    // #search-what is gated on NEXT_PUBLIC_ENABLE_SEMANTIC_SEARCH (inlined at
+    // build time) and absent in CI/prod builds, so it can't be the sentinel.
+    await page.waitForSelector("#search-location", { timeout: 30000 });
 
     for (const id of INPUT_IDS) {
+      if (
+        id === "search-what" &&
+        (await page.locator("#search-what").count()) === 0
+      ) {
+        continue; // flag-gated field not in this build
+      }
       // The indicator lives on the field-cell wrapper (a hairline ring +
       // tint driven by React focus state), not on the input itself — text
       // inputs match :focus-visible on mouse click too, so an input-level
