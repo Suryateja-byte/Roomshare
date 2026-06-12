@@ -673,3 +673,74 @@ describe("facet exclusion logic", () => {
     expect(amenitiesQuery).toContain("house_rules_lower @>");
   });
 });
+
+describe("eligibility parity with list search (H1)", () => {
+  const boundsParams = {
+    minLng: "-97.8",
+    maxLng: "-97.6",
+    minLat: "30.2",
+    maxLat: "30.4",
+  };
+
+  function queueEmptyFacetResults() {
+    // 4 queries when no price filter (histogram skipped on null min/max):
+    // amenities, houseRules, roomTypes, priceRanges
+    mockQueryRawUnsafe
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ min: null, max: null, median: null }]);
+  }
+
+  function futureDateInput(daysFromNow: number): string {
+    const date = new Date();
+    date.setUTCHours(0, 0, 0, 0);
+    date.setUTCDate(date.getUTCDate() + daysFromNow);
+    return date.toISOString().slice(0, 10);
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockExecuteRawUnsafe.mockResolvedValue(undefined);
+  });
+
+  it("applies live-join eligibility to every facet query", async () => {
+    queueEmptyFacetResults();
+
+    const request = createRequest({ ...boundsParams, minSlots: "3" });
+    await GET(request);
+
+    expect(mockQueryRawUnsafe).toHaveBeenCalledTimes(4);
+    for (const call of mockQueryRawUnsafe.mock.calls) {
+      const query = call[0] as string;
+      expect(query).toContain(`JOIN "Listing" l ON l.id = d.id`);
+      expect(query).toContain(`JOIN "User" u ON u.id = l."ownerId"`);
+      expect(query).toContain(`u."isSuspended" = FALSE`);
+      expect(query).toContain(`l.status = 'ACTIVE'`);
+      expect(query).toContain(`l."lastConfirmedAt"`);
+      expect(query).toContain(
+        `'MIGRATION_REVIEW', 'ADMIN_PAUSED', 'SUPPRESSED'`
+      );
+      expect(query).toContain("d.status = 'ACTIVE'");
+      // Live open-slot filter, not the legacy total_slots-only condition
+      expect(query).toContain(`l."openSlots" >= $2`);
+      // First two bound params are the (legacy, host-managed) minSlots pair
+      expect(call[1]).toBe(3);
+      expect(call[2]).toBe(3);
+    }
+  });
+
+  it("applies move-in coverage on both live listing and doc columns", async () => {
+    queueEmptyFacetResults();
+
+    const request = createRequest({
+      ...boundsParams,
+      moveInDate: futureDateInput(30),
+    });
+    await GET(request);
+
+    const amenitiesQuery = mockQueryRawUnsafe.mock.calls[0][0] as string;
+    expect(amenitiesQuery).toContain(`l."moveInDate"::date <= $3::date`);
+    expect(amenitiesQuery).toContain("(d.move_in_date IS NULL OR d.move_in_date <=");
+  });
+});

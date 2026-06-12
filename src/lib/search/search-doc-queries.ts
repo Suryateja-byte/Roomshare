@@ -806,6 +806,46 @@ function buildSearchDocListAvailabilitySqlFragments(options: {
   };
 }
 
+/**
+ * Public-search eligibility conditions shared by the list/map/count queries
+ * and the facets endpoint. This is the single seam for "which listings are
+ * publicly searchable" SQL — both consumers must produce identical eligibility
+ * so facet counts cannot drift from actual search results (H1 fix).
+ *
+ * Conditions reference `listing_search_docs d`, `"Listing" l`, and `"User" u`,
+ * so every consumer query must JOIN "Listing" l ON l.id = d.id and
+ * JOIN "User" u ON u.id = l."ownerId".
+ */
+export function buildPublicSearchEligibilityConditions(options: {
+  minAvailableSlots?: number;
+  moveInDate?: string;
+  endDate?: string;
+  startParamIndex: number;
+}): {
+  conditions: string[];
+  params: unknown[];
+  nextParamIndex: number;
+  effectiveAvailableSql: string;
+} {
+  const { effectiveAvailableSql, slotConditionSql, params, nextParamIndex } =
+    buildSearchDocListAvailabilitySqlFragments(options);
+
+  return {
+    conditions: [
+      slotConditionSql,
+      `l.status = 'ACTIVE'`,
+      `u."isSuspended" = FALSE`,
+      `COALESCE(FALSE, FALSE) = FALSE`,
+      `COALESCE(l."statusReason", '') NOT IN ('MIGRATION_REVIEW', 'ADMIN_PAUSED', 'SUPPRESSED')`,
+      "d.lat IS NOT NULL",
+      "d.lng IS NOT NULL",
+    ],
+    params,
+    nextParamIndex,
+    effectiveAvailableSql,
+  };
+}
+
 function buildSearchDocWhereConditionsInternal(
   filterParams: FilterParams
 ): WhereBuilder {
@@ -832,26 +872,16 @@ function buildSearchDocWhereConditionsInternal(
   } = filterParams;
 
   const {
-    effectiveAvailableSql,
-    slotConditionSql,
+    conditions,
     params,
     nextParamIndex,
-  } = buildSearchDocListAvailabilitySqlFragments({
+    effectiveAvailableSql,
+  } = buildPublicSearchEligibilityConditions({
     minAvailableSlots,
     moveInDate,
     endDate,
     startParamIndex: 1,
   });
-
-  const conditions: string[] = [
-    slotConditionSql,
-    `l.status = 'ACTIVE'`,
-    `u."isSuspended" = FALSE`,
-    `COALESCE(FALSE, FALSE) = FALSE`,
-    `COALESCE(l."statusReason", '') NOT IN ('MIGRATION_REVIEW', 'ADMIN_PAUSED', 'SUPPRESSED')`,
-    "d.lat IS NOT NULL",
-    "d.lng IS NOT NULL",
-  ];
   let paramIndex = nextParamIndex;
   let ftsQueryParamIndex: number | null = null;
 
