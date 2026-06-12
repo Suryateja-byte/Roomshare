@@ -129,3 +129,6 @@ memory-bank/activeContext.md
 .codex.file-backup-*
 playwright/.cache/
 tmp/
+
+# UI-review screenshot/snapshot artifacts (local only)
+tasks/.ui-review/
