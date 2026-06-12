@@ -27,7 +27,7 @@ import { urlToFilterChips } from "@/components/filters/filter-chip-utils";
 import {
   MAP_FLY_TO_EVENT,
   type MapFlyToEventDetail,
-} from "@/components/SearchForm";
+} from "@/lib/search/map-fly-to";
 import {
   buildSearchIntentParams,
   readSearchIntentState,

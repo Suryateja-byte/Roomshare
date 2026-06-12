@@ -1,3 +1,37 @@
+# Unified SearchBar — one pill, every surface (2026-06-12)
+
+Full plan: `~/.claude/plans/make-the-search-bar-expressive-sundae.md` (approved).
+
+- **Goal + acceptance criteria:** Home hero bar and search-page header bar are pixel-identical
+  (one shared SearchBar component, 68px pill, Where → What(AI, env-gated) → Budget), with the
+  full interaction treatment (raised active cell, morphing submit, scrim + Esc layering,
+  collapsed-pill segment deep-links, stacked mobile layout). All unit + e2e gates green on a
+  prod build, both semantic-flag states.
+- **Scope:** new `src/components/search/SearchBar/` module; rewrites of DesktopHeaderSearch +
+  MobileSearchOverlay form block; HomeSearchBar replaces SearchForm on HomeClient; lib
+  extractions (map-fly-to, search-dates, price-input); SearchForm.tsx + CompactSearchPill.tsx
+  deleted at the end.
+- **Risks:** URL-sync clobbering typing; auto-submit double-navigation; filter/sort/bounds
+  param survival; search-page collapse/focus regressions; env-gated What field in CI/prod
+  builds. Stable-selector contract in the plan MUST be preserved.
+- **Verification:** pnpm lint/typecheck/test → pnpm build + start → prod-build Playwright gate
+  (home-a11y, homepage, search-a11y, filter-price, search-smoke, p0-filters-mobile) →
+  flag-off build → manual Chrome pass.
+
+## Checklist
+
+- [x] Slice 0: this checklist
+- [x] Slice 1: lib extractions (map-fly-to.ts, search-dates.ts, price-input.ts) + import flips
+- [ ] Slice 2: SearchBar module + unit tests (pipeline + chrome states)
+- [ ] Slice 3: swap search-page desktop header (scrim, equal-height summary, id unify)
+- [ ] Slice 4: swap home (HomeSearchBar, port SearchForm tests as parity oracle)
+- [ ] Slice 5: collapsed-summary segment deep-links (openAndFocus + budget)
+- [ ] Slice 6: mobile overlay on stacked SearchBar (+ What field, real form)
+- [ ] Slice 7: delete SearchForm.tsx / CompactSearchPill.tsx / shim; grep clean
+- [ ] Verification story written below
+
+---
+
 # M1 no-empty-listings bypass fix — (2026-06-11)
 
 ## Problem

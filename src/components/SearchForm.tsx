@@ -67,6 +67,14 @@ import {
   normalizeSearchQuery,
   serializeSearchQuery,
 } from "@/lib/search/search-query";
+import {
+  MAP_FLY_TO_EVENT,
+  type MapFlyToEventDetail,
+} from "@/lib/search/map-fly-to";
+import {
+  getValidatedSearchDateRange,
+  validateMoveInDate,
+} from "@/lib/search/search-dates";
 
 // Debounce delay in milliseconds
 const SEARCH_DEBOUNCE_MS = 300;
@@ -95,78 +103,9 @@ const SUGGESTION_TYPE_TO_PENDING_KEYS: Record<
 const HOME_SEARCH_INPUT_CLASSES =
   "rounded-md pl-1 pr-8 py-1 -ml-1 text-[16px] text-on-surface caret-primary placeholder-shown:caret-transparent placeholder:text-on-surface-variant/55 transition-colors focus:placeholder:text-on-surface-variant/40 md:-ml-0 md:pl-0 md:pr-8 md:py-0 md:text-base md:font-medium";
 
-/**
- * Validate a move-in date string. Returns the date if valid (today or future, within 2 years),
- * otherwise returns empty string. This matches the server-side safeParseDate logic.
- */
-const validateMoveInDate = (value: string | null): string => {
-  if (!value) return "";
-  const trimmed = value.trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return "";
-
-  const [yearStr, monthStr, dayStr] = trimmed.split("-");
-  const year = parseInt(yearStr, 10);
-  const month = parseInt(monthStr, 10);
-  const day = parseInt(dayStr, 10);
-
-  if (month < 1 || month > 12) return "";
-  if (day < 1 || day > 31) return "";
-
-  const date = new Date(year, month - 1, day);
-  if (
-    date.getFullYear() !== year ||
-    date.getMonth() !== month - 1 ||
-    date.getDate() !== day
-  ) {
-    return "";
-  }
-
-  // Reject past dates
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  if (date < today) return "";
-
-  // Reject dates more than 2 years in the future
-  const maxDate = new Date();
-  maxDate.setFullYear(maxDate.getFullYear() + 2);
-  if (date > maxDate) return "";
-
-  return trimmed;
-};
-
-const validateEndDate = (value: string | null, moveInDate: string): string => {
-  const validatedEndDate = validateMoveInDate(value);
-  if (!validatedEndDate || !moveInDate) return "";
-  return validatedEndDate > moveInDate ? validatedEndDate : "";
-};
-
-function getValidatedSearchDateRange(
-  moveInDateValue: string | null,
-  endDateValue: string | null
-) {
-  const moveInDate = validateMoveInDate(moveInDateValue);
-  if (!moveInDate) {
-    return {
-      moveInDate: "",
-      endDate: "",
-    };
-  }
-
-  return {
-    moveInDate,
-    endDate: validateEndDate(endDateValue, moveInDate),
-  };
-}
-
-// Custom event for map fly-to
-export const MAP_FLY_TO_EVENT = "mapFlyToLocation";
-
-export interface MapFlyToEventDetail {
-  lat: number;
-  lng: number;
-  bbox?: [number, number, number, number];
-  zoom?: number;
-}
+// Re-exported for back-compat until SearchForm is retired; canonical home is the lib.
+export { MAP_FLY_TO_EVENT };
+export type { MapFlyToEventDetail };
 
 export default function SearchForm({
   variant = "default",

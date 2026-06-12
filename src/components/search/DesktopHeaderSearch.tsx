@@ -32,7 +32,8 @@ import {
 import {
   MAP_FLY_TO_EVENT,
   type MapFlyToEventDetail,
-} from "@/components/SearchForm";
+} from "@/lib/search/map-fly-to";
+import { validateMoveInDate } from "@/lib/search/search-dates";
 
 export interface DesktopHeaderSearchHandle {
   openAndFocus: (field?: "where" | "vibe") => void;
@@ -46,39 +47,6 @@ const LOCATION_INPUT_ID = "desktop-header-search-location";
 const VIBE_INPUT_ID = "desktop-header-search-vibe";
 const MIN_BUDGET_INPUT_ID = "search-budget-min";
 const MAX_BUDGET_INPUT_ID = "search-budget-max";
-
-function validateMoveInDate(value: string | null): string {
-  if (!value) return "";
-  const trimmed = value.trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return "";
-
-  const [yearStr, monthStr, dayStr] = trimmed.split("-");
-  const year = parseInt(yearStr, 10);
-  const month = parseInt(monthStr, 10);
-  const day = parseInt(dayStr, 10);
-
-  if (month < 1 || month > 12) return "";
-  if (day < 1 || day > 31) return "";
-
-  const date = new Date(year, month - 1, day);
-  if (
-    date.getFullYear() !== year ||
-    date.getMonth() !== month - 1 ||
-    date.getDate() !== day
-  ) {
-    return "";
-  }
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  if (date < today) return "";
-
-  const maxDate = new Date();
-  maxDate.setFullYear(maxDate.getFullYear() + 2);
-  if (date > maxDate) return "";
-
-  return trimmed;
-}
 
 function focusInput(field: "where" | "vibe") {
   const element = document.getElementById(

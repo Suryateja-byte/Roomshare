@@ -35,7 +35,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Home, MapPin, Minus, Plus, Star, X } from "lucide-react";
 import { triggerHaptic } from "@/lib/haptics";
 import { formatPrice } from "@/lib/format";
-import { MAP_FLY_TO_EVENT, MapFlyToEventDetail } from "./SearchForm";
+import {
+  MAP_FLY_TO_EVENT,
+  type MapFlyToEventDetail,
+} from "@/lib/search/map-fly-to";
 import { useListingFocus } from "@/contexts/ListingFocusContext";
 import { useMobileSearch } from "@/contexts/MobileSearchContext";
 import {
