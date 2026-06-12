@@ -342,6 +342,16 @@ describe("SearchBar chrome", () => {
     );
   });
 
+  it("does not steal focus from the max input when the morph retargets a click to the cell", () => {
+    render(<Harness />);
+    const maxInput = screen.getByLabelText("Maximum budget");
+    maxInput.focus();
+    // Engage-morph layout shift can turn a click on Max into a click on the
+    // cell (instant under prefers-reduced-motion). Focus must stay on Max.
+    fireEvent.click(document.querySelector('[data-field="budget"]')!);
+    expect(document.activeElement).toBe(maxInput);
+  });
+
   it("shows the role=alert location warning on blur with typed unselected text", () => {
     render(<Harness />);
     const input = screen.getByTestId("location-input");

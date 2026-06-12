@@ -69,6 +69,11 @@ export function SearchBarField({
         // native behavior — without this guard a click on the Max input would
         // bubble up and yank focus back to Min.
         if ((event.target as HTMLElement).closest("input, button, a")) return;
+        // If focus already lives inside this cell, leave it alone. The
+        // engage-morph shifts layout between mousedown and mouseup (instantly
+        // under reduced motion), which retargets the click to the cell — the
+        // mousedown-focused input must not be stolen.
+        if (event.currentTarget.contains(document.activeElement)) return;
         document.getElementById(inputId)?.focus();
       }}
       onMouseEnter={() => setHoveredField(fieldId)}
