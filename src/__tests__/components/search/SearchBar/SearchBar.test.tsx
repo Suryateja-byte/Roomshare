@@ -4,7 +4,7 @@
  * resolution, bounds preservation, recents) and the interaction chrome
  * (engaged state, active cell, dead-space click, location warning).
  */
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
@@ -286,6 +286,25 @@ describe("SearchBar submit pipeline", () => {
       lat: 37.7749,
       lng: -122.4194,
     });
+  });
+
+  it("navigates exactly once for rapid duplicate submits (debounced)", () => {
+    jest.useFakeTimers();
+    try {
+      setSearchParams("minLat=37&minLng=-123&maxLat=38&maxLng=-122");
+      render(<Harness submitOptions={{ debounceMs: 300 }} />);
+      const form = screen.getByRole("search");
+      // Regression: the duplicate submit must NOT cancel the pending
+      // debounced navigation (that swallowed the search entirely).
+      fireEvent.submit(form);
+      fireEvent.submit(form);
+      act(() => {
+        jest.advanceTimersByTime(600);
+      });
+      expect(mockPush).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it("calls onBeforeNavigate before navigating", async () => {

@@ -4,8 +4,8 @@
 import { render, screen } from "@testing-library/react";
 
 // Mock the components that would be used in the home page
-jest.mock("@/components/SearchForm", () => {
-  return function MockSearchForm() {
+jest.mock("@/components/search/SearchBar/HomeSearchBar", () => {
+  return function MockHomeSearchBar() {
     return <div data-testid="search-form">Search Form</div>;
   };
 });

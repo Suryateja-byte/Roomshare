@@ -97,7 +97,7 @@ interface FilterModalProps {
 /**
  * FilterModal - Presentational slide-out drawer for detailed filters
  *
- * Pure presentational component - all state and logic remains in SearchForm.
+ * Pure presentational component - all state and logic remains in HomeSearchBar.
  * This extracts the filter drawer UI into a reusable component.
  */
 export function FilterModal({

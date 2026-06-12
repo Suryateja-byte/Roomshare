@@ -80,7 +80,7 @@ interface LocationSearchInputProps {
    * When true, the fallbackItems list is shown as a "recent" list on focus
    * with an empty input (reusing the accessible combobox listbox + keyboard
    * navigation). Opt-in: other consumers keep the default (fallbacks only on
-   * service-unavailable). Used by the homepage SearchForm to fold its recent
+   * service-unavailable). Used by the search bar's Where field to fold its recent
    * searches into the one accessible combobox.
    */
   showFallbackOnEmptyFocus?: boolean;

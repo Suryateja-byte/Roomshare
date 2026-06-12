@@ -22,11 +22,11 @@ Full plan: `~/.claude/plans/make-the-search-bar-expressive-sundae.md` (approved)
 
 - [x] Slice 0: this checklist
 - [x] Slice 1: lib extractions (map-fly-to.ts, search-dates.ts, price-input.ts) + import flips
-- [ ] Slice 2: SearchBar module + unit tests (pipeline + chrome states)
-- [ ] Slice 3: swap search-page desktop header (scrim, equal-height summary, id unify)
-- [ ] Slice 4: swap home (HomeSearchBar, port SearchForm tests as parity oracle)
-- [ ] Slice 5: collapsed-summary segment deep-links (openAndFocus + budget)
-- [ ] Slice 6: mobile overlay on stacked SearchBar (+ What field, real form)
+- [x] Slice 2: SearchBar module + unit tests (pipeline + chrome states)
+- [x] Slice 3: swap search-page desktop header (scrim, equal-height summary, id unify)
+- [x] Slice 4: swap home (HomeSearchBar, port SearchForm tests as parity oracle)
+- [x] Slice 5: collapsed-summary segment deep-links (openAndFocus + budget) — done in slice 3
+- [x] Slice 6: mobile overlay on stacked SearchBar (+ What field, real form)
 - [ ] Slice 7: delete SearchForm.tsx / CompactSearchPill.tsx / shim; grep clean
 - [ ] Verification story written below
 

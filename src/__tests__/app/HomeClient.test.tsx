@@ -4,10 +4,8 @@ import HomeClient from "@/app/HomeClient";
 
 const mockUseSession = jest.fn();
 
-const mockSearchForm = jest.fn(({ variant }: { variant?: string }) => (
-  <div data-testid="search-form" data-variant={variant}>
-    Search Form
-  </div>
+const mockHomeSearchBar = jest.fn(() => (
+  <div data-testid="search-form">Search Form</div>
 ));
 
 jest.mock("next-auth/react", () => ({
@@ -30,9 +28,9 @@ jest.mock("next/link", () => ({
   ),
 }));
 
-jest.mock("@/components/SearchForm", () => ({
+jest.mock("@/components/search/SearchBar/HomeSearchBar", () => ({
   __esModule: true,
-  default: (props: { variant?: string }) => mockSearchForm(props),
+  default: () => mockHomeSearchBar(),
 }));
 
 jest.mock("framer-motion", () => {
@@ -80,18 +78,18 @@ jest.mock("framer-motion", () => {
 
 describe("HomeClient", () => {
   beforeEach(() => {
-    mockSearchForm.mockClear();
+    mockHomeSearchBar.mockClear();
     mockUseSession.mockReturnValue({
       data: null,
       status: "unauthenticated",
     });
   });
 
-  it('passes the "home" variant to SearchForm', async () => {
+  it("renders the home search bar in the hero", async () => {
     render(<HomeClient />);
 
-    const searchForm = await screen.findByTestId("search-form");
-    expect(searchForm).toHaveAttribute("data-variant", "home");
+    expect(await screen.findByTestId("search-form")).toBeInTheDocument();
+    expect(mockHomeSearchBar).toHaveBeenCalled();
   });
 
   it("renders the heading and hero section", () => {

@@ -211,10 +211,6 @@ export function useSearchSubmit({
       }
     }
 
-    // Invalidate any in-flight debounced navigation.
-    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    navigationVersionRef.current++;
-
     const currentQuery = normalizeSearchQuery(
       new URLSearchParams(s.searchParamsString)
     );
@@ -255,9 +251,16 @@ export function useSearchSubmit({
     );
 
     // Prevent duplicate searches (same URL within the debounce window).
+    // Checked BEFORE cancelling any pending debounced navigation — clearing
+    // first and then returning here would swallow the in-flight search
+    // entirely and leave isSearching stuck (latent SearchForm bug).
     if (searchUrl === lastSearchRef.current && isSearchingRef.current) {
       return;
     }
+
+    // Invalidate any in-flight debounced navigation for a DIFFERENT search.
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    navigationVersionRef.current++;
 
     safeMark("search-submit");
     setIsSearching(true);

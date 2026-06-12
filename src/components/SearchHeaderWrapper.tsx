@@ -4,12 +4,12 @@
  * SearchHeaderWrapper - Manages collapsible header on mobile and desktop
  *
  * On mobile:
- * - Shows full SearchForm when at top or manually expanded
+ * - Shows the full search bar when at top or manually expanded
  * - Shows collapsed bar when scrolled down
  * - Collapsed bar shows location summary and filter access
  *
  * On desktop:
- * - Shows full SearchForm when at top or manually expanded
+ * - Shows the full search bar when at top or manually expanded
  * - Shows compact search pill when scrolled down
  */
 
