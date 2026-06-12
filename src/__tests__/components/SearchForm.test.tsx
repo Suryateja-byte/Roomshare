@@ -25,6 +25,7 @@ jest.mock("@/components/LocationSearchInput", () => {
     onChange,
     onLocationSelect,
     placeholder,
+    inputClassName,
   }: {
     value: string;
     onChange: (value: string) => void;
@@ -35,6 +36,7 @@ jest.mock("@/components/LocationSearchInput", () => {
       bbox?: [number, number, number, number];
     }) => void;
     placeholder?: string;
+    inputClassName?: string;
   }) {
     return (
       <div>
@@ -43,6 +45,7 @@ jest.mock("@/components/LocationSearchInput", () => {
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
+          className={inputClassName}
         />
         <button
           data-testid="select-location"
@@ -216,6 +219,17 @@ describe("SearchForm", () => {
       expect(screen.getByTestId("location-input")).toBeInTheDocument();
     });
 
+    it("does not apply home-only polished input classes", () => {
+      render(<SearchForm />);
+
+      expect(screen.getByTestId("location-input")).not.toHaveClass(
+        "caret-primary",
+        "placeholder-shown:caret-transparent",
+        "placeholder:text-on-surface-variant/55",
+        "focus:placeholder:text-on-surface-variant/40"
+      );
+    });
+
     it("renders min/max price inputs", () => {
       render(<SearchForm />);
       expect(screen.getByLabelText(/minimum budget/i)).toBeInTheDocument();
@@ -284,8 +298,32 @@ describe("SearchForm", () => {
       expect(screen.getByText("Where")).toBeInTheDocument();
       expect(screen.getByText("Budget")).toBeInTheDocument();
       expect(
-        screen.getByPlaceholderText(/describe your ideal room/i)
+        screen.getByPlaceholderText(/quiet, near campus/i)
       ).toBeInTheDocument();
+    });
+
+    it("applies polished home input classes to search fields", () => {
+      render(<SearchForm variant="home" />);
+
+      const homeInputClasses = [
+        "caret-primary",
+        "placeholder-shown:caret-transparent",
+        "placeholder:text-on-surface-variant/55",
+        "focus:placeholder:text-on-surface-variant/40",
+      ];
+
+      expect(screen.getByPlaceholderText(/quiet, near campus/i)).toHaveClass(
+        ...homeInputClasses
+      );
+      expect(screen.getByTestId("location-input")).toHaveClass(
+        ...homeInputClasses
+      );
+      expect(screen.getByLabelText(/minimum budget/i)).toHaveClass(
+        ...homeInputClasses
+      );
+      expect(screen.getByLabelText(/maximum budget/i)).toHaveClass(
+        ...homeInputClasses
+      );
     });
 
     it("renders filters and search buttons", () => {
@@ -312,7 +350,7 @@ describe("SearchForm", () => {
       render(<SearchForm variant="home" />);
 
       await user.type(
-        screen.getByPlaceholderText(/describe your ideal room/i),
+        screen.getByPlaceholderText(/quiet, near campus/i),
         "sunny room"
       );
       await user.type(screen.getByTestId("location-input"), "San Francisco");
@@ -761,6 +799,18 @@ describe("SearchForm", () => {
       expect(
         screen.getByText(/select a location from the dropdown/i)
       ).toBeInTheDocument();
+    });
+
+    it("announces the location warning to assistive tech (role=alert)", async () => {
+      render(<SearchForm />);
+
+      const locationInput = screen.getByTestId("location-input");
+      await user.type(locationInput, "San Francisco");
+
+      // The warning is an alert region so screen readers announce it on insert.
+      const alert = screen.getByRole("alert");
+      expect(alert).toHaveAttribute("id", "location-warning");
+      expect(alert).toHaveTextContent(/select a location from the dropdown/i);
     });
 
     it("hides warning in compact mode", async () => {

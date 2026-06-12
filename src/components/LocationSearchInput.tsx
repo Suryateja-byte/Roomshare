@@ -7,7 +7,7 @@ import {
   useCallback,
   useId,
   useMemo,
-  type MutableRefObject,
+  type RefObject,
 } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -73,9 +73,19 @@ interface LocationSearchInputProps {
   inputClassName?: string;
   id?: string;
   autoFocus?: boolean;
-  inputRef?: MutableRefObject<HTMLInputElement | null>;
+  inputRef?: RefObject<HTMLInputElement | null>;
   fallbackItems?: LocationSearchFallbackItem[];
   fallbackTitle?: string;
+  /**
+   * When true, the fallbackItems list is shown as a "recent" list on focus
+   * with an empty input (reusing the accessible combobox listbox + keyboard
+   * navigation). Opt-in: other consumers keep the default (fallbacks only on
+   * service-unavailable). Used by the homepage SearchForm to fold its recent
+   * searches into the one accessible combobox.
+   */
+  showFallbackOnEmptyFocus?: boolean;
+  /** Optional clear-all action rendered in the recent-list header. */
+  onClearFallback?: () => void;
 }
 
 class AutocompleteUnavailableError extends Error {
@@ -311,6 +321,8 @@ export default function LocationSearchInput({
   inputRef: forwardedInputRef,
   fallbackItems = [],
   fallbackTitle = "Recent locations",
+  showFallbackOnEmptyFocus = false,
+  onClearFallback,
 }: LocationSearchInputProps) {
   const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -390,7 +402,18 @@ export default function LocationSearchInput({
     return matches.length > 0 ? matches : fallbackItems;
   }, [fallbackItems, sanitizedValue]);
 
-  const showFallbackOptions = serviceUnavailable && visibleFallbackItems.length > 0;
+  // Recent-searches list shown on empty focus (opt-in). Distinct from the
+  // service-unavailable fallback: same items, but rendered as a clean
+  // "recent" listbox without the offline/retry chrome.
+  const showRecentList =
+    showFallbackOnEmptyFocus &&
+    !serviceUnavailable &&
+    !sanitizedValue &&
+    visibleFallbackItems.length > 0;
+  // Both fallback modes navigate the same keyboard machinery (arrow/Enter/Tab
+  // operate on visibleFallbackItems via handleSelectFallback).
+  const showFallbackOptions =
+    (serviceUnavailable || showRecentList) && visibleFallbackItems.length > 0;
   const availableOptionCount = showFallbackOptions
     ? visibleFallbackItems.length
     : suggestions.length;
@@ -743,23 +766,39 @@ export default function LocationSearchInput({
     if (
       suggestions.length > 0 ||
       serviceUnavailable ||
+      (showFallbackOnEmptyFocus && visibleFallbackItems.length > 0) ||
       value.length >= LOCATION_AUTOCOMPLETE_MIN_QUERY_LENGTH
     ) {
       setShowSuggestions(true);
     }
     onFocus?.();
-  }, [onFocus, serviceUnavailable, suggestions.length, value.length]);
+  }, [
+    onFocus,
+    serviceUnavailable,
+    showFallbackOnEmptyFocus,
+    suggestions.length,
+    value.length,
+    visibleFallbackItems.length,
+  ]);
 
   const handleInputClick = useCallback(() => {
     if (
       (suggestions.length > 0 ||
         serviceUnavailable ||
+        (showFallbackOnEmptyFocus && visibleFallbackItems.length > 0) ||
         value.length >= LOCATION_AUTOCOMPLETE_MIN_QUERY_LENGTH) &&
       !showSuggestions
     ) {
       setShowSuggestions(true);
     }
-  }, [serviceUnavailable, showSuggestions, suggestions.length, value.length]);
+  }, [
+    serviceUnavailable,
+    showFallbackOnEmptyFocus,
+    showSuggestions,
+    suggestions.length,
+    value.length,
+    visibleFallbackItems.length,
+  ]);
 
   const handleInputBlur = useCallback(() => {
     setTimeout(() => {
@@ -782,6 +821,7 @@ export default function LocationSearchInput({
     showSuggestions &&
     (suggestions.length > 0 ||
       serviceUnavailable ||
+      showRecentList ||
       (noResults && !isLoading) ||
       showTypeMoreHint);
 
@@ -942,6 +982,77 @@ export default function LocationSearchInput({
                       </li>
                     );
                   })}
+                </ul>
+              </div>
+            )}
+
+            {showSuggestions && showRecentList && !showTypeMoreHint && (
+              <div
+                ref={suggestionsRef}
+                data-location-search-popup="true"
+                data-location-search-recent="true"
+                className="fixed z-[9999] overflow-hidden rounded-2xl bg-surface-container-lowest shadow-ghost backdrop-blur-xl animate-in fade-in-0 slide-in-from-top-2"
+                style={{
+                  top: dropdownPos.top,
+                  left: dropdownPos.left,
+                  width: dropdownPos.width,
+                }}
+              >
+                <div className="flex items-center justify-between px-4 pt-3">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-on-surface-variant">
+                    {fallbackTitle}
+                  </span>
+                  {onClearFallback ? (
+                    <button
+                      type="button"
+                      onClick={onClearFallback}
+                      className="rounded-full px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-on-surface-variant transition-colors hover:text-red-500"
+                      data-location-search-clear-recent="true"
+                    >
+                      Clear
+                    </button>
+                  ) : null}
+                </div>
+                <ul
+                  className="p-2"
+                  role="listbox"
+                  id={`${listboxId}-listbox`}
+                  aria-label={fallbackTitle}
+                >
+                  {visibleFallbackItems.map((item, index) => (
+                    <li
+                      key={item.id}
+                      role="option"
+                      id={`${listboxId}-option-${index}`}
+                      aria-selected={index === selectedIndex}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleSelectFallback(item)}
+                        className={cn(
+                          "flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors duration-150",
+                          index === selectedIndex
+                            ? "bg-surface-container-high"
+                            : "hover:bg-surface-container-high/80"
+                        )}
+                        tabIndex={-1}
+                      >
+                        <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-surface-container-high text-on-surface-variant">
+                          <History className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-on-surface">
+                            {item.primaryText}
+                          </p>
+                          {item.secondaryText ? (
+                            <p className="truncate text-xs text-on-surface-variant">
+                              {item.secondaryText}
+                            </p>
+                          ) : null}
+                        </div>
+                      </button>
+                    </li>
+                  ))}
                 </ul>
               </div>
             )}

@@ -12,7 +12,6 @@ import { flushSync } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Search,
-  Clock,
   Loader2,
   SlidersHorizontal,
   LocateFixed,
@@ -41,7 +40,6 @@ import { useMobileSearch } from "@/contexts/MobileSearchContext";
 import { cn } from "@/lib/utils";
 import {
   useRecentSearches,
-  type RecentSearch,
   type RecentSearchFilters,
 } from "@/hooks/useRecentSearches";
 import { useDebouncedFilterCount } from "@/hooks/useDebouncedFilterCount";
@@ -93,6 +91,9 @@ const SUGGESTION_TYPE_TO_PENDING_KEYS: Record<
   amenities: ["amenities"],
   leaseDuration: ["leaseDuration"],
 };
+
+const HOME_SEARCH_INPUT_CLASSES =
+  "rounded-md px-1 py-1 -ml-1 text-[16px] text-on-surface caret-primary placeholder-shown:caret-transparent placeholder:text-on-surface-variant/55 transition-colors focus:placeholder:text-on-surface-variant/40 md:-ml-0 md:px-0 md:py-0 md:text-base md:font-medium";
 
 /**
  * Validate a move-in date string. Returns the date if valid (today or future, within 2 years),
@@ -287,8 +288,9 @@ export default function SearchForm({
   // Recent searches from canonical hook (handles localStorage, migration, enhanced format)
   const { recentSearches, saveRecentSearch, clearRecentSearches } =
     useRecentSearches();
-  const [showRecentSearches, setShowRecentSearches] = useState(false);
 
+  // Recent searches surface inside LocationSearchInput's accessible combobox
+  // (shown on empty focus). Selecting one fills location + coords.
   const recentLocationFallbackItems = useMemo(
     () =>
       recentSearches
@@ -300,20 +302,10 @@ export default function SearchForm({
           onSelect: () => {
             setLocation(search.location);
             setSelectedCoords(search.coords!);
-            setShowRecentSearches(false);
           },
         })),
     [recentSearches]
   );
-
-  // Select a recent search
-  const selectRecentSearch = useCallback((search: RecentSearch) => {
-    setLocation(search.location);
-    if (search.coords) {
-      setSelectedCoords(search.coords);
-    }
-    setShowRecentSearches(false);
-  }, []);
 
   // Set hasMounted after initial render and validate moveInDate
   // Intentionally run-once ([] deps): mount-time validation of URL params and
@@ -465,7 +457,7 @@ export default function SearchForm({
   }, []);
 
   const handleSearch = useCallback(
-    (e: React.FormEvent) => {
+    (e: React.SyntheticEvent<HTMLFormElement>) => {
       e.preventDefault();
 
       // Try natural language parsing: if the input contains structured filters
@@ -934,7 +926,7 @@ export default function SearchForm({
       // input-level ring would show for pointer users and read as a stray border).
       return cn(
         focusedField === field &&
-          "rounded-[1.125rem] bg-surface-canvas/72 ring-1 ring-inset ring-primary/50 md:bg-primary/[0.045]"
+          "rounded-[1.125rem] bg-surface-canvas/55 ring-1 ring-inset ring-primary/30 md:bg-primary/[0.035]"
       );
     }
 
@@ -1022,11 +1014,11 @@ export default function SearchForm({
                   onChange={(e) => setWhatQuery(e.target.value)}
                   onFocus={() => handleFieldFocus("what")}
                   onBlur={handleFieldBlur}
-                  placeholder="Describe your ideal room"
+                  placeholder="Try 'quiet, near campus'"
                   className={cn(
                     "w-full bg-transparent border-none focus:outline-none focus:ring-0",
                     isHome
-                      ? "rounded-md px-1 py-1 -ml-1 text-[16px] text-on-surface placeholder:text-on-surface-variant transition-colors focus:bg-surface-canvas md:-ml-0 md:px-0 md:py-0 md:text-base md:font-medium md:focus:bg-transparent"
+                      ? HOME_SEARCH_INPUT_CLASSES
                       : "p-0 text-[16px] md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant"
                   )}
                   autoComplete="off"
@@ -1099,36 +1091,32 @@ export default function SearchForm({
                 isUserTypingLocationRef.current = true;
                 setLocation(value);
                 if (selectedCoords) setSelectedCoords(null);
-                setShowRecentSearches(false);
               }}
               onLocationSelect={(data) => {
                 isUserTypingLocationRef.current = false;
                 handleLocationSelect(data);
-                setShowRecentSearches(false);
               }}
               fallbackItems={recentLocationFallbackItems}
+              showFallbackOnEmptyFocus
+              fallbackTitle="Recent searches"
+              onClearFallback={clearRecentSearches}
               onFocus={() => {
                 setLocationInputFocused(true);
                 handleFieldFocus("where");
-                if (recentSearches.length > 0 && !location) {
-                  setShowRecentSearches(true);
-                }
               }}
               onBlur={() => {
                 setLocationInputFocused(false);
                 handleFieldBlur();
-                // Delay hiding to allow click on recent search
-                setTimeout(() => setShowRecentSearches(false), 200);
                 // Allow pending URL syncs to settle before re-enabling location sync
                 setTimeout(() => {
                   isUserTypingLocationRef.current = false;
                 }, 500);
               }}
-              placeholder="Search destinations"
+              placeholder="Search city or area"
               className="min-w-0 flex-1"
               inputClassName={
                 isHome
-                  ? "rounded-md px-1 py-1 -ml-1 text-[16px] text-on-surface placeholder:text-on-surface-variant transition-colors focus:bg-surface-canvas md:-ml-0 md:px-0 md:py-0 md:text-base md:font-medium md:focus:bg-transparent"
+                  ? HOME_SEARCH_INPUT_CLASSES
                   : "text-[16px] md:text-sm"
               }
             />
@@ -1165,49 +1153,9 @@ export default function SearchForm({
             </button>
           </div>
 
-          {/* Recent Searches Dropdown */}
-          {showRecentSearches && recentSearches.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-3 bg-surface-container-lowest/95 backdrop-blur-[20px] rounded-lg shadow-ambient z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
-              <div className="flex items-center justify-between px-5 py-3 bg-surface-container-high/30">
-                <span className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">
-                  Recent Searches
-                </span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    clearRecentSearches();
-                  }}
-                  className="h-auto py-1 px-2 text-xs font-bold uppercase tracking-wider text-on-surface-variant hover:text-red-500"
-                >
-                  Clear
-                </Button>
-              </div>
-              <ul className="py-2">
-                {recentSearches.map((search, idx) => (
-                  <li key={`${search.location}-${idx}`}>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        selectRecentSearch(search);
-                      }}
-                      className="w-full flex items-center gap-4 px-5 py-3 hover:bg-surface-canvas/80 text-left transition-colors"
-                    >
-                      <Clock className="w-4 h-4 text-on-surface-variant flex-shrink-0" />
-                      <span className="text-sm font-medium text-on-surface-variant truncate">
-                        {search.location}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          {/* Recent searches now render inside LocationSearchInput's accessible
+              combobox listbox (showFallbackOnEmptyFocus) — keyboard-navigable
+              and announced, replacing the former mouse-only dropdown here. */}
         </div>
 
         {/* Divider */}
@@ -1261,15 +1209,16 @@ export default function SearchForm({
                 aria-label="Minimum budget"
                 type="number"
                 inputMode="numeric"
+                autoComplete="off"
                 value={minPrice}
                 onChange={(e) => setPending({ minPrice: e.target.value })}
                 onFocus={() => handleFieldFocus("budget")}
                 onBlur={handleFieldBlur}
-                placeholder="Min"
+                placeholder="800"
                 className={cn(
                   "w-full bg-transparent border-none appearance-none focus:outline-none focus:ring-0 [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
                   isHome
-                    ? "rounded-md px-1 py-1 -ml-1 text-[16px] text-on-surface placeholder:text-on-surface-variant transition-colors focus:bg-surface-canvas md:-ml-0 md:px-0 md:py-0 md:text-base md:font-medium md:focus:bg-transparent"
+                    ? HOME_SEARCH_INPUT_CLASSES
                     : "p-0 text-[16px] md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant"
                 )}
                 min="0"
@@ -1300,15 +1249,16 @@ export default function SearchForm({
                 aria-label="Maximum budget"
                 type="number"
                 inputMode="numeric"
+                autoComplete="off"
                 value={maxPrice}
                 onChange={(e) => setPending({ maxPrice: e.target.value })}
                 onFocus={() => handleFieldFocus("budget")}
                 onBlur={handleFieldBlur}
-                placeholder="Max"
+                placeholder="1500"
                 className={cn(
                   "w-full bg-transparent border-none appearance-none focus:outline-none focus:ring-0 [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
                   isHome
-                    ? "rounded-md px-1 py-1 -ml-1 text-[16px] text-on-surface placeholder:text-on-surface-variant transition-colors focus:bg-surface-canvas md:-ml-0 md:px-0 md:py-0 md:text-base md:font-medium md:focus:bg-transparent"
+                    ? HOME_SEARCH_INPUT_CLASSES
                     : "p-0 text-[16px] md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant"
                 )}
                 min="0"
@@ -1432,6 +1382,7 @@ export default function SearchForm({
       {showLocationWarning && !isCompact && !locationInputFocused && (
         <div
           id="location-warning"
+          role="alert"
           className={cn(
             "border border-outline-variant/20 bg-amber-50 text-sm text-amber-800 flex gap-2",
             isHome
@@ -1444,6 +1395,7 @@ export default function SearchForm({
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
+            aria-hidden="true"
           >
             <path
               strokeLinecap="round"

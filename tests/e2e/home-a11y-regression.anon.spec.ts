@@ -1,11 +1,15 @@
 /**
  * Homepage A11y Regressions (P0)
  *
- * Pins the two keyboard-accessibility fixes from the 2026-06-10 homepage review:
+ * Pins the keyboard/screen-reader fixes from the 2026-06-10/06-11 homepage review:
  *  1. Skip link must scroll the custom scroll container and move focus to
  *     #main-content (native anchor navigation cannot scroll the app container).
  *  2. Hero search inputs must show a visible :focus-visible indicator
  *     (WCAG 2.4.7) — they previously had focus:outline-none with no replacement.
+ *  3. Recent searches must be keyboard-navigable inside the location combobox
+ *     (they were a separate mouse-only dropdown that hid on blur).
+ *  4. The "select a location from the dropdown" warning must be announced
+ *     (role=alert) so screen-reader users know why submit is blocked.
  *
  * Run: pnpm playwright test tests/e2e/home-a11y-regression.anon.spec.ts --project=chromium-anon
  */
@@ -117,5 +121,71 @@ test.describe("Home A11y: search input focus indicators", () => {
         )
         .toBe(id);
     }
+  });
+});
+
+test.describe("Home A11y: recent searches in the combobox", () => {
+  test("recent searches are keyboard-navigable and fill the location field", async ({
+    page,
+  }) => {
+    // Seed a recent search (with coords) before the app mounts so the list is
+    // deterministic and independent of the live geocoding API.
+    await page.addInitScript(() => {
+      window.localStorage.setItem(
+        "roomshare-recent-searches",
+        JSON.stringify([
+          {
+            id: "seed-austin",
+            location: "Austin, TX",
+            coords: { lat: 30.2672, lng: -97.7431 },
+            timestamp: Date.now(),
+            filters: {},
+          },
+        ])
+      );
+    });
+
+    await gotoHome(page);
+    const input = page.locator("#search-location");
+    await page.waitForSelector("#search-location", { timeout: 30000 });
+
+    // Focusing the empty input opens the recent list inside the combobox.
+    await input.focus();
+    const listbox = page.getByRole("listbox", { name: "Recent searches" });
+    await expect(listbox).toBeVisible();
+    await expect(listbox.getByRole("option")).toHaveCount(1);
+
+    // Arrow-key navigation drives aria-activedescendant (was impossible before).
+    await page.keyboard.press("ArrowDown");
+    await expect
+      .poll(() => input.getAttribute("aria-activedescendant"))
+      .toMatch(/option-0$/);
+
+    // Enter selects the recent item and fills the field with coords.
+    await page.keyboard.press("Enter");
+    await expect(input).toHaveValue("Austin, TX");
+
+    // The selection is functional end-to-end: submitting navigates with coords.
+    await page.locator('button[type="submit"]').click();
+    await page.waitForURL(/\/search/, { timeout: 15000 });
+    expect(page.url()).toContain("lat=");
+  });
+});
+
+test.describe("Home A11y: unselected-location warning", () => {
+  test("the warning is announced as an alert", async ({ page }) => {
+    await gotoHome(page);
+    const input = page.locator("#search-location");
+    await page.waitForSelector("#search-location", { timeout: 30000 });
+
+    await input.fill("Austin");
+    // Blur without selecting a suggestion → the warning renders. Blur the
+    // element directly (clicking page chrome is overlay-prone at some viewports).
+    await input.evaluate((el: HTMLElement) => el.blur());
+
+    const alert = page.locator("#location-warning");
+    await expect(alert).toBeVisible();
+    await expect(alert).toHaveAttribute("role", "alert");
+    await expect(alert).toContainText(/select a location from the dropdown/i);
   });
 });
