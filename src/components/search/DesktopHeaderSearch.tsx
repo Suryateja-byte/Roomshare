@@ -128,6 +128,48 @@ export const DesktopHeaderSearch = forwardRef<
     return parsed !== undefined ? String(parsed) : "";
   });
 
+  const [focusedField, setFocusedField] = useState<"where" | "vibe" | "budget" | null>(null);
+  const [hoveredField, setHoveredField] = useState<"where" | "vibe" | "budget" | null>(null);
+  const focusBlurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleFieldFocus = useCallback((field: "where" | "vibe" | "budget") => {
+    if (focusBlurTimeoutRef.current) clearTimeout(focusBlurTimeoutRef.current);
+    setFocusedField(field);
+  }, []);
+
+  const handleFieldBlur = useCallback(() => {
+    focusBlurTimeoutRef.current = setTimeout(() => setFocusedField(null), 150);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (focusBlurTimeoutRef.current) clearTimeout(focusBlurTimeoutRef.current);
+    };
+  }, []);
+
+  const getFieldStateClasses = (field: "where" | "vibe" | "budget") => {
+    if (focusedField === field) {
+      return "md:bg-on-surface/[0.035] md:rounded-full opacity-100";
+    }
+
+    return cn(
+      focusedField !== null ? "opacity-50" : "opacity-100",
+      focusedField === null && "md:hover:bg-on-surface/[0.02] md:hover:rounded-full"
+    );
+  };
+
+  const hideDivider1 =
+    focusedField === "where" ||
+    focusedField === "vibe" ||
+    hoveredField === "where" ||
+    hoveredField === "vibe";
+
+  const hideDivider2 =
+    focusedField === "vibe" ||
+    focusedField === "budget" ||
+    hoveredField === "vibe" ||
+    hoveredField === "budget";
+
   const handleMinPriceValueChange = useCallback((value: string) => {
     setMinPrice(value);
   }, []);
@@ -450,7 +492,21 @@ export const DesktopHeaderSearch = forwardRef<
         aria-label="Search listings"
       >
         <div className="grid flex-1 grid-cols-[minmax(130px,1fr)_minmax(110px,0.75fr)_minmax(180px,0.95fr)] items-center px-2 lg:grid-cols-[minmax(220px,1.15fr)_minmax(180px,0.95fr)_minmax(270px,0.85fr)] lg:px-3">
-          <div className="min-w-0 px-3 py-1.5 shadow-[inset_-1px_0_0_rgba(220,193,185,0.18)] lg:px-4">
+          <div
+            onClick={(e) => {
+              if ((e.target as HTMLElement).closest("input, button, a")) return;
+              document.getElementById(LOCATION_INPUT_ID)?.focus();
+            }}
+            onMouseEnter={() => setHoveredField("where")}
+            onMouseLeave={() => setHoveredField(null)}
+            className={cn(
+              "min-w-0 px-3 py-1.5 lg:px-4 transition-all duration-200 cursor-text",
+              hideDivider1
+                ? "shadow-[inset_0_0_0_rgba(220,193,185,0)]"
+                : "shadow-[inset_-1px_0_0_rgba(220,193,185,0.18)]",
+              getFieldStateClasses("where")
+            )}
+          >
             <label
               htmlFor={LOCATION_INPUT_ID}
               className="mb-1 block text-[10px] font-bold uppercase tracking-normal text-on-surface-variant"
@@ -463,17 +519,33 @@ export const DesktopHeaderSearch = forwardRef<
               onChange={handleLocationChange}
               onLocationSelect={handleLocationSelect}
               fallbackItems={locationFallbackItems}
+              onFocus={() => handleFieldFocus("where")}
+              onBlur={handleFieldBlur}
               placeholder={
                 selectedLocation && location.length === 0
                   ? "Selected area"
                   : "Search destinations"
               }
               className="w-full"
-              inputClassName="text-sm font-semibold text-on-surface placeholder:text-on-surface-variant lg:text-base"
+              inputClassName="text-sm font-semibold text-on-surface placeholder:text-on-surface-variant/50 lg:text-base"
             />
           </div>
 
-          <div className="min-w-0 px-3 py-1.5 shadow-[inset_-1px_0_0_rgba(220,193,185,0.18)] lg:px-4">
+          <div
+            onClick={(e) => {
+              if ((e.target as HTMLElement).closest("input, button, a")) return;
+              document.getElementById(VIBE_INPUT_ID)?.focus();
+            }}
+            onMouseEnter={() => setHoveredField("vibe")}
+            onMouseLeave={() => setHoveredField(null)}
+            className={cn(
+              "min-w-0 px-3 py-1.5 lg:px-4 transition-all duration-200 cursor-text",
+              hideDivider2
+                ? "shadow-[inset_0_0_0_rgba(220,193,185,0)]"
+                : "shadow-[inset_-1px_0_0_rgba(220,193,185,0.18)]",
+              getFieldStateClasses("vibe")
+            )}
+          >
             <label
               htmlFor={VIBE_INPUT_ID}
               className="mb-1 block text-[10px] font-bold uppercase tracking-normal text-on-surface-variant"
@@ -485,13 +557,26 @@ export const DesktopHeaderSearch = forwardRef<
               type="text"
               value={vibe}
               onChange={(event) => setVibe(event.target.value)}
+              onFocus={() => handleFieldFocus("vibe")}
+              onBlur={handleFieldBlur}
               placeholder="Any vibe"
-              className="w-full bg-transparent border-none p-0 text-sm font-semibold text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-0 lg:text-base"
+              className="w-full bg-transparent border-none p-0 text-sm font-semibold text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-0 lg:text-base"
               autoComplete="off"
             />
           </div>
 
-          <div className="min-w-0 px-3 py-1.5 lg:px-4">
+          <div
+            onClick={(e) => {
+              if ((e.target as HTMLElement).closest("input, button, a")) return;
+              document.getElementById(MIN_BUDGET_INPUT_ID)?.focus();
+            }}
+            onMouseEnter={() => setHoveredField("budget")}
+            onMouseLeave={() => setHoveredField(null)}
+            className={cn(
+              "min-w-0 px-3 py-1.5 lg:px-4 transition-all duration-200 cursor-text",
+              getFieldStateClasses("budget")
+            )}
+          >
             <label
               htmlFor={MIN_BUDGET_INPUT_ID}
               className="mb-1 block text-[10px] font-bold uppercase tracking-normal text-on-surface-variant"
@@ -500,7 +585,14 @@ export const DesktopHeaderSearch = forwardRef<
             </label>
             <div className="flex items-center gap-2 text-sm">
               <div className="flex h-9 min-w-0 flex-1 items-center gap-1 rounded-full bg-surface-canvas px-3 shadow-[inset_0_0_0_1px_rgba(220,193,185,0.22)]">
-                <span className="text-on-surface-variant">$</span>
+                <span
+                  className={cn(
+                    "text-sm font-semibold transition-colors duration-200",
+                    minPrice ? "text-on-surface" : "text-on-surface-variant/50"
+                  )}
+                >
+                  $
+                </span>
                 <input
                   ref={minPriceInputRef}
                   id={MIN_BUDGET_INPUT_ID}
@@ -516,16 +608,25 @@ export const DesktopHeaderSearch = forwardRef<
                   onInput={(event) =>
                     handleMinPriceValueChange(event.currentTarget.value)
                   }
-                  onBlur={(event) =>
-                    handleMinPriceValueChange(event.currentTarget.value)
-                  }
+                  onBlur={(event) => {
+                    handleMinPriceValueChange(event.currentTarget.value);
+                    handleFieldBlur();
+                  }}
+                  onFocus={() => handleFieldFocus("budget")}
                   placeholder="Min"
-                  className="w-full bg-transparent border-none p-0 text-sm font-semibold text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-0 [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  className="w-full bg-transparent border-none p-0 text-sm font-semibold text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-0 [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
               </div>
               <span className="text-on-surface-variant">-</span>
               <div className="flex h-9 min-w-0 flex-1 items-center gap-1 rounded-full bg-surface-canvas px-3 shadow-[inset_0_0_0_1px_rgba(220,193,185,0.22)]">
-                <span className="text-on-surface-variant">$</span>
+                <span
+                  className={cn(
+                    "text-sm font-semibold transition-colors duration-200",
+                    maxPrice ? "text-on-surface" : "text-on-surface-variant/50"
+                  )}
+                >
+                  $
+                </span>
                 <input
                   ref={maxPriceInputRef}
                   id={MAX_BUDGET_INPUT_ID}
@@ -541,11 +642,13 @@ export const DesktopHeaderSearch = forwardRef<
                   onInput={(event) =>
                     handleMaxPriceValueChange(event.currentTarget.value)
                   }
-                  onBlur={(event) =>
-                    handleMaxPriceValueChange(event.currentTarget.value)
-                  }
+                  onBlur={(event) => {
+                    handleMaxPriceValueChange(event.currentTarget.value);
+                    handleFieldBlur();
+                  }}
+                  onFocus={() => handleFieldFocus("budget")}
                   placeholder="Max"
-                  className="w-full bg-transparent border-none p-0 text-sm font-semibold text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-0 [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  className="w-full bg-transparent border-none p-0 text-sm font-semibold text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-0 [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
               </div>
             </div>

@@ -39,6 +39,7 @@ import {
   buildCanonicalSearchUrl,
   normalizeSearchQuery,
 } from "@/lib/search/search-query";
+import { cn } from "@/lib/utils";
 
 interface MobileSearchOverlayProps {
   /** Whether the overlay is open */
@@ -378,7 +379,7 @@ export default function MobileSearchOverlay({
                         fallbackItems={locationFallbackItems}
                         placeholder="Enter city or area"
                         className="w-full h-12 rounded-xl border border-outline-variant/30 bg-surface-container-lowest px-4 pr-11 focus-within:border-primary/30 focus-within:ring-2 focus-within:ring-primary/30"
-                        inputClassName="text-base text-on-surface placeholder:text-on-surface-variant"
+                        inputClassName="text-base text-on-surface placeholder:text-on-surface-variant/50"
                       />
                       <LocateFixed className="absolute right-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
                     </div>
@@ -390,7 +391,14 @@ export default function MobileSearchOverlay({
                       Budget
                     </label>
                     <div className="flex items-center gap-2 border border-outline-variant/30 rounded-xl px-4 h-12">
-                      <span className="text-on-surface-variant text-sm">$</span>
+                      <span
+                        className={cn(
+                          "transition-colors duration-200 text-sm",
+                          minPrice ? "text-on-surface" : "text-on-surface-variant/50"
+                        )}
+                      >
+                        $
+                      </span>
                       <input
                         type="number"
                         inputMode="numeric"
@@ -398,10 +406,17 @@ export default function MobileSearchOverlay({
                         onChange={(e) => setMinPrice(e.target.value)}
                         placeholder="Min"
                         aria-label="Minimum budget"
-                        className="flex-1 h-full bg-transparent text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 min-w-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        className="flex-1 h-full bg-transparent text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 min-w-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                       <span className="text-on-surface-variant text-xs">—</span>
-                      <span className="text-on-surface-variant text-sm">$</span>
+                      <span
+                        className={cn(
+                          "transition-colors duration-200 text-sm",
+                          maxPrice ? "text-on-surface" : "text-on-surface-variant/50"
+                        )}
+                      >
+                        $
+                      </span>
                       <input
                         type="number"
                         inputMode="numeric"
@@ -409,7 +424,7 @@ export default function MobileSearchOverlay({
                         onChange={(e) => setMaxPrice(e.target.value)}
                         placeholder="Max"
                         aria-label="Maximum budget"
-                        className="flex-1 h-full bg-transparent text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 min-w-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        className="flex-1 h-full bg-transparent text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 min-w-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                     </div>
                   </div>
