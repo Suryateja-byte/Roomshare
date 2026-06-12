@@ -37,3 +37,36 @@
 - Root cause: Tailwind v4 content scanning treats documentation prose as class candidates; url() arbitrary values trigger webpack module resolution.
 - Prevention rule: in markdown/docs inside the repo, never write class-shaped tokens containing url(...) — describe them in prose instead. If quoting classes is unavoidable, break the token (space after the bracket) or put the doc in a gitignored location.
 - Follow-up: todo.md and this lessons entry both de-fanged (prose only, no quotable token). When documenting this class of bug, never paste the literal token anywhere Tailwind scans.
+
+## 2026-06-12 — Focus-shifting layout morphs break clicks under reduced motion
+
+- Date: 2026-06-12
+- Mistake / failure mode: The search bar's submit orb morphs wider when a field gains
+  focus. Under prefers-reduced-motion (which tests/e2e/helpers/test-utils.ts emulates for
+  ALL e2e) the shift is instant, so it happens between mousedown and mouseup — the click
+  event retargets to the common ancestor (the field cell) and the cell's dead-space
+  click-to-focus handler stole focus from the input the user actually clicked.
+- Detection signal: filter-price.anon e2e deterministic failure (`toBeFocused` got
+  "inactive"; error-context snapshot showed the WRONG input `[active]`), while manual
+  clicks with animations enabled worked fine.
+- Root cause: focus-triggered layout change + click retargeting + a dead-space handler
+  that didn't check whether focus was already inside the cell.
+- Prevention rule: any click-to-focus delegation must no-op when
+  `currentTarget.contains(document.activeElement)`; and when adding focus-triggered
+  geometry changes, test with `page.emulateMedia({ reducedMotion: "reduce" })` because
+  every Roomshare e2e runs that way.
+
+## 2026-06-12 — Conditional portals are a React 19 hydration mismatch
+
+- Date: 2026-06-12
+- Mistake / failure mode: `if (typeof document === "undefined") return null; return createPortal(...)`
+  in an SSR'd client component (SearchBarScrim) threw React #418 on /search — server
+  rendered null, client rendered the portal during hydration.
+- Detection signal: minified React error #418 in the prod-build console; dev server showed
+  the full mismatch diff naming the component (but only after a FRESH dev restart — stale
+  dev chunks reproduced the OLD error even after the fix, reconfirming the 2026-06-11
+  dev-server lesson).
+- Root cause: portal rendered during the hydration pass instead of after mount.
+- Prevention rule: portals in SSR'd components must be gated on a `mounted` state set in
+  useEffect; "typeof document" checks are not equivalent. Verify hydration-sensitive fixes
+  against `pnpm build` + `pnpm start`, never the dev server.
