@@ -73,6 +73,13 @@ describe("Phase 09 booking retirement", () => {
     (auth as jest.Mock).mockResolvedValue({
       user: { id: "admin-1", isAdmin: true },
     });
+    // The stub now gates via requireAdminAuth(), which re-reads the admin's
+    // isAdmin/isSuspended from the DB rather than trusting the JWT.
+    const { prisma } = await import("@/lib/prisma");
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+      isAdmin: true,
+      isSuspended: false,
+    });
     const page = await import("@/app/admin/bookings/page");
 
     await expect(page.default()).rejects.toThrow("NEXT_REDIRECT:/admin");

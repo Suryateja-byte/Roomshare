@@ -1,6 +1,6 @@
-import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { requireAdminAuth } from "@/lib/admin-auth";
 import type { Prisma } from "@prisma/client";
 import Link from "next/link";
 import { ArrowLeft, Users } from "lucide-react";
@@ -33,19 +33,11 @@ function parseFilter(value: string | undefined): UserFilter {
 export default async function AdminUsersPage({
   searchParams,
 }: AdminUsersPageProps) {
-  const session = await auth();
-
-  if (!session?.user?.id) {
+  const adminCheck = await requireAdminAuth();
+  if (adminCheck.code === "SESSION_EXPIRED") {
     redirect("/login?callbackUrl=/admin/users");
   }
-
-  // Check if user is admin
-  const currentUser = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { isAdmin: true },
-  });
-
-  if (!currentUser?.isAdmin) {
+  if (!adminCheck.isAdmin) {
     redirect("/");
   }
 
@@ -124,7 +116,7 @@ export default async function AdminUsersPage({
         <UserList
           initialUsers={users}
           totalUsers={totalUsers}
-          currentUserId={session.user.id}
+          currentUserId={adminCheck.userId}
           searchQuery={searchQuery}
           currentFilter={currentFilter}
           currentPage={currentPage}
