@@ -175,6 +175,16 @@ export function useSearchSubmit({
         );
         opts.onBeforeNavigate?.();
         navigate(searchUrl);
+        // Reset isSearching like the main commit() path does. Today the home
+        // tree unmounts on navigate (NL parsing is home-only), but don't leave
+        // the orb stuck if the route ever stays mounted across the transition.
+        if (resetSearchingTimeoutRef.current) {
+          clearTimeout(resetSearchingTimeoutRef.current);
+        }
+        resetSearchingTimeoutRef.current = setTimeout(
+          () => setIsSearching(false),
+          500
+        );
         return;
       }
     }
