@@ -15,6 +15,33 @@ jest.mock("@/lib/geocoding", () => ({
   geocodeAddress: jest.fn(),
 }));
 
+jest.mock("@/lib/geocoding/address-suggestion-token", () => ({
+  verifyAddressSuggestionToken: jest.fn().mockReturnValue({
+    valid: false,
+    reason: "malformed",
+  }),
+}));
+
+const mockValidateAddressForPublish = jest.fn();
+
+jest.mock("@/lib/geocoding/google-places", () => {
+  class GooglePlacesUnavailableError extends Error {
+    constructor(
+      message: string,
+      public readonly code: "MISSING_KEY" | "TIMEOUT" | "UPSTREAM" | "CAPPED"
+    ) {
+      super(message);
+      this.name = "GooglePlacesUnavailableError";
+    }
+  }
+
+  return {
+    GooglePlacesUnavailableError,
+    validateAddressForPublish: (...args: unknown[]) =>
+      mockValidateAddressForPublish(...args),
+  };
+});
+
 jest.mock("@/lib/listing-language-guard", () => ({
   checkListingLanguageCompliance: jest.fn().mockReturnValue({ allowed: true }),
 }));
@@ -60,6 +87,9 @@ jest.mock("@/lib/env", () => ({
     semanticSearch: false,
     get moderationWriteLocks() {
       return process.env.FEATURE_MODERATION_WRITE_LOCKS === "true";
+    },
+    get googleAddressValidation() {
+      return process.env.FEATURE_GOOGLE_ADDRESS_VALIDATION === "true";
     },
   },
 }));
@@ -118,7 +148,7 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "test-key";
 import { PATCH } from "@/app/api/listings/[id]/route";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { geocodeAddress } from "@/lib/geocoding";
+import { verifyAddressSuggestionToken } from "@/lib/geocoding/address-suggestion-token";
 import { syncCanonicalListingInventory } from "@/lib/listings/canonical-inventory";
 import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 import { createClient } from "@supabase/supabase-js";
@@ -228,10 +258,13 @@ function mockTransaction({
 describe("PATCH /api/listings/[id] contact-first availability contract", () => {
   const originalModerationWriteLocks =
     process.env.FEATURE_MODERATION_WRITE_LOCKS;
+  const originalGoogleAddressValidation =
+    process.env.FEATURE_GOOGLE_ADDRESS_VALIDATION;
 
   beforeEach(() => {
     jest.clearAllMocks();
     delete process.env.FEATURE_MODERATION_WRITE_LOCKS;
+    delete process.env.FEATURE_GOOGLE_ADDRESS_VALIDATION;
     (auth as jest.Mock).mockResolvedValue(ownerSession);
     (prisma.listing.findUnique as jest.Mock).mockResolvedValue(listing);
     (syncCanonicalListingInventory as jest.Mock).mockResolvedValue({
@@ -240,6 +273,13 @@ describe("PATCH /api/listings/[id] contact-first availability contract", () => {
       publishStatus: "PENDING_PROJECTION",
       sourceVersion: BigInt(4),
     });
+    // Default: no valid suggestion token and Google validation disabled, so an
+    // address change is blocked unless a test opts into one of the trusted paths.
+    (verifyAddressSuggestionToken as jest.Mock).mockReturnValue({
+      valid: false,
+      reason: "malformed",
+    });
+    mockValidateAddressForPublish.mockReset();
   });
 
   afterEach(() => {
@@ -247,6 +287,12 @@ describe("PATCH /api/listings/[id] contact-first availability contract", () => {
       delete process.env.FEATURE_MODERATION_WRITE_LOCKS;
     } else {
       process.env.FEATURE_MODERATION_WRITE_LOCKS = originalModerationWriteLocks;
+    }
+    if (originalGoogleAddressValidation === undefined) {
+      delete process.env.FEATURE_GOOGLE_ADDRESS_VALIDATION;
+    } else {
+      process.env.FEATURE_GOOGLE_ADDRESS_VALIDATION =
+        originalGoogleAddressValidation;
     }
   });
 
@@ -533,10 +579,9 @@ describe("PATCH /api/listings/[id] contact-first availability contract", () => {
   });
 
   it("refreshes normalized address and physical unit linkage on address edits", async () => {
-    (geocodeAddress as jest.Mock).mockResolvedValue({
-      status: "ok",
-      lat: 37.781,
-      lng: -122.412,
+    (verifyAddressSuggestionToken as jest.Mock).mockReturnValue({
+      valid: true,
+      coords: { lat: 37.781, lng: -122.412 },
     });
     const { update, locationUpdate, executeRaw } = mockTransaction({
       lockedRows: [
@@ -556,6 +601,7 @@ describe("PATCH /api/listings/[id] contact-first availability contract", () => {
             city: "San Francisco",
             state: "CA",
             zip: "94103",
+            addressSuggestionToken: "valid-token",
           })
         ),
       }),
@@ -602,10 +648,9 @@ describe("PATCH /api/listings/[id] contact-first availability contract", () => {
   });
 
   it("repairs canonical unit linkage when no physical unit exists", async () => {
-    (geocodeAddress as jest.Mock).mockResolvedValue({
-      status: "ok",
-      lat: 37.781,
-      lng: -122.412,
+    (verifyAddressSuggestionToken as jest.Mock).mockReturnValue({
+      valid: true,
+      coords: { lat: 37.781, lng: -122.412 },
     });
     const { update } = mockTransaction({
       lockedRows: [
@@ -625,6 +670,7 @@ describe("PATCH /api/listings/[id] contact-first availability contract", () => {
             city: "San Francisco",
             state: "CA",
             zip: "94103",
+            addressSuggestionToken: "valid-token",
           })
         ),
       }),
@@ -654,6 +700,174 @@ describe("PATCH /api/listings/[id] contact-first availability contract", () => {
       })
     );
     expect(update.mock.calls[0][0].data).not.toHaveProperty("physicalUnitId");
+  });
+
+  describe("trusted-address validation on address edits (P1 bypass guard)", () => {
+    it("blocks an address change that lacks a valid suggestion token when Google validation is disabled (no silent geocode)", async () => {
+      // Default beforeEach: token invalid, FEATURE_GOOGLE_ADDRESS_VALIDATION unset.
+      const { update, locationUpdate, executeRaw } = mockTransaction();
+
+      const response = await PATCH(
+        new Request("http://localhost/api/listings/listing-abc", {
+          method: "PATCH",
+          body: JSON.stringify(
+            validPatchPayload({
+              address: "1 Spoofed Way",
+              city: "San Francisco",
+              state: "CA",
+              zip: "94103",
+            })
+          ),
+        }),
+        { params: Promise.resolve({ id: "listing-abc" }) }
+      );
+
+      expect(response.status).toBe(503);
+      expect(response.headers.get("Retry-After")).toBe("10");
+      // The write transaction must never run for an unverified address change.
+      expect(update).not.toHaveBeenCalled();
+      expect(locationUpdate).not.toHaveBeenCalled();
+      expect(executeRaw).not.toHaveBeenCalled();
+      expect(mockValidateAddressForPublish).not.toHaveBeenCalled();
+    });
+
+    it("accepts an address change backed by a valid suggestion token and persists the token coords", async () => {
+      (verifyAddressSuggestionToken as jest.Mock).mockReturnValue({
+        valid: true,
+        coords: { lat: 40.7128, lng: -74.006 },
+      });
+      const { locationUpdate, executeRaw } = mockTransaction({
+        lockedRows: [
+          lockedListing({
+            normalizedAddress: "123 main st san francisco ca 94102",
+            physicalUnitId: "unit-123",
+          }),
+        ],
+      });
+
+      const response = await PATCH(
+        new Request("http://localhost/api/listings/listing-abc", {
+          method: "PATCH",
+          body: JSON.stringify(
+            validPatchPayload({
+              address: "456 Oak Ave",
+              city: "San Francisco",
+              state: "CA",
+              zip: "94103",
+              addressSuggestionToken: "valid-token",
+            })
+          ),
+        }),
+        { params: Promise.resolve({ id: "listing-abc" }) }
+      );
+
+      expect(response.status).toBe(200);
+      expect(verifyAddressSuggestionToken).toHaveBeenCalledWith("valid-token", {
+        userId: "owner-123",
+        address: "456 Oak Ave",
+        city: "San Francisco",
+        state: "CA",
+        zip: "94103",
+      });
+      // Google validation is never consulted once the token is trusted.
+      expect(mockValidateAddressForPublish).not.toHaveBeenCalled();
+      expect(locationUpdate).toHaveBeenCalled();
+      // Token coords are written to PostGIS via raw SQL.
+      const coordsCall = executeRaw.mock.calls.find((call) =>
+        JSON.stringify(call).includes("ST_SetSRID")
+      );
+      expect(coordsCall).toBeTruthy();
+    });
+
+    it("falls back to Google Address Validation when enabled and the token is absent", async () => {
+      process.env.FEATURE_GOOGLE_ADDRESS_VALIDATION = "true";
+      mockValidateAddressForPublish.mockResolvedValue({
+        address: "456 Oak Ave",
+        city: "San Francisco",
+        state: "CA",
+        zip: "94103",
+        lat: 37.781,
+        lng: -122.412,
+        precision: "PREMISE",
+      });
+      const { update } = mockTransaction({
+        lockedRows: [
+          lockedListing({
+            normalizedAddress: "123 main st san francisco ca 94102",
+            physicalUnitId: "unit-123",
+          }),
+        ],
+      });
+
+      const response = await PATCH(
+        new Request("http://localhost/api/listings/listing-abc", {
+          method: "PATCH",
+          body: JSON.stringify(
+            validPatchPayload({
+              address: "456 Oak Ave",
+              city: "San Francisco",
+              state: "CA",
+              zip: "94103",
+            })
+          ),
+        }),
+        { params: Promise.resolve({ id: "listing-abc" }) }
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockValidateAddressForPublish).toHaveBeenCalledWith({
+        address: "456 Oak Ave",
+        city: "San Francisco",
+        state: "CA",
+        zip: "94103",
+      });
+      expect(update).toHaveBeenCalled();
+    });
+
+    it("rejects an address change that Google cannot verify with 400", async () => {
+      process.env.FEATURE_GOOGLE_ADDRESS_VALIDATION = "true";
+      mockValidateAddressForPublish.mockResolvedValue(null);
+      const { update } = mockTransaction();
+
+      const response = await PATCH(
+        new Request("http://localhost/api/listings/listing-abc", {
+          method: "PATCH",
+          body: JSON.stringify(
+            validPatchPayload({
+              address: "1 Unverifiable Pl",
+              city: "San Francisco",
+              state: "CA",
+              zip: "94103",
+            })
+          ),
+        }),
+        { params: Promise.resolve({ id: "listing-abc" }) }
+      );
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({
+        field: "address",
+      });
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it("does not re-validate when the address is unchanged", async () => {
+      const { update } = mockTransaction();
+
+      const response = await PATCH(
+        new Request("http://localhost/api/listings/listing-abc", {
+          method: "PATCH",
+          // validPatchPayload() reuses the stored address (123 Main St ...).
+          body: JSON.stringify(validPatchPayload()),
+        }),
+        { params: Promise.resolve({ id: "listing-abc" }) }
+      );
+
+      expect(response.status).toBe(200);
+      expect(verifyAddressSuggestionToken).not.toHaveBeenCalled();
+      expect(mockValidateAddressForPublish).not.toHaveBeenCalled();
+      expect(update).toHaveBeenCalled();
+    });
   });
 
   it("survives a phase01 canonical-sync skip: PATCH succeeds, physicalUnitId falls back, dirty mark still fires (H2)", async () => {
