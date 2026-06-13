@@ -719,6 +719,15 @@ export async function deleteMessage(
     return { success: false, error: "Unauthorized", code: "SESSION_EXPIRED" };
   }
 
+  const suspension = await checkSuspension(session.user.id);
+  if (suspension.suspended) {
+    return {
+      success: false,
+      error: suspension.error || "Account suspended",
+      code: "ACCOUNT_SUSPENDED",
+    };
+  }
+
   try {
     // Verify the user is the sender of the message
     const message = await prisma.message.findUnique({
@@ -767,6 +776,15 @@ export async function deleteConversation(
   const session = await auth();
   if (!session?.user?.id) {
     return { success: false, error: "Unauthorized", code: "SESSION_EXPIRED" };
+  }
+
+  const suspension = await checkSuspension(session.user.id);
+  if (suspension.suspended) {
+    return {
+      success: false,
+      error: suspension.error || "Account suspended",
+      code: "ACCOUNT_SUSPENDED",
+    };
   }
 
   try {
