@@ -364,6 +364,19 @@ describe("SearchBar chrome", () => {
     expect(alert).toHaveAttribute("id", "location-warning");
   });
 
+  it("does NOT show the warning from URL hydration alone (no user typing)", () => {
+    // Landing on /search?q=test hydrates location to "test" with no selection.
+    // The warning is feedback on the user's own typing — it must not render on
+    // hydration, or it duplicates the server "Please select a location" prompt
+    // and (in the hidden md:block desktop header) breaks getByText().first()
+    // on mobile. Regression for CI Shard 5 / J18.
+    setSearchParams("q=test");
+    render(<Harness />);
+    expect(screen.getByTestId("location-input")).toHaveValue("test");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(document.getElementById("location-warning")).toBeNull();
+  });
+
   it("keeps in-progress location typing when the URL changes underneath", () => {
     const { rerender } = render(<Harness />);
     const input = screen.getByTestId("location-input");

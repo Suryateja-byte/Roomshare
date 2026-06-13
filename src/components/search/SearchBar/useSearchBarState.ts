@@ -126,6 +126,13 @@ export function useSearchBarState(
       initialIntentState.selectedLocation
     );
   const [locationInputFocused, setLocationInputFocused] = useState(false);
+  // True only after the user has actually typed into the location field this
+  // session. The "select a location" warning is feedback on that action — it
+  // must NOT render from URL hydration (e.g. landing on /search?q=test, where
+  // location hydrates to "test" with no selection). Rendering it on hydration
+  // duplicated the server-side "Please select a location" prompt and, inside
+  // the hidden md:block desktop header, broke `getByText().first()` on mobile.
+  const [locationEdited, setLocationEdited] = useState(false);
   const [geoLoading, setGeoLoading] = useState(false);
   const [internalMinPrice, setInternalMinPrice] = useState(() =>
     priceFromParams(searchParamsString, "min")
@@ -169,6 +176,7 @@ export function useSearchBarState(
 
   const onLocationChange = useCallback((value: string) => {
     isUserTypingLocationRef.current = true;
+    setLocationEdited(true);
     setLocation(value);
     setSelectedLocation(null);
   }, []);
@@ -181,6 +189,7 @@ export function useSearchBarState(
       bbox?: [number, number, number, number];
     }) => {
       isUserTypingLocationRef.current = false;
+      setLocationEdited(false);
       // flushSync ensures the selection is committed before requestSubmit reads it
       flushSync(() => {
         setLocation(locationData.name);
@@ -264,6 +273,7 @@ export function useSearchBarState(
           secondaryText: "Recent search",
           onSelect: () => {
             isUserTypingLocationRef.current = false;
+            setLocationEdited(false);
             setLocation(search.location);
             setSelectedLocation({
               lat: search.coords!.lat,
@@ -283,6 +293,7 @@ export function useSearchBarState(
       new URLSearchParams(searchParamsString)
     );
     isUserTypingLocationRef.current = false;
+    setLocationEdited(false);
     setLocation(nextIntentState.locationInput);
     setWhat(nextIntentState.vibeInput);
     setSelectedLocation(nextIntentState.selectedLocation);
@@ -309,7 +320,7 @@ export function useSearchBarState(
   );
 
   const showLocationWarning =
-    location.trim().length > 2 && !selectedLocation;
+    locationEdited && location.trim().length > 2 && !selectedLocation;
 
   return {
     formRef,
