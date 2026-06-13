@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -10,35 +10,24 @@ import {
   AnimatePresence,
   useReducedMotion,
 } from "framer-motion";
-import { toast } from "sonner";
-import {
-  ArrowLeft,
-  Search,
-  Clock,
-  X,
-  SlidersHorizontal,
-  LocateFixed,
-} from "lucide-react";
+import { ArrowLeft, Clock, X, SlidersHorizontal } from "lucide-react";
 import { useRecentSearches } from "@/hooks/useRecentSearches";
 import { FocusTrap } from "@/components/ui/FocusTrap";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
-import LocationSearchInput from "@/components/LocationSearchInput";
 import { urlToFilterChips } from "@/components/filters/filter-chip-utils";
-import {
-  MAP_FLY_TO_EVENT,
-  type MapFlyToEventDetail,
-} from "@/components/SearchForm";
 import {
   buildSearchIntentParams,
   readSearchIntentState,
-  type SearchLocationSelection,
 } from "@/lib/search/search-intent";
-import { resolveTypedSearchLocation } from "@/lib/search/typed-location-resolver";
 import {
-  applySearchQueryChange,
   buildCanonicalSearchUrl,
   normalizeSearchQuery,
 } from "@/lib/search/search-query";
+import {
+  SearchBar,
+  useSearchBarState,
+  useSearchSubmit,
+} from "@/components/search/SearchBar";
 
 interface MobileSearchOverlayProps {
   /** Whether the overlay is open */
@@ -50,18 +39,12 @@ interface MobileSearchOverlayProps {
 }
 
 /**
- * Full-screen search overlay for mobile (Option A — Airbnb pattern).
+ * Full-screen search overlay for mobile (Airbnb pattern).
  *
- * Slides up from bottom when collapsed search pill is tapped.
- * Contains:
- * - ← back arrow to dismiss
- * - WHERE field with location autocomplete
- * - BUDGET min/max fields
- * - Filters button (opens FilterModal)
- * - SEARCH button
- * - Recent searches list
- *
- * Replaces the cramped in-header expansion with a spacious full-viewport form.
+ * Slides up from bottom when the collapsed search pill is tapped. The form is
+ * the shared SearchBar in stacked layout (same field components as the home
+ * hero and desktop header — ids prefixed because the hidden desktop header
+ * form stays mounted in the DOM on mobile), followed by recent searches.
  */
 export default function MobileSearchOverlay({
   isOpen,
@@ -72,19 +55,15 @@ export default function MobileSearchOverlay({
   const searchParams = useSearchParams();
   const searchParamsString = searchParams.toString();
   const reducedMotion = useReducedMotion();
-  const locationInputRef = useRef<HTMLInputElement>(null);
   const { recentSearches, removeRecentSearch, formatSearch } =
     useRecentSearches();
 
-  // Form state — initialized from current URL params
-  const [location, setLocation] = useState("");
-  const [locationCoords, setLocationCoords] =
-    useState<SearchLocationSelection | null>(null);
-  const [isResolvingTypedLocation, setIsResolvingTypedLocation] =
-    useState(false);
-  const [minPrice, setMinPrice] = useState("");
-  const [maxPrice, setMaxPrice] = useState("");
-  // FilterModal is handled by the parent via onOpenFilters callback
+  const state = useSearchBarState();
+  const { handleSubmit, isSearching, isResolvingTypedLocation } =
+    useSearchSubmit({
+      state,
+      onBeforeNavigate: onClose,
+    });
 
   // Count active filters for badge
   const activeFilterCount = urlToFilterChips(searchParams).filter(
@@ -95,28 +74,26 @@ export default function MobileSearchOverlay({
       c.paramKey !== "q"
   ).length;
 
-  // Sync form state from URL when overlay opens
+  // Discard stale edits each time the overlay opens.
+  const wasOpenRef = useRef(false);
+  const resetFromUrlRef = useRef(state.resetFromUrl);
+  resetFromUrlRef.current = state.resetFromUrl;
   useEffect(() => {
-    if (isOpen) {
-      const intentState = readSearchIntentState(
-        new URLSearchParams(searchParamsString)
-      );
-      setLocation(intentState.locationInput);
-      setLocationCoords(intentState.selectedLocation);
-      setMinPrice(searchParams.get("minPrice") || "");
-      setMaxPrice(searchParams.get("maxPrice") || "");
+    if (isOpen && !wasOpenRef.current) {
+      resetFromUrlRef.current();
     }
-  }, [isOpen, searchParams, searchParamsString]);
+    wasOpenRef.current = isOpen;
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
 
     const focusLocationInput = () => {
       if (
-        locationInputRef.current &&
-        document.activeElement !== locationInputRef.current
+        state.locationInputRef.current &&
+        document.activeElement !== state.locationInputRef.current
       ) {
-        locationInputRef.current.focus();
+        state.locationInputRef.current.focus();
       }
     };
 
@@ -127,6 +104,7 @@ export default function MobileSearchOverlay({
       window.cancelAnimationFrame(rafId);
       window.clearTimeout(timer);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ref identity is stable
   }, [isOpen]);
 
   // Escape closes
@@ -141,139 +119,6 @@ export default function MobileSearchOverlay({
 
   // Prevent body scroll when open
   useBodyScrollLock(isOpen);
-
-  const handleLocationSelect = useCallback(
-    (loc: {
-      name: string;
-      lat: number;
-      lng: number;
-      bounds?: [number, number, number, number];
-    }) => {
-      // Build search URL directly with fresh callback data to avoid stale closure.
-      const selectedLocation: SearchLocationSelection = {
-        lat: loc.lat,
-        lng: loc.lng,
-        bounds: loc.bounds,
-      };
-      const currentIntent = readSearchIntentState(
-        new URLSearchParams(searchParamsString)
-      );
-      const params = buildSearchIntentParams(searchParams, {
-        location: loc.name,
-        vibe: currentIntent.vibeInput,
-        selectedLocation,
-      });
-      // CFM-604: canonical-on-write guarantee — must go through buildCanonicalSearchUrl.
-      const nextUrl = buildCanonicalSearchUrl(
-        applySearchQueryChange(normalizeSearchQuery(params), "filter", {
-          minPrice: minPrice ? Number.parseFloat(minPrice) : undefined,
-          maxPrice: maxPrice ? Number.parseFloat(maxPrice) : undefined,
-        })
-      );
-
-      window.dispatchEvent(
-        new CustomEvent<MapFlyToEventDetail>(MAP_FLY_TO_EVENT, {
-          detail: { lat: loc.lat, lng: loc.lng, bbox: loc.bounds, zoom: 13 },
-        })
-      );
-
-      router.push(nextUrl);
-      onClose();
-    },
-    [searchParams, searchParamsString, minPrice, maxPrice, router, onClose]
-  );
-
-  const locationFallbackItems = useMemo(
-    () =>
-      recentSearches
-        .filter((search) => search.coords)
-        .map((search) => ({
-          id: search.id,
-          primaryText: search.location,
-          secondaryText: "Recent search",
-          onSelect: () => {
-            setLocation(search.location);
-            setLocationCoords({
-              lat: search.coords!.lat,
-              lng: search.coords!.lng,
-              bounds: search.coords!.bounds,
-            });
-          },
-        })),
-    [recentSearches]
-  );
-
-  const handleSearch = useCallback(async () => {
-    let nextLocationLabel = location;
-    let nextLocationCoords = locationCoords;
-
-    if (location.trim().length > 2 && !nextLocationCoords) {
-      if (isResolvingTypedLocation) {
-        return;
-      }
-
-      setIsResolvingTypedLocation(true);
-      try {
-        const resolvedLocation = await resolveTypedSearchLocation(location);
-        if (!resolvedLocation) {
-          toast.error("Select a location from the dropdown suggestions.");
-          locationInputRef.current?.focus();
-          return;
-        }
-
-        nextLocationLabel = resolvedLocation.label;
-        nextLocationCoords = resolvedLocation.selection;
-        setLocation(resolvedLocation.label);
-        setLocationCoords(resolvedLocation.selection);
-      } finally {
-        setIsResolvingTypedLocation(false);
-      }
-    }
-
-    const currentIntent = readSearchIntentState(
-      new URLSearchParams(searchParamsString)
-    );
-    const params = buildSearchIntentParams(searchParams, {
-      location: nextLocationLabel,
-      vibe: currentIntent.vibeInput,
-      selectedLocation: nextLocationCoords,
-    });
-    // CFM-604: canonical-on-write guarantee — must go through buildCanonicalSearchUrl.
-    const nextUrl = buildCanonicalSearchUrl(
-      applySearchQueryChange(normalizeSearchQuery(params), "filter", {
-        minPrice: minPrice ? Number.parseFloat(minPrice) : undefined,
-        maxPrice: maxPrice ? Number.parseFloat(maxPrice) : undefined,
-      })
-    );
-
-    // Dispatch fly-to event so the persistent map flies to the new location.
-    // On mobile the map never remounts (it lives in layout), so without this
-    // event the map stays at its old position after a location search.
-    if (nextLocationCoords) {
-      const event = new CustomEvent<MapFlyToEventDetail>(MAP_FLY_TO_EVENT, {
-        detail: {
-          lat: nextLocationCoords.lat,
-          lng: nextLocationCoords.lng,
-          bbox: nextLocationCoords.bounds,
-          zoom: 13,
-        },
-      });
-      window.dispatchEvent(event);
-    }
-
-    router.push(nextUrl);
-    onClose();
-  }, [
-    searchParams,
-    searchParamsString,
-    isResolvingTypedLocation,
-    location,
-    locationCoords,
-    minPrice,
-    maxPrice,
-    router,
-    onClose,
-  ]);
 
   const handleRecentClick = useCallback(
     (search: (typeof recentSearches)[number]) => {
@@ -294,6 +139,24 @@ export default function MobileSearchOverlay({
       onClose();
     },
     [onClose, recentSearches, router, searchParams, searchParamsString]
+  );
+
+  const filtersButton = (
+    <button
+      type="button"
+      onClick={() => {
+        onOpenFilters?.();
+      }}
+      className="relative flex h-12 w-full items-center gap-2.5 rounded-xl border border-outline-variant/30 px-4 text-sm font-medium text-on-surface-variant transition-colors hover:bg-surface-container-high"
+    >
+      <SlidersHorizontal className="h-4.5 w-4.5" />
+      <span>Filters</span>
+      {activeFilterCount > 0 && (
+        <span className="ml-auto flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-on-surface px-1.5 text-[11px] font-bold text-surface-container-lowest">
+          {activeFilterCount}
+        </span>
+      )}
+    </button>
   );
 
   // Portal to document.body to escape the <header>'s stacking context (z-[1100]).
@@ -320,7 +183,7 @@ export default function MobileSearchOverlay({
             aria-modal="true"
             aria-label="Search"
           >
-            <FocusTrap active={isOpen} initialFocusRef={locationInputRef}>
+            <FocusTrap active={isOpen} initialFocusRef={state.locationInputRef}>
               {/* Header — back arrow + title */}
               <div className="flex items-center gap-3 px-4 pt-3 pb-3 border-b border-outline-variant/20">
                 <button
@@ -344,7 +207,7 @@ export default function MobileSearchOverlay({
                 </m.span>
               </div>
 
-              {/* Form fields */}
+              {/* Form fields — the shared SearchBar, stacked */}
               <m.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -355,94 +218,16 @@ export default function MobileSearchOverlay({
                 }
                 className="flex-1 overflow-y-auto hide-scrollbar-mobile"
               >
-                <div className="px-5 pt-6 pb-4 space-y-5">
-                  {/* WHERE */}
-                  <div>
-                    <label
-                      htmlFor="mobile-search-where"
-                      className="block text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-2"
-                    >
-                      Where
-                    </label>
-                    <div className="relative">
-                      <LocationSearchInput
-                        id="mobile-search-where"
-                        value={location}
-                        inputRef={locationInputRef}
-                        autoFocus={isOpen}
-                        onChange={(nextLocation) => {
-                          setLocation(nextLocation);
-                          setLocationCoords(null);
-                        }}
-                        onLocationSelect={handleLocationSelect}
-                        fallbackItems={locationFallbackItems}
-                        placeholder="Enter city or area"
-                        className="w-full h-12 rounded-xl border border-outline-variant/30 bg-surface-container-lowest px-4 pr-11 focus-within:border-primary/30 focus-within:ring-2 focus-within:ring-primary/30"
-                        inputClassName="text-base text-on-surface placeholder:text-on-surface-variant"
-                      />
-                      <LocateFixed className="absolute right-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
-                    </div>
-                  </div>
-
-                  {/* BUDGET */}
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-2">
-                      Budget
-                    </label>
-                    <div className="flex items-center gap-2 border border-outline-variant/30 rounded-xl px-4 h-12">
-                      <span className="text-on-surface-variant text-sm">$</span>
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        value={minPrice}
-                        onChange={(e) => setMinPrice(e.target.value)}
-                        placeholder="Min"
-                        aria-label="Minimum budget"
-                        className="flex-1 h-full bg-transparent text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 min-w-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      />
-                      <span className="text-on-surface-variant text-xs">—</span>
-                      <span className="text-on-surface-variant text-sm">$</span>
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        value={maxPrice}
-                        onChange={(e) => setMaxPrice(e.target.value)}
-                        placeholder="Max"
-                        aria-label="Maximum budget"
-                        className="flex-1 h-full bg-transparent text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 min-w-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Filters button */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onOpenFilters?.();
-                    }}
-                    className="relative flex items-center gap-2.5 w-full h-12 px-4 border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface-variant hover:bg-surface-container-high transition-colors"
-                  >
-                    <SlidersHorizontal className="w-4.5 h-4.5" />
-                    <span>Filters</span>
-                    {activeFilterCount > 0 && (
-                      <span className="ml-auto flex items-center justify-center min-w-[22px] h-[22px] px-1.5 text-[11px] font-bold rounded-full bg-on-surface text-surface-container-lowest">
-                        {activeFilterCount}
-                      </span>
-                    )}
-                  </button>
-
-                  {/* SEARCH button */}
-                  <button
-                    type="button"
-                    onClick={handleSearch}
-                    disabled={isResolvingTypedLocation}
-                    className="flex items-center justify-center gap-2.5 w-full h-13 py-3.5 bg-primary hover:bg-primary/90 text-on-primary rounded-full text-base font-semibold shadow-ambient shadow-primary/20 transition-colors active:scale-[0.98]"
-                  >
-                    <Search className="w-5 h-5" />
-                    <span className="uppercase tracking-wider text-sm">
-                      Search
-                    </span>
-                  </button>
+                <div className="px-5 pt-6 pb-4">
+                  <SearchBar
+                    state={state}
+                    onSubmit={handleSubmit}
+                    isSearching={isSearching}
+                    submitDisabled={isResolvingTypedLocation}
+                    layout="stacked"
+                    idPrefix="mobile-"
+                    trailingSlot={filtersButton}
+                  />
                 </div>
 
                 {/* Divider */}

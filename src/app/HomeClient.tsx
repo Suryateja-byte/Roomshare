@@ -15,7 +15,9 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const SearchForm = lazy(() => import("@/components/SearchForm"));
+const HomeSearchBar = lazy(
+  () => import("@/components/search/SearchBar/HomeSearchBar")
+);
 
 class SearchFormErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -177,12 +179,12 @@ function HeroSection() {
             <SearchFormErrorBoundary>
               <Suspense
                 fallback={
-                  <div className="mx-auto h-[18.5rem] max-w-[22.5rem] rounded-[1.5rem] bg-surface-container-lowest shadow-ambient md:h-[6.25rem] md:max-w-none md:rounded-[1.875rem]">
+                  <div className="mx-auto h-[17rem] max-w-[400px] rounded-[1.75rem] bg-surface-container-lowest shadow-ambient md:h-[4.375rem] md:max-w-[1120px] md:rounded-full">
                     <div className="h-full animate-shimmer rounded-[inherit] bg-gradient-to-r from-surface-container-high via-surface-canvas to-surface-container-high bg-[length:200%_100%]" />
                   </div>
                 }
               >
-                <SearchForm variant="home" />
+                <HomeSearchBar />
               </Suspense>
             </SearchFormErrorBoundary>
           </div>

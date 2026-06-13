@@ -1,3 +1,77 @@
+# Unified SearchBar — one pill, every surface (2026-06-12)
+
+Full plan: `~/.claude/plans/make-the-search-bar-expressive-sundae.md` (approved).
+
+- **Goal + acceptance criteria:** Home hero bar and search-page header bar are pixel-identical
+  (one shared SearchBar component, 68px pill, Where → What(AI, env-gated) → Budget), with the
+  full interaction treatment (raised active cell, morphing submit, scrim + Esc layering,
+  collapsed-pill segment deep-links, stacked mobile layout). All unit + e2e gates green on a
+  prod build, both semantic-flag states.
+- **Scope:** new `src/components/search/SearchBar/` module; rewrites of DesktopHeaderSearch +
+  MobileSearchOverlay form block; HomeSearchBar replaces SearchForm on HomeClient; lib
+  extractions (map-fly-to, search-dates, price-input); SearchForm.tsx + CompactSearchPill.tsx
+  deleted at the end.
+- **Risks:** URL-sync clobbering typing; auto-submit double-navigation; filter/sort/bounds
+  param survival; search-page collapse/focus regressions; env-gated What field in CI/prod
+  builds. Stable-selector contract in the plan MUST be preserved.
+- **Verification:** pnpm lint/typecheck/test → pnpm build + start → prod-build Playwright gate
+  (home-a11y, homepage, search-a11y, filter-price, search-smoke, p0-filters-mobile) →
+  flag-off build → manual Chrome pass.
+
+## Checklist
+
+- [x] Slice 0: this checklist
+- [x] Slice 1: lib extractions (map-fly-to.ts, search-dates.ts, price-input.ts) + import flips
+- [x] Slice 2: SearchBar module + unit tests (pipeline + chrome states)
+- [x] Slice 3: swap search-page desktop header (scrim, equal-height summary, id unify)
+- [x] Slice 4: swap home (HomeSearchBar, port SearchForm tests as parity oracle)
+- [x] Slice 5: collapsed-summary segment deep-links (openAndFocus + budget) — done in slice 3
+- [x] Slice 6: mobile overlay on stacked SearchBar (+ What field, real form)
+- [x] Slice 7: delete SearchForm.tsx / CompactSearchPill.tsx / shim; grep clean
+- [x] Verification story written below
+
+## Results + verification story (2026-06-12)
+
+**Shipped** (8 commits on codex/fix-search-bar-ui-ux): one shared `SearchBar` module renders
+the search bar on the home hero, the search-page header (expanded + 68px segmented summary
+pill with deep-links + scrim + Esc layering), and the mobile overlay (stacked, `mobile-`
+prefixed ids). Fields unified to Where → What(AI, env-gated) → Budget; one submit pipeline
+(canonical URL, typed-location resolution, bounds preservation, price swap/clamp via live
+refs, single fly-to, recents everywhere); typing guard now on all surfaces.
+SearchForm.tsx + CompactSearchPill.tsx deleted.
+
+**Bugs found & fixed during verification** (each with regression coverage or e2e):
+1. React #418 hydration error on /search — scrim portal rendered during hydration; mount-gated.
+2. Duplicate-submit dedupe ran after cancelling the pending debounced navigation → search
+   swallowed + isSearching stuck (latent SearchForm bug); dedupe now checked first.
+3. Dead-space cell click stole focus from the clicked budget input when the engage-morph
+   shifted layout under reduced motion (all e2e emulate it); handler now no-ops when focus
+   is already inside the cell.
+4. Desktop header collapse never triggered — useScrollHeader watched window.scrollY but
+   /search scrolls an inner panel; hook now also tracks [data-search-results-scroll-region].
+
+**Verification evidence**:
+- `pnpm lint` 0 errors · `pnpm typecheck` clean · `pnpm test` 502 suites / 7843 tests green
+  (102 new SearchBar tests incl. parity fingerprint home-vs-header under both flag states;
+  82-test HomeSearchBar port of the SearchForm behavioral contract).
+- Prod-build e2e (per lessons.md): flag-ON build → home-a11y + homepage + search-a11y +
+  filter-price = 30/30. Flag-OFF build (CI/prod parity, `search-what` absent from SSR) →
+  29/30 + HP-06 passes 3/3 on retry (cold-server flake in the untouched bottom CTA).
+- Manual Chrome pass (desktop + mobile, both pages): idle/engaged/raised-cell states, morph,
+  recents combobox, collapse → summary → segment deep-link → scrim → Esc → focus restore,
+  mobile overlay + collapsed bar, home stacked card.
+
+**Known limitations / follow-ups**:
+- Authenticated e2e projects (search-smoke, Mobile Chrome journeys) fail locally at
+  auth.setup (CredentialsSignin) against a manually started prod server — pre-existing
+  local-env issue (documented in memory); rely on CI for those.
+- Mobile overlay: Escape closes the overlay even while the autocomplete popup is open
+  (no Esc layering there; pre-existing).
+- `InlineFilterStrip.tsx` still has its own validateMoveInDate copy (deliberately untouched).
+- Local `.next` currently holds the flag-OFF build.
+
+---
+
 # M1 no-empty-listings bypass fix — (2026-06-11)
 
 ## Problem

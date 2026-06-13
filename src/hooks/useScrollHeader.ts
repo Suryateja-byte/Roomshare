@@ -24,7 +24,18 @@ interface ScrollHeaderState {
  * - Expands when scrolling up (like iOS Safari)
  * - Debounced for performance
  * - Uses RAF for smooth updates
+ *
+ * Watches BOTH window scroll and the search results panel
+ * ([data-search-results-scroll-region]) — the desktop /search layout is
+ * h-screen with an internal scroll container, so window.scrollY alone never
+ * moves there and the header would never collapse.
  */
+const SCROLL_REGION_SELECTOR = "[data-search-results-scroll-region]";
+
+function readScrollTop(): number {
+  const region = document.querySelector<HTMLElement>(SCROLL_REGION_SELECTOR);
+  return Math.max(window.scrollY, region?.scrollTop ?? 0);
+}
 export function useScrollHeader({
   threshold = 100,
 }: UseScrollHeaderOptions = {}): ScrollHeaderState {
@@ -39,7 +50,7 @@ export function useScrollHeader({
   const rafId = useRef<number | null>(null);
 
   const updateScrollState = useCallback(() => {
-    const currentScrollY = window.scrollY;
+    const currentScrollY = readScrollTop();
     const isScrollingUp = currentScrollY < lastScrollY.current;
 
     // Determine if header should be collapsed
@@ -89,17 +100,37 @@ export function useScrollHeader({
 
   useEffect(() => {
     // Initialize with current scroll position
-    lastScrollY.current = window.scrollY;
+    const initialScrollY = readScrollTop();
+    lastScrollY.current = initialScrollY;
     setState({
-      isCollapsed: window.scrollY > threshold,
-      scrollY: window.scrollY,
+      isCollapsed: initialScrollY > threshold,
+      scrollY: initialScrollY,
       isScrollingUp: false,
     });
 
-    window.addEventListener("scroll", handleScroll, { passive: true });
+    // Scroll events don't bubble, but they DO propagate in the capture
+    // phase — one document-level listener covers the window and the results
+    // panel. Other scrollables (dropdowns, drawers) are ignored.
+    const handleDocumentScroll = (event: Event) => {
+      const target = event.target;
+      const isTracked =
+        target === document ||
+        (target instanceof HTMLElement &&
+          target.matches(SCROLL_REGION_SELECTOR));
+      if (isTracked) {
+        handleScroll();
+      }
+    };
+
+    document.addEventListener("scroll", handleDocumentScroll, {
+      capture: true,
+      passive: true,
+    });
 
     return () => {
-      window.removeEventListener("scroll", handleScroll);
+      document.removeEventListener("scroll", handleDocumentScroll, {
+        capture: true,
+      });
       if (rafId.current) {
         cancelAnimationFrame(rafId.current);
       }

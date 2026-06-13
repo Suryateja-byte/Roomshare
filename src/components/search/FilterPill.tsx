@@ -13,7 +13,7 @@ interface FilterPillProps {
  * FilterPill - Presentational component for displaying an active filter
  *
  * Pure component that receives props - no internal state management.
- * All filter logic remains in SearchForm.
+ * All filter logic remains in HomeSearchBar.
  */
 export function FilterPill({
   label,

@@ -1,10 +1,10 @@
-import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import DesktopHeaderSearch from "@/components/search/DesktopHeaderSearch";
 import { SearchResultsLoadingWrapper } from "@/components/search/SearchResultsLoadingWrapper";
-import { MAP_FLY_TO_EVENT } from "@/components/SearchForm";
+import { MAP_FLY_TO_EVENT } from "@/lib/search/map-fly-to";
 
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
 const mockToastError = jest.fn();
 const mockFetch = jest.fn();
 let mockSearchParams = "";
@@ -21,6 +21,7 @@ const mockRecentSearches = [
 jest.mock("next/navigation", () => ({
   useRouter: () => ({
     push: mockPush,
+    replace: mockReplace,
   }),
   useSearchParams: () => new URLSearchParams(mockSearchParams),
 }));
@@ -32,6 +33,10 @@ jest.mock("@/contexts/SearchTransitionContext", () => ({
 jest.mock("@/hooks/useRecentSearches", () => ({
   useRecentSearches: () => ({
     recentSearches: mockRecentSearches,
+    saveRecentSearch: jest.fn(),
+    clearRecentSearches: jest.fn(),
+    removeRecentSearch: jest.fn(),
+    formatSearch: jest.fn(() => ""),
   }),
 }));
 
@@ -41,11 +46,6 @@ jest.mock("sonner", () => ({
   },
 }));
 
-jest.mock("@/components/SearchForm", () => ({
-  __esModule: true,
-  MAP_FLY_TO_EVENT: "mapFlyToLocation",
-}));
-
 jest.mock("@/components/LocationSearchInput", () => ({
   __esModule: true,
   default: ({
@@ -53,6 +53,8 @@ jest.mock("@/components/LocationSearchInput", () => ({
     value,
     onChange,
     onLocationSelect,
+    onFocus,
+    onBlur,
     placeholder,
     fallbackItems = [],
   }: {
@@ -65,6 +67,8 @@ jest.mock("@/components/LocationSearchInput", () => ({
       lng: number;
       bbox?: [number, number, number, number];
     }) => void;
+    onFocus?: () => void;
+    onBlur?: () => void;
     placeholder?: string;
     fallbackItems?: Array<{
       id: string;
@@ -79,6 +83,8 @@ jest.mock("@/components/LocationSearchInput", () => ({
         value={value}
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
+        onFocus={onFocus}
+        onBlur={onBlur}
       />
       <button
         type="button"
@@ -108,11 +114,24 @@ jest.mock("@/components/LocationSearchInput", () => ({
   ),
 }));
 
+const ORIGINAL_SEMANTIC_FLAG = process.env.NEXT_PUBLIC_ENABLE_SEMANTIC_SEARCH;
+
+beforeAll(() => {
+  if (!HTMLFormElement.prototype.requestSubmit) {
+    HTMLFormElement.prototype.requestSubmit = function () {
+      this.dispatchEvent(
+        new Event("submit", { cancelable: true, bubbles: true })
+      );
+    };
+  }
+});
+
 describe("DesktopHeaderSearch", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     global.fetch = mockFetch;
     mockSearchParams = "";
+    process.env.NEXT_PUBLIC_ENABLE_SEMANTIC_SEARCH = "true";
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -130,6 +149,10 @@ describe("DesktopHeaderSearch", () => {
     });
   });
 
+  afterAll(() => {
+    process.env.NEXT_PUBLIC_ENABLE_SEMANTIC_SEARCH = ORIGINAL_SEMANTIC_FLAG;
+  });
+
   it("renders a collapsed summary and expands to the inline editor on click", () => {
     render(<DesktopHeaderSearch collapsed />);
 
@@ -142,7 +165,72 @@ describe("DesktopHeaderSearch", () => {
     expect(
       screen.getByTestId("desktop-header-search-form")
     ).toBeInTheDocument();
-    expect(screen.getByLabelText("Vibe")).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText("Try 'quiet, near campus'")
+    ).toBeInTheDocument();
+  });
+
+  it("deep-links each summary segment into its field", async () => {
+    render(<DesktopHeaderSearch collapsed />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit budget" }));
+
+    expect(
+      screen.getByTestId("desktop-header-search-form")
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByLabelText("Minimum budget")).toHaveFocus()
+    );
+  });
+
+  it("shows the scrim while editing from collapsed and reverts edits on Escape", async () => {
+    mockSearchParams = "locationLabel=Irving%2C+TX&lat=32.814&lng=-96.9489";
+    render(<DesktopHeaderSearch collapsed />);
+
+    fireEvent.click(screen.getByTestId("desktop-header-search-summary"));
+    expect(screen.getByTestId("search-bar-scrim")).toHaveAttribute(
+      "data-visible",
+      "true"
+    );
+
+    const locationInput = screen.getByTestId("desktop-location-input");
+    fireEvent.change(locationInput, { target: { value: "Berl" } });
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("desktop-header-search-summary")
+      ).toBeInTheDocument()
+    );
+
+    // Re-open: the unsaved edit must be gone, replaced by URL state.
+    fireEvent.click(screen.getByTestId("desktop-header-search-summary"));
+    expect(screen.getByTestId("desktop-location-input")).toHaveValue(
+      "Irving, TX"
+    );
+  });
+
+  it("lets an open autocomplete popup consume the first Escape", () => {
+    render(<DesktopHeaderSearch collapsed />);
+    fireEvent.click(screen.getByTestId("desktop-header-search-summary"));
+
+    const popup = document.createElement("div");
+    popup.setAttribute("data-location-search-popup", "true");
+    document.body.appendChild(popup);
+    try {
+      fireEvent.keyDown(document, { key: "Escape" });
+      // Popup open — editor must stay expanded.
+      expect(
+        screen.getByTestId("desktop-header-search-form")
+      ).toBeInTheDocument();
+    } finally {
+      popup.remove();
+    }
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(
+      screen.getByTestId("desktop-header-search-summary")
+    ).toBeInTheDocument();
   });
 
   it("resolves a typed destination on submit when autocomplete was not selected", async () => {
@@ -197,13 +285,10 @@ describe("DesktopHeaderSearch", () => {
         "Select a location from the dropdown suggestions."
       )
     );
-    expect(mockToastError).toHaveBeenCalledWith(
-      "Select a location from the dropdown suggestions."
-    );
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it("submits selected location and vibe while preserving existing filters", () => {
+  it("auto-submits on selection, preserving vibe and existing filters", async () => {
     mockSearchParams = "sort=recommended&amenities=Wifi";
     const events: CustomEvent[] = [];
     const handler = (event: Event) => events.push(event as CustomEvent);
@@ -211,13 +296,14 @@ describe("DesktopHeaderSearch", () => {
 
     render(<DesktopHeaderSearch collapsed={false} />);
 
+    fireEvent.change(
+      screen.getByPlaceholderText("Try 'quiet, near campus'"),
+      { target: { value: "quiet roommates" } }
+    );
+    // Dropdown selection auto-submits — one navigation, no Search press needed.
     fireEvent.click(screen.getByTestId("desktop-location-select"));
-    fireEvent.change(screen.getByLabelText("Vibe"), {
-      target: { value: "quiet roommates" },
-    });
-    fireEvent.submit(screen.getByTestId("desktop-header-search-form"));
 
-    expect(mockPush).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(mockPush).toHaveBeenCalledTimes(1));
     const pushedUrl = mockPush.mock.calls[0][0] as string;
     const url = new URL(pushedUrl, "http://localhost");
 
@@ -229,6 +315,8 @@ describe("DesktopHeaderSearch", () => {
     expect(url.searchParams.get("lng")).toBe("-122.4194");
     expect(url.searchParams.get("minLng")).toBe("-122.600");
     expect(url.searchParams.get("maxLat")).toBe("37.900");
+    // Exactly one fly-to for the whole interaction.
+    expect(events).toHaveLength(1);
     expect(events[0]?.detail).toEqual({
       lat: 37.7749,
       lng: -122.4194,
@@ -239,13 +327,13 @@ describe("DesktopHeaderSearch", () => {
     window.removeEventListener(MAP_FLY_TO_EVENT, handler);
   });
 
-  it("passes recent locations as fallback items that set a valid selected location", () => {
+  it("passes recent locations as fallback items that set a valid selected location", async () => {
     render(<DesktopHeaderSearch collapsed={false} />);
 
     fireEvent.click(screen.getByTestId("desktop-fallback-recent-1"));
     fireEvent.submit(screen.getByTestId("desktop-header-search-form"));
 
-    expect(mockPush).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(mockPush).toHaveBeenCalledTimes(1));
     const pushedUrl = mockPush.mock.calls[0][0] as string;
     const url = new URL(pushedUrl, "http://localhost");
 

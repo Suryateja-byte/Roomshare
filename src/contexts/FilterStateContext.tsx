@@ -24,13 +24,13 @@ interface FilterStateContextValue {
   changeCount: number;
   /** Whether the filter drawer is currently open */
   isDrawerOpen: boolean;
-  /** Update dirty state (called by SearchForm) */
+  /** Update dirty state (called by the search bar) */
   setDirtyState: (isDirty: boolean, changeCount: number) => void;
-  /** Update drawer open state (called by SearchForm) */
+  /** Update drawer open state (called by the search bar) */
   setDrawerOpen: (isOpen: boolean) => void;
-  /** Callback to open the filter drawer (set by SearchForm) */
+  /** Callback to open the filter drawer (set by the search bar) */
   openDrawer: () => void;
-  /** Register the open drawer callback (called by SearchForm) */
+  /** Register the open drawer callback (called by the search bar) */
   registerOpenDrawer: (callback: () => void) => void;
 }
 
@@ -46,7 +46,7 @@ export function FilterStateProvider({
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   // Use ref for callback to avoid re-renders when registering
-  // This prevents infinite loops when SearchForm registers its callback
+  // This prevents infinite loops when the search bar registers its callback
   const openDrawerCallbackRef = useRef<() => void>(() => {});
 
   const setDirtyState = useCallback((dirty: boolean, count: number) => {
