@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import VerificationList from "./VerificationList";
+import { requireAdminAuth } from "@/lib/admin-auth";
 import Link from "next/link";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
 
@@ -13,19 +13,11 @@ export const metadata: Metadata = {
 };
 
 export default async function VerificationsPage() {
-  const session = await auth();
-
-  if (!session?.user?.id) {
+  const adminCheck = await requireAdminAuth();
+  if (adminCheck.code === "SESSION_EXPIRED") {
     redirect("/login?callbackUrl=/admin/verifications");
   }
-
-  // Check if user is admin
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { isAdmin: true },
-  });
-
-  if (!user?.isAdmin) {
+  if (!adminCheck.isAdmin) {
     redirect("/");
   }
 

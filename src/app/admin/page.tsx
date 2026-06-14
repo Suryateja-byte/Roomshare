@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { requireAdminAuth } from "@/lib/admin-auth";
 import Link from "next/link";
 import {
   Users,
@@ -50,19 +50,11 @@ async function getAdminStats() {
 }
 
 export default async function AdminDashboard() {
-  const session = await auth();
-
-  if (!session?.user?.id) {
+  const adminCheck = await requireAdminAuth();
+  if (adminCheck.code === "SESSION_EXPIRED") {
     redirect("/login?callbackUrl=/admin");
   }
-
-  // Check if user is admin
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { isAdmin: true },
-  });
-
-  if (!user?.isAdmin) {
+  if (!adminCheck.isAdmin) {
     redirect("/");
   }
 

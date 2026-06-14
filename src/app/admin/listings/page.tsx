@@ -1,6 +1,6 @@
-import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { requireAdminAuth } from "@/lib/admin-auth";
 import type { ListingStatus, Prisma } from "@prisma/client";
 import Link from "next/link";
 import { ArrowLeft, Home } from "lucide-react";
@@ -33,19 +33,11 @@ function parseStatus(value: string | undefined): ListingStatusFilter {
 export default async function AdminListingsPage({
   searchParams,
 }: AdminListingsPageProps) {
-  const session = await auth();
-
-  if (!session?.user?.id) {
+  const adminCheck = await requireAdminAuth();
+  if (adminCheck.code === "SESSION_EXPIRED") {
     redirect("/login?callbackUrl=/admin/listings");
   }
-
-  // Check if user is admin
-  const currentUser = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { isAdmin: true },
-  });
-
-  if (!currentUser?.isAdmin) {
+  if (!adminCheck.isAdmin) {
     redirect("/");
   }
 

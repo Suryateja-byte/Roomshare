@@ -1,5 +1,5 @@
-import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import { requireAdminAuth } from "@/lib/admin-auth";
 
 export const metadata = {
   title: "Admin | RoomShare",
@@ -7,13 +7,11 @@ export const metadata = {
 };
 
 export default async function AdminBookingDetailRedirectPage() {
-  const session = await auth();
-
-  if (!session?.user?.id) {
+  const adminCheck = await requireAdminAuth();
+  if (adminCheck.code === "SESSION_EXPIRED") {
     redirect("/login?callbackUrl=/admin");
   }
-
-  if (!session.user.isAdmin) {
+  if (!adminCheck.isAdmin) {
     redirect("/");
   }
 
