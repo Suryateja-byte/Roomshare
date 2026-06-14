@@ -36,10 +36,15 @@ WHERE inventory.unit_id = listing."physical_unit_id"
   AND listing."booking_mode" <> 'WHOLE_UNIT';
 
 -- Fall back to legacy derive-from-roomType behavior for rows without an inventory signal.
-UPDATE "Listing"
+UPDATE "Listing" AS listing
 SET "booking_mode" = 'WHOLE_UNIT'
-WHERE "roomType" = 'Entire Place'
-  AND "booking_mode" <> 'WHOLE_UNIT';
+WHERE listing."roomType" = 'Entire Place'
+  AND listing."booking_mode" <> 'WHOLE_UNIT'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM "listing_inventories" AS inventory
+    WHERE inventory.unit_id = listing."physical_unit_id"
+  );
 
 WITH reconciled_search_docs AS (
   UPDATE listing_search_docs AS doc

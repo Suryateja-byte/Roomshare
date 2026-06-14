@@ -18,14 +18,14 @@ describe("listing booking mode migration", () => {
       /UPDATE\s+"Listing"\s+AS\s+listing[\s\S]*FROM\s+"listing_inventories"\s+AS\s+inventory[\s\S]*inventory\.unit_id\s*=\s*listing\."physical_unit_id"[\s\S]*inventory\.room_category\s*=\s*'ENTIRE_PLACE'[\s\S]*listing\."booking_mode"\s*<>\s*'WHOLE_UNIT'/
     );
     expect(migrationSql).toMatch(
-      /UPDATE\s+"Listing"[\s\S]*SET\s+"booking_mode"\s*=\s*'WHOLE_UNIT'[\s\S]*WHERE\s+"roomType"\s*=\s*'Entire Place'/
+      /UPDATE\s+"Listing"\s+AS\s+listing[\s\S]*SET\s+"booking_mode"\s*=\s*'WHOLE_UNIT'[\s\S]*WHERE\s+listing\."roomType"\s*=\s*'Entire Place'[\s\S]*listing\."booking_mode"\s*<>\s*'WHOLE_UNIT'[\s\S]*NOT\s+EXISTS\s*\([\s\S]*SELECT\s+1[\s\S]*FROM\s+"listing_inventories"\s+AS\s+inventory[\s\S]*inventory\.unit_id\s*=\s*listing\."physical_unit_id"[\s\S]*\)/
     );
 
     const inventoryBackfillIndex = migrationSql.indexOf(
       'FROM "listing_inventories" AS inventory'
     );
     const roomTypeFallbackIndex = migrationSql.indexOf(
-      `WHERE "roomType" = 'Entire Place'`
+      `WHERE listing."roomType" = 'Entire Place'`
     );
 
     expect(inventoryBackfillIndex).toBeGreaterThan(-1);
@@ -46,7 +46,7 @@ describe("listing booking mode migration", () => {
       'FROM "listing_inventories" AS inventory'
     );
     const roomTypeFallbackIndex = migrationSql.indexOf(
-      `WHERE "roomType" = 'Entire Place'`
+      `WHERE listing."roomType" = 'Entire Place'`
     );
     const reconciliationIndex = migrationSql.indexOf(
       "WITH reconciled_search_docs AS"
