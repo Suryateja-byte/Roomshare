@@ -594,6 +594,25 @@ describe("POST /api/listings — extended edge cases", () => {
       );
     });
 
+    it("rejects enabled wholeUnitMode Entire Place listings with SHARED bookingMode", async () => {
+      Object.defineProperty(features, "wholeUnitMode", {
+        configurable: true,
+        get: () => true,
+      });
+      const response = await POST(
+        makeRequest({
+          ...validBody,
+          roomType: "Entire Place",
+          bookingMode: "SHARED",
+        })
+      );
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body.fields).toHaveProperty("bookingMode");
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
     it("derives WHOLE_UNIT from Entire Place when wholeUnitMode is disabled even if SHARED is posted", async () => {
       const { create } = mockCapturingTransaction();
       const response = await POST(

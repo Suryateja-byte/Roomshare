@@ -60,6 +60,7 @@ interface ListingWithData {
   primaryHomeLanguage: string | null;
   leaseDuration: string | null;
   roomType: string | null;
+  bookingMode: string;
   moveInDate: Date | null;
   totalSlots: number;
   availableSlots: number;
@@ -102,6 +103,7 @@ async function fetchListingsWithData(
       l."primary_home_language" as "primaryHomeLanguage",
       l."leaseDuration" as "leaseDuration",
       l."roomType" as "roomType",
+      l."booking_mode" as "bookingMode",
       l."moveInDate" as "moveInDate",
       l."totalSlots" as "totalSlots",
       l."availableSlots" as "availableSlots",
@@ -221,7 +223,7 @@ async function upsertSearchDocsBatch(
       INSERT INTO listing_search_docs (
         id, owner_id, title, description, price, images,
         amenities, house_rules, household_languages, primary_home_language,
-        lease_duration, room_type, move_in_date, total_slots, available_slots,
+        lease_duration, room_type, booking_mode, move_in_date, total_slots, available_slots,
         view_count, status, listing_created_at,
         address, city, state, zip, location_geog, lat, lng,
         avg_rating, review_count, recommended_score,
@@ -231,7 +233,7 @@ async function upsertSearchDocsBatch(
       ) VALUES (
         ${listing.id}, ${listing.ownerId}, ${listing.title}, ${listing.description}, ${listing.price}, ${listing.images},
         ${listing.amenities}, ${listing.houseRules}, ${listing.householdLanguages}, ${listing.primaryHomeLanguage},
-        ${listing.leaseDuration}, ${listing.roomType}, ${listing.moveInDate}, ${listing.totalSlots}, ${listing.availableSlots},
+        ${listing.leaseDuration}, ${listing.roomType}, ${listing.bookingMode}, ${listing.moveInDate}, ${listing.totalSlots}, ${listing.availableSlots},
         ${listing.viewCount}, ${listing.status}, ${listing.createdAt},
         ${listing.address}, ${listing.city}, ${listing.state}, ${listing.zip},
         ST_SetSRID(ST_MakePoint(${listing.lng}, ${listing.lat}), 4326)::geography,
@@ -253,6 +255,7 @@ async function upsertSearchDocsBatch(
         primary_home_language = EXCLUDED.primary_home_language,
         lease_duration = EXCLUDED.lease_duration,
         room_type = EXCLUDED.room_type,
+        booking_mode = EXCLUDED.booking_mode,
         move_in_date = EXCLUDED.move_in_date,
         total_slots = EXCLUDED.total_slots,
         available_slots = EXCLUDED.available_slots,

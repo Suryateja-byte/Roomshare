@@ -12,6 +12,7 @@ type ListingRow = {
   ownerId: string;
   price: string;
   roomType: string | null;
+  bookingMode: string;
   totalSlots: number;
   availableSlots: number;
   openSlots: number | null;
@@ -130,6 +131,7 @@ function canonicalize(row: ListingRow): {
 function roomCategory(
   row: ListingRow
 ): "ENTIRE_PLACE" | "PRIVATE_ROOM" | "SHARED_ROOM" {
+  if (row.bookingMode === "WHOLE_UNIT") return "ENTIRE_PLACE";
   if (row.roomType === "Entire Place") return "ENTIRE_PLACE";
   if (row.roomType === "Shared Room") return "SHARED_ROOM";
   return "PRIVATE_ROOM";
@@ -163,6 +165,7 @@ async function fetchPendingRows(
       l."ownerId" AS "ownerId",
       l.price::TEXT AS price,
       l."roomType" AS "roomType",
+      l."booking_mode" AS "bookingMode",
       l."totalSlots" AS "totalSlots",
       l."availableSlots" AS "availableSlots",
       l."openSlots" AS "openSlots",
