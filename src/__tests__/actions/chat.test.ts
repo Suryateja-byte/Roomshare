@@ -30,6 +30,7 @@ jest.mock("@/lib/prisma", () => {
       findUnique: jest.fn(),
       findMany: jest.fn(),
       create: jest.fn(),
+      update: jest.fn(),
       updateMany: jest.fn(),
       count: jest.fn(),
       groupBy: jest.fn(),
@@ -104,6 +105,8 @@ import {
   pollMessages,
   markConversationMessagesAsRead,
   markAllMessagesAsRead,
+  deleteMessage,
+  deleteConversation,
 } from "@/app/actions/chat";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
@@ -1152,6 +1155,142 @@ describe("Chat Actions", () => {
       });
       expect(prisma.conversation.findMany).not.toHaveBeenCalled();
       expect(prisma.message.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("deleteMessage", () => {
+    beforeEach(() => {
+      (prisma.message.findUnique as jest.Mock).mockResolvedValue({
+        senderId: "user-123",
+        deletedAt: null,
+      });
+      (prisma.message.update as jest.Mock).mockResolvedValue({});
+    });
+
+    it("returns error when not authenticated", async () => {
+      (auth as jest.Mock).mockResolvedValue(null);
+
+      const result = await deleteMessage("message-123");
+
+      expect(result).toEqual({
+        success: false,
+        error: "Unauthorized",
+        code: "SESSION_EXPIRED",
+      });
+    });
+
+    it("returns suspended error before reading or deleting the message", async () => {
+      const error = mockCurrentUserSuspended();
+
+      const result = await deleteMessage("message-123");
+
+      expect(result).toEqual({
+        success: false,
+        error,
+        code: "ACCOUNT_SUSPENDED",
+      });
+      expect(prisma.message.findUnique).not.toHaveBeenCalled();
+      expect(prisma.message.update).not.toHaveBeenCalled();
+    });
+
+    it("blocks deletion of a message the user did not send", async () => {
+      (prisma.message.findUnique as jest.Mock).mockResolvedValue({
+        senderId: "other-456",
+        deletedAt: null,
+      });
+
+      const result = await deleteMessage("message-123");
+
+      expect(result).toEqual({
+        success: false,
+        error: "You can only delete your own messages",
+      });
+      expect(prisma.message.update).not.toHaveBeenCalled();
+    });
+
+    it("soft deletes the sender's own message", async () => {
+      const result = await deleteMessage("message-123");
+
+      expect(result).toEqual({ success: true });
+      expect(prisma.message.update).toHaveBeenCalledWith({
+        where: { id: "message-123" },
+        data: {
+          deletedAt: expect.any(Date),
+          deletedBy: "user-123",
+        },
+      });
+    });
+  });
+
+  describe("deleteConversation", () => {
+    beforeEach(() => {
+      (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
+        deletedAt: null,
+        participants: [{ id: "user-123" }, { id: "other-456" }],
+      });
+      (prisma.conversationDeletion.upsert as jest.Mock).mockResolvedValue({});
+    });
+
+    it("returns error when not authenticated", async () => {
+      (auth as jest.Mock).mockResolvedValue(null);
+
+      const result = await deleteConversation("conv-123");
+
+      expect(result).toEqual({
+        success: false,
+        error: "Unauthorized",
+        code: "SESSION_EXPIRED",
+      });
+    });
+
+    it("returns suspended error before reading or deleting the conversation", async () => {
+      const error = mockCurrentUserSuspended();
+
+      const result = await deleteConversation("conv-123");
+
+      expect(result).toEqual({
+        success: false,
+        error,
+        code: "ACCOUNT_SUSPENDED",
+      });
+      expect(prisma.conversation.findUnique).not.toHaveBeenCalled();
+      expect(prisma.conversationDeletion.upsert).not.toHaveBeenCalled();
+    });
+
+    it("blocks deletion by a non-participant", async () => {
+      (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
+        deletedAt: null,
+        participants: [{ id: "other-1" }, { id: "other-2" }],
+      });
+
+      const result = await deleteConversation("conv-123");
+
+      expect(result).toEqual({
+        success: false,
+        error: "You are not part of this conversation",
+      });
+      expect(prisma.conversationDeletion.upsert).not.toHaveBeenCalled();
+    });
+
+    it("soft deletes the conversation for the current participant", async () => {
+      const result = await deleteConversation("conv-123");
+
+      expect(result).toEqual({ success: true });
+      expect(prisma.conversationDeletion.upsert).toHaveBeenCalledWith({
+        where: {
+          conversationId_userId: {
+            conversationId: "conv-123",
+            userId: "user-123",
+          },
+        },
+        update: {
+          deletedAt: expect.any(Date),
+        },
+        create: {
+          conversationId: "conv-123",
+          userId: "user-123",
+        },
+      });
     });
   });
 });
