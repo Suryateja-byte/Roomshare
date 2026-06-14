@@ -26,7 +26,7 @@ ALTER TABLE "Listing"
 UPDATE "Listing" AS listing
 SET "booking_mode" = 'WHOLE_UNIT'
 FROM "listing_inventories" AS inventory
-WHERE inventory.listing_id = listing.id
+WHERE inventory.unit_id = listing."physical_unit_id"
   AND inventory.room_category = 'ENTIRE_PLACE'
   AND listing."booking_mode" <> 'WHOLE_UNIT';
 

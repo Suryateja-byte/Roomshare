@@ -15,7 +15,7 @@ describe("listing booking mode migration", () => {
 
   it("backfills whole-unit mode from canonical inventory before roomType fallback", () => {
     expect(migrationSql).toMatch(
-      /UPDATE\s+"Listing"\s+AS\s+listing[\s\S]*FROM\s+"listing_inventories"\s+AS\s+inventory[\s\S]*inventory\.listing_id\s*=\s*listing\.id[\s\S]*inventory\.room_category\s*=\s*'ENTIRE_PLACE'[\s\S]*listing\."booking_mode"\s*<>\s*'WHOLE_UNIT'/
+      /UPDATE\s+"Listing"\s+AS\s+listing[\s\S]*FROM\s+"listing_inventories"\s+AS\s+inventory[\s\S]*inventory\.unit_id\s*=\s*listing\."physical_unit_id"[\s\S]*inventory\.room_category\s*=\s*'ENTIRE_PLACE'[\s\S]*listing\."booking_mode"\s*<>\s*'WHOLE_UNIT'/
     );
     expect(migrationSql).toMatch(
       /UPDATE\s+"Listing"[\s\S]*SET\s+"booking_mode"\s*=\s*'WHOLE_UNIT'[\s\S]*WHERE\s+"roomType"\s*=\s*'Entire Place'/
