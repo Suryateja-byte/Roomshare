@@ -439,3 +439,43 @@ two aria-hidden spacers distributing tall-viewport slack (capped max-h-14 breath
 flex-[4] photo reveal below it; both md:hidden, collapse to zero on short phones). globals.css:
 .home-hero-frame mobile padding-top clamp raised (1rem→2.25rem) for navbar breathing room; md override
 unchanged. Verified 412x860, 375x812, 360x700, 320x568 + 768 sanity (balance2-*.jpeg).
+
+---
+
+## 2026-06-13 — Fix P1: persist `bookingMode` on canonical Listing
+
+**Goal / acceptance:** A listing-create (and profile-edit) `bookingMode` (`SHARED`|`WHOLE_UNIT`)
+durably persists and is read consistently by search docs, the detail page, and canonical
+resync — including the divergent (roomType ≠ "Entire Place") case. Branch:
+`fix/listing-bookingmode-persistence`. Plan: ~/.claude/plans/parsed-hopping-waffle.md.
+
+**Root cause:** `Listing.booking_mode` was dropped in the phase-09 CFM cutover
+(`20260509000000`); create still accepted `bookingMode` but had nowhere to store it, so the
+host's choice survived only transiently and every read path re-derived it from `roomType`
+(detail page hardcoded `"SHARED"`). Masked only because the whole-unit UI is flag-gated off.
+
+**Changes (12 files):**
+- `prisma/migrations/20260613000000_readd_listing_booking_mode/migration.sql` — re-add
+  `booking_mode TEXT NOT NULL DEFAULT 'SHARED'` + roomType backfill + CHECK (NOT VALID→VALIDATE).
+  Reversible; metadata-only ADD COLUMN; no lock.
+- `prisma/schema.prisma` — `bookingMode String @default("SHARED") @map("booking_mode")`.
+- `src/app/api/listings/route.ts` — persist in `listingCreateData`; drop transient spread.
+- `src/app/api/listings/[id]/route.ts` — accept in profile-patch schema; persist on update
+  only when provided (non-clobber).
+- `src/app/listings/[id]/edit/EditListingForm.tsx` — pass `bookingMode` through in detailsPayload.
+- `src/lib/search/search-doc-sync.ts` — read stored `l."booking_mode"` (was derived from roomType).
+- `src/app/listings/[id]/page.tsx` + `src/lib/listings/public-detail.ts` — select + surface
+  stored value (was hardcoded `"SHARED"`).
+- `src/lib/data.ts` — legacy filter reads `l."booking_mode"` (was roomType).
+- `src/lib/listings/canonical-lifecycle.ts` — add `bookingMode` to the resync select so
+  lifecycle resync preserves the divergent value (closes the durability hole).
+- Tests: +3 create-persistence (`listings-post`), +2 PATCH persist/non-clobber (`listings-idor`).
+
+**Results + Verification story:**
+- `pnpm prisma validate` ✅ ; `pnpm prisma generate` ✅ ; `pnpm typecheck` ✅ (0 errors).
+- `pnpm lint` ✅ 0 errors (22 warnings, all pre-existing in untouched files).
+- `pnpm test` (full) ✅ **7850 passed, 8 skipped, 0 failed** — incl. 5 new regression tests;
+  no pglite fixture needed the new column (plan contingency not triggered).
+- Gotcha hit + fixed: Edit tool normalized mixed-EOL `data.ts` (1000-line spurious diff);
+  restored HEAD bytes + byte-level re-apply → clean 2-line diff. See lessons.md 2026-06-13.
+- NOT committed (awaiting explicit request). DB note: reversible migration, rollback in SQL header.

@@ -70,3 +70,21 @@
 - Prevention rule: portals in SSR'd components must be gated on a `mounted` state set in
   useEffect; "typeof document" checks are not equivalent. Verify hydration-sensitive fixes
   against `pnpm build` + `pnpm start`, never the dev server.
+
+## 2026-06-13 — Edit tool normalizes mixed-EOL files → spurious 1000-line diff
+
+- Date: 2026-06-13
+- Mistake / failure mode: A 2-line logical change to `src/lib/data.ts` produced a
+  1072-line `git diff --stat` (668 ins / 542 del). The file had MIXED line endings in
+  HEAD (1740 lines, 1204 CRLF + 536 LF); the Edit tool rewrote the whole file to all-CRLF.
+- Detection signal: `git diff --stat` showed one file ballooning far beyond the edit;
+  `git diff --ignore-space-at-eol <file>` collapsed to the true ~2-line change, confirming
+  the rest was pure EOL churn. CR-count check: `grep -c $'\r'` differed between HEAD and
+  working tree (1204 → 1740).
+- Root cause: repo has no `.gitattributes` and `core.autocrlf` is unset, so mixed EOLs are
+  stored verbatim; the Edit tool normalized them on write. Uniform-EOL files were unaffected.
+- Prevention rule: after editing, run `git diff --stat`; if a touched file balloons, restore
+  with `git checkout HEAD -- <file>` and re-apply the change at byte level (Python
+  `open(...,'rb')` + `bytes.replace` with a count assertion) so non-edited bytes/EOLs are
+  preserved. Don't commit wholesale EOL flips.
+- Follow-up: none required; consider adding `.gitattributes` (`* text=auto`) repo-wide later.
