@@ -574,13 +574,28 @@ describe("POST /api/listings — extended edge cases", () => {
       );
     });
 
-    it("defaults bookingMode to SHARED when omitted", async () => {
+    it("defaults omitted bookingMode to SHARED for non-entire-place roomType", async () => {
       const { create } = mockCapturingTransaction();
-      const response = await POST(makeRequest(validBody));
+      const response = await POST(
+        makeRequest({ ...validBody, roomType: "Private Room" })
+      );
       expect(response.status).toBe(201);
       expect(create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ bookingMode: "SHARED" }),
+        })
+      );
+    });
+
+    it("defaults omitted bookingMode to WHOLE_UNIT for Entire Place roomType", async () => {
+      const { create } = mockCapturingTransaction();
+      const response = await POST(
+        makeRequest({ ...validBody, roomType: "Entire Place" })
+      );
+      expect(response.status).toBe(201);
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ bookingMode: "WHOLE_UNIT" }),
         })
       );
     });
