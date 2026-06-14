@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
-import { geocodeAddress } from "@/lib/geocoding";
 import { createClient } from "@supabase/supabase-js";
 import bcrypt from "bcryptjs";
 import {
@@ -22,7 +21,6 @@ import { isValidLanguageCode } from "@/lib/languages";
 import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { captureApiError } from "@/lib/api-error-handler";
-import { isCircuitOpenError } from "@/lib/circuit-breaker";
 import { validateCsrf } from "@/lib/csrf";
 import { logger } from "@/lib/logger";
 import { checkSuspension, checkEmailVerified } from "@/app/actions/suspension";
@@ -32,6 +30,11 @@ import { features } from "@/lib/env";
 import { syncListingEmbedding } from "@/lib/embeddings/sync";
 import { getHostModerationWriteLockResult } from "@/lib/listings/moderation-write-lock";
 import { normalizeAddress } from "@/lib/search/normalize-address";
+import { verifyAddressSuggestionToken } from "@/lib/geocoding/address-suggestion-token";
+import {
+  GooglePlacesUnavailableError,
+  validateAddressForPublish,
+} from "@/lib/geocoding/google-places";
 import { syncCanonicalAvailability } from "@/lib/listings/canonical-sync";
 import {
   syncListingLifecycleProjectionInTx,
@@ -168,6 +171,12 @@ const listingProfilePatchSchema = z
       .nullable()
       .optional(),
     images: z.array(supabaseImageUrlSchema).max(10).optional(),
+    addressSuggestionToken: z
+      .string()
+      .trim()
+      .max(4096, "Address suggestion token is invalid")
+      .optional()
+      .transform((value) => (value && value.length > 0 ? value : undefined)),
   })
   .strict();
 
@@ -857,6 +866,7 @@ export async function PATCH(
         householdGender,
         primaryHomeLanguage,
         images,
+        addressSuggestionToken,
       } = profilePatch;
 
       if (householdLanguages && householdLanguages.length > 0) {
@@ -933,48 +943,80 @@ export async function PATCH(
         zip,
       });
 
+      // Address edits must clear the same trusted-address bar as listing
+      // creation: a server-signed suggestion token (PREMISE precision, bound to
+      // this user + the submitted fields) or Google Address Validation. Never
+      // fall back to best-guess forward geocoding, which would let a direct API
+      // caller point a listing at an unverified address.
       let coords: { lat: number; lng: number } | null = null;
       if (addressChanged && listing.location) {
-        const fullAddress = `${address}, ${city}, ${state} ${zip}`;
-        try {
-          const geoResult = await geocodeAddress(fullAddress);
-          if (geoResult.status === "not_found") {
-            await logger.warn("Geocoding failed for listing update", {
+        const verifiedAddressSuggestion = verifyAddressSuggestionToken(
+          addressSuggestionToken,
+          {
+            userId,
+            address,
+            city,
+            state,
+            zip,
+          }
+        );
+
+        if (verifiedAddressSuggestion.valid) {
+          coords = verifiedAddressSuggestion.coords;
+        } else if (features.googleAddressValidation) {
+          try {
+            const validatedAddress = await validateAddressForPublish({
+              address,
+              city,
+              state,
+              zip,
+            });
+
+            if (!validatedAddress) {
+              const message =
+                "Could not verify this exact address. Please choose a suggested address or check the details and try again.";
+              return NextResponse.json(
+                {
+                  error: message,
+                  field: "address",
+                  fields: { address: message },
+                },
+                { status: 400 }
+              );
+            }
+
+            coords = { lat: validatedAddress.lat, lng: validatedAddress.lng };
+          } catch (validationError) {
+            if (validationError instanceof GooglePlacesUnavailableError) {
+              return NextResponse.json(
+                {
+                  error:
+                    "Address verification temporarily unavailable. Please try again.",
+                },
+                { status: 503, headers: { "Retry-After": "10" } }
+              );
+            }
+
+            throw validationError;
+          }
+        } else {
+          await logger.warn(
+            "Listing update blocked: address validation disabled",
+            {
               route: "/api/listings/[id]",
               method: "PATCH",
               userId: userId.slice(0, 8) + "...",
               city,
               state,
-            });
-            return NextResponse.json(
-              {
-                error:
-                  "Could not find this address. Please check and try again.",
-              },
-              { status: 400 }
-            );
-          }
-          if (geoResult.status === "error") {
-            return NextResponse.json(
-              {
-                error:
-                  "Address verification temporarily unavailable. Please try again.",
-              },
-              { status: 503, headers: { "Retry-After": "10" } }
-            );
-          }
-          coords = { lat: geoResult.lat, lng: geoResult.lng };
-        } catch (geoError) {
-          if (isCircuitOpenError(geoError)) {
-            return NextResponse.json(
-              {
-                error:
-                  "Address verification service temporarily unavailable. Please try again shortly.",
-              },
-              { status: 503, headers: { "Retry-After": "30" } }
-            );
-          }
-          throw geoError;
+            }
+          );
+          return NextResponse.json(
+            {
+              error:
+                "Address verification temporarily unavailable. Please try again.",
+            },
+            { status: 503, headers: { "Retry-After": "10" } }
+          );
         }
       }
 
