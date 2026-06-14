@@ -13,14 +13,24 @@
 --
 -- Data-safety:
 --   * ADD COLUMN with a constant DEFAULT is metadata-only on PG 11+ (no table rewrite/long lock).
---   * Backfill UPDATE touches only roomType='Entire Place' rows.
+--   * Backfill first preserves existing canonical inventory rows that already represent
+--     whole-unit listings, including divergent rows where roomType is not 'Entire Place'.
+--   * Legacy roomType fallback only fills rows without a stronger inventory signal.
 --   * CHECK added NOT VALID then VALIDATE to avoid a blocking scan on large tables.
 
 ALTER TABLE "Listing"
   ADD COLUMN IF NOT EXISTS "booking_mode" TEXT NOT NULL DEFAULT 'SHARED';
 
--- Backfill existing rows from roomType so current data stays consistent with the
--- derive-from-roomType behavior that was in effect while the column was absent.
+-- Backfill from existing canonical inventory first; this preserves divergent rows
+-- created while bookingMode was accepted but not stored on Listing.
+UPDATE "Listing" AS listing
+SET "booking_mode" = 'WHOLE_UNIT'
+FROM "listing_inventories" AS inventory
+WHERE inventory.listing_id = listing.id
+  AND inventory.room_category = 'ENTIRE_PLACE'
+  AND listing."booking_mode" <> 'WHOLE_UNIT';
+
+-- Fall back to legacy derive-from-roomType behavior for rows without an inventory signal.
 UPDATE "Listing"
 SET "booking_mode" = 'WHOLE_UNIT'
 WHERE "roomType" = 'Entire Place'
