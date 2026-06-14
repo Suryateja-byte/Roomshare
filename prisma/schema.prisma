@@ -115,6 +115,7 @@ model Listing {
   houseRules              String[]
   leaseDuration           String?
   roomType                String?
+  bookingMode             String                    @default("SHARED") @map("booking_mode")
   normalizedAddress       String?
   physicalUnitId          String?                   @map("physical_unit_id")
   householdLanguages      String[]                  @default([]) @map("household_languages")

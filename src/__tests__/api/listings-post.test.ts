@@ -534,6 +534,66 @@ describe("POST /api/listings — extended edge cases", () => {
   });
 
   // =========================================================================
+  // bookingMode persistence (P1 regression)
+  // =========================================================================
+  // Regression: bookingMode was accepted + validated but omitted from
+  // listingCreateData, so a host's WHOLE_UNIT choice never reached the
+  // canonical Listing row (the column had been dropped in the phase-09 cutover).
+  describe("bookingMode persistence (P1 regression)", () => {
+    function mockCapturingTransaction() {
+      const create = jest.fn().mockResolvedValue(mockListing);
+      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+        const tx = {
+          listing: { create },
+          location: { create: jest.fn().mockResolvedValue({ id: "loc-123" }) },
+          $executeRaw: jest.fn().mockResolvedValue(1),
+          $queryRaw: jest
+            .fn()
+            .mockResolvedValueOnce([{ count: 0 }])
+            .mockResolvedValue([]),
+        };
+        return callback(tx);
+      });
+      return { create };
+    }
+
+    it("persists bookingMode WHOLE_UNIT even when roomType diverges", async () => {
+      const { create } = mockCapturingTransaction();
+      const response = await POST(
+        makeRequest({
+          ...validBody,
+          roomType: "Private Room",
+          bookingMode: "WHOLE_UNIT",
+        })
+      );
+      expect(response.status).toBe(201);
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ bookingMode: "WHOLE_UNIT" }),
+        })
+      );
+    });
+
+    it("defaults bookingMode to SHARED when omitted", async () => {
+      const { create } = mockCapturingTransaction();
+      const response = await POST(makeRequest(validBody));
+      expect(response.status).toBe(201);
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ bookingMode: "SHARED" }),
+        })
+      );
+    });
+
+    it('rejects filter-only bookingMode "any"', async () => {
+      const response = await POST(
+        makeRequest({ ...validBody, bookingMode: "any" })
+      );
+      expect(response.status).toBe(400);
+    });
+  });
+
+  // =========================================================================
   // 3. Image validation
   // =========================================================================
 

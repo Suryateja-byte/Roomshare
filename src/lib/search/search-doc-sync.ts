@@ -128,10 +128,7 @@ async function fetchListingSearchSnapshot(
       l."statusReason" as "statusReason",
       l."viewCount" as "viewCount",
       l.status::text as status,
-      CASE
-        WHEN l."roomType" = 'Entire Place' THEN 'WHOLE_UNIT'
-        ELSE 'SHARED'
-      END as "bookingMode",
+      l."booking_mode" as "bookingMode",
       l."createdAt" as "createdAt",
       l."updatedAt" as "updatedAt",
       l."version" as "version",

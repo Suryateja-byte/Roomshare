@@ -350,6 +350,63 @@ describe("Listings API IDOR Protection", () => {
       expect(updateMock).toHaveBeenCalled();
     });
 
+    // P1 regression: bookingMode must persist on profile edit, and must not be
+    // clobbered when a (flag-off) client omits it from the payload.
+    function mockOwnerPatchTransaction() {
+      (auth as jest.Mock).mockResolvedValue(ownerSession);
+      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
+      const updateMock = jest
+        .fn()
+        .mockResolvedValue({ ...mockListing, title: "Updated Title" });
+      (prisma.$transaction as jest.Mock).mockImplementation(
+        async (callback) => {
+          const tx = {
+            $queryRaw: jest.fn().mockResolvedValue([makeLockedListing()]),
+            listing: {
+              findUnique: jest.fn().mockResolvedValue(makeLockedListing()),
+              update: updateMock,
+            },
+            location: { update: jest.fn() },
+            $executeRaw: jest.fn(),
+          };
+          return callback(tx);
+        }
+      );
+      return updateMock;
+    }
+
+    it("persists bookingMode on profile PATCH when provided", async () => {
+      const updateMock = mockOwnerPatchTransaction();
+      const request = new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify({ ...validPatchPayload, bookingMode: "WHOLE_UNIT" }),
+      });
+
+      const response = await PATCH(request, {
+        params: Promise.resolve({ id: "listing-abc" }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(updateMock.mock.calls[0][0].data).toMatchObject({
+        bookingMode: "WHOLE_UNIT",
+      });
+    });
+
+    it("does not clobber bookingMode when omitted from profile PATCH", async () => {
+      const updateMock = mockOwnerPatchTransaction();
+      const request = new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify(validPatchPayload),
+      });
+
+      const response = await PATCH(request, {
+        params: Promise.resolve({ id: "listing-abc" }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(updateMock.mock.calls[0][0].data).not.toHaveProperty("bookingMode");
+    });
+
     it("returns 409 for legacy inventory writes against HOST_MANAGED listings", async () => {
       (auth as jest.Mock).mockResolvedValue(ownerSession);
       (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);

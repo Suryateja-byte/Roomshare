@@ -12,6 +12,7 @@ import {
   NO_HTML_MSG,
   listingLeaseDurationSchema,
   listingRoomTypeSchema,
+  listingBookingModeSchema,
   listingGenderPreferenceSchema,
   listingHouseholdGenderSchema,
 } from "@/lib/schemas";
@@ -154,6 +155,7 @@ const listingProfilePatchSchema = z
     zip: z.string().trim().min(1).max(20),
     leaseDuration: listingLeaseDurationSchema,
     roomType: listingRoomTypeSchema,
+    bookingMode: listingBookingModeSchema,
     householdLanguages: z
       .array(z.string().trim().toLowerCase().transform(sanitizeUnicode))
       .max(20)
@@ -849,6 +851,7 @@ export async function PATCH(
         zip,
         leaseDuration,
         roomType,
+        bookingMode,
         householdLanguages,
         genderPreference,
         householdGender,
@@ -1086,6 +1089,9 @@ export async function PATCH(
               }),
               leaseDuration: leaseDuration || null,
               roomType: roomType || null,
+              ...(bookingMode !== undefined && {
+                bookingMode: bookingMode || "SHARED",
+              }),
               ...(addressChanged && {
                 normalizedAddress: nextNormalizedAddress,
               }),

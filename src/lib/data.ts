@@ -213,12 +213,12 @@ function applyLegacyBookingModeFilter(
   }
 
   if (bookingMode === "WHOLE_UNIT") {
-    conditions.push(`LOWER(l."roomType") = LOWER('Entire Place')`);
+    conditions.push(`l."booking_mode" = 'WHOLE_UNIT'`);
     return;
   }
 
   if (bookingMode === "SHARED") {
-    conditions.push(`COALESCE(LOWER(l."roomType"), '') <> LOWER('Entire Place')`);
+    conditions.push(`l."booking_mode" = 'SHARED'`);
   }
 }
 

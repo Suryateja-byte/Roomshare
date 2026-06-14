@@ -431,6 +431,7 @@ export async function POST(request: Request) {
       primaryHomeLanguage: primaryHomeLanguage || null,
       leaseDuration: leaseDuration || null,
       roomType: roomType || null,
+      bookingMode: bookingMode || "SHARED",
       totalSlots,
       availableSlots: totalSlots,
       openSlots: totalSlots,
@@ -528,7 +529,8 @@ export async function POST(request: Request) {
             `;
 
       await syncCanonicalAvailability(tx, {
-        listing: { ...listing, bookingMode },
+        // Created row now carries booking_mode, so no transient override needed.
+        listing,
         address: { address, city, state, zip },
         actor: { role: "host", id: userId },
         trustedCoordinates: coords,

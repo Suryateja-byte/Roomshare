@@ -30,6 +30,7 @@ export const publicListingDetailSelect = {
   version: true,
   genderPreference: true,
   householdGender: true,
+  bookingMode: true,
   owner: {
     select: {
       id: true,
