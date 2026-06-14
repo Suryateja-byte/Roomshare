@@ -80,6 +80,9 @@ describe("admin read pages gate on suspended status", () => {
 
   describe.each(adminPages)("$name", ({ Page }) => {
     it("redirects a suspended admin to /", async () => {
+      (auth as jest.Mock).mockResolvedValue({
+        user: { id: "admin-1", isAdmin: true },
+      });
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         isAdmin: true,
         isSuspended: true,
@@ -87,6 +90,16 @@ describe("admin read pages gate on suspended status", () => {
 
       await expect(Page({ searchParams: Promise.resolve({}) })).rejects.toThrow(
         "REDIRECT:/"
+      );
+      expect(prisma.user.findUnique).toHaveBeenCalledTimes(1);
+      expect(prisma.user.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "admin-1" },
+          select: expect.objectContaining({
+            isAdmin: true,
+            isSuspended: true,
+          }),
+        })
       );
       expect(mockRedirect).toHaveBeenCalledTimes(1);
       expect(mockRedirect).toHaveBeenCalledWith("/");
