@@ -509,6 +509,30 @@ describe("Listings API IDOR Protection", () => {
       });
     });
 
+    it("repairs existing Entire Place listings with SHARED bookingMode when bookingMode is omitted", async () => {
+      const updateMock = mockOwnerPatchTransaction({
+        roomType: "Entire Place",
+        bookingMode: "SHARED",
+      });
+      const request = new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify({
+          ...validPatchPayload,
+          title: "Updated Entire Place Title",
+          roomType: "Entire Place",
+        }),
+      });
+
+      const response = await PATCH(request, {
+        params: Promise.resolve({ id: "listing-abc" }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(updateMock.mock.calls[0][0].data).toMatchObject({
+        bookingMode: "WHOLE_UNIT",
+      });
+    });
+
     it("does not clobber bookingMode when omitted from profile PATCH", async () => {
       const updateMock = mockOwnerPatchTransaction();
       const request = new Request("http://localhost/api/listings/listing-abc", {

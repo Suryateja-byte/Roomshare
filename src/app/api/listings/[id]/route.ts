@@ -1127,9 +1127,6 @@ export async function PATCH(
 
           const nextRoomType =
             roomType === undefined ? lockedListing.roomType : roomType;
-          const roomTypeChangedToEntirePlace =
-            roomType === "Entire Place" &&
-            lockedListing.roomType !== "Entire Place";
           const submittedBookingMode =
             bookingMode === "SHARED" || bookingMode === "WHOLE_UNIT"
               ? bookingMode
@@ -1155,17 +1152,17 @@ export async function PATCH(
               } as const;
             }
 
-            if (bookingModeProvided) {
+            if (nextRoomType === "Entire Place") {
+              resolvedBookingModePatch = "WHOLE_UNIT";
+            } else if (bookingModeProvided) {
               resolvedBookingModePatch =
                 submittedBookingMode ?? deriveBookingModeForRoomType(nextRoomType);
-            } else if (roomTypeChangedToEntirePlace) {
-              resolvedBookingModePatch = "WHOLE_UNIT";
             }
+          } else if (nextRoomType === "Entire Place") {
+            resolvedBookingModePatch = "WHOLE_UNIT";
           } else if (bookingModeProvided) {
             resolvedBookingModePatch =
               deriveBookingModeForRoomType(nextRoomType);
-          } else if (roomTypeChangedToEntirePlace) {
-            resolvedBookingModePatch = "WHOLE_UNIT";
           }
 
           const updatedListing = await tx.listing.update({
