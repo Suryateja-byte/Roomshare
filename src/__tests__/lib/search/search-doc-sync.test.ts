@@ -186,9 +186,9 @@ describe("getProjectionDivergenceReason", () => {
     ).toBe("version_skew");
   });
 
-  it("exports SEARCH_DOC_PROJECTION_VERSION as an integer >= 1", () => {
+  it("exports SEARCH_DOC_PROJECTION_VERSION as projection contract version 2", () => {
     expect(Number.isInteger(SEARCH_DOC_PROJECTION_VERSION)).toBe(true);
-    expect(SEARCH_DOC_PROJECTION_VERSION).toBeGreaterThanOrEqual(1);
+    expect(SEARCH_DOC_PROJECTION_VERSION).toBe(2);
   });
 
   it("suppresses stale cron writes when a newer doc version already won the race", async () => {

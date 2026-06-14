@@ -40,7 +40,7 @@ export type CasSuppressionReason =
  * this against `listing_search_docs.projection_version` to detect shape drift
  * even when the underlying listing.updatedAt has not moved.
  */
-export const SEARCH_DOC_PROJECTION_VERSION = 1;
+export const SEARCH_DOC_PROJECTION_VERSION = 2;
 
 interface ListingSearchSnapshot {
   id: string;

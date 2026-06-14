@@ -8,6 +8,9 @@
 -- choice persists and may legitimately diverge from roomType.
 --
 -- Rollback (reversible):
+--   DELETE FROM listing_search_doc_dirty WHERE reason = 'booking_mode_backfill';
+--   Regenerate listing_search_docs from the pre-rollback projection, or restore prior
+--   search docs from backup if preserving stale booking_mode values is required.
 --   ALTER TABLE "Listing" DROP CONSTRAINT "Listing_bookingMode_check";
 --   ALTER TABLE "Listing" DROP COLUMN "booking_mode";
 --
@@ -16,6 +19,8 @@
 --   * Backfill first preserves existing canonical inventory rows that already represent
 --     whole-unit listings, including divergent rows where roomType is not 'Entire Place'.
 --   * Legacy roomType fallback only fills rows without a stronger inventory signal.
+--   * Existing search docs are reconciled and marked dirty so stale booking_mode filters
+--     are repaired immediately and by the durable backstop.
 --   * CHECK added NOT VALID then VALIDATE to avoid a blocking scan on large tables.
 
 ALTER TABLE "Listing"
@@ -35,6 +40,22 @@ UPDATE "Listing"
 SET "booking_mode" = 'WHOLE_UNIT'
 WHERE "roomType" = 'Entire Place'
   AND "booking_mode" <> 'WHOLE_UNIT';
+
+WITH reconciled_search_docs AS (
+  UPDATE listing_search_docs AS doc
+  SET booking_mode = listing."booking_mode",
+      doc_updated_at = NOW()
+  FROM "Listing" AS listing
+  WHERE doc.id = listing.id
+    AND doc.booking_mode IS DISTINCT FROM listing."booking_mode"
+  RETURNING doc.id
+)
+INSERT INTO listing_search_doc_dirty (listing_id, reason, marked_at)
+SELECT id, 'booking_mode_backfill', NOW()
+FROM reconciled_search_docs
+ON CONFLICT (listing_id) DO UPDATE SET
+  reason = EXCLUDED.reason,
+  marked_at = EXCLUDED.marked_at;
 
 ALTER TABLE "Listing"
   ADD CONSTRAINT "Listing_bookingMode_check"

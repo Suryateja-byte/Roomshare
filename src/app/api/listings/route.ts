@@ -414,8 +414,11 @@ export async function POST(request: Request) {
     });
     const listingMoveInDate = new Date(`${moveInDate}T00:00:00.000Z`);
     const listingConfirmedAt = new Date();
-    const resolvedBookingMode =
-      bookingMode ?? (roomType === "Entire Place" ? "WHOLE_UNIT" : "SHARED");
+    const derivedBookingMode =
+      roomType === "Entire Place" ? "WHOLE_UNIT" : "SHARED";
+    const resolvedBookingMode = features.wholeUnitMode
+      ? (bookingMode ?? derivedBookingMode)
+      : derivedBookingMode;
 
     // Build listing create data from validated fields
     const listingCreateData = {

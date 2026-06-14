@@ -32,4 +32,27 @@ describe("listing booking mode migration", () => {
     expect(roomTypeFallbackIndex).toBeGreaterThan(-1);
     expect(inventoryBackfillIndex).toBeLessThan(roomTypeFallbackIndex);
   });
+
+  it("reconciles search docs after Listing backfills and marks dirty rows", () => {
+    expect(migrationSql).toContain("WITH reconciled_search_docs AS");
+    expect(migrationSql).toMatch(
+      /UPDATE\s+listing_search_docs\s+AS\s+doc[\s\S]*SET\s+booking_mode\s*=\s*listing\."booking_mode"[\s\S]*doc_updated_at\s*=\s*NOW\(\)[\s\S]*doc\.booking_mode\s+IS\s+DISTINCT\s+FROM\s+listing\."booking_mode"/
+    );
+    expect(migrationSql).toMatch(
+      /INSERT\s+INTO\s+listing_search_doc_dirty\s+\(listing_id,\s+reason,\s+marked_at\)[\s\S]*'booking_mode_backfill'[\s\S]*ON\s+CONFLICT\s+\(listing_id\)\s+DO\s+UPDATE\s+SET[\s\S]*reason\s*=\s*EXCLUDED\.reason[\s\S]*marked_at\s*=\s*EXCLUDED\.marked_at/
+    );
+
+    const inventoryBackfillIndex = migrationSql.indexOf(
+      'FROM "listing_inventories" AS inventory'
+    );
+    const roomTypeFallbackIndex = migrationSql.indexOf(
+      `WHERE "roomType" = 'Entire Place'`
+    );
+    const reconciliationIndex = migrationSql.indexOf(
+      "WITH reconciled_search_docs AS"
+    );
+
+    expect(reconciliationIndex).toBeGreaterThan(inventoryBackfillIndex);
+    expect(reconciliationIndex).toBeGreaterThan(roomTypeFallbackIndex);
+  });
 });

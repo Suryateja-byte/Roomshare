@@ -182,6 +182,7 @@ import { triggerInstantAlerts } from "@/lib/search-alerts";
 import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 import { syncCanonicalListingInventory } from "@/lib/listings/canonical-inventory";
 import { calculateProfileCompletion } from "@/lib/profile-completion";
+import { features } from "@/lib/env";
 
 // ---------------------------------------------------------------------------
 // Shared fixtures
@@ -262,9 +263,17 @@ function mockSuccessfulTransaction() {
 
 describe("POST /api/listings — extended edge cases", () => {
   const originalGooglePlacesApiKey = process.env.GOOGLE_PLACES_API_KEY;
+  const originalWholeUnitModeDescriptor = Object.getOwnPropertyDescriptor(
+    features,
+    "wholeUnitMode"
+  );
 
   beforeEach(() => {
     jest.clearAllMocks();
+    Object.defineProperty(features, "wholeUnitMode", {
+      configurable: true,
+      get: () => false,
+    });
     process.env.GOOGLE_PLACES_API_KEY = "test-google-key";
     (geocodeAddress as jest.Mock).mockReset();
     (verifyAddressSuggestionToken as jest.Mock).mockReset();
@@ -307,6 +316,13 @@ describe("POST /api/listings — extended edge cases", () => {
   });
 
   afterAll(() => {
+    if (originalWholeUnitModeDescriptor) {
+      Object.defineProperty(
+        features,
+        "wholeUnitMode",
+        originalWholeUnitModeDescriptor
+      );
+    }
     if (originalGooglePlacesApiKey === undefined) {
       delete process.env.GOOGLE_PLACES_API_KEY;
     } else {
@@ -558,12 +574,33 @@ describe("POST /api/listings — extended edge cases", () => {
     }
 
     it("persists bookingMode WHOLE_UNIT even when roomType diverges", async () => {
+      Object.defineProperty(features, "wholeUnitMode", {
+        configurable: true,
+        get: () => true,
+      });
       const { create } = mockCapturingTransaction();
       const response = await POST(
         makeRequest({
           ...validBody,
           roomType: "Private Room",
           bookingMode: "WHOLE_UNIT",
+        })
+      );
+      expect(response.status).toBe(201);
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ bookingMode: "WHOLE_UNIT" }),
+        })
+      );
+    });
+
+    it("derives WHOLE_UNIT from Entire Place when wholeUnitMode is disabled even if SHARED is posted", async () => {
+      const { create } = mockCapturingTransaction();
+      const response = await POST(
+        makeRequest({
+          ...validBody,
+          roomType: "Entire Place",
+          bookingMode: "SHARED",
         })
       );
       expect(response.status).toBe(201);
