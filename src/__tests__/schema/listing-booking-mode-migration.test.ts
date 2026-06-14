@@ -25,7 +25,7 @@ describe("listing booking mode migration", () => {
       'FROM "listing_inventories" AS inventory'
     );
     const roomTypeFallbackIndex = migrationSql.indexOf(
-      'WHERE "roomType" = \'Entire Place\''
+      `WHERE "roomType" = 'Entire Place'`
     );
 
     expect(inventoryBackfillIndex).toBeGreaterThan(-1);
