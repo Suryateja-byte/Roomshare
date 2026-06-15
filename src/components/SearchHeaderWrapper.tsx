@@ -9,8 +9,7 @@
  * - Collapsed bar shows location summary and filter access
  *
  * On desktop:
- * - Shows the full search bar when at top or manually expanded
- * - Shows compact search pill when scrolled down
+ * - Always shows the full search bar (no scroll collapse)
  */
 
 import { useCallback, useState, useRef, useEffect, useId } from "react";
@@ -26,7 +25,6 @@ import {
   Bookmark,
   MessageSquare,
 } from "lucide-react";
-import { useScrollHeader } from "@/hooks/useScrollHeader";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useMobileSearch } from "@/contexts/MobileSearchContext";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
@@ -101,7 +99,6 @@ const MenuItem = ({
 };
 
 export default function SearchHeaderWrapper() {
-  const { isCollapsed } = useScrollHeader({ threshold: 80 });
   const { openFilters } = useMobileSearch();
   const isMobileViewport = useMediaQuery("(max-width: 767px)");
   const { data: session } = useSession();
@@ -337,7 +334,7 @@ export default function SearchHeaderWrapper() {
 
   return (
     <>
-      {/* Full search form - hidden on mobile always, hidden on desktop when collapsed */}
+      {/* Full search form - hidden on mobile always, always shown on desktop */}
       <div className="hidden transition-all duration-300 ease-out md:block">
         <div className="mx-auto w-full max-w-[1920px] px-4 py-4 xl:px-8">
           <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-4 xl:grid-cols-[auto_minmax(620px,1120px)_auto] xl:gap-6">
@@ -359,10 +356,7 @@ export default function SearchHeaderWrapper() {
 
             {/* Desktop header search — mobile keeps the full-screen overlay flow */}
             <div className="relative hidden min-w-0 justify-center md:flex">
-              <DesktopHeaderSearch
-                ref={desktopSearchRef}
-                collapsed={isCollapsed}
-              />
+              <DesktopHeaderSearch ref={desktopSearchRef} collapsed={false} />
             </div>
 
             {/* Right Actions - User Profile / Auth */}
