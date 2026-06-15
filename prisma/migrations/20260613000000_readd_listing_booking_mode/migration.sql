@@ -66,11 +66,21 @@ WHERE listing."roomType" = 'Entire Place'
 
 WITH reconciled_search_docs AS (
   UPDATE listing_search_docs AS doc
-  SET booking_mode = listing."booking_mode",
+  SET booking_mode = listing.effective_booking_mode,
       doc_updated_at = NOW()
-  FROM "Listing" AS listing
+  FROM (
+    SELECT
+      listing.id,
+      CASE
+        WHEN listing."booking_mode" = 'WHOLE_UNIT'
+          OR listing."roomType" = 'Entire Place'
+        THEN 'WHOLE_UNIT'
+        ELSE COALESCE(listing."booking_mode", 'SHARED')
+      END AS effective_booking_mode
+    FROM "Listing" AS listing
+  ) AS listing
   WHERE doc.id = listing.id
-    AND doc.booking_mode IS DISTINCT FROM listing."booking_mode"
+    AND doc.booking_mode IS DISTINCT FROM listing.effective_booking_mode
   RETURNING doc.id
 )
 INSERT INTO listing_search_doc_dirty (listing_id, reason, marked_at)

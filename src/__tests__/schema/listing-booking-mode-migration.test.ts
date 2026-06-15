@@ -39,7 +39,13 @@ describe("listing booking mode migration", () => {
   it("reconciles search docs after Listing backfills and marks dirty rows", () => {
     expect(migrationSql).toContain("WITH reconciled_search_docs AS");
     expect(migrationSql).toMatch(
-      /UPDATE\s+listing_search_docs\s+AS\s+doc[\s\S]*SET\s+booking_mode\s*=\s*listing\."booking_mode"[\s\S]*doc_updated_at\s*=\s*NOW\(\)[\s\S]*doc\.booking_mode\s+IS\s+DISTINCT\s+FROM\s+listing\."booking_mode"/
+      /CASE\s+WHEN\s+listing\."booking_mode"\s*=\s*'WHOLE_UNIT'\s+OR\s+listing\."roomType"\s*=\s*'Entire Place'\s+THEN\s+'WHOLE_UNIT'\s+ELSE\s+COALESCE\(listing\."booking_mode",\s*'SHARED'\)\s+END\s+AS\s+effective_booking_mode/
+    );
+    expect(migrationSql).toMatch(
+      /UPDATE\s+listing_search_docs\s+AS\s+doc[\s\S]*SET\s+booking_mode\s*=\s*listing\.effective_booking_mode[\s\S]*doc_updated_at\s*=\s*NOW\(\)[\s\S]*doc\.booking_mode\s+IS\s+DISTINCT\s+FROM\s+listing\.effective_booking_mode/
+    );
+    expect(migrationSql).not.toMatch(
+      /SET\s+booking_mode\s*=\s*listing\."booking_mode"[\s\S]*doc\.booking_mode\s+IS\s+DISTINCT\s+FROM\s+listing\."booking_mode"/
     );
     expect(migrationSql).toMatch(
       /INSERT\s+INTO\s+listing_search_doc_dirty\s+\(listing_id,\s+reason,\s+marked_at\)[\s\S]*'booking_mode_backfill'[\s\S]*ON\s+CONFLICT\s+\(listing_id\)\s+DO\s+UPDATE\s+SET[\s\S]*reason\s*=\s*EXCLUDED\.reason[\s\S]*marked_at\s*=\s*EXCLUDED\.marked_at/
