@@ -189,6 +189,16 @@ function computeRecommendedScore(
   return ratingScore + viewScore + reviewScore + freshnessBoost;
 }
 
+function resolveSearchBookingMode(
+  listing: Pick<ListingWithData, "bookingMode" | "roomType">
+): string {
+  if (listing.bookingMode === "WHOLE_UNIT" || listing.roomType === "Entire Place") {
+    return "WHOLE_UNIT";
+  }
+
+  return listing.bookingMode || "SHARED";
+}
+
 /**
  * Upsert a batch of search docs
  */
@@ -217,6 +227,7 @@ async function upsertSearchDocsBatch(
     const householdLanguagesLower = listing.householdLanguages.map((l) =>
       l.toLowerCase()
     );
+    const searchBookingMode = resolveSearchBookingMode(listing);
 
     // Use raw SQL for upsert with geography type
     await prisma.$executeRaw`
@@ -233,7 +244,7 @@ async function upsertSearchDocsBatch(
       ) VALUES (
         ${listing.id}, ${listing.ownerId}, ${listing.title}, ${listing.description}, ${listing.price}, ${listing.images},
         ${listing.amenities}, ${listing.houseRules}, ${listing.householdLanguages}, ${listing.primaryHomeLanguage},
-        ${listing.leaseDuration}, ${listing.roomType}, ${listing.bookingMode}, ${listing.moveInDate}, ${listing.totalSlots}, ${listing.availableSlots},
+        ${listing.leaseDuration}, ${listing.roomType}, ${searchBookingMode}, ${listing.moveInDate}, ${listing.totalSlots}, ${listing.availableSlots},
         ${listing.viewCount}, ${listing.status}, ${listing.createdAt},
         ${listing.address}, ${listing.city}, ${listing.state}, ${listing.zip},
         ST_SetSRID(ST_MakePoint(${listing.lng}, ${listing.lat}), 4326)::geography,

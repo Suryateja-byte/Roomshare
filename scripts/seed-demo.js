@@ -18,6 +18,10 @@ const prisma = new PrismaClient();
 const DRY_RUN = process.argv.includes('--dry-run');
 const DEMO_PASSWORD = 'RoomshareDemo2026!';
 
+function deriveBookingMode(roomType) {
+  return roomType === 'Entire Place' ? 'WHOLE_UNIT' : 'SHARED';
+}
+
 // ---------------------------------------------------------------------------
 // Demo user definitions
 // ---------------------------------------------------------------------------
@@ -473,6 +477,7 @@ async function tableExists(tableName) {
 // upsertListingWithLocation — mirrors seed-e2e.js exactly
 // ---------------------------------------------------------------------------
 async function upsertListingWithLocation(ownerId, seed) {
+  const bookingMode = seed.bookingMode || deriveBookingMode(seed.roomType);
   const listing = await prisma.listing.upsert({
     where: { id: seed.id },
     update: {
@@ -481,6 +486,7 @@ async function upsertListingWithLocation(ownerId, seed) {
       description: seed.description,
       price: seed.price,
       roomType: seed.roomType,
+      bookingMode,
       amenities: seed.amenities || ['Wifi', 'Furnished', 'Kitchen'],
       houseRules: seed.houseRules || [],
       householdLanguages: ['en'],
@@ -518,6 +524,7 @@ async function upsertListingWithLocation(ownerId, seed) {
       description: seed.description,
       price: seed.price,
       roomType: seed.roomType,
+      bookingMode,
       amenities: seed.amenities || ['Wifi', 'Furnished', 'Kitchen'],
       houseRules: seed.houseRules || [],
       householdLanguages: ['en'],
@@ -912,7 +919,7 @@ async function main() {
         INSERT INTO listing_search_docs (
           id, owner_id, title, description, price, images,
           amenities, house_rules, household_languages, primary_home_language,
-          lease_duration, room_type, move_in_date, total_slots, available_slots,
+          lease_duration, room_type, booking_mode, move_in_date, total_slots, available_slots,
           view_count, status, listing_created_at,
           address, city, state, zip, location_geog, lat, lng,
           avg_rating, review_count, recommended_score,
@@ -923,7 +930,12 @@ async function main() {
         SELECT
           l.id, l."ownerId", l.title, l.description, l.price, l.images,
           l.amenities, l."houseRules", l."household_languages", l."primary_home_language",
-          l."leaseDuration", l."roomType", l."moveInDate", l."totalSlots", l."availableSlots",
+          l."leaseDuration", l."roomType",
+          CASE
+            WHEN l."booking_mode" = 'WHOLE_UNIT' OR l."roomType" = 'Entire Place' THEN 'WHOLE_UNIT'
+            ELSE COALESCE(l."booking_mode", 'SHARED')
+          END,
+          l."moveInDate", l."totalSlots", l."availableSlots",
           l."viewCount", l.status::text, l."createdAt",
           loc.address, loc.city, loc.state, loc.zip,
           loc.coords, ST_Y(loc.coords::geometry), ST_X(loc.coords::geometry),
@@ -949,6 +961,7 @@ async function main() {
           primary_home_language = EXCLUDED.primary_home_language,
           lease_duration = EXCLUDED.lease_duration,
           room_type = EXCLUDED.room_type,
+          booking_mode = EXCLUDED.booking_mode,
           move_in_date = EXCLUDED.move_in_date,
           total_slots = EXCLUDED.total_slots,
           available_slots = EXCLUDED.available_slots,

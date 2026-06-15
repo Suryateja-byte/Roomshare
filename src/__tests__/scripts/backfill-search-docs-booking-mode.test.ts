@@ -10,6 +10,8 @@ describe("src/scripts/backfill-search-docs booking mode projection", () => {
   it("selects Listing.bookingMode for search-doc backfills", () => {
     expect(script).toContain("bookingMode: string;");
     expect(script).toContain('l."booking_mode" as "bookingMode"');
+    expect(script).toContain("function resolveSearchBookingMode");
+    expect(script).toContain('listing.roomType === "Entire Place"');
   });
 
   it("upserts booking_mode into listing_search_docs", () => {
@@ -17,7 +19,7 @@ describe("src/scripts/backfill-search-docs booking mode projection", () => {
       /lease_duration,\s*room_type,\s*booking_mode,\s*move_in_date/
     );
     expect(script).toMatch(
-      /\$\{listing\.leaseDuration\},\s*\$\{listing\.roomType\},\s*\$\{listing\.bookingMode\},\s*\$\{listing\.moveInDate\}/
+      /\$\{listing\.leaseDuration\},\s*\$\{listing\.roomType\},\s*\$\{searchBookingMode\},\s*\$\{listing\.moveInDate\}/
     );
     expect(script).toContain("booking_mode = EXCLUDED.booking_mode");
   });

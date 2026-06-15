@@ -54,6 +54,10 @@ function toNumberParam(value: unknown, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function deriveBookingMode(roomType: string | null | undefined): "WHOLE_UNIT" | "SHARED" {
+  return roomType === "Entire Place" ? "WHOLE_UNIT" : "SHARED";
+}
+
 async function setListingCoords(listingId: string, lng: number, lat: number) {
   await prisma.$executeRaw`
     UPDATE "Location"
@@ -564,6 +568,7 @@ export async function POST(request: NextRequest) {
               description,
               price,
               roomType,
+              bookingMode: deriveBookingMode(roomType),
               amenities: ["Wifi", "Kitchen"],
               houseRules: ["No Smoking"],
               householdLanguages: ["en"],

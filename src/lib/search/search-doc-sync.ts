@@ -40,7 +40,7 @@ export type CasSuppressionReason =
  * this against `listing_search_docs.projection_version` to detect shape drift
  * even when the underlying listing.updatedAt has not moved.
  */
-export const SEARCH_DOC_PROJECTION_VERSION = 2;
+export const SEARCH_DOC_PROJECTION_VERSION = 3;
 
 interface ListingSearchSnapshot {
   id: string;
@@ -192,6 +192,16 @@ function canProjectSearchDocument(listing: ListingSearchSnapshot): boolean {
   );
 }
 
+function resolveSearchBookingMode(
+  listing: Pick<ListingSearchSnapshot, "bookingMode" | "roomType">
+): string {
+  if (listing.bookingMode === "WHOLE_UNIT" || listing.roomType === "Entire Place") {
+    return "WHOLE_UNIT";
+  }
+
+  return listing.bookingMode || "SHARED";
+}
+
 function classifyCasSuppressionReason(
   listing: Pick<
     ListingSearchSnapshot,
@@ -242,6 +252,7 @@ async function writeSearchDocument(
   const householdLanguagesLower = listing.householdLanguages.map((language) =>
     language.toLowerCase()
   );
+  const searchBookingMode = resolveSearchBookingMode(listing);
 
   const rowsAffected = await prisma.$executeRaw`
     INSERT INTO listing_search_docs (
@@ -265,7 +276,7 @@ async function writeSearchDocument(
       ${listing.lat}, ${listing.lng},
       ${listing.avgRating}, ${listing.reviewCount}, ${recommendedScore},
       ${amenitiesLower}, ${houseRulesLower}, ${householdLanguagesLower},
-      ${listing.bookingMode},
+      ${searchBookingMode},
       ${SEARCH_DOC_PROJECTION_VERSION}, ${listing.version},
       NOW(), NOW()
     )

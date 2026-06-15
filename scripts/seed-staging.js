@@ -423,6 +423,10 @@ function daysFromNow(days) {
   return date;
 }
 
+function deriveBookingMode(roomType) {
+  return roomType === "Entire Place" ? "WHOLE_UNIT" : "SHARED";
+}
+
 function buildListingData(seed, ownerId) {
   const moveInDate = daysFromNow(seed.status === "ACTIVE" ? 14 : 30);
   const availableUntil = daysFromNow(180);
@@ -438,6 +442,7 @@ function buildListingData(seed, ownerId) {
     houseRules: seed.houseRules,
     leaseDuration: seed.leaseDuration,
     roomType: seed.roomType,
+    bookingMode: seed.bookingMode || deriveBookingMode(seed.roomType),
     normalizedAddress:
       `${seed.address}, ${seed.city}, ${seed.state} ${seed.zip}`
         .toLowerCase()
