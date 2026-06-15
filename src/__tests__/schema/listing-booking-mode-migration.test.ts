@@ -15,10 +15,13 @@ describe("listing booking mode migration", () => {
 
   it("backfills whole-unit mode from canonical inventory before roomType fallback", () => {
     expect(migrationSql).toMatch(
-      /UPDATE\s+"Listing"\s+AS\s+listing[\s\S]*FROM\s+"listing_inventories"\s+AS\s+inventory[\s\S]*inventory\.unit_id\s*=\s*listing\."physical_unit_id"[\s\S]*inventory\.room_category\s*=\s*'ENTIRE_PLACE'[\s\S]*listing\."booking_mode"\s*<>\s*'WHOLE_UNIT'/
+      /UPDATE\s+"Listing"\s+AS\s+listing[\s\S]*FROM\s+"listing_inventories"\s+AS\s+inventory[\s\S]*inventory\.id\s*=\s*listing\.id[\s\S]*inventory\.inventory_key\s*=\s*\('listing:'\s*\|\|\s*listing\.id\)[\s\S]*inventory\.lifecycle_status\s*=\s*'ACTIVE'[\s\S]*inventory\.publish_status\s+IN\s*\([\s\S]*'PENDING_GEOCODE'[\s\S]*'PENDING_PROJECTION'[\s\S]*'PENDING_EMBEDDING'[\s\S]*'PUBLISHED'[\s\S]*'STALE_PUBLISHED'[\s\S]*\)[\s\S]*inventory\.room_category\s*=\s*'ENTIRE_PLACE'[\s\S]*listing\."booking_mode"\s*<>\s*'WHOLE_UNIT'/
     );
     expect(migrationSql).toMatch(
-      /UPDATE\s+"Listing"\s+AS\s+listing[\s\S]*SET\s+"booking_mode"\s*=\s*'WHOLE_UNIT'[\s\S]*WHERE\s+listing\."roomType"\s*=\s*'Entire Place'[\s\S]*listing\."booking_mode"\s*<>\s*'WHOLE_UNIT'[\s\S]*NOT\s+EXISTS\s*\([\s\S]*SELECT\s+1[\s\S]*FROM\s+"listing_inventories"\s+AS\s+inventory[\s\S]*inventory\.unit_id\s*=\s*listing\."physical_unit_id"[\s\S]*\)/
+      /UPDATE\s+"Listing"\s+AS\s+listing[\s\S]*SET\s+"booking_mode"\s*=\s*'WHOLE_UNIT'[\s\S]*WHERE\s+listing\."roomType"\s*=\s*'Entire Place'[\s\S]*listing\."booking_mode"\s*<>\s*'WHOLE_UNIT'[\s\S]*NOT\s+EXISTS\s*\([\s\S]*SELECT\s+1[\s\S]*FROM\s+"listing_inventories"\s+AS\s+inventory[\s\S]*inventory\.id\s*=\s*listing\.id[\s\S]*inventory\.inventory_key\s*=\s*\('listing:'\s*\|\|\s*listing\.id\)[\s\S]*inventory\.lifecycle_status\s*=\s*'ACTIVE'[\s\S]*inventory\.publish_status\s+IN\s*\([\s\S]*'PENDING_GEOCODE'[\s\S]*'PENDING_PROJECTION'[\s\S]*'PENDING_EMBEDDING'[\s\S]*'PUBLISHED'[\s\S]*'STALE_PUBLISHED'[\s\S]*\)[\s\S]*\)/
+    );
+    expect(migrationSql).not.toContain(
+      'inventory.unit_id = listing."physical_unit_id"'
     );
 
     const inventoryBackfillIndex = migrationSql.indexOf(

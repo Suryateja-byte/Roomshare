@@ -31,7 +31,16 @@ ALTER TABLE "Listing"
 UPDATE "Listing" AS listing
 SET "booking_mode" = 'WHOLE_UNIT'
 FROM "listing_inventories" AS inventory
-WHERE inventory.unit_id = listing."physical_unit_id"
+WHERE inventory.id = listing.id
+  AND inventory.inventory_key = ('listing:' || listing.id)
+  AND inventory.lifecycle_status = 'ACTIVE'
+  AND inventory.publish_status IN (
+    'PENDING_GEOCODE',
+    'PENDING_PROJECTION',
+    'PENDING_EMBEDDING',
+    'PUBLISHED',
+    'STALE_PUBLISHED'
+  )
   AND inventory.room_category = 'ENTIRE_PLACE'
   AND listing."booking_mode" <> 'WHOLE_UNIT';
 
@@ -43,7 +52,16 @@ WHERE listing."roomType" = 'Entire Place'
   AND NOT EXISTS (
     SELECT 1
     FROM "listing_inventories" AS inventory
-    WHERE inventory.unit_id = listing."physical_unit_id"
+    WHERE inventory.id = listing.id
+      AND inventory.inventory_key = ('listing:' || listing.id)
+      AND inventory.lifecycle_status = 'ACTIVE'
+      AND inventory.publish_status IN (
+        'PENDING_GEOCODE',
+        'PENDING_PROJECTION',
+        'PENDING_EMBEDDING',
+        'PUBLISHED',
+        'STALE_PUBLISHED'
+      )
   );
 
 WITH reconciled_search_docs AS (
