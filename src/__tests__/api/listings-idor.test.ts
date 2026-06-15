@@ -163,6 +163,7 @@ import {
   getFuturePeakReservedLoad,
   syncFutureInventoryTotalSlots,
 } from "@/lib/availability";
+import { features } from "@/lib/env";
 
 function makeAvailabilitySnapshot(
   overrides: Partial<{
@@ -192,6 +193,7 @@ function makeLockedListing(
     ownerId: string;
     totalSlots: number;
     availableSlots: number;
+    roomType: string | null;
     bookingMode: string;
     availabilitySource: "LEGACY_BOOKING" | "HOST_MANAGED";
     moveInDate: Date | null;
@@ -210,6 +212,7 @@ function makeLockedListing(
     openSlots: 2,
     totalSlots: 2,
     availableSlots: 2,
+    roomType: null,
     bookingMode: "SHARED",
     availabilitySource: "LEGACY_BOOKING" as const,
     moveInDate: new Date("2026-05-01T00:00:00.000Z"),
@@ -220,6 +223,11 @@ function makeLockedListing(
 }
 
 describe("Listings API IDOR Protection", () => {
+  const originalWholeUnitModeDescriptor = Object.getOwnPropertyDescriptor(
+    features,
+    "wholeUnitMode"
+  );
+
   const ownerSession = {
     user: { id: "owner-123", email: "owner@example.com", isSuspended: false },
     authTime: Math.floor(Date.now() / 1000),
@@ -273,10 +281,24 @@ describe("Listings API IDOR Protection", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    Object.defineProperty(features, "wholeUnitMode", {
+      configurable: true,
+      get: () => false,
+    });
     (prisma.user.findUnique as jest.Mock).mockResolvedValue({ password: null });
     (getAvailability as jest.Mock).mockResolvedValue(makeAvailabilitySnapshot());
     (getFuturePeakReservedLoad as jest.Mock).mockResolvedValue(0);
     (syncFutureInventoryTotalSlots as jest.Mock).mockResolvedValue(undefined);
+  });
+
+  afterAll(() => {
+    if (originalWholeUnitModeDescriptor) {
+      Object.defineProperty(
+        features,
+        "wholeUnitMode",
+        originalWholeUnitModeDescriptor
+      );
+    }
   });
 
   describe("PATCH /api/listings/[id]", () => {
@@ -292,6 +314,7 @@ describe("Listings API IDOR Protection", () => {
           description: "Hacked description",
           price: "1",
           totalSlots: "1",
+          bookingMode: "WHOLE_UNIT",
         }),
       });
 
@@ -348,6 +371,181 @@ describe("Listings API IDOR Protection", () => {
       const sqlStrings = queryRawMock.mock.calls[0][0].join("");
       expect(sqlStrings).toContain("FOR UPDATE");
       expect(updateMock).toHaveBeenCalled();
+    });
+
+    // P1 regression: bookingMode must persist on profile edit, and must not be
+    // clobbered when a (flag-off) client omits it from the payload.
+    function mockOwnerPatchTransaction(
+      lockedOverrides: Parameters<typeof makeLockedListing>[0] = {}
+    ) {
+      (auth as jest.Mock).mockResolvedValue(ownerSession);
+      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
+      const lockedListing = makeLockedListing(lockedOverrides);
+      const updateMock = jest
+        .fn()
+        .mockResolvedValue({ ...mockListing, title: "Updated Title" });
+      (prisma.$transaction as jest.Mock).mockImplementation(
+        async (callback) => {
+          const tx = {
+            $queryRaw: jest.fn().mockResolvedValue([lockedListing]),
+            listing: {
+              findUnique: jest.fn().mockResolvedValue(lockedListing),
+              update: updateMock,
+            },
+            location: { update: jest.fn() },
+            $executeRaw: jest.fn(),
+          };
+          return callback(tx);
+        }
+      );
+      return updateMock;
+    }
+
+    it("persists bookingMode on profile PATCH when provided and wholeUnitMode is enabled", async () => {
+      Object.defineProperty(features, "wholeUnitMode", {
+        configurable: true,
+        get: () => true,
+      });
+      const updateMock = mockOwnerPatchTransaction();
+      const request = new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify({ ...validPatchPayload, bookingMode: "WHOLE_UNIT" }),
+      });
+
+      const response = await PATCH(request, {
+        params: Promise.resolve({ id: "listing-abc" }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(updateMock.mock.calls[0][0].data).toMatchObject({
+        bookingMode: "WHOLE_UNIT",
+      });
+    });
+
+    it("derives SHARED when wholeUnitMode is disabled and non-entire roomType posts WHOLE_UNIT", async () => {
+      const updateMock = mockOwnerPatchTransaction({ roomType: "Private Room" });
+      const request = new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify({
+          ...validPatchPayload,
+          roomType: "Private Room",
+          bookingMode: "WHOLE_UNIT",
+        }),
+      });
+
+      const response = await PATCH(request, {
+        params: Promise.resolve({ id: "listing-abc" }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(updateMock.mock.calls[0][0].data).toMatchObject({
+        bookingMode: "SHARED",
+      });
+    });
+
+    it("derives WHOLE_UNIT when wholeUnitMode is disabled and Entire Place posts SHARED", async () => {
+      const updateMock = mockOwnerPatchTransaction({ roomType: "Private Room" });
+      const request = new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify({
+          ...validPatchPayload,
+          roomType: "Entire Place",
+          bookingMode: "SHARED",
+        }),
+      });
+
+      const response = await PATCH(request, {
+        params: Promise.resolve({ id: "listing-abc" }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(updateMock.mock.calls[0][0].data).toMatchObject({
+        bookingMode: "WHOLE_UNIT",
+      });
+    });
+
+    it("rejects enabled wholeUnitMode Entire Place PATCH with SHARED bookingMode", async () => {
+      Object.defineProperty(features, "wholeUnitMode", {
+        configurable: true,
+        get: () => true,
+      });
+      const updateMock = mockOwnerPatchTransaction({ roomType: "Private Room" });
+      const request = new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify({
+          ...validPatchPayload,
+          roomType: "Entire Place",
+          bookingMode: "SHARED",
+        }),
+      });
+
+      const response = await PATCH(request, {
+        params: Promise.resolve({ id: "listing-abc" }),
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body.fields).toHaveProperty("bookingMode");
+      expect(updateMock).not.toHaveBeenCalled();
+    });
+
+    it("sets WHOLE_UNIT when roomType changes to Entire Place and bookingMode is omitted", async () => {
+      const updateMock = mockOwnerPatchTransaction({ roomType: "Private Room" });
+      const request = new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify({
+          ...validPatchPayload,
+          roomType: "Entire Place",
+        }),
+      });
+
+      const response = await PATCH(request, {
+        params: Promise.resolve({ id: "listing-abc" }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(updateMock.mock.calls[0][0].data).toMatchObject({
+        bookingMode: "WHOLE_UNIT",
+      });
+    });
+
+    it("repairs existing Entire Place listings with SHARED bookingMode when bookingMode is omitted", async () => {
+      const updateMock = mockOwnerPatchTransaction({
+        roomType: "Entire Place",
+        bookingMode: "SHARED",
+      });
+      const request = new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify({
+          ...validPatchPayload,
+          title: "Updated Entire Place Title",
+          roomType: "Entire Place",
+        }),
+      });
+
+      const response = await PATCH(request, {
+        params: Promise.resolve({ id: "listing-abc" }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(updateMock.mock.calls[0][0].data).toMatchObject({
+        bookingMode: "WHOLE_UNIT",
+      });
+    });
+
+    it("does not clobber bookingMode when omitted from profile PATCH", async () => {
+      const updateMock = mockOwnerPatchTransaction();
+      const request = new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify(validPatchPayload),
+      });
+
+      const response = await PATCH(request, {
+        params: Promise.resolve({ id: "listing-abc" }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(updateMock.mock.calls[0][0].data).not.toHaveProperty("bookingMode");
     });
 
     it("returns 409 for legacy inventory writes against HOST_MANAGED listings", async () => {

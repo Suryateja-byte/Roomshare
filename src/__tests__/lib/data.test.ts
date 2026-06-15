@@ -1512,3 +1512,71 @@ describe("slotThreshold parameterization", () => {
     });
   });
 });
+
+describe("legacy bookingMode SQL filters", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("uses effective whole-unit semantics for map listings", async () => {
+    mockQueryWithTimeout.mockResolvedValue([]);
+
+    await getMapListings({
+      bookingMode: "WHOLE_UNIT",
+      bounds: { minLat: 30, maxLat: 40, minLng: -120, maxLng: -110 },
+    });
+
+    const sql = mockQueryWithTimeout.mock.calls[0][0] as string;
+
+    expect(sql).toContain(
+      `(l."booking_mode" = 'WHOLE_UNIT' OR l."roomType" = 'Entire Place')`
+    );
+  });
+
+  it("uses effective shared semantics for map listings", async () => {
+    mockQueryWithTimeout.mockResolvedValue([]);
+
+    await getMapListings({
+      bookingMode: "SHARED",
+      bounds: { minLat: 30, maxLat: 40, minLng: -120, maxLng: -110 },
+    });
+
+    const sql = mockQueryWithTimeout.mock.calls[0][0] as string;
+
+    expect(sql).toContain(
+      `(l."booking_mode" = 'SHARED' AND (l."roomType" IS NULL OR l."roomType" <> 'Entire Place'))`
+    );
+  });
+
+  it("uses effective whole-unit semantics for paginated listings", async () => {
+    mockQueryWithTimeout.mockResolvedValue([{ total: BigInt(0) }]);
+
+    await getListingsPaginated({
+      bookingMode: "WHOLE_UNIT",
+      bounds: { minLat: 30, maxLat: 40, minLng: -120, maxLng: -110 },
+    });
+
+    for (const call of mockQueryWithTimeout.mock.calls) {
+      const sql = call[0] as string;
+      expect(sql).toContain(
+        `(l."booking_mode" = 'WHOLE_UNIT' OR l."roomType" = 'Entire Place')`
+      );
+    }
+  });
+
+  it("uses effective shared semantics for paginated listings", async () => {
+    mockQueryWithTimeout.mockResolvedValue([{ total: BigInt(0) }]);
+
+    await getListingsPaginated({
+      bookingMode: "SHARED",
+      bounds: { minLat: 30, maxLat: 40, minLng: -120, maxLng: -110 },
+    });
+
+    for (const call of mockQueryWithTimeout.mock.calls) {
+      const sql = call[0] as string;
+      expect(sql).toContain(
+        `(l."booking_mode" = 'SHARED' AND (l."roomType" IS NULL OR l."roomType" <> 'Entire Place'))`
+      );
+    }
+  });
+});

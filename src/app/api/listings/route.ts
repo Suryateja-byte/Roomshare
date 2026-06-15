@@ -63,6 +63,9 @@ class ListingCollisionRateLimitedError extends Error {
   }
 }
 
+const WHOLE_UNIT_ROOM_TYPE_BOOKING_MODE_ERROR =
+  "Entire place listings must use whole-unit booking mode";
+
 export async function GET(request: Request) {
   // Use Redis-backed limiter for high-volume read path consistency.
   const rateLimitResponse = await withRateLimitRedis(request, {
@@ -414,6 +417,27 @@ export async function POST(request: Request) {
     });
     const listingMoveInDate = new Date(`${moveInDate}T00:00:00.000Z`);
     const listingConfirmedAt = new Date();
+    const derivedBookingMode =
+      roomType === "Entire Place" ? "WHOLE_UNIT" : "SHARED";
+    const resolvedBookingMode = features.wholeUnitMode
+      ? (bookingMode ?? derivedBookingMode)
+      : derivedBookingMode;
+    if (
+      features.wholeUnitMode &&
+      roomType === "Entire Place" &&
+      bookingMode === "SHARED"
+    ) {
+      return NextResponse.json(
+        {
+          error: WHOLE_UNIT_ROOM_TYPE_BOOKING_MODE_ERROR,
+          field: "bookingMode",
+          fields: {
+            bookingMode: WHOLE_UNIT_ROOM_TYPE_BOOKING_MODE_ERROR,
+          },
+        },
+        { status: 400 }
+      );
+    }
 
     // Build listing create data from validated fields
     const listingCreateData = {
@@ -431,6 +455,7 @@ export async function POST(request: Request) {
       primaryHomeLanguage: primaryHomeLanguage || null,
       leaseDuration: leaseDuration || null,
       roomType: roomType || null,
+      bookingMode: resolvedBookingMode,
       totalSlots,
       availableSlots: totalSlots,
       openSlots: totalSlots,
@@ -528,7 +553,8 @@ export async function POST(request: Request) {
             `;
 
       await syncCanonicalAvailability(tx, {
-        listing: { ...listing, bookingMode },
+        // Created row now carries booking_mode, so no transient override needed.
+        listing,
         address: { address, city, state, zip },
         actor: { role: "host", id: userId },
         trustedCoordinates: coords,

@@ -478,6 +478,20 @@ describe("CreateListingForm", () => {
       });
     });
 
+    it("omits bookingMode from the POST body when whole-unit mode is disabled", async () => {
+      render(<CreateListingForm enableWholeUnitMode={false} />);
+      await addImageAndSubmit();
+
+      await waitFor(() => {
+        expect(fetchSpy).toHaveBeenCalled();
+      });
+
+      const [, options] = fetchSpy.mock.calls[0];
+      expect(JSON.parse(options.body as string)).not.toHaveProperty(
+        "bookingMode"
+      );
+    });
+
     it("includes X-Idempotency-Key header", async () => {
       render(<CreateListingForm />);
       await addImageAndSubmit();

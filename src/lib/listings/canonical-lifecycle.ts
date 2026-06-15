@@ -104,6 +104,7 @@ export async function syncListingLifecycleProjectionInTx(
       physicalUnitId: true,
       price: true,
       roomType: true,
+      bookingMode: true,
       totalSlots: true,
       availableSlots: true,
       openSlots: true,

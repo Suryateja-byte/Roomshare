@@ -591,7 +591,7 @@ export default function CreateListingForm({
       roomType: roomType || undefined,
       genderPreference: genderPreference || undefined,
       householdGender: householdGender || undefined,
-      bookingMode: enableWholeUnitMode ? bookingMode : "SHARED",
+      ...(enableWholeUnitMode ? { bookingMode } : {}),
     };
 
     // Client-side Zod pre-validation (optimistic — server validates as defense-in-depth)

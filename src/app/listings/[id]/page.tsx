@@ -361,7 +361,7 @@ export default async function ListingPage({ params, searchParams }: PageProps) {
           availableSlots: resolvedAvailability.effectiveAvailableSlots,
           version: listing.version,
           availabilitySource: resolvedAvailability.availabilitySource,
-          bookingMode: "SHARED",
+          bookingMode: listing.bookingMode,
           status: listing.status,
           statusReason: listing.statusReason,
           viewCount: listing.viewCount,

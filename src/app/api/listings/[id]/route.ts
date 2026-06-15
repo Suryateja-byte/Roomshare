@@ -11,6 +11,7 @@ import {
   NO_HTML_MSG,
   listingLeaseDurationSchema,
   listingRoomTypeSchema,
+  listingBookingModeSchema,
   listingGenderPreferenceSchema,
   listingHouseholdGenderSchema,
 } from "@/lib/schemas";
@@ -47,6 +48,14 @@ import {
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const SESSION_FRESHNESS_SECONDS = 5 * 60;
+const WHOLE_UNIT_ROOM_TYPE_BOOKING_MODE_ERROR =
+  "Entire place listings must use whole-unit booking mode";
+
+function deriveBookingModeForRoomType(
+  roomType: string | null | undefined
+): "SHARED" | "WHOLE_UNIT" {
+  return roomType === "Entire Place" ? "WHOLE_UNIT" : "SHARED";
+}
 
 // Extract storage path from Supabase public URL
 function extractStoragePath(publicUrl: string): string | null {
@@ -157,6 +166,7 @@ const listingProfilePatchSchema = z
     zip: z.string().trim().min(1).max(20),
     leaseDuration: listingLeaseDurationSchema,
     roomType: listingRoomTypeSchema,
+    bookingMode: listingBookingModeSchema,
     householdLanguages: z
       .array(z.string().trim().toLowerCase().transform(sanitizeUnicode))
       .max(20)
@@ -845,6 +855,10 @@ export async function PATCH(
       }
 
       const profilePatch: ListingProfilePatch = parsed.data;
+      const bookingModeProvided = Object.prototype.hasOwnProperty.call(
+        rawBody,
+        "bookingMode"
+      );
       const {
         expectedVersion,
         title,
@@ -858,6 +872,7 @@ export async function PATCH(
         zip,
         leaseDuration,
         roomType,
+        bookingMode,
         householdLanguages,
         genderPreference,
         householdGender,
@@ -1076,6 +1091,8 @@ export async function PATCH(
               freshnessReminderSentAt: true,
               freshnessWarningSentAt: true,
               autoPausedAt: true,
+              roomType: true,
+              bookingMode: true,
             },
           });
 
@@ -1108,6 +1125,46 @@ export async function PATCH(
             } as const;
           }
 
+          const nextRoomType =
+            roomType === undefined ? lockedListing.roomType : roomType;
+          const submittedBookingMode =
+            bookingMode === "SHARED" || bookingMode === "WHOLE_UNIT"
+              ? bookingMode
+              : undefined;
+          let resolvedBookingModePatch:
+            | ReturnType<typeof deriveBookingModeForRoomType>
+            | undefined;
+
+          if (features.wholeUnitMode) {
+            if (
+              nextRoomType === "Entire Place" &&
+              submittedBookingMode === "SHARED"
+            ) {
+              return {
+                ok: false,
+                error: WHOLE_UNIT_ROOM_TYPE_BOOKING_MODE_ERROR,
+                code: "INVALID_BOOKING_MODE",
+                field: "bookingMode",
+                fields: {
+                  bookingMode: WHOLE_UNIT_ROOM_TYPE_BOOKING_MODE_ERROR,
+                },
+                httpStatus: 400,
+              } as const;
+            }
+
+            if (nextRoomType === "Entire Place") {
+              resolvedBookingModePatch = "WHOLE_UNIT";
+            } else if (bookingModeProvided) {
+              resolvedBookingModePatch =
+                submittedBookingMode ?? deriveBookingModeForRoomType(nextRoomType);
+            }
+          } else if (nextRoomType === "Entire Place") {
+            resolvedBookingModePatch = "WHOLE_UNIT";
+          } else if (bookingModeProvided) {
+            resolvedBookingModePatch =
+              deriveBookingModeForRoomType(nextRoomType);
+          }
+
           const updatedListing = await tx.listing.update({
             where: { id },
             data: {
@@ -1128,6 +1185,9 @@ export async function PATCH(
               }),
               leaseDuration: leaseDuration || null,
               roomType: roomType || null,
+              ...(resolvedBookingModePatch !== undefined && {
+                bookingMode: resolvedBookingModePatch,
+              }),
               ...(addressChanged && {
                 normalizedAddress: nextNormalizedAddress,
               }),
@@ -1180,6 +1240,12 @@ export async function PATCH(
               code: profilePatchResult.code,
               ...("lockReason" in profilePatchResult
                 ? { lockReason: profilePatchResult.lockReason }
+                : {}),
+              ...("field" in profilePatchResult
+                ? { field: profilePatchResult.field }
+                : {}),
+              ...("fields" in profilePatchResult
+                ? { fields: profilePatchResult.fields }
                 : {}),
             },
             { status: profilePatchResult.httpStatus }

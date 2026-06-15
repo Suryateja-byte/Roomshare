@@ -9,6 +9,10 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
+function deriveBookingMode(roomType) {
+  return roomType === 'Entire Place' ? 'WHOLE_UNIT' : 'SHARED';
+}
+
 // ============================================================
 // LANGUAGE CODES (ISO 639-1) - matching src/lib/languages.ts
 // ============================================================
@@ -1046,6 +1050,7 @@ async function main() {
       const amenities = test.amenities || ['WiFi'];
       const houseRules = test.houseRules || ['No Smoking'];
       const price = 1000 + Math.floor(Math.random() * 1500);
+      const roomType = test.roomType !== undefined ? test.roomType : 'Private Room';
 
       const listing = await prisma.listing.create({
         data: {
@@ -1062,7 +1067,8 @@ async function main() {
           genderPreference: test.genderPreference !== undefined ? test.genderPreference : 'NO_PREFERENCE',
           householdGender: test.householdGender !== undefined ? test.householdGender : 'MIXED',
           leaseDuration: test.leaseDuration !== undefined ? test.leaseDuration : 'Flexible',
-          roomType: test.roomType !== undefined ? test.roomType : 'Private Room',
+          roomType,
+          bookingMode: deriveBookingMode(roomType),
           totalSlots: 2,
           availableSlots: 1,
           status: 'ACTIVE',

@@ -386,6 +386,7 @@ function HostManagedEditListingForm({
         zip: listing.location?.zip || "",
         leaseDuration: listing.leaseDuration,
         roomType: listing.roomType,
+        bookingMode: listing.bookingMode,
         householdLanguages: listing.householdLanguages,
         genderPreference: listing.genderPreference,
         householdGender: listing.householdGender,

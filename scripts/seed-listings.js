@@ -169,6 +169,11 @@ const leaseDurations = ["Month-to-month", "3 months", "6 months", "12 months"];
 const genderPrefs = ["NO_PREFERENCE", "MALE_ONLY", "FEMALE_ONLY"];
 // CHECK constraint: householdGender IN ('ALL_MALE','ALL_FEMALE','MIXED')
 const householdGenders = ["MIXED", "ALL_MALE", "ALL_FEMALE"];
+
+function deriveBookingMode(roomType) {
+    return roomType === "Entire Place" ? "WHOLE_UNIT" : "SHARED";
+}
+
 async function main() {
     // Get the user ID for the owner
     const user = await prisma.user.findFirst({
@@ -186,6 +191,7 @@ async function main() {
         const listing = listings[i];
         const amenitySet = amenities[i % amenities.length];
         const ruleSet = houseRules[i % houseRules.length];
+        const roomType = roomTypes[i % roomTypes.length];
 
         try {
             const created = await prisma.listing.create({
@@ -204,7 +210,8 @@ async function main() {
                     genderPreference: genderPrefs[i % genderPrefs.length],
                     householdGender: householdGenders[i % householdGenders.length],
                     leaseDuration: leaseDurations[i % leaseDurations.length],
-                    roomType: roomTypes[i % roomTypes.length],
+                    roomType,
+                    bookingMode: deriveBookingMode(roomType),
                     totalSlots: 2,
                     availableSlots: 1,
                     status: "ACTIVE",

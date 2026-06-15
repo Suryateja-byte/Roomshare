@@ -186,9 +186,41 @@ describe("getProjectionDivergenceReason", () => {
     ).toBe("version_skew");
   });
 
-  it("exports SEARCH_DOC_PROJECTION_VERSION as an integer >= 1", () => {
+  it("exports SEARCH_DOC_PROJECTION_VERSION as projection contract version 3", () => {
     expect(Number.isInteger(SEARCH_DOC_PROJECTION_VERSION)).toBe(true);
-    expect(SEARCH_DOC_PROJECTION_VERSION).toBeGreaterThanOrEqual(1);
+    expect(SEARCH_DOC_PROJECTION_VERSION).toBe(3);
+  });
+
+  it("projects WHOLE_UNIT for Entire Place even when the snapshot bookingMode is SHARED", async () => {
+    mockQueryRaw.mockResolvedValueOnce([
+      makeProjectableListingSnapshot({
+        roomType: "Entire Place",
+        bookingMode: "SHARED",
+      }),
+    ]);
+    mockExecuteRaw.mockResolvedValueOnce(1);
+
+    const result = await projectSearchDocument("listing-1");
+
+    expect(result.writeApplied).toBe(true);
+    const executeArgs = mockExecuteRaw.mock.calls[0].slice(1);
+    expect(executeArgs).toContain("WHOLE_UNIT");
+    expect(executeArgs).not.toContain("SHARED");
+  });
+
+  it("projects explicit WHOLE_UNIT for non-entire room types", async () => {
+    mockQueryRaw.mockResolvedValueOnce([
+      makeProjectableListingSnapshot({
+        roomType: "Private Room",
+        bookingMode: "WHOLE_UNIT",
+      }),
+    ]);
+    mockExecuteRaw.mockResolvedValueOnce(1);
+
+    const result = await projectSearchDocument("listing-1");
+
+    expect(result.writeApplied).toBe(true);
+    expect(mockExecuteRaw.mock.calls[0].slice(1)).toContain("WHOLE_UNIT");
   });
 
   it("suppresses stale cron writes when a newer doc version already won the race", async () => {
