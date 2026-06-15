@@ -5,8 +5,6 @@ export {
   SEARCH_BAR_LABEL_CLASSES,
 } from "./SearchBarField";
 export { SearchBarSubmit } from "./SearchBarSubmit";
-export { SearchBarSummary } from "./SearchBarSummary";
-export { SearchBarScrim } from "./SearchBarScrim";
 export {
   useSearchBarState,
   type SearchBarState,

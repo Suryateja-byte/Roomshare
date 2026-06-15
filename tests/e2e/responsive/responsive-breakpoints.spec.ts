@@ -408,10 +408,9 @@ test.describe("search page responsive layout", () => {
 
         const layoutState = await page.evaluate(() => {
           const viewportWidth = document.documentElement.clientWidth;
-          const header = document.querySelector("header");
           const logo = document.querySelector('a[aria-label="RoomShare Home"]');
           const searchForm = document.querySelector(
-            '[data-testid="desktop-header-search-form"], [data-testid="desktop-header-search-summary"]'
+            '[data-testid="desktop-header-search-form"]'
           );
           const authCluster =
             Array.from(
