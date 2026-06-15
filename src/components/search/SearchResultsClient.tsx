@@ -15,6 +15,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import ListingCard from "@/components/listings/ListingCard";
 import { ListingCardErrorBoundary } from "@/components/search/ListingCardErrorBoundary";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import NearMatchSeparator from "@/components/listings/NearMatchSeparator";
 import ZeroResultsSuggestions from "@/components/ZeroResultsSuggestions";
 import SaveSearchButton from "@/components/SaveSearchButton";
@@ -163,6 +164,10 @@ export function SearchResultsClient({
   const { shouldShowMap } = useSearchMapUI();
   const testScenario = useSearchTestScenario();
   const [isHydrated, setIsHydrated] = useState(false);
+  // Airbnb-style: on desktop, open listings in a new tab so the search page + map
+  // stay live (no remount/zoom on return) and users can compare listings. Mobile
+  // keeps same-tab navigation. Resolves to false until mounted, matching SSR.
+  const openListingInNewTab = useMediaQuery("(min-width: 768px)") === true;
   const [extraListings, setExtraListings] = useState<PublicSearchListing[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(
     initialNextCursor
@@ -1196,6 +1201,7 @@ export function SearchResultsClient({
                         estimatedMonths={estimatedMonths}
                         queryHashPrefix8={responseMeta.queryHash?.slice(0, 8)}
                         desktopVariant="grid"
+                        openInNewTab={openListingInNewTab}
                       />
                     </div>
                   </ListingCardErrorBoundary>
