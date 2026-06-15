@@ -356,7 +356,7 @@ export default function SearchHeaderWrapper() {
 
             {/* Desktop header search — mobile keeps the full-screen overlay flow */}
             <div className="relative hidden min-w-0 justify-center md:flex">
-              <DesktopHeaderSearch ref={desktopSearchRef} collapsed={false} />
+              <DesktopHeaderSearch ref={desktopSearchRef} />
             </div>
 
             {/* Right Actions - User Profile / Auth */}

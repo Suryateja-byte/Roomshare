@@ -8,16 +8,11 @@ jest.mock("@/components/search/DesktopHeaderSearch", () => {
   return {
     __esModule: true,
     default: React.forwardRef(function MockDesktopHeaderSearch(
-      { collapsed }: { collapsed: boolean },
+      _props: Record<string, never>,
       ref: React.Ref<unknown>
     ) {
       React.useImperativeHandle(ref, () => ({ openAndFocus: jest.fn() }));
-      return (
-        <div
-          data-testid="desktop-header-search-probe"
-          data-collapsed={String(collapsed)}
-        />
-      );
+      return <div data-testid="desktop-header-search-probe" />;
     }),
   };
 });
@@ -54,16 +49,18 @@ jest.mock("next-auth/react", () => ({
 }));
 
 describe("SearchHeaderWrapper", () => {
-  it("keeps the desktop search bar in its full (non-collapsed) form regardless of scroll", () => {
+  it("renders the desktop search bar and keeps it mounted across results-panel scroll", () => {
     // Simulate the page already scrolled well past any former collapse threshold.
     Object.defineProperty(window, "scrollY", { value: 500, writable: true });
 
     render(<SearchHeaderWrapper />);
 
-    const probe = screen.getByTestId("desktop-header-search-probe");
-    expect(probe).toHaveAttribute("data-collapsed", "false");
+    expect(
+      screen.getByTestId("desktop-header-search-probe")
+    ).toBeInTheDocument();
 
-    // Scrolling the results panel must NOT flip the header into the summary pill.
+    // The header is static: scrolling the results panel must not swap it out
+    // for a collapsed summary (the scroll-collapse behaviour was removed).
     const region = document.createElement("div");
     region.setAttribute("data-search-results-scroll-region", "desktop");
     document.body.appendChild(region);
@@ -75,7 +72,7 @@ describe("SearchHeaderWrapper", () => {
       fireEvent.scroll(region);
       expect(
         screen.getByTestId("desktop-header-search-probe")
-      ).toHaveAttribute("data-collapsed", "false");
+      ).toBeInTheDocument();
     } finally {
       region.remove();
     }

@@ -153,92 +153,12 @@ describe("DesktopHeaderSearch", () => {
     process.env.NEXT_PUBLIC_ENABLE_SEMANTIC_SEARCH = ORIGINAL_SEMANTIC_FLAG;
   });
 
-  it("renders a collapsed summary and expands to the inline editor on click", () => {
-    render(<DesktopHeaderSearch collapsed />);
-
-    expect(
-      screen.getByTestId("desktop-header-search-summary")
-    ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByTestId("desktop-header-search-summary"));
-
-    expect(
-      screen.getByTestId("desktop-header-search-form")
-    ).toBeInTheDocument();
-    expect(
-      screen.getByPlaceholderText("Try 'quiet, near campus'")
-    ).toBeInTheDocument();
-  });
-
-  it("deep-links each summary segment into its field", async () => {
-    render(<DesktopHeaderSearch collapsed />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Edit budget" }));
-
-    expect(
-      screen.getByTestId("desktop-header-search-form")
-    ).toBeInTheDocument();
-    await waitFor(() =>
-      expect(screen.getByLabelText("Minimum budget")).toHaveFocus()
-    );
-  });
-
-  it("shows the scrim while editing from collapsed and reverts edits on Escape", async () => {
-    mockSearchParams = "locationLabel=Irving%2C+TX&lat=32.814&lng=-96.9489";
-    render(<DesktopHeaderSearch collapsed />);
-
-    fireEvent.click(screen.getByTestId("desktop-header-search-summary"));
-    expect(screen.getByTestId("search-bar-scrim")).toHaveAttribute(
-      "data-visible",
-      "true"
-    );
-
-    const locationInput = screen.getByTestId("desktop-location-input");
-    fireEvent.change(locationInput, { target: { value: "Berl" } });
-    fireEvent.keyDown(document, { key: "Escape" });
-
-    await waitFor(() =>
-      expect(
-        screen.getByTestId("desktop-header-search-summary")
-      ).toBeInTheDocument()
-    );
-
-    // Re-open: the unsaved edit must be gone, replaced by URL state.
-    fireEvent.click(screen.getByTestId("desktop-header-search-summary"));
-    expect(screen.getByTestId("desktop-location-input")).toHaveValue(
-      "Irving, TX"
-    );
-  });
-
-  it("lets an open autocomplete popup consume the first Escape", () => {
-    render(<DesktopHeaderSearch collapsed />);
-    fireEvent.click(screen.getByTestId("desktop-header-search-summary"));
-
-    const popup = document.createElement("div");
-    popup.setAttribute("data-location-search-popup", "true");
-    document.body.appendChild(popup);
-    try {
-      fireEvent.keyDown(document, { key: "Escape" });
-      // Popup open — editor must stay expanded.
-      expect(
-        screen.getByTestId("desktop-header-search-form")
-      ).toBeInTheDocument();
-    } finally {
-      popup.remove();
-    }
-
-    fireEvent.keyDown(document, { key: "Escape" });
-    expect(
-      screen.getByTestId("desktop-header-search-summary")
-    ).toBeInTheDocument();
-  });
-
   it("resolves a typed destination on submit when autocomplete was not selected", async () => {
     const events: CustomEvent[] = [];
     const handler = (event: Event) => events.push(event as CustomEvent);
     window.addEventListener(MAP_FLY_TO_EVENT, handler);
 
-    render(<DesktopHeaderSearch collapsed={false} />);
+    render(<DesktopHeaderSearch />);
 
     expect(screen.queryByText("⌘")).not.toBeInTheDocument();
 
@@ -273,7 +193,7 @@ describe("DesktopHeaderSearch", () => {
       json: async () => ({ results: [] }),
     });
 
-    render(<DesktopHeaderSearch collapsed={false} />);
+    render(<DesktopHeaderSearch />);
 
     fireEvent.change(screen.getByTestId("desktop-location-input"), {
       target: { value: "Atlantis" },
@@ -294,7 +214,7 @@ describe("DesktopHeaderSearch", () => {
     const handler = (event: Event) => events.push(event as CustomEvent);
     window.addEventListener(MAP_FLY_TO_EVENT, handler);
 
-    render(<DesktopHeaderSearch collapsed={false} />);
+    render(<DesktopHeaderSearch />);
 
     fireEvent.change(
       screen.getByPlaceholderText("Try 'quiet, near campus'"),
@@ -328,7 +248,7 @@ describe("DesktopHeaderSearch", () => {
   });
 
   it("passes recent locations as fallback items that set a valid selected location", async () => {
-    render(<DesktopHeaderSearch collapsed={false} />);
+    render(<DesktopHeaderSearch />);
 
     fireEvent.click(screen.getByTestId("desktop-fallback-recent-1"));
     fireEvent.submit(screen.getByTestId("desktop-header-search-form"));
@@ -351,7 +271,7 @@ describe("DesktopHeaderSearch", () => {
     try {
       const renderSearchHeaderWithResults = () => (
         <>
-          <DesktopHeaderSearch collapsed={false} />
+          <DesktopHeaderSearch />
           <SearchResultsLoadingWrapper>
             <h2 id="search-results-heading" tabIndex={-1}>
               12 rooms
