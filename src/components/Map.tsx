@@ -79,6 +79,16 @@ import {
   sanitizeStyleSpecification,
 } from "@/lib/maps/style-sanitize";
 import {
+  getCachedLightStyle,
+  setCachedLightStyle,
+  getCachedDarkStyle,
+  setCachedDarkStyle,
+  getCachedCamera,
+  setCachedCamera,
+  boundsSignature,
+  boundsSignatureFromParams,
+} from "@/lib/maps/style-cache";
+import {
   SEARCH_MOBILE_PREVIEW_CARD_OFFSET,
   SNAP_COLLAPSED,
 } from "@/lib/mobile-layout";
@@ -2062,6 +2072,21 @@ export default function MapComponent({
   // Prevents SF default from being re-applied when listings temporarily become empty.
   // In controlled mode, this is used as the starting point before parent provides viewState.
 
+  // Restore the exact camera (incl. zoom) from a prior visit to this same viewport
+  // earlier this page-load, keyed by the URL bounds. Computed once at mount; null on
+  // a cold entry / new-location search (signature miss) → today's URL-bounds center
+  // + zoom 12 + onLoad fitBounds path runs unchanged.
+  const initialCameraRestore = useMemo(
+    () => {
+      const signature = boundsSignatureFromParams(searchParams);
+      return signature ? getCachedCamera(signature) : null;
+    },
+    // Mirror initialViewState's stable-after-mount contract: computed once from the
+    // mount-time URL snapshot so the camera doesn't shift on later renders.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+
   const initialViewState = useMemo(
     () =>
       (() => {
@@ -2096,6 +2121,16 @@ export default function MapComponent({
               if (centerLng > 180) centerLng -= 360;
             } else {
               centerLng = (parsedMinLng + parsedMaxLng) / 2;
+            }
+
+            if (initialCameraRestore) {
+              return {
+                longitude: initialCameraRestore.longitude,
+                latitude: initialCameraRestore.latitude,
+                zoom: initialCameraRestore.zoom,
+                bearing: initialCameraRestore.bearing,
+                pitch: initialCameraRestore.pitch,
+              };
             }
 
             return { longitude: centerLng, latitude: centerLat, zoom: 12 };
@@ -2522,7 +2557,14 @@ export default function MapComponent({
     if (isPhoneViewport !== true || !isMapLoaded || listings.length === 0) {
       return;
     }
-    if (hasPerformedInitialMobileResultsFitRef.current || hasUserMoved) {
+    // A restored camera already places the map at the user's prior viewport, so skip
+    // the 1000ms auto-fit that would otherwise re-animate the bounds on every mobile
+    // remount. Cold entries (no restore) still auto-fit exactly as before.
+    if (
+      hasPerformedInitialMobileResultsFitRef.current ||
+      hasUserMoved ||
+      initialCameraRestore
+    ) {
       return;
     }
 
@@ -2536,6 +2578,7 @@ export default function MapComponent({
     isMapLoaded,
     isPhoneViewport,
     listings.length,
+    initialCameraRestore,
   ]);
 
   const handleToggleFullscreen = useCallback(async () => {
@@ -3307,6 +3350,23 @@ export default function MapComponent({
       }
       setViewportInfoMessage(null);
 
+      // This is a genuine user move that will write `bounds` to the URL (via the
+      // debounced executeMapSearch below). Persist the camera under those exact
+      // bounds so that, after a remount (e.g. returning from a listing detail page,
+      // which unmounts the whole /search layout), initialViewState restores the
+      // viewport on the first paint — no placeholder-zoom → fitBounds snap. The URL
+      // serializes these bounds at 3 decimals, matching boundsSignature's quantization.
+      setCachedCamera(
+        boundsSignature(bounds.minLat, bounds.maxLat, bounds.minLng, bounds.maxLng),
+        {
+          longitude: e.viewState.longitude,
+          latitude: e.viewState.latitude,
+          zoom: e.viewState.zoom,
+          bearing: e.viewState.bearing,
+          pitch: e.viewState.pitch,
+        }
+      );
+
       if (debounceTimer.current) {
         clearTimeout(debounceTimer.current);
       }
@@ -3402,11 +3462,13 @@ export default function MapComponent({
     isPhoneViewport === false &&
     hasConfirmedEmptyViewport &&
     mobileResultsState !== "positive";
+  // Seed from the module-scope style cache so a remount this page-load renders the
+  // resolved vector style on the FIRST paint — no raster→vector swap (the flash).
   const [lightMapStyle, setLightMapStyle] = useState<
     string | StyleSpecification
-  >(LIGHT_STYLE_FALLBACK);
+  >(() => getCachedLightStyle() ?? LIGHT_STYLE_FALLBACK);
   const [darkMapStyle, setDarkMapStyle] = useState<StyleSpecification | null>(
-    null
+    () => getCachedDarkStyle()
   );
 
   // Patch the Map prototype as soon as the map instance is available.
@@ -3419,6 +3481,10 @@ export default function MapComponent({
 
   useEffect(() => {
     if (isDarkMode) return;
+    // Warm from a prior mount this page-load: the lazy useState initializer already
+    // seeded the resolved style, so skip the re-fetch + setState (which would
+    // otherwise trigger a full style reload = the flash).
+    if (getCachedLightStyle()) return;
 
     const controller = new AbortController();
     let cancelled = false;
@@ -3449,6 +3515,9 @@ export default function MapComponent({
         const sanitizedStyle = sanitizeStyleSpecification(
           rawStyle
         ) as StyleSpecification;
+        // Cache only a real themed style — never the raster fallback below — so a
+        // remount restores the vector theme immediately and offline never poisons it.
+        setCachedLightStyle(sanitizedStyle);
         setLightMapStyle(sanitizedStyle);
       } catch (error) {
         if ((error as { name?: string }).name === "AbortError") return;
@@ -3522,6 +3591,7 @@ export default function MapComponent({
   // so zoom expression sanitization is applied before MapLibre processes it.
   useEffect(() => {
     if (!isDarkMode) return;
+    if (getCachedDarkStyle()) return;
 
     const controller = new AbortController();
     let cancelled = false;
@@ -3543,6 +3613,7 @@ export default function MapComponent({
         const sanitizedStyle = sanitizeStyleSpecification(
           rawStyle
         ) as StyleSpecification;
+        setCachedDarkStyle(sanitizedStyle);
         setDarkMapStyle(sanitizedStyle);
       } catch (error) {
         if ((error as { name?: string }).name === "AbortError") return;

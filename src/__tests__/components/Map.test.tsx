@@ -481,6 +481,11 @@ jest.mock("framer-motion", () => ({
 // Import component after mocks
 import MapComponent from "@/components/Map";
 import { triggerHaptic } from "@/lib/haptics";
+import {
+  resetMapCachesForTests,
+  setCachedCamera,
+  boundsSignature,
+} from "@/lib/maps/style-cache";
 
 // --------------------------------------------------------------------------
 // Test Data
@@ -630,6 +635,7 @@ describe("Map Component", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    resetMapCachesForTests();
     mockReplace.mockClear();
     mockReplaceWithTransition.mockClear();
     mockPrivacyCircle.mockClear();
@@ -804,6 +810,63 @@ describe("Map Component", () => {
             right: 50,
           }),
         })
+      );
+    });
+
+    it("skips the mobile auto-fit when a camera is cached for the current viewport", async () => {
+      phoneViewportMatches = true;
+      // A prior visit cached the camera for these exact bounds (the URL serializes
+      // the map's bounds at 3 decimals, matching boundsSignature's quantization).
+      setCachedCamera(boundsSignature(37.7, 37.85, -122.5, -122.3), {
+        longitude: -122.4,
+        latitude: 37.77,
+        zoom: 15,
+        bearing: 0,
+        pitch: 0,
+      });
+      mockSearchParams = new URLSearchParams(
+        "minLat=37.7&maxLat=37.85&minLng=-122.5&maxLng=-122.3"
+      );
+
+      render(<MapComponent listings={mockListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      // The restored camera already positions the map, so the 1000ms auto-fit
+      // (the visible "bbox recalc") must not fire on this remount.
+      expect(mockMapInstance.fitBounds).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ duration: 1000 })
+      );
+    });
+
+    it("still auto-fits when the cached camera is for a different viewport (no stale reuse)", async () => {
+      phoneViewportMatches = true;
+      // Cached camera is for a far-away viewport (NYC); the current search is SF.
+      setCachedCamera(boundsSignature(40.7, 40.8, -74.02, -73.95), {
+        longitude: -73.98,
+        latitude: 40.75,
+        zoom: 15,
+        bearing: 0,
+        pitch: 0,
+      });
+      mockSearchParams = new URLSearchParams(
+        "minLat=37.7&maxLat=37.85&minLng=-122.5&maxLng=-122.3"
+      );
+
+      render(<MapComponent listings={mockListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      // Signature miss → no restore → today's auto-fit runs and the stale NYC
+      // camera is never reused.
+      expect(mockMapInstance.fitBounds).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ duration: 1000 })
       );
     });
 
