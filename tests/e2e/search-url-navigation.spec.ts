@@ -15,6 +15,7 @@ import {
   expect,
   SF_BOUNDS,
   searchResultsContainer,
+  openListingDetail,
 } from "./helpers/test-utils";
 import { pollForUrlParam } from "./helpers/sync-helpers";
 import type { Page } from "@playwright/test";
@@ -283,19 +284,29 @@ test.describe("Search URL Browser Navigation (P1)", () => {
       .getAttribute("href");
     expect(href).toBeTruthy();
 
-    // Navigate via h3 click (inside Link but outside carousel area)
-    await firstCard.locator("h3").first().click();
-    await expect(page).toHaveURL(/\/listings\//, { timeout: 15_000 });
+    // Open the listing detail via an h3 click (inside the Link, outside the
+    // carousel drag area). On desktop the card opens in a NEW TAB, so the search
+    // page never navigates away and keeps its params live; on mobile it navigates
+    // the same tab and we go back. Either way, search must retain its params.
+    const { detail, newTab } = await openListingDetail(
+      page,
+      () => firstCard.locator("h3").first().click(),
+      /\/listings\//,
+      15_000
+    );
 
-    // Go back to search
-    await page.goBack();
-    await page.waitForLoadState("domcontentloaded");
+    if (newTab) {
+      await detail.close();
+    } else {
+      await page.goBack();
+      await page.waitForLoadState("domcontentloaded");
+    }
 
-    // Should be back on search with params preserved
-    const urlAfterBack = new URL(page.url());
-    expect(urlAfterBack.pathname).toBe("/search");
-    expect(urlAfterBack.searchParams.get("maxPrice")).toBe("2000");
-    expect(urlAfterBack.searchParams.get("sort")).toBe("price_asc");
+    // The search page must still carry the original filters.
+    const searchUrl = new URL(page.url());
+    expect(searchUrl.pathname).toBe("/search");
+    expect(searchUrl.searchParams.get("maxPrice")).toBe("2000");
+    expect(searchUrl.searchParams.get("sort")).toBe("price_asc");
   });
 
   // -------------------------------------------------------------------------
