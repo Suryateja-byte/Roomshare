@@ -411,6 +411,38 @@ export function searchResultsContainer(page: Page): Locator {
 }
 
 /**
+ * Open a listing detail from the search results, accounting for the desktop
+ * "open in a new tab" behaviour (Airbnb-style): on desktop (>=768px) clicking a
+ * listing card opens a NEW TAB so the search page + map stay live, so we capture
+ * the popup page; on mobile the same tab navigates. `activate` performs whatever
+ * triggers navigation (click, evaluate, Enter key).
+ *
+ * Returns the page showing the listing detail and whether it opened in a new tab
+ * (`newTab`). For new-tab flows the original `page` stays on /search untouched.
+ */
+export async function openListingDetail(
+  page: Page,
+  activate: () => Promise<unknown>,
+  urlPattern: RegExp | string = /\/listings\//,
+  timeout = 30_000
+): Promise<{ detail: Page; newTab: boolean }> {
+  const opensNewTab = (page.viewportSize()?.width ?? 1024) >= 768;
+
+  if (opensNewTab) {
+    const [detail] = await Promise.all([
+      page.context().waitForEvent("page"),
+      activate(),
+    ]);
+    await detail.waitForURL(urlPattern, { waitUntil: "commit", timeout });
+    return { detail, newTab: true };
+  }
+
+  await activate();
+  await page.waitForURL(urlPattern, { waitUntil: "commit", timeout });
+  return { detail: page, newTab: false };
+}
+
+/**
  * Returns a scoped listing card locator within the visible search container.
  * Equivalent to: searchResultsContainer(page).locator('[data-testid="listing-card"]')
  */

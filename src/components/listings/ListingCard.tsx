@@ -210,6 +210,12 @@ interface ListingCardProps {
   showTotalPrice?: boolean;
   estimatedMonths?: number;
   queryHashPrefix8?: string;
+  /**
+   * Open the listing in a new tab (Airbnb-style). Enabled on desktop search so
+   * the search page + map stay live (no remount) and users can compare listings.
+   * Callers should pass the already-resolved value (e.g. desktop viewport only).
+   */
+  openInNewTab?: boolean;
 }
 
 function arePropsEqual(
@@ -280,7 +286,8 @@ function arePropsEqual(
     prev.priority === next.priority &&
     prev.showTotalPrice === next.showTotalPrice &&
     prev.estimatedMonths === next.estimatedMonths &&
-    prev.queryHashPrefix8 === next.queryHashPrefix8
+    prev.queryHashPrefix8 === next.queryHashPrefix8 &&
+    prev.openInNewTab === next.openInNewTab
   );
 }
 
@@ -295,6 +302,7 @@ function ListingCardInner({
   showTotalPrice = false,
   estimatedMonths = 1,
   queryHashPrefix8,
+  openInNewTab = false,
 }: ListingCardProps) {
   const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
   const [isDragging, setIsDragging] = useState(false);
@@ -524,6 +532,9 @@ function ListingCardInner({
 
       <Link
         href={listingHref}
+        {...(openInNewTab
+          ? { target: "_blank", rel: "noopener noreferrer" }
+          : {})}
         onClick={isDragging ? (e) => e.preventDefault() : undefined}
         data-testid="listing-card-link"
         className={cn(
@@ -659,6 +670,9 @@ function ListingCardInner({
             className="mt-3 w-full justify-start rounded-[0.875rem] px-3 py-2"
           />
         </div>
+        {openInNewTab ? (
+          <span className="sr-only"> (opens in a new tab)</span>
+        ) : null}
       </Link>
       {hasGroupDates && groupSummary ? (
         <>

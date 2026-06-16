@@ -26,6 +26,7 @@ import {
   expect,
   SF_BOUNDS,
   searchResultsContainer,
+  openListingDetail,
 } from "../helpers/test-utils";
 import { setupPaginationMock } from "../helpers/pagination-mock-factory";
 
@@ -155,19 +156,21 @@ test.describe("Pagination URL State", () => {
       expect(href).toBeTruthy();
       await expect(firstCardLink).toBeVisible({ timeout: 30_000 });
 
-      await Promise.all([
-        page.waitForURL(/\/listings\//, {
-          timeout: 30_000,
-          waitUntil: "commit",
-        }),
-        firstCardLink.press("Enter"),
-      ]);
+      // On desktop the card opens the detail in a NEW TAB so the search page
+      // stays live; on mobile it navigates the same tab and we go back. Either
+      // way the search results must remain available afterwards.
+      const { detail, newTab } = await openListingDetail(page, () =>
+        firstCardLink.press("Enter")
+      );
 
-      // Go back to search results
-      await page.goBack();
+      if (newTab) {
+        await detail.close();
+      } else {
+        await page.goBack();
+        await page.waitForURL(/\/search/, { timeout: 30_000 });
+      }
 
-      // Search results should be visible again
-      await page.waitForURL(/\/search/, { timeout: 30_000 });
+      // Search results should still be visible.
       await expect(cards.first()).toBeVisible({ timeout: 30_000 });
 
       // Results should be present (count may vary depending on bfcache behavior)

@@ -373,4 +373,49 @@ describe("SearchViewToggle", () => {
 
     expect(screen.getByTestId("desktop-results-top-fade")).toBeInTheDocument();
   });
+
+  it("reserves the desktop split layout via CSS before hydration so it does not reflow", () => {
+    matchMediaMatches = true;
+    // Pre-hydration props from useMapPreference: isLoading=true and the
+    // visibility flags still false. The layout must already reserve the split.
+    render(
+      <SearchViewToggle
+        {...props}
+        isLoading={true}
+        shouldShowMap={false}
+        canShowMap={false}
+      >
+        <TestChild />
+      </SearchViewToggle>
+    );
+
+    const shell = screen.getByTestId("search-results-container");
+    // Split width is reserved via the xl: CSS breakpoint (no JS-driven width flip).
+    expect(shell.className).toContain("xl:w-[55%]");
+    // The map pane occupies its space from the first paint (content mounts later).
+    expect(screen.getByTestId("desktop-search-map-panel")).toBeInTheDocument();
+  });
+
+  it("collapses the desktop list to full width only once the user has hidden the map", () => {
+    matchMediaMatches = true;
+    // Hydrated (isLoading=false), split-capable (canShowMap), but preference is
+    // list-only (shouldShowMap=false) → the map is intentionally hidden.
+    render(
+      <SearchViewToggle
+        {...props}
+        isLoading={false}
+        shouldShowMap={false}
+        canShowMap={true}
+      >
+        <TestChild />
+      </SearchViewToggle>
+    );
+
+    const shell = screen.getByTestId("search-results-container");
+    expect(shell.className).toContain("w-full");
+    expect(shell.className).not.toContain("xl:w-[55%]");
+    expect(
+      screen.queryByTestId("desktop-search-map-panel")
+    ).not.toBeInTheDocument();
+  });
 });

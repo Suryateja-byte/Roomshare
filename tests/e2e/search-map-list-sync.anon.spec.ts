@@ -25,6 +25,7 @@ import {
   SF_BOUNDS,
   waitForMapReady,
   searchResultsContainer,
+  openListingDetail,
 } from "./helpers";
 import {
   getMarkerState,
@@ -681,23 +682,24 @@ test.describe("Map-List Synchronization", () => {
       // Use page.evaluate to click the link — bypasses ImageCarousel's drag
       // handler which can prevent default click behavior on Playwright's
       // synthesized mouse events. HTMLAnchorElement.click() triggers both
-      // native navigation and Next.js Link's React onClick handler.
-      await page.evaluate((id) => {
-        const cardEl = document.querySelector(
-          `[data-testid="listing-card"][data-listing-id="${id}"]`
-        );
-        const link = cardEl?.querySelector(
-          'a[href*="/listings/"]'
-        ) as HTMLAnchorElement;
-        if (link) link.click();
-      }, cardId);
-
-      // Wait for URL to contain the listing ID — use waitForURL with "commit"
-      // to avoid timeout waiting for full page resource load on listing detail pages
-      await page.waitForURL(new RegExp(`/listings/${cardId}`), {
-        timeout: timeouts.navigation,
-        waitUntil: "commit",
-      });
+      // native navigation and Next.js Link's React onClick handler. On desktop
+      // the click opens the detail in a new tab; on mobile it navigates the same tab.
+      const { detail } = await openListingDetail(
+        page,
+        () =>
+          page.evaluate((id) => {
+            const cardEl = document.querySelector(
+              `[data-testid="listing-card"][data-listing-id="${id}"]`
+            );
+            const link = cardEl?.querySelector(
+              'a[href*="/listings/"]'
+            ) as HTMLAnchorElement;
+            if (link) link.click();
+          }, cardId),
+        new RegExp(`/listings/${cardId}`),
+        timeouts.navigation
+      );
+      if (detail !== page) await detail.close();
     });
   });
 

@@ -126,6 +126,13 @@ export default function SearchViewToggle({
     canShowMap &&
     shouldShowMap;
 
+  // Whether the user has explicitly hidden the desktop map (preference = list-only).
+  // Default to "map visible" until we KNOW otherwise (isLoading guards the
+  // pre-hydration window). This lets the split layout below be reserved purely via
+  // CSS (xl:) on the first paint, so the common case never reflows when hydration
+  // resolves. Only a hydrated list-only preference collapses the list to full width.
+  const desktopMapHidden = !isLoading && canShowMap && !shouldShowMap;
+
   // Render children in BOTH containers before mount so SSR HTML matches
   // client hydration regardless of viewport (CSS md:hidden / hidden md:flex
   // hides the inactive one). After mount, render in exactly one container.
@@ -140,9 +147,9 @@ export default function SearchViewToggle({
   const isMobileActive = isDesktop === false;
   const showChildrenInMobile = !hasMounted || isMobileActive;
   const showChildrenInDesktop = !hasMounted || !isMobileActive;
-  const desktopScrollInsetClass = renderMapInDesktop
-    ? "right-3 lg:right-4"
-    : "right-2 lg:right-3";
+  const desktopScrollInsetClass = desktopMapHidden
+    ? "right-2 lg:right-3"
+    : "right-2 lg:right-3 xl:right-4";
 
   const updateDesktopOverflowState = useCallback(() => {
     const scrollContainer = desktopListScrollRef.current;
@@ -205,6 +212,7 @@ export default function SearchViewToggle({
     isDesktop,
     searchParamsKey,
     renderMapInDesktop,
+    desktopMapHidden,
     showChildrenInDesktop,
     updateDesktopOverflowState,
   ]);
@@ -258,15 +266,18 @@ export default function SearchViewToggle({
           data-testid="search-results-container"
           className={cn(
             "relative h-full min-h-0 overflow-hidden bg-surface-canvas transition-all duration-300",
-            renderMapInDesktop
-              ? "w-[55%] min-w-[42rem] max-w-[58rem] 2xl:w-[52%] 2xl:max-w-[66rem]"
-              : "w-full"
+            // Reserve the split width via CSS at the xl breakpoint so the first paint
+            // already matches the hydrated split layout (no JS-driven reflow). Only a
+            // hydrated list-only preference forces the list back to full width.
+            desktopMapHidden
+              ? "w-full"
+              : "w-full xl:w-[55%] xl:min-w-[42rem] xl:max-w-[58rem] 2xl:w-[52%] 2xl:max-w-[66rem]"
           )}
         >
           <div
             className={cn(
               "relative h-full min-h-0",
-              renderMapInDesktop ? "pr-3 lg:pr-5" : "pr-2 lg:pr-3"
+              desktopMapHidden ? "pr-2 lg:pr-3" : "pr-2 lg:pr-3 xl:pr-5"
             )}
           >
             <div
@@ -304,18 +315,23 @@ export default function SearchViewToggle({
           </div>
         </div>
 
-        {/* Right Panel: Map View */}
-        {renderMapInDesktop && (
+        {/* Right Panel: Map View — the pane (its layout space) is reserved purely
+            via CSS at the xl split breakpoint so the split is correct on the first
+            paint and never reflows. The expensive map CONTENT still mounts only when
+            ready (renderMapInDesktop), filling the already-sized pane; until then the
+            styled surface below acts as the placeholder. The pane is removed entirely
+            only when the user has hidden the map (desktopMapHidden). */}
+        {!desktopMapHidden && (
           <div
             data-testid="desktop-search-map-panel"
-            className="relative h-full min-h-0 min-w-0 flex-1 overflow-hidden bg-surface-container-high/35 p-2 pl-0 lg:p-3 lg:pl-0"
+            className="relative hidden h-full min-h-0 min-w-0 flex-1 overflow-hidden bg-surface-container-high/35 p-2 pl-0 xl:block lg:p-3 lg:pl-0"
           >
             <div
               aria-hidden="true"
               className="pointer-events-none absolute inset-y-3 left-0 z-[1] w-5 rounded-l-[1.5rem] bg-gradient-to-r from-surface-canvas via-surface-container-high/45 to-transparent lg:w-6"
             />
             <div className="relative h-full overflow-hidden rounded-[1.25rem] bg-surface-container shadow-[inset_0_0_0_1px_rgba(220,193,185,0.18),0_18px_48px_-34px_rgba(27,28,25,0.42)]">
-              {mapComponent}
+              {renderMapInDesktop && mapComponent}
             </div>
           </div>
         )}

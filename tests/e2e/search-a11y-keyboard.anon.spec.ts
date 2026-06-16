@@ -15,6 +15,7 @@ import {
   timeouts,
   tags,
   searchResultsContainer,
+  openListingDetail,
 } from "./helpers/test-utils";
 import { filtersButton as getFiltersButton } from "./helpers/filter-helpers";
 
@@ -200,15 +201,16 @@ test.describe("Search A11y: Keyboard Navigation", () => {
       await listingLink.focus();
       await expect(listingLink).toBeFocused();
 
-      // Press Enter to navigate
-      await page.keyboard.press("Enter");
-
-      // Should navigate to the listing detail page
-      await page.waitForURL(/\/listings\//, {
-        timeout: timeouts.navigation,
-        waitUntil: "commit",
-      });
-      expect(page.url()).toContain("/listings/");
+      // Press Enter — on desktop the link opens in a new tab (Airbnb-style); on
+      // mobile it navigates the same tab. Keyboard activation must work either way.
+      const { detail } = await openListingDetail(
+        page,
+        () => page.keyboard.press("Enter"),
+        /\/listings\//,
+        timeouts.navigation
+      );
+      expect(detail.url()).toContain("/listings/");
+      if (detail !== page) await detail.close();
     }
   );
 

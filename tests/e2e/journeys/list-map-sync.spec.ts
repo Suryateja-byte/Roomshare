@@ -25,6 +25,7 @@ import {
   waitForMapMarkers,
   waitForMapReady,
   searchResultsContainer,
+  openListingDetail,
 } from "../helpers";
 import {
   setupStackedMarkerMock,
@@ -1363,28 +1364,30 @@ test.describe("List <-> Map Sync", () => {
       .not.toBeVisible({ timeout: 5_000 })
       .catch(() => {});
 
-    // Click the card — use evaluate click to bypass any remaining overlay interception
-    await firstCard.evaluate((el) => {
-      // Find the anchor inside the card and click it for proper navigation
-      const link = el.querySelector(
-        'a[href*="/listings/"]'
-      ) as HTMLElement | null;
-      if (link) {
-        link.click();
-      } else {
-        (el as HTMLElement).click();
-      }
-    });
+    // Click the card — this test is desktop-only, so it opens the detail in a new
+    // tab. Use an evaluate click to bypass any remaining overlay interception.
+    const { detail } = await openListingDetail(
+      page,
+      () =>
+        firstCard.evaluate((el) => {
+          // Find the anchor inside the card and click it for proper navigation
+          const link = el.querySelector(
+            'a[href*="/listings/"]'
+          ) as HTMLElement | null;
+          if (link) {
+            link.click();
+          } else {
+            (el as HTMLElement).click();
+          }
+        }),
+      `**/listings/${listingId}`,
+      timeouts.navigation
+    );
 
-    // Should navigate to listing detail page -- use "commit" to avoid waiting for full resource load
-    await page.waitForURL(`**/listings/${listingId}`, {
-      timeout: timeouts.navigation,
-      waitUntil: "commit",
-    });
-
-    // On the detail page, there should be no popup visible
-    // (popup was dismissed before navigation, not left orphaned)
-    const detailPopup = page.locator(".maplibregl-popup");
+    // On the detail page, there should be no orphaned map popup carried over
+    // (the search popup was dismissed before navigation).
+    const detailPopup = detail.locator(".maplibregl-popup");
     await expect(detailPopup).toHaveCount(0, { timeout: timeouts.action });
+    if (detail !== page) await detail.close();
   });
 });

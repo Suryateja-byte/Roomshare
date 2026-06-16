@@ -24,8 +24,8 @@ import {
   expect,
   SF_BOUNDS,
   selectors,
-  timeouts,
   waitForMapReady,
+  openListingDetail,
 } from "./helpers/test-utils";
 import type { Page } from "@playwright/test";
 
@@ -473,27 +473,29 @@ test.describe("Map persistence: Map state recovery", () => {
       return;
     }
 
-    await listingLink.click();
-    await page.waitForLoadState("domcontentloaded");
+    // On desktop the card opens the detail in a NEW TAB, so the search page + map
+    // stay live (nothing to navigate back to); on mobile it navigates the same tab
+    // and we go back. Either way the map must remain present on /search afterwards.
+    const { detail, newTab } = await openListingDetail(
+      page,
+      () => listingLink.click(),
+      /\/listings\//,
+      15_000
+    );
+    expect(detail.url()).toContain("/listings/");
 
-    // Should be on a listing page now — wait with timeout for navigation
-    try {
-      await page.waitForURL(/\/listings\//, { timeout: 15_000 });
-    } catch {
-      test.skip(true, "Navigation to listing page did not complete in time");
-      return;
+    if (newTab) {
+      await detail.close();
+    } else {
+      await page.goBack();
+      await page.waitForLoadState("domcontentloaded");
     }
-    expect(page.url()).toContain("/listings/");
-
-    // Go back
-    await page.goBack();
-    await page.waitForLoadState("domcontentloaded");
     await waitForMapReady(page);
 
     // Map should still be visible
     expect(await isMapContainerVisible(page)).toBe(true);
 
-    // URL should be back on search
+    // The search page should still be the active page
     expect(page.url()).toContain("/search");
   });
 

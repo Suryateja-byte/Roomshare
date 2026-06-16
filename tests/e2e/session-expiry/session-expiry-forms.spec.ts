@@ -45,8 +45,15 @@ test.describe("Session Expiry: Form Submissions", () => {
       test.skip(true, "No listings found");
       return;
     }
-    // Click h3 title instead of <a> to avoid ImageCarousel's pointerDown setting isDragging=true
-    await firstCard.locator("h3").first().click();
+    // Navigate to the detail page directly via the card href. Card clicks open a
+    // new tab on desktop (Airbnb-style); goto reaches the detail same-tab so the
+    // rest of this session-expiry flow runs against `page`.
+    const detailHref = await firstCard
+      .locator('a[href^="/listings/"]')
+      .first()
+      .getAttribute("href");
+    expect(detailHref).toBeTruthy();
+    await page.goto(detailHref!);
     await page.waitForURL(/\/listings\/.+/);
 
     // Fill review form (if available)

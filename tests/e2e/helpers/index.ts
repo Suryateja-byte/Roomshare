@@ -30,6 +30,7 @@ export {
   takeScreenshot,
   logStep,
   searchResultsContainer,
+  openListingDetail,
   scopedCards,
   waitForSortHydrated,
 } from "./test-utils";

@@ -791,4 +791,21 @@ describe("ListingCard", () => {
       );
     });
   });
+
+  describe("new-tab navigation (desktop search comparison)", () => {
+    it("opens in the same tab by default", () => {
+      render(<ListingCard listing={mockListing} />);
+      const link = screen.getByTestId("listing-card-link");
+      expect(link).not.toHaveAttribute("target");
+      expect(link).not.toHaveAttribute("rel");
+    });
+
+    it("opens in a new tab with safe rel and an a11y hint when openInNewTab is set", () => {
+      render(<ListingCard listing={mockListing} openInNewTab />);
+      const link = screen.getByTestId("listing-card-link");
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", "noopener noreferrer");
+      expect(link).toHaveTextContent("opens in a new tab");
+    });
+  });
 });
