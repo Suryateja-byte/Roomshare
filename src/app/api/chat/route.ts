@@ -19,7 +19,7 @@ import {
 import { DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
-import { isOriginAllowed, isHostAllowed } from "@/lib/origin-guard";
+import { isOriginAllowed, isHostAllowed, isSameOrigin } from "@/lib/origin-guard";
 
 /**
  * Neighborhood Chat API Route
@@ -262,7 +262,7 @@ export async function POST(request: Request) {
 
     // In production, enforce origin/host
     if (process.env.NODE_ENV === "production") {
-      if (origin && !isOriginAllowed(origin)) {
+      if (origin && !isOriginAllowed(origin) && !isSameOrigin(origin, host)) {
         return new Response(JSON.stringify({ error: "Forbidden" }), {
           status: 403,
           headers: { "Content-Type": "application/json" },

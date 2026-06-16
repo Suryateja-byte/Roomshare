@@ -6,9 +6,21 @@ jest.mock("@/lib/rate-limit", () => ({
   getClientIP: jest.fn(() => "127.0.0.1"),
 }));
 
+const mockIsOriginAllowed = jest.fn().mockReturnValue(true);
+const mockIsHostAllowed = jest.fn().mockReturnValue(true);
+
 jest.mock("@/lib/origin-guard", () => ({
-  isOriginAllowed: jest.fn(() => true),
-  isHostAllowed: jest.fn(() => true),
+  isOriginAllowed: (...args: unknown[]) => mockIsOriginAllowed(...args),
+  isHostAllowed: (...args: unknown[]) => mockIsHostAllowed(...args),
+  // Use the real same-origin logic so production-path tests are meaningful.
+  isSameOrigin: (origin: string | null, host: string | null) => {
+    if (!origin || !host) return false;
+    try {
+      return new URL(origin).host === host;
+    } catch {
+      return false;
+    }
+  },
 }));
 
 jest.mock("@/lib/logger", () => ({
@@ -32,6 +44,10 @@ describe("POST /api/metrics/search", () => {
   beforeEach(() => {
     resetSearchTelemetryForTests();
     jest.clearAllMocks();
+    // clearAllMocks() resets call history but leaks mockReturnValue overrides,
+    // so re-assert the allow-by-default origin/host guard each test.
+    mockIsOriginAllowed.mockReturnValue(true);
+    mockIsHostAllowed.mockReturnValue(true);
   });
 
   it("records a client abort metric", async () => {
@@ -116,5 +132,61 @@ describe("POST /api/metrics/search", () => {
     const res = await POST(req);
 
     expect(res.status).toBe(200);
+  });
+
+  describe("production origin enforcement", () => {
+    const originalEnv = process.env;
+
+    beforeEach(() => {
+      process.env = { ...originalEnv, NODE_ENV: "production" };
+      // Empty allowlist: this is exactly the local-prod-build / unconfigured case.
+      mockIsOriginAllowed.mockReturnValue(false);
+      mockIsHostAllowed.mockReturnValue(false);
+    });
+
+    afterEach(() => {
+      process.env = originalEnv;
+    });
+
+    const ABORT_PAYLOAD = {
+      metric: "search_client_abort_total",
+      route: "search-results-client",
+      queryHash: "hash-1",
+      reason: "superseded",
+    };
+
+    it("accepts a same-origin beacon even when the allowlist is empty", async () => {
+      const req = new Request("http://localhost:3000/api/metrics/search", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          origin: "http://localhost:3000",
+          host: "localhost:3000",
+        },
+        body: JSON.stringify(ABORT_PAYLOAD),
+      });
+
+      const res = await POST(req);
+
+      expect(res.status).toBe(200);
+      expect(getSearchTelemetrySnapshot().clientAbortTotal).toBe(1);
+    });
+
+    it("rejects a cross-origin beacon (returns 403)", async () => {
+      const req = new Request("http://localhost:3000/api/metrics/search", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          origin: "https://evil.com",
+          host: "localhost:3000",
+        },
+        body: JSON.stringify(ABORT_PAYLOAD),
+      });
+
+      const res = await POST(req);
+
+      expect(res.status).toBe(403);
+      expect(getSearchTelemetrySnapshot().clientAbortTotal).toBe(0);
+    });
   });
 });

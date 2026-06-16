@@ -3,7 +3,7 @@ import * as Sentry from "@sentry/nextjs";
 import { auth } from "@/auth";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
-import { isOriginAllowed, isHostAllowed } from "@/lib/origin-guard";
+import { isOriginAllowed, isHostAllowed, isSameOrigin } from "@/lib/origin-guard";
 
 interface AgentRequest {
   question: string;
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
   const host = request.headers.get("host");
 
   if (process.env.NODE_ENV === "production") {
-    if (origin && !isOriginAllowed(origin)) {
+    if (origin && !isOriginAllowed(origin) && !isSameOrigin(origin, host)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     if (!origin && !isHostAllowed(host)) {

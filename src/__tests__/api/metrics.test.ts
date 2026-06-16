@@ -11,6 +11,7 @@
 
 const mockIsOriginAllowed = jest.fn().mockReturnValue(true);
 const mockIsHostAllowed = jest.fn().mockReturnValue(true);
+const mockIsSameOrigin = jest.fn().mockReturnValue(false);
 
 const mockCheckMetricsRateLimit = jest
   .fn()
@@ -27,6 +28,7 @@ const mockWithScope = jest.fn();
 jest.mock("@/lib/origin-guard", () => ({
   isOriginAllowed: (...args: unknown[]) => mockIsOriginAllowed(...args),
   isHostAllowed: (...args: unknown[]) => mockIsHostAllowed(...args),
+  isSameOrigin: (...args: unknown[]) => mockIsSameOrigin(...args),
 }));
 
 jest.mock("@/lib/rate-limit-redis", () => ({
@@ -126,6 +128,7 @@ describe("POST /api/metrics", () => {
     // Reset defaults
     mockIsOriginAllowed.mockReturnValue(true);
     mockIsHostAllowed.mockReturnValue(true);
+    mockIsSameOrigin.mockReturnValue(false);
     mockCheckMetricsRateLimit.mockResolvedValue({ success: true });
     mockGetClientIP.mockReturnValue("127.0.0.1");
     // Restore env in case a previous test mutated it
@@ -161,6 +164,23 @@ describe("POST /api/metrics", () => {
       expect(res.status).toBe(403);
       const data = await res.json();
       expect(data.error).toBe("Forbidden");
+    });
+
+    it("allows a same-origin request even when origin is not in the allowlist", async () => {
+      // First-party beacon: Origin host === Host header. The allowlist may be
+      // empty (no ALLOWED_ORIGINS / VERCEL_URL), but same-origin must still pass.
+      mockIsOriginAllowed.mockReturnValue(false);
+      mockIsSameOrigin.mockReturnValue(true);
+      const req = makeRequest(VALID_PAYLOAD, {
+        origin: "http://localhost:3000",
+        host: "localhost:3000",
+      });
+      const res = await POST(req);
+      expect(mockIsSameOrigin).toHaveBeenCalledWith(
+        "http://localhost:3000",
+        "localhost:3000"
+      );
+      expect(res.status).not.toBe(403);
     });
 
     it("falls back to host check when origin header is absent", async () => {

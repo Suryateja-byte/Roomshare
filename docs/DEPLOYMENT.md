@@ -91,10 +91,10 @@ Local Docker default: `postgresql://postgres:password@localhost:5433/roomshare?s
 
 | Variable | Required | Description | Example |
 |----------|----------|-------------|---------|
-| `ALLOWED_ORIGINS` | Prod only | Comma-separated allowed origins | `https://roomshare.com,https://www.roomshare.com` |
-| `ALLOWED_HOSTS` | Prod only | Comma-separated allowed hosts | `roomshare.com,www.roomshare.com` |
+| `ALLOWED_ORIGINS` | Optional | Comma-separated *additional* cross-origin origins | `https://roomshare.com,https://www.roomshare.com` |
+| `ALLOWED_HOSTS` | Optional | Comma-separated *additional* allowed hosts | `roomshare.com,www.roomshare.com` |
 
-These are enforced by `/api/agent`, `/api/chat`, and `/api/metrics` to reject cross-origin requests.
+These are enforced by `/api/agent`, `/api/chat`, `/api/metrics`, `/api/metrics/search`, and `/api/web-vitals` to reject cross-origin requests. Same-origin requests (the app's own pages) are always allowed without configuration — the guard matches the request's `Origin` host against its `Host` header — so `ALLOWED_ORIGINS` / `ALLOWED_HOSTS` are only needed to allow extra cross-origin callers.
 
 ### Error Tracking (Sentry)
 
