@@ -111,7 +111,7 @@ function HeroSection() {
       />
 
       <div className="home-hero-frame relative z-10 flex w-full flex-1 flex-col justify-start">
-        <div className="flex w-full flex-1 flex-col md:block">
+        <div className="home-hero-stack flex w-full flex-1 flex-col md:block">
           <div className="grid items-start gap-4 md:grid-cols-[minmax(0,0.56fr)_minmax(0,0.44fr)] md:gap-8 lg:gap-12">
             <div className="max-w-[34rem] md:max-w-[46rem] lg:max-w-[52rem]">
               <div className="animate-editorial-rise mb-3 inline-flex items-center gap-2 text-micro-label text-primary md:mb-4">
