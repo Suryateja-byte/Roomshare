@@ -254,7 +254,7 @@ test.describe("homepage responsive composition", () => {
   ] as const;
 
   for (const viewport of homepageViewports) {
-    test(`home layout fits and hints next section at ${viewport.name}`, async ({
+    test(`home layout fits and hero fills the viewport at ${viewport.name}`, async ({
       page,
     }) => {
       await page.setViewportSize({
@@ -316,8 +316,11 @@ test.describe("homepage responsive composition", () => {
 
       expect(layoutState.hasHorizontalScroll).toBe(false);
       expect(layoutState.heroTop).toBe(0);
-      expect(layoutState.whyTop).toBeGreaterThan(0);
-      expect(layoutState.whyTop).toBeLessThan(viewport.height);
+      // Hero fills the full viewport: the next section begins at (or just below)
+      // the fold instead of peeking in as a gap above it. A reintroduced
+      // sub-viewport hero (e.g. min-height: calc(100dvh - 2rem)) would push
+      // whyTop above the fold and fail this. 2px sub-pixel tolerance.
+      expect(layoutState.whyTop).toBeGreaterThanOrEqual(viewport.height - 2);
       expect(layoutState.cardEscapesViewport).toBe(false);
     });
   }
