@@ -365,7 +365,8 @@ textarea:focus-visible {
 }
 
 .home-hero-section {
-  min-height: calc(100dvh - 1rem);
+  min-height: 100vh; /* fallback for browsers without dvh support */
+  min-height: 100dvh;
 }
 
 .home-hero-frame {
@@ -379,10 +380,6 @@ textarea:focus-visible {
 }
 
 @media (min-width: 768px) {
-  .home-hero-section {
-    min-height: calc(100dvh - 2rem);
-  }
-
   .home-hero-frame {
     padding-top: clamp(1rem, 2.7vh, 2.75rem);
   }
@@ -390,6 +387,18 @@ textarea:focus-visible {
   .home-hero-search-row {
     max-width: 78rem;
     margin-inline: 0;
+  }
+}
+
+/* On tall tablet/desktop viewports the top-aligned hero leaves a large empty
+   photo area below the content. Vertically center the stack so the slack is
+   shared above and below. Shorter viewports keep the top-aligned md:block.
+   `safe center` falls back to top-alignment if content ever exceeds the frame. */
+@media (min-width: 768px) and (min-height: 960px) {
+  .home-hero-stack {
+    display: flex;
+    flex-direction: column;
+    justify-content: safe center;
   }
 }
 
