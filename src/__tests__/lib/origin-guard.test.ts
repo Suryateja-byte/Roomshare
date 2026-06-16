@@ -10,6 +10,7 @@ describe("origin-guard", () => {
     jest.resetModules();
     process.env = { ...ORIGINAL_ENV };
     delete process.env.VERCEL_URL;
+    delete process.env.VERCEL_PROJECT_PRODUCTION_URL;
   });
 
   afterAll(() => {
@@ -54,6 +55,16 @@ describe("origin-guard", () => {
         "https://roomshare-random.vercel.app",
       ]);
     });
+
+    it("adds the production-domain origin from VERCEL_PROJECT_PRODUCTION_URL", async () => {
+      delete process.env.ALLOWED_ORIGINS;
+      process.env.VERCEL_PROJECT_PRODUCTION_URL = "roomshare.com";
+      (process.env as any).NODE_ENV = "production";
+
+      const { getAllowedOrigins } = await import("@/lib/origin-guard");
+
+      expect(getAllowedOrigins()).toEqual(["https://roomshare.com"]);
+    });
   });
 
   describe("isOriginAllowed", () => {
@@ -92,6 +103,35 @@ describe("origin-guard", () => {
     });
   });
 
+  describe("isSameOrigin", () => {
+    it("returns true when the origin host matches the request host", async () => {
+      const { isSameOrigin } = await import("@/lib/origin-guard");
+      expect(isSameOrigin("https://roomshare.com", "roomshare.com")).toBe(true);
+    });
+
+    it("returns true for a matching host that includes a port (local prod build)", async () => {
+      const { isSameOrigin } = await import("@/lib/origin-guard");
+      expect(isSameOrigin("http://localhost:3000", "localhost:3000")).toBe(true);
+    });
+
+    it("returns false for a cross-origin request", async () => {
+      const { isSameOrigin } = await import("@/lib/origin-guard");
+      expect(isSameOrigin("https://evil.com", "roomshare.com")).toBe(false);
+      expect(isSameOrigin("https://evil.com", "localhost:3000")).toBe(false);
+    });
+
+    it("returns false when origin or host is null", async () => {
+      const { isSameOrigin } = await import("@/lib/origin-guard");
+      expect(isSameOrigin(null, "roomshare.com")).toBe(false);
+      expect(isSameOrigin("https://roomshare.com", null)).toBe(false);
+    });
+
+    it("returns false for a malformed origin", async () => {
+      const { isSameOrigin } = await import("@/lib/origin-guard");
+      expect(isSameOrigin("not a url", "roomshare.com")).toBe(false);
+    });
+  });
+
   describe("getAllowedHosts", () => {
     it("parses a comma-separated ALLOWED_HOSTS env variable", async () => {
       process.env.ALLOWED_HOSTS = "example.com,api.example.com";
@@ -111,6 +151,16 @@ describe("origin-guard", () => {
         "example.com",
         "roomshare-random.vercel.app",
       ]);
+    });
+
+    it("adds the production-domain host from VERCEL_PROJECT_PRODUCTION_URL", async () => {
+      delete process.env.ALLOWED_HOSTS;
+      process.env.VERCEL_PROJECT_PRODUCTION_URL = "roomshare.com";
+      (process.env as any).NODE_ENV = "production";
+
+      const { getAllowedHosts } = await import("@/lib/origin-guard");
+
+      expect(getAllowedHosts()).toEqual(["roomshare.com"]);
     });
   });
 

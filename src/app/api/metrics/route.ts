@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { checkMetricsRateLimit } from "@/lib/rate-limit-redis";
 import { getClientIP } from "@/lib/rate-limit";
-import { isOriginAllowed, isHostAllowed } from "@/lib/origin-guard";
+import { isOriginAllowed, isHostAllowed, isSameOrigin } from "@/lib/origin-guard";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { hmacListingId, hasHmacSecret } from "./hmac";
 
@@ -165,7 +165,7 @@ export async function POST(request: Request) {
 
     // In production, enforce origin/host
     if (process.env.NODE_ENV === "production") {
-      if (origin && !isOriginAllowed(origin)) {
+      if (origin && !isOriginAllowed(origin) && !isSameOrigin(origin, host)) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
 

@@ -520,6 +520,14 @@ Configured via environment variables:
 - `ALLOWED_ORIGINS` -- comma-separated full origin URLs (e.g., `https://roomshare.com`)
 - `ALLOWED_HOSTS` -- comma-separated hostnames (e.g., `roomshare.com`)
 
+**Same-origin requests are always allowed.** A first-party request whose `Origin`
+header host equals the request's own `Host` header is treated as same-origin and
+passes the guard on any domain — production, custom domains, preview deployments,
+and local production builds — without needing `ALLOWED_ORIGINS`. `ALLOWED_ORIGINS` /
+`ALLOWED_HOSTS` are therefore only required to permit *additional cross-origin*
+callers. The Vercel production domain is also auto-trusted via
+`VERCEL_PROJECT_PRODUCTION_URL` (and the per-deployment URL via `VERCEL_URL`).
+
 In development, `http://localhost:3000` and `localhost` are automatically added.
 
 ### Enforcement Points

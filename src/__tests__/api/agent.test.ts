@@ -34,6 +34,7 @@ jest.mock("@sentry/nextjs", () => ({
 jest.mock("@/lib/origin-guard", () => ({
   isOriginAllowed: jest.fn().mockReturnValue(false),
   isHostAllowed: jest.fn().mockReturnValue(false),
+  isSameOrigin: jest.fn().mockReturnValue(false),
 }));
 
 jest.mock("next/server", () => ({
