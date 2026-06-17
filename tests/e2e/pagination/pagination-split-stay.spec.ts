@@ -40,7 +40,9 @@ const sel = {
   loadMoreBtn: 'button:has-text("Show more places")',
   splitStayHeading: 'h3:has-text("Split your stay")',
   splitStayLabel: "text=/Split Stay/",
-  combinedTotal: 'text="Combined total"',
+  // Substring match: the footer renders "Combined total" or "Combined total · N mo"
+  // (the duration suffix clarifies it's the full-stay total, not a monthly figure).
+  combinedTotal: "text=Combined total",
 } as const;
 
 // ---------------------------------------------------------------------------
