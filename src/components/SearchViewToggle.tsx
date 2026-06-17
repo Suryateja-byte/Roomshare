@@ -2,7 +2,6 @@
 
 import { useRef, useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
-import { Map } from "lucide-react";
 import MobileBottomSheet from "./search/MobileBottomSheet";
 import FloatingMapButton from "./search/FloatingMapButton";
 import { useListingFocus } from "@/contexts/ListingFocusContext";
@@ -22,8 +21,6 @@ interface SearchViewToggleProps {
   shouldShowMap: boolean;
   /** Whether the current viewport can display an inline map pane */
   canShowMap: boolean;
-  /** Toggle map visibility callback */
-  onToggle: () => void;
   /** Whether the preference is still loading (hydrating from localStorage) */
   isLoading: boolean;
   /** Result count text for mobile bottom sheet header */
@@ -35,7 +32,6 @@ export default function SearchViewToggle({
   mapComponent,
   shouldShowMap,
   canShowMap,
-  onToggle,
   isLoading,
   resultHeaderText,
 }: SearchViewToggleProps) {
@@ -336,18 +332,9 @@ export default function SearchViewToggle({
           </div>
         )}
 
-        {/* Desktop Show Map Button - Only visible when map is hidden */}
-        {canShowMap && isSplitViewport === true && !shouldShowMap && (
-          <button
-            onClick={onToggle}
-            disabled={isLoading}
-            className="fixed top-[100px] right-6 z-[50] inline-flex h-11 items-center gap-2 rounded-full border border-outline-variant/30 bg-surface-container-lowest/95 px-4 text-on-surface shadow-[0_12px_32px_-18px_rgba(27,28,25,0.42),0_4px_16px_rgba(27,28,25,0.08)] backdrop-blur-md transition-all duration-200 hover:border-on-surface-variant/35 hover:bg-surface-container-lowest hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60"
-            aria-label="Show map"
-          >
-            <Map className="w-4 h-4" />
-            <span className="text-sm font-semibold">Show map</span>
-          </button>
-        )}
+        {/* Show-map affordance lives in the results toolbar (desktop-toolbar-map-toggle),
+            which is always present on desktop — a second fixed button here was redundant
+            and exposed an inconsistent accessible name. */}
       </div>
     </>
   );

@@ -14,6 +14,7 @@ jest.mock("@/lib/prisma", () => {
     savedSearch: {
       count: jest.fn(),
       create: jest.fn(),
+      findFirst: jest.fn(),
       findMany: jest.fn(),
       delete: jest.fn(),
       update: jest.fn(),
@@ -82,6 +83,8 @@ describe("Saved Search Actions", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (auth as jest.Mock).mockResolvedValue(mockSession);
+    // Default: no duplicate saved search exists (the dedup check finds nothing).
+    (prisma.savedSearch.findFirst as jest.Mock).mockResolvedValue(null);
     mockEvaluateSavedSearchAlertPaywall.mockResolvedValue({
       enabled: false,
       mode: "PASS_ACTIVE",
@@ -124,6 +127,20 @@ describe("Saved Search Actions", () => {
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
       expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
       expect(order).toEqual(["lock", "count"]);
+      expect(prisma.savedSearch.create).not.toHaveBeenCalled();
+    });
+
+    // Regression (L-15): an identical (same canonical searchSpecHash) saved search
+    // must be rejected instead of creating a duplicate row (which eats the 10-slot
+    // limit and fires duplicate alert emails).
+    it("rejects a duplicate saved search without creating a new row", async () => {
+      (prisma.savedSearch.findFirst as jest.Mock).mockResolvedValue({
+        id: "existing-search",
+      });
+
+      const result = await saveSearch({ name: "Test", filters: mockFilters });
+
+      expect(result).toEqual({ error: "You've already saved this search." });
       expect(prisma.savedSearch.create).not.toHaveBeenCalled();
     });
 

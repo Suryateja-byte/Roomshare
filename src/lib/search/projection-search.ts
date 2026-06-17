@@ -998,6 +998,15 @@ export async function executeProjectionSearchV2(input: {
         spec,
       });
     }
+    // A non-snapshot cursor reached the projection path (e.g. the engine switched
+    // mid-session after a page-1 freshness-hole fallback emitted a legacy/keyset
+    // cursor). Don't silently restart at page 1 — signal a contract change so the
+    // client resets cleanly, mirroring the inverse handling in search-v2-service.
+    return {
+      response: null,
+      paginatedResult: null,
+      snapshotExpired: buildSnapshotExpired(queryHash, "search_contract_changed"),
+    };
   }
 
   const rows = await queryProjectionUnitRows(spec);

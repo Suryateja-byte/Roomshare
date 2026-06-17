@@ -133,12 +133,18 @@ export function ExpandSearchSuggestions({
         const withCounts: Suggestion[] = [];
         for (let i = 0; i < candidates.length; i++) {
           const result = results[i];
-          if (result.status === "fulfilled") {
-            const delta =
-              (result.value.count ?? 101) - currentCount;
+          if (result.status !== "fulfilled") continue;
+          const rawCount = result.value.count;
+          if (typeof rawCount === "number") {
+            const delta = rawCount - currentCount;
             if (delta > 0) {
               withCounts.push({ ...candidates[i], count: delta });
             }
+          } else {
+            // count null/absent => >100 (or unbounded) results. Don't fabricate a
+            // precise number (the old `?? 101` showed e.g. "+98 rooms"); surface a
+            // "many more" suggestion instead (count: null).
+            withCounts.push({ ...candidates[i], count: null });
           }
         }
 
@@ -193,8 +199,11 @@ export function ExpandSearchSuggestions({
                   </div>
                   <span className="text-sm">
                     <strong className="font-semibold text-primary">
-                      +{suggestion.count} room
-                      {suggestion.count !== 1 ? "s" : ""}
+                      {suggestion.count === null
+                        ? "Many more rooms"
+                        : `+${suggestion.count} room${
+                            suggestion.count !== 1 ? "s" : ""
+                          }`}
                     </strong>{" "}
                     {suggestion.label}
                   </span>

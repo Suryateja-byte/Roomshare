@@ -40,4 +40,21 @@ describe("ExpandSearchSuggestions", () => {
 
     expect(screen.queryAllByRole("button")).toHaveLength(0);
   });
+
+  // Regression (L-16): /api/search-count returns { count: null } for >100 results.
+  // The old code did `count ?? 101`, fabricating a precise "+98 rooms". A null count
+  // must render the non-fabricated "Many more rooms" label instead.
+  it("shows 'Many more rooms' (not a fabricated number) when the count is null", async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue({ json: async () => ({ count: null }) }) as jest.Mock;
+
+    render(
+      <ExpandSearchSuggestions currentCount={3} searchParamsString="maxPrice=1000" />
+    );
+
+    const button = await screen.findByRole("button");
+    expect(button).toHaveTextContent(/many more rooms/i);
+    expect(button).not.toHaveTextContent(/\+\d+ room/i);
+  });
 });

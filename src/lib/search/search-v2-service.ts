@@ -335,11 +335,20 @@ async function resolveEligibleSemanticItems(
     });
 }
 
+// Deep semantic pages OFFSET-walk the vector search (cost grows linearly with the
+// page), and the outer withTimeout doesn't cancel an in-flight walk. The client
+// caps accumulation at 60 (~5 pages), so deeper pages are effectively unreachable
+// via the UI — bound the walk and let them fall through to soft-vibe ranking.
+const SEMANTIC_ELIGIBLE_MAX_PAGE = 20;
+
 async function getSemanticEligibleListPage(
   filterParams: FilterParams,
   page: number,
   pageSize: number
 ): Promise<PaginatedResultHybrid<ListingData> | null> {
+  if (page > SEMANTIC_ELIGIBLE_MAX_PAGE) {
+    return null;
+  }
   const pageOffset = (page - 1) * pageSize;
   const requiredEligibleCount = pageOffset + pageSize + 1;
   const rawBatchSize = pageSize + 1;
@@ -995,8 +1004,11 @@ export async function executeSearchV2(
       warnings.push(VIBE_SOFT_FALLBACK_WARNING);
     }
 
-    const hasConfirmedEmptyList =
-      listResult.total === 0 && listResult.items.length === 0;
+    // Treat any empty list page as confirmed-empty regardless of whether total is
+    // 0 or null (the "unknown / >100" sentinel). A deep/out-of-range page can
+    // return 0 items with total=null; without this the map would still ship the
+    // full in-bounds candidate set, showing pins next to an empty list.
+    const hasConfirmedEmptyList = listResult.items.length === 0;
     const responseMapListings = hasConfirmedEmptyList ? [] : mapListings;
     const responseMapTruncated = hasConfirmedEmptyList
       ? undefined
@@ -1175,6 +1187,7 @@ export async function executeSearchV2(
         fullItems: toPublicSearchListings(listResult.items),
         nextCursor: listNextCursor,
         total: listResult.total,
+        nearMatchExpansion: listResult.nearMatchExpansion,
       },
       map: mapResponse,
     };

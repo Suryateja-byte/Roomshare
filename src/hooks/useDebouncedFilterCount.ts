@@ -374,6 +374,12 @@ export function useDebouncedFilterCount({
     if (isLoading) {
       return "listings";
     }
+    // No pending change yet (e.g. the price popover just opened): there is no
+    // count to preview, so return a neutral label and let the consumer fall back
+    // to "Show results" instead of a misleading "100+ listings".
+    if (!isDirty && count === null) {
+      return "";
+    }
     if (count === null) {
       return "100+ listings";
     }
@@ -381,7 +387,7 @@ export function useDebouncedFilterCount({
       return "1 listing";
     }
     return `${count} listings`;
-  }, [boundsRequired, count, isLoading]);
+  }, [boundsRequired, count, isLoading, isDirty]);
 
   return {
     count,

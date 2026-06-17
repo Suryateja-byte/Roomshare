@@ -143,6 +143,8 @@ export interface SearchV2List {
   nextCursor: string | null;
   /** Exact total if ≤100, null if >100 (hybrid count optimization) */
   total?: number | null;
+  /** Near-match expansion description (e.g. "Showing rooms within $200 of your budget") */
+  nearMatchExpansion?: string;
 }
 
 /** Map section of the response */

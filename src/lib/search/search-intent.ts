@@ -116,9 +116,10 @@ export function buildSearchIntentParams(
   });
 
   if (trimmedVibe.length >= 2) {
-    nextQuery.bounds =
-      currentQuery.bounds ??
-      boundsTupleToObject(deriveSearchBoundsFromPoint(37.7749, -122.4194));
+    // Vibe-only search with no selected location: keep any current map bounds,
+    // but never inject a hardcoded city. With no bounds the server shows the
+    // location-required prompt instead of silently defaulting to San Francisco.
+    nextQuery.bounds = currentQuery.bounds ?? undefined;
   } else {
     nextQuery.bounds = undefined;
   }

@@ -645,10 +645,19 @@ export default function LocationSearchInput({
 
   const handleSelectFallback = useCallback(
     (item: LocationSearchFallbackItem) => {
+      // Mirror handleSelectSuggestion: mark the committed value so the debounced
+      // effect (gated on lastSelectedValueRef !== debouncedValue) doesn't re-fetch
+      // and reopen the dropdown for the recent the user just picked. primaryText
+      // equals the value the recent writes to the input.
+      justSelectedRef.current = true;
+      lastSelectedValueRef.current = item.primaryText;
       item.onSelect();
       setShowSuggestions(false);
       setSelectedIndex(-1);
       clearTransientState();
+      requestAnimationFrame(() => {
+        justSelectedRef.current = false;
+      });
     },
     [clearTransientState]
   );

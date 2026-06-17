@@ -211,6 +211,13 @@ interface ListingCardProps {
   estimatedMonths?: number;
   queryHashPrefix8?: string;
   /**
+   * Position within an enclosing role="feed"/list (1-based) and the total set
+   * size. Applied to the card's <article> so screen readers announce "article
+   * X of Y" — they ignore these on a role-less wrapper.
+   */
+  ariaPosInSet?: number;
+  ariaSetSize?: number;
+  /**
    * Open the listing in a new tab (Airbnb-style). Enabled on desktop search so
    * the search page + map stay live (no remount) and users can compare listings.
    * Callers should pass the already-resolved value (e.g. desktop viewport only).
@@ -302,6 +309,8 @@ function ListingCardInner({
   showTotalPrice = false,
   estimatedMonths = 1,
   queryHashPrefix8,
+  ariaPosInSet,
+  ariaSetSize,
   openInNewTab = false,
 }: ListingCardProps) {
   const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
@@ -468,6 +477,8 @@ function ListingCardInner({
   return (
     <article
       aria-label={ariaLabel}
+      aria-posinset={ariaPosInSet}
+      aria-setsize={ariaSetSize}
       data-testid="listing-card"
       data-listing-card-id={listing.id}
       data-listing-id={listing.id}
