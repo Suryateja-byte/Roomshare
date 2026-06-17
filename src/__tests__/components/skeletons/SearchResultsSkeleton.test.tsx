@@ -18,8 +18,15 @@ describe("SearchResultsSkeleton", () => {
     expect(rows).toHaveLength(3);
     for (const row of rows) {
       expect(row).toHaveAttribute("aria-hidden", "true");
-      expect(row).toHaveClass("md:grid-cols-[168px_minmax(0,1fr)]");
     }
+
+    // The skeleton must mirror the real results layout to avoid a layout shift
+    // on load: a multi-column auto-fit grid of vertical cards (not a single
+    // column of horizontal rows). See M-08 in docs/search-feature-audit-2026-06-16.md.
+    const list = screen.getByTestId("search-loading-listing-list");
+    expect(list).toHaveClass(
+      "sm:grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))]"
+    );
   });
 
   it("uses motion-reduction classes on animated skeleton elements", () => {

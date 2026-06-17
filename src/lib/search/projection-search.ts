@@ -892,9 +892,23 @@ async function hydratePhase04Snapshot(input: {
     consideredCount: unitKeys.length,
   });
 
+  // Slice by absolute offset over the FROZEN unitKeys order, not the compacted
+  // visibleRows. Holes (units that dropped out since the snapshot) are removed
+  // only within each page window, so a hole on an earlier page can never shift a
+  // later listing into an already-served page — which would silently skip it.
+  const liveRowByUnitKey = new Map(
+    visibleRows.map((row) => [row.unitKey, row])
+  );
   const start = (input.cursor.page - 1) * input.cursor.pageSize;
-  const pageRows = visibleRows.slice(start, start + input.cursor.pageSize);
-  const hasNext = start + input.cursor.pageSize < visibleRows.length;
+  const pageRows = unitKeys
+    .slice(start, start + input.cursor.pageSize)
+    .map((key) => liveRowByUnitKey.get(key))
+    .filter((row): row is ProjectionUnitRow => row !== undefined);
+  // More results remain only if some non-hole unit exists past this window
+  // (avoids advertising a next page that would resolve to all holes).
+  const hasNext = unitKeys
+    .slice(start + input.cursor.pageSize)
+    .some((key) => liveRowByUnitKey.has(key));
   const nextCursor = hasNext
     ? buildSnapshotCursor({
         snapshotId: snapshot.id,

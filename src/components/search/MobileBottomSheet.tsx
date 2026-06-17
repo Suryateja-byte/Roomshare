@@ -314,8 +314,11 @@ export default function MobileBottomSheet({
 
       const content = contentRef.current;
       if (content && content.scrollTop <= 0) {
-        isScrollDrag.current = true;
+        // Set the content-drag flag AFTER handleTouchStart, which resets it to
+        // false. Setting it before would be clobbered, leaving the content-drag
+        // guards (scrolled-away abort + downward-only) in handleTouchMove dead.
         handleTouchStart(e);
+        isScrollDrag.current = true;
       }
     },
     [snapIndex, handleTouchStart]

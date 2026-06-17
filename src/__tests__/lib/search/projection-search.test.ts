@@ -390,13 +390,13 @@ describe("Phase 04 projection search", () => {
     expect(mockSnapshotFindUnique).not.toHaveBeenCalled();
   });
 
-  it("hydrates snapshot pages by filtering missing units and backfilling holes", async () => {
+  it("filters holes within a page and removes missing units", async () => {
     const queryHash = phase04QueryHash(2);
     const cursor = encodeSnapshotCursor({
       v: 4,
       snapshotId: "snapshot-phase04",
       page: 1,
-      pageSize: 2,
+      pageSize: 4,
       queryHash,
       responseVersion: SEARCH_RESPONSE_VERSION,
       snapshotVersion: PHASE04_SNAPSHOT_VERSION,
@@ -419,6 +419,9 @@ describe("Phase 04 projection search", () => {
       expiresAt: new Date(Date.now() + 60_000),
       createdAt: new Date("2026-04-23T00:00:00Z"),
     });
+    // unit-b dropped out (hole). Page window (pageSize 4) spans all keys, so the
+    // hole is simply removed — the page shows [a, c] (no later listing exists to
+    // shift, so there is nothing to skip here).
     mockQueryRawUnsafe.mockResolvedValueOnce([
       projectionRow({
         unit_id: "unit-a",
@@ -432,12 +435,67 @@ describe("Phase 04 projection search", () => {
 
     const result = await executeProjectionSearchV2({
       parsed: parsed(),
-      params: { rawParams: { cursor }, limit: 2 },
+      params: { rawParams: { cursor }, limit: 4 },
     });
 
     expect(result.response?.list.fullItems?.map((item) => item.id)).toEqual([
       "inv-a1",
       "inv-c1",
+    ]);
+    expect(result.response?.list.nextCursor).toBeNull();
+  });
+
+  // Regression (M-04): slicing the COMPACTED rows by absolute offset skips a
+  // listing when an earlier-page unit becomes a hole. Here page 1 served frozen
+  // [a, b]; on page 2, unit-a became a hole, compacting the live rows to
+  // [b, c, d]. The buggy slice(2, 4) over the compacted array returned [d],
+  // silently skipping c. The position-stable slice over the FROZEN unit keys
+  // must return [c, d].
+  it("does not skip a listing on page 2 when a page-1 unit becomes a hole", async () => {
+    const queryHash = phase04QueryHash(2);
+    const cursor = encodeSnapshotCursor({
+      v: 4,
+      snapshotId: "snapshot-skip",
+      page: 2,
+      pageSize: 2,
+      queryHash,
+      responseVersion: SEARCH_RESPONSE_VERSION,
+      snapshotVersion: PHASE04_SNAPSHOT_VERSION,
+    });
+    mockSnapshotFindUnique.mockResolvedValue({
+      id: "snapshot-skip",
+      queryHash,
+      backendSource: "v2",
+      responseVersion: SEARCH_RESPONSE_VERSION,
+      projectionVersion: null,
+      projectionEpoch: BigInt(1),
+      embeddingVersion: "embed-v1",
+      rankerProfileVersion: "2026-04-19.search-ranker-v1",
+      unitIdentityEpochFloor: 1,
+      snapshotVersion: PHASE04_SNAPSHOT_VERSION,
+      orderedListingIds: ["inv-a1", "inv-b1", "inv-c1", "inv-d1"],
+      orderedUnitKeys: ["unit-a:1", "unit-b:1", "unit-c:1", "unit-d:1"],
+      mapPayload: null,
+      total: 4,
+      expiresAt: new Date(Date.now() + 60_000),
+      createdAt: new Date("2026-04-23T00:00:00Z"),
+    });
+    // unit-a (served on page 1) is now a hole; live re-fetch returns b, c, d.
+    mockQueryRawUnsafe.mockResolvedValueOnce([
+      projectionRow({ unit_id: "unit-b", representative_inventory_id: "inv-b1" }),
+      projectionRow({ unit_id: "unit-c", representative_inventory_id: "inv-c1" }),
+      projectionRow({ unit_id: "unit-d", representative_inventory_id: "inv-d1" }),
+    ]);
+
+    const result = await executeProjectionSearchV2({
+      parsed: parsed(),
+      params: { rawParams: { cursor }, limit: 2 },
+    });
+
+    // Page 2 = frozen keys[2..4] = [c, d]; c must NOT be skipped.
+    expect(result.response?.list.fullItems?.map((item) => item.id)).toEqual([
+      "inv-c1",
+      "inv-d1",
     ]);
     expect(result.response?.list.nextCursor).toBeNull();
   });

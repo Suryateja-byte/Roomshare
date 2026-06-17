@@ -738,6 +738,14 @@ export function SearchResultsClient({
         setIsDegraded(false);
         setExtraListings([]);
         setNextCursor(null);
+        // Drop any client-fetched listings so effectiveListings falls back to the
+        // refreshed SSR data after router.refresh(); otherwise stale, possibly
+        // mis-ordered client-fetched results keep shadowing the refresh. Mirrors
+        // the PUBLIC_CACHE_INVALIDATED handler above.
+        setClientFetchedListings(null);
+        setClientFetchedTotal(null);
+        setClientFetchedNearMatch(undefined);
+        setClientFetchedVibeAdvisory(undefined);
         totalCountRef.current =
           dedupeListingsForDisplay(currentListings).length;
         seenIdsRef.current = new Set(

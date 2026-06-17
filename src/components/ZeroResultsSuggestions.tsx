@@ -16,15 +16,18 @@ import { clearAllFilters } from "@/components/filters/filter-chip-utils";
  * Nearby area suggestions for zero-result searches.
  * Shown when user searched a specific location that returned nothing.
  */
-const NEARBY_SUGGESTIONS: Record<string, string[]> = {
-  // Fallback suggestions shown when no location-specific ones match
-  _default: [
-    "Austin, TX",
-    "San Francisco, CA",
-    "New York, NY",
-    "Los Angeles, CA",
-  ],
-};
+/**
+ * Nearby area chips MUST carry lat/lng. A bare `/search?q=Area` link is treated as
+ * a text query without bounds, which short-circuits to the "Please select a location"
+ * screen (boundsRequired) — a dead-end. Including lat/lng routes through the legacy
+ * point path that derives bounds, so the area's listings actually render.
+ */
+const NEARBY_SUGGESTIONS: { label: string; lat: number; lng: number }[] = [
+  { label: "Austin, TX", lat: 30.2672, lng: -97.7431 },
+  { label: "San Francisco, CA", lat: 37.7749, lng: -122.4194 },
+  { label: "New York, NY", lat: 40.7128, lng: -74.006 },
+  { label: "Los Angeles, CA", lat: 34.0522, lng: -118.2437 },
+];
 
 interface ZeroResultsSuggestionsProps {
   suggestions: FilterSuggestion[];
@@ -236,14 +239,14 @@ export default function ZeroResultsSuggestions({
             </span>
           </div>
           <div className="flex flex-wrap gap-2">
-            {NEARBY_SUGGESTIONS._default.map((area) => (
+            {NEARBY_SUGGESTIONS.map((area) => (
               <Link
-                key={area}
-                href={`/search?q=${encodeURIComponent(area)}`}
+                key={area.label}
+                href={`/search?q=${encodeURIComponent(area.label)}&lat=${area.lat}&lng=${area.lng}`}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container-high hover:bg-surface-container-high text-sm text-on-surface-variant transition-colors"
               >
                 <MapPin className="w-3 h-3" />
-                {area}
+                {area.label}
               </Link>
             ))}
           </div>
@@ -308,17 +311,18 @@ export default function ZeroResultsSuggestions({
             </span>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {NEARBY_SUGGESTIONS._default
-              .filter((area) => area.toLowerCase() !== query.toLowerCase())
+            {NEARBY_SUGGESTIONS.filter(
+              (area) => area.label.toLowerCase() !== query.toLowerCase()
+            )
               .slice(0, 3)
               .map((area) => (
                 <Link
-                  key={area}
-                  href={`/search?q=${encodeURIComponent(area)}`}
+                  key={area.label}
+                  href={`/search?q=${encodeURIComponent(area.label)}&lat=${area.lat}&lng=${area.lng}`}
                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-canvas hover:bg-surface-container-high text-xs text-on-surface-variant transition-colors"
                 >
                   <MapPin className="w-3 h-3" />
-                  {area}
+                  {area.label}
                 </Link>
               ))}
           </div>

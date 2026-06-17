@@ -278,5 +278,30 @@ describe("search-query", () => {
       );
       expect(url).toBe("/search");
     });
+
+    // Regression (M-05): the real submit pipeline stores the place in
+    // locationLabel (+lat/lng), not q. Without the fallback, every location
+    // search canonicalized to bare /search while its <title> was location-specific.
+    it("falls back to locationLabel when the place is stored there (M-05)", () => {
+      const url = buildSeoCanonicalSearchUrl(
+        normalizeSearchQuery(
+          new URLSearchParams(
+            "locationLabel=Austin&lat=30.2672&lng=-97.7431&minLat=30.1&maxLat=30.5&minLng=-97.9&maxLng=-97.5"
+          )
+        )
+      );
+      expect(url).toBe("/search?q=Austin");
+    });
+
+    // Regression (L-13): legacy q+point URLs normalize q into locationLabel; the
+    // canonical must still recover the city term.
+    it("recovers the city term from a legacy q+point URL (L-13)", () => {
+      const url = buildSeoCanonicalSearchUrl(
+        normalizeSearchQuery(
+          new URLSearchParams("q=San Francisco&lat=37.7749&lng=-122.4194")
+        )
+      );
+      expect(url).toBe("/search?q=San+Francisco");
+    });
   });
 });

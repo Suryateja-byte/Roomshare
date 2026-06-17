@@ -187,7 +187,7 @@ describe("search-alerts", () => {
         );
       });
 
-      it("includes searches that have never been alerted", async () => {
+      it("includes never-alerted DAILY/WEEKLY searches but not INSTANT", async () => {
         (prisma.savedSearch.findMany as jest.Mock).mockResolvedValue([
           mockSavedSearch,
         ]);
@@ -199,10 +199,33 @@ describe("search-alerts", () => {
         expect(prisma.savedSearch.findMany).toHaveBeenCalledWith(
           expect.objectContaining({
             where: expect.objectContaining({
-              OR: expect.arrayContaining([{ lastAlertAt: null }]),
+              OR: expect.arrayContaining([
+                {
+                  alertFrequency: { in: ["DAILY", "WEEKLY"] },
+                  lastAlertAt: null,
+                },
+              ]),
             }),
           })
         );
+      });
+
+      // Regression (M-06): a freshly-created INSTANT search has lastAlertAt=null.
+      // An unscoped { lastAlertAt: null } branch would sweep it into this scheduled
+      // (digest) cron and send a batched "N matching listings" email instead of the
+      // per-listing instant alert delivered by triggerInstantAlerts.
+      it("does not sweep never-alerted INSTANT searches into the scheduled cron", async () => {
+        (prisma.savedSearch.findMany as jest.Mock).mockResolvedValue([]);
+
+        await processSearchAlerts();
+
+        const call = (prisma.savedSearch.findMany as jest.Mock).mock.calls[0][0];
+        const orBranches = call.where.OR as Array<Record<string, unknown>>;
+        expect(orBranches).not.toContainEqual({ lastAlertAt: null });
+        expect(orBranches).toContainEqual({
+          alertFrequency: { in: ["DAILY", "WEEKLY"] },
+          lastAlertAt: null,
+        });
       });
 
       it("includes DAILY searches last alerted more than 24 hours ago", async () => {

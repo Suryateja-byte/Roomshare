@@ -36,6 +36,13 @@ export function ExpandSearchSuggestions({
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
+    // Clear stale state from the previous query so the old "+N rooms" buttons
+    // (built from the prior params) can't be clicked during this refetch window.
+    // The component is not always remounted on param change (client-side search),
+    // so without this reset the buttons would relax the previous query.
+    setLoading(true);
+    setSuggestions([]);
+
     const params = new URLSearchParams(searchParamsString);
     const candidates: Suggestion[] = [];
 
