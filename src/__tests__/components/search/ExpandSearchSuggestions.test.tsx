@@ -57,4 +57,21 @@ describe("ExpandSearchSuggestions", () => {
     expect(button).toHaveTextContent(/many more rooms/i);
     expect(button).not.toHaveTextContent(/\+\d+ room/i);
   });
+
+  // Regression (L-16): a bounds-required / browse / error response also has
+  // count===null but does NOT mean ">100 results" — it must not produce a
+  // "many more" suggestion that links to an empty page.
+  it("does not suggest 'many more' for a bounds-required (null count) response", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      json: async () => ({ count: null, boundsRequired: true }),
+    }) as jest.Mock;
+
+    render(
+      <ExpandSearchSuggestions currentCount={3} searchParamsString="maxPrice=1000" />
+    );
+
+    // Give the debounce + fetch time to resolve, then assert no buttons appear.
+    await new Promise((r) => setTimeout(r, 700));
+    expect(screen.queryAllByRole("button")).toHaveLength(0);
+  });
 });

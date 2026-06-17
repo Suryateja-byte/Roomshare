@@ -134,16 +134,27 @@ export function ExpandSearchSuggestions({
         for (let i = 0; i < candidates.length; i++) {
           const result = results[i];
           if (result.status !== "fulfilled") continue;
-          const rawCount = result.value.count;
-          if (typeof rawCount === "number") {
-            const delta = rawCount - currentCount;
+          const value = result.value as {
+            count?: number | null;
+            boundsRequired?: boolean;
+            browseMode?: boolean;
+            error?: string;
+          };
+          if (typeof value.count === "number") {
+            const delta = value.count - currentCount;
             if (delta > 0) {
               withCounts.push({ ...candidates[i], count: delta });
             }
-          } else {
-            // count null/absent => >100 (or unbounded) results. Don't fabricate a
-            // precise number (the old `?? 101` showed e.g. "+98 rooms"); surface a
-            // "many more" suggestion instead (count: null).
+          } else if (
+            value.count === null &&
+            !value.boundsRequired &&
+            !value.browseMode &&
+            !value.error
+          ) {
+            // Explicit `count: null` with no qualifier = >100 results. Surface a
+            // "many more" suggestion without fabricating a precise number (the old
+            // `?? 101` showed e.g. "+98 rooms"). Skip error / bounds-required /
+            // browse-mode responses entirely so we never link to an empty page.
             withCounts.push({ ...candidates[i], count: null });
           }
         }
