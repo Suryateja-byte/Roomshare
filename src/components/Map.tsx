@@ -2620,9 +2620,15 @@ export default function MapComponent({
   }, [hideMap]);
 
   // Auto-zoom-out: when map loads empty with no active filters, zoom out once
-  // Build a key from non-bounds params so we reset per search context
+  // Build a key from the search-identity params (everything that defines a *new*
+  // search) so the auto-zoom + pan latch reset per search context. This includes
+  // the location/vibe identity (`locationLabel`, `what`) — the normal submit
+  // pipeline stores a selected place in `locationLabel` and may omit `q`, so a
+  // fresh location/vibe search must still reset the latch. Bounds and `lat`/`lng`
+  // are deliberately excluded: a pure map pan rewrites bounds and clears lat/lng
+  // (see applySearchQueryChange "map-pan"), so the latch must survive pans.
   const nonBoundsParamsKey = useMemo(() => {
-    const keys = ["q", ...FILTER_PARAM_KEYS];
+    const keys = ["q", "locationLabel", "what", ...FILTER_PARAM_KEYS];
     return keys
       .map((k) => `${k}=${searchParams.getAll(k).sort().join(",")}`)
       .join("&");
