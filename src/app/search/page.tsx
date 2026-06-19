@@ -569,6 +569,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     !("nextCursor" in paginatedResult) &&
     "totalPages" in paginatedResult &&
     typeof paginatedResult.page === "number" &&
+    // PaginatedResultHybrid.totalPages is `number | null` (null = unknown count);
+    // only synthesize an offset cursor when we have a concrete page count.
+    typeof paginatedResult.totalPages === "number" &&
     paginatedResult.page < paginatedResult.totalPages;
   const initialNextCursor =
     v2NextCursor ??
