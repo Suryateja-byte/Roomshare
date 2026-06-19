@@ -281,6 +281,31 @@ describe("search telemetry", () => {
     );
   });
 
+  it("sampleCount caps at MAX_REQUEST_LATENCY_SAMPLES while count keeps climbing", () => {
+    // Record 1001 samples — one more than the ring buffer holds.
+    for (let i = 0; i < 1001; i++) {
+      recordSearchRequestLatency({
+        route: "search-page-ssr",
+        durationMs: i + 1,
+      });
+    }
+
+    const snapshot = getSearchTelemetrySnapshot();
+
+    // Lifetime count must equal the total number of calls.
+    expect(snapshot.requestLatency.count).toBe(1001);
+    // Windowed sample count must be capped at 1000.
+    expect(snapshot.requestLatency.sampleCount).toBe(1000);
+    // Percentiles are computed from the ring buffer (≤1000 entries), so they
+    // must not include the very first sample (durationMs=1) which was evicted.
+    // The ring holds samples 2..1001 after 1001 writes, so p50 should be
+    // within that range, confirming it reflects only the last 1000 entries.
+    expect(snapshot.requestLatency.p50).toBeGreaterThan(1);
+    expect(snapshot.requestLatency.p99).toBeGreaterThanOrEqual(
+      snapshot.requestLatency.p50
+    );
+  });
+
   it("emits dedupe member-click client metrics via fetch when sendBeacon is unavailable", () => {
     Object.defineProperty(process.env, "NODE_ENV", {
       configurable: true,

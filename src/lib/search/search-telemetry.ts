@@ -478,8 +478,16 @@ export function getSearchTelemetrySnapshot() {
 
   return {
     requestLatency: {
+      // Lifetime totals — unbounded, reflect all requests since cold start.
       count: telemetryStore.requestLatencyCount,
       sum: Math.round(telemetryStore.requestLatencySum * 100) / 100,
+      // Windowed sample count — capped at MAX_REQUEST_LATENCY_SAMPLES (1000).
+      // The p50/p95/p99 percentiles are computed from this same window, so
+      // sampleCount and the quantiles always describe the same observation set.
+      sampleCount: Math.min(
+        telemetryStore.requestLatencyCount,
+        MAX_REQUEST_LATENCY_SAMPLES
+      ),
       p50: computePercentile(validLatencies, 50),
       p95: computePercentile(validLatencies, 95),
       p99: computePercentile(validLatencies, 99),
