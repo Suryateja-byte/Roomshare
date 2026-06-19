@@ -14,6 +14,7 @@ jest.mock("@/lib/embeddings/version", () => ({
 
 import { prisma } from "@/lib/prisma";
 import type { ParsedSearchParams } from "@/lib/search-params";
+import type { SortOption } from "@/lib/search-types";
 import { encodeSnapshotCursor } from "@/lib/search/cursor";
 import {
   executeProjectionSearchV2,
@@ -28,7 +29,10 @@ import {
   buildPhase04SearchSpec,
   getPhase04SearchSpecHash,
 } from "@/lib/search/search-spec";
-import { getProjectionReadEligibility } from "@/lib/search/projection-read-eligibility";
+import {
+  getProjectionReadEligibility,
+  getProjectionReadEligibilityForFilterParams,
+} from "@/lib/search/projection-read-eligibility";
 import { getReadEmbeddingVersion } from "@/lib/embeddings/version";
 
 const mockQueryRawUnsafe = prisma.$queryRawUnsafe as jest.Mock;
@@ -130,7 +134,10 @@ describe("Phase 04 projection search", () => {
     expect(
       getProjectionReadEligibility(
         parsed({
+          // price_asc is faithfully reproducible by the projection engine.
+          sortOption: "price_asc",
           filterParams: {
+            sort: "price_asc",
             bounds: {
               minLat: 37.7,
               maxLat: 37.8,
@@ -150,7 +157,9 @@ describe("Phase 04 projection search", () => {
     expect(
       getProjectionReadEligibility(
         parsed({
+          sortOption: "price_asc",
           filterParams: {
+            sort: "price_asc",
             query: "sunny",
             vibeQuery: "quiet roommates",
             amenities: ["wifi"],
@@ -175,6 +184,73 @@ describe("Phase 04 projection search", () => {
         "near_matches",
       ],
     });
+  });
+
+  // Regression: audit findings #3 and #4. The projection engine cannot
+  // faithfully rank recommended/rating (no rating/recommended_score column) or
+  // newest (updated_at tracks projection writes, not listing creation), so
+  // these sorts must be projection-read-ineligible and fall back to the
+  // SearchDoc/V1 engines.
+  it.each<SortOption>(["recommended", "rating", "newest"])(
+    "marks sort=%s as projection-read-unsupported",
+    (sort) => {
+      expect(
+        getProjectionReadEligibility(
+          parsed({
+            sortOption: sort,
+            filterParams: {
+              sort,
+              bounds: {
+                minLat: 37.7,
+                maxLat: 37.8,
+                minLng: -122.5,
+                maxLng: -122.4,
+              },
+            },
+          })
+        )
+      ).toEqual({ supported: false, unsupportedReasons: ["sort"] });
+    }
+  );
+
+  it.each<SortOption>(["price_asc", "price_desc"])(
+    "keeps sort=%s projection-read-supported",
+    (sort) => {
+      expect(
+        getProjectionReadEligibility(
+          parsed({
+            sortOption: sort,
+            filterParams: {
+              sort,
+              bounds: {
+                minLat: 37.7,
+                maxLat: 37.8,
+                minLng: -122.5,
+                maxLng: -122.4,
+              },
+            },
+          })
+        )
+      ).toEqual({ supported: true, unsupportedReasons: [] });
+    }
+  );
+
+  it("gates the FilterParams entry point on sort directly", () => {
+    // The gate keys on filterParams.sort, which parseSearchParams always
+    // populates with the resolved sort in production.
+    expect(
+      getProjectionReadEligibilityForFilterParams({
+        sort: "rating",
+        bounds: { minLat: 37.7, maxLat: 37.8, minLng: -122.5, maxLng: -122.4 },
+      })
+    ).toEqual({ supported: false, unsupportedReasons: ["sort"] });
+
+    expect(
+      getProjectionReadEligibilityForFilterParams({
+        sort: "price_asc",
+        bounds: { minLat: 37.7, maxLat: 37.8, minLng: -122.5, maxLng: -122.4 },
+      })
+    ).toEqual({ supported: true, unsupportedReasons: [] });
   });
 
   it("reads projections, returns one grouped result per unit key, and stores v4 snapshot keys", async () => {

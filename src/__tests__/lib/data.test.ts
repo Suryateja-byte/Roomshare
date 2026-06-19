@@ -1370,6 +1370,27 @@ describe("sortListings", () => {
       const result = sortListings(sameRatingAndReviews, "rating");
       expect(result.map((l) => l.id)).toEqual(["b", "a"]);
     });
+
+    // Regression: audit finding #16. With rating, reviewCount, and createdAt
+    // all equal, ordering must be deterministic via the id ASC tiebreak.
+    it("uses id ASC as the final tiebreaker when rating, reviews, and createdAt tie", () => {
+      const allEqual = [
+        createMockListing({
+          id: "z",
+          avgRating: 4.5,
+          reviewCount: 10,
+          createdAt: new Date("2024-01-01"),
+        }),
+        createMockListing({
+          id: "a",
+          avgRating: 4.5,
+          reviewCount: 10,
+          createdAt: new Date("2024-01-01"),
+        }),
+      ];
+      const result = sortListings(allEqual, "rating");
+      expect(result.map((l) => l.id)).toEqual(["a", "z"]);
+    });
   });
 
   describe("recommended sort", () => {
@@ -1400,6 +1421,29 @@ describe("sortListings", () => {
       ];
       const result = sortListings(sameScore, "recommended");
       expect(result.map((l) => l.id)).toEqual(["b", "a"]);
+    });
+
+    // Regression: audit finding #16. With the score and createdAt identical,
+    // ordering must be deterministic via the id ASC tiebreak.
+    it("uses id ASC as the final tiebreaker when score and createdAt tie", () => {
+      const allEqual = [
+        createMockListing({
+          id: "z",
+          avgRating: 4.0,
+          viewCount: 100,
+          reviewCount: 10,
+          createdAt: new Date("2024-01-01"),
+        }),
+        createMockListing({
+          id: "a",
+          avgRating: 4.0,
+          viewCount: 100,
+          reviewCount: 10,
+          createdAt: new Date("2024-01-01"),
+        }),
+      ];
+      const result = sortListings(allEqual, "recommended");
+      expect(result.map((l) => l.id)).toEqual(["a", "z"]);
     });
 
     it("is the default sort", () => {
@@ -1510,6 +1554,26 @@ describe("slotThreshold parameterization", () => {
         expect(sql).toMatch(/l\."moveInDate"::date <= \$\d+::date/);
       }
     });
+
+    // Regression: audit finding #16. The rating/recommended ORDER BY clauses
+    // must end with the keyset id ASC tiebreak so paging stays deterministic.
+    it.each(["rating", "recommended"] as const)(
+      "ends the %s ORDER BY with the l.id ASC tiebreak",
+      async (sort) => {
+        mockQueryWithTimeout.mockResolvedValue([{ total: BigInt(0) }]);
+
+        await getListingsPaginated({
+          sort,
+          bounds: { minLat: 30, maxLat: 40, minLng: -120, maxLng: -110 },
+        });
+
+        const orderBySql = mockQueryWithTimeout.mock.calls
+          .map((call) => call[0] as string)
+          .find((sql) => sql.includes("ORDER BY"));
+        expect(orderBySql).toBeDefined();
+        expect(orderBySql).toMatch(/ORDER BY[\s\S]*l\.id ASC/);
+      }
+    );
   });
 });
 

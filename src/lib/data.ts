@@ -425,7 +425,9 @@ export function sortListings(
         if (ratingDiff !== 0) return ratingDiff;
         const reviewDiff = b.reviewCount - a.reviewCount;
         if (reviewDiff !== 0) return reviewDiff;
-        return b.createdAt.getTime() - a.createdAt.getTime();
+        const timeDiff = b.createdAt.getTime() - a.createdAt.getTime();
+        if (timeDiff !== 0) return timeDiff;
+        return a.id.localeCompare(b.id);
       });
       break;
     case "recommended":
@@ -435,7 +437,9 @@ export function sortListings(
         const bScore = b.avgRating * 20 + b.viewCount * 0.1 + b.reviewCount * 5;
         const scoreDiff = bScore - aScore;
         if (scoreDiff !== 0) return scoreDiff;
-        return b.createdAt.getTime() - a.createdAt.getTime();
+        const timeDiff = b.createdAt.getTime() - a.createdAt.getTime();
+        if (timeDiff !== 0) return timeDiff;
+        return a.id.localeCompare(b.id);
       });
       break;
   }
@@ -1059,12 +1063,12 @@ export async function getListingsPaginated(
         break;
       case "rating":
         orderByClause =
-          'COALESCE(AVG(r.rating), 0) DESC, COUNT(r.id) DESC, l."createdAt" DESC';
+          'COALESCE(AVG(r.rating), 0) DESC, COUNT(r.id) DESC, l."createdAt" DESC, l.id ASC';
         break;
       case "recommended":
       default:
         orderByClause =
-          '(COALESCE(AVG(r.rating), 0) * 20 + l."viewCount" * 0.1 + COUNT(r.id) * 5) DESC, l."createdAt" DESC';
+          '(COALESCE(AVG(r.rating), 0) * 20 + l."viewCount" * 0.1 + COUNT(r.id) * 5) DESC, l."createdAt" DESC, l.id ASC';
         break;
     }
 
