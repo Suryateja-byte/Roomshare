@@ -289,7 +289,6 @@ Card component for search results and listing lists. Features:
 |---|---|---|
 | `ImageCarousel` | `listings/ImageCarousel.tsx` | Embla-based image carousel with navigation |
 | `ImageUploader` | `listings/ImageUploader.tsx` | Image upload with preview and drag-drop |
-| `ListingCardCarousel` | `listings/ListingCardCarousel.tsx` | Horizontal carousel of listing cards (homepage) |
 | `ListingCardSkeleton` | `listings/ListingCardSkeleton.tsx` | Loading skeleton for listing cards |
 | `RoomPlaceholder` | `listings/RoomPlaceholder.tsx` | Placeholder image for listings without photos |
 | `NearMatchSeparator` | `listings/NearMatchSeparator.tsx` | Visual separator between exact and near matches |

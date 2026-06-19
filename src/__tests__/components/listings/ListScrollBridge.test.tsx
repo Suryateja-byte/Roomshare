@@ -9,6 +9,20 @@ import {
 const mockScrollIntoView = jest.fn();
 beforeEach(() => {
   mockScrollIntoView.mockClear();
+  // Reset matchMedia to the default (no reduced-motion preference)
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: jest.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: jest.fn(),
+      removeListener: jest.fn(),
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      dispatchEvent: jest.fn(),
+    })),
+  });
   HTMLElement.prototype.scrollIntoView = mockScrollIntoView;
 });
 
@@ -64,5 +78,36 @@ describe("ListScrollBridge", () => {
 
     // No click = no scroll request
     expect(mockScrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it("uses behavior:'auto' when prefers-reduced-motion is active", async () => {
+    // Override matchMedia to report reduced-motion preference
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      value: jest.fn().mockImplementation((query: string) => ({
+        matches: query === "(prefers-reduced-motion: reduce)",
+        media: query,
+        onchange: null,
+        addListener: jest.fn(),
+        removeListener: jest.fn(),
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+        dispatchEvent: jest.fn(),
+      })),
+    });
+
+    renderBridge();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Scroll to listing" }));
+    });
+
+    // Must use "auto" (instant jump), not "smooth", to honour the user's
+    // motion preference — JS behavior:"smooth" bypasses the CSS
+    // scroll-behavior:auto !important guard in globals.css.
+    expect(mockScrollIntoView).toHaveBeenCalledWith({
+      behavior: "auto",
+      block: "nearest",
+    });
   });
 });

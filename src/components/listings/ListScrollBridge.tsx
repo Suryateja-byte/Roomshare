@@ -64,9 +64,14 @@ export default function ListScrollBridge() {
       return;
     }
 
-    // Element found - perform scroll
+    // Element found - perform scroll.
+    // Respect prefers-reduced-motion: JS behavior:"smooth" overrides the CSS
+    // scroll-behavior:auto !important guard, so we must branch explicitly.
+    const reduced =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     targetCard.scrollIntoView({
-      behavior: "smooth",
+      behavior: reduced ? "auto" : "smooth",
       block: "nearest",
     });
 
