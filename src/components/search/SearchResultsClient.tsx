@@ -61,6 +61,29 @@ import { cn } from "@/lib/utils";
  */
 const MAX_ACCUMULATED = 60;
 
+/**
+ * Max consecutive load-more pages that may be entirely de-duplicated before we
+ * stop auto-advancing. Caps rate-limit spend when inventory shift makes a page
+ * repeat prior canonicals (#18). One initial fetch + up to this many auto-fetches.
+ */
+const MAX_CONSECUTIVE_EMPTY_PAGES = 2;
+
+/**
+ * Static per-card entrance-animation delay classes, indexed by Math.min(index, 6).
+ * Literal strings so Tailwind's scanner emits the arbitrary `animation-delay`
+ * utilities. Applied to the card's <article> (via ListingCard's className) so the
+ * <article> is a direct role="feed" child — no intermediate wrapper div (#33).
+ */
+const CARD_ENTRANCE_DELAY_CLASSES = [
+  "[animation-delay:0ms]",
+  "[animation-delay:40ms]",
+  "[animation-delay:80ms]",
+  "[animation-delay:120ms]",
+  "[animation-delay:160ms]",
+  "[animation-delay:200ms]",
+  "[animation-delay:240ms]",
+] as const;
+
 function getSeenGroupKeys(listings: PublicSearchListing[]): Set<string> {
   return new Set(
     listings
@@ -160,7 +183,7 @@ export function SearchResultsClient({
     initialStateKind ?? (hasConfirmedZeroResults ? "zero-results" : "ok");
   const router = useRouter();
   const { setIsV2Enabled, setPendingQueryHash } = useSearchV2Setters();
-  const { setV2MapData, dataVersion } = useV2MapDataSetter();
+  const { setV2MapData } = useV2MapDataSetter();
   const { setSearchResultsLabel, setMobileResultsState } = useMobileSearch();
   const { shouldShowMap } = useSearchMapUI();
   // During a pending filter/sort/bounds transition the SearchResultsLoadingWrapper
@@ -348,7 +371,6 @@ export function SearchResultsClient({
     const controller = new AbortController();
     clientFetchAbortRef.current = controller;
     const requestQueryHash = currentQueryHash;
-    const requestDataVersion = dataVersion;
 
     if (unifiedV2ClientEnabled) {
       setIsV2Enabled(true);
@@ -372,11 +394,21 @@ export function SearchResultsClient({
           }
         );
 
+        if (response.status === 429) {
+          // Rate limited: surface a friendly message instead of silently degrading (#19).
+          setLoadError("Too many requests — please wait a moment and try again.");
+          setIsClientFetching(false);
+          return;
+        }
+
         if (!response.ok) {
           // Non-OK response: silently degrade, SSR data remains visible
           setIsClientFetching(false);
           return;
         }
+
+        // Successful fetch — clear any stale rate-limit/error notice from a prior attempt.
+        setLoadError(null);
 
         if (unifiedV2ClientEnabled) {
           const data = (await response.json()) as
@@ -482,15 +514,17 @@ export function SearchResultsClient({
           fetchedFavIdsRef.current = new Set();
           totalCountRef.current = dedupeListingsForDisplay(fullItems).length;
           setIsV2Enabled(true);
-          setV2MapData(
-            {
-              ...searchResponse.map,
-              mode: searchResponse.meta.mode,
-              queryHash: searchResponse.meta.queryHash,
-              querySnapshotId: searchResponse.meta.querySnapshotId,
-            },
-            requestDataVersion
-          );
+          // Do NOT pass the captured dataVersion: by the time this effect runs the
+          // provider has already synchronously bumped dataVersionRef, so the closed-over
+          // state value is stale and the setter's numeric guard would reject the payload,
+          // desyncing the persistent map on map-pan. The queryHash gates above already
+          // prevent stale/out-of-order map payloads. Mirrors V2MapDataSetter.tsx (#5).
+          setV2MapData({
+            ...searchResponse.map,
+            mode: searchResponse.meta.mode,
+            queryHash: searchResponse.meta.queryHash,
+            querySnapshotId: searchResponse.meta.querySnapshotId,
+          });
           return;
         }
 
@@ -576,7 +610,6 @@ export function SearchResultsClient({
     clientSideSearchEnabled,
     currentQueryHash,
     currentSearchParamsString,
-    dataVersion,
     setIsV2Enabled,
     setPendingQueryHash,
     setV2MapData,
@@ -723,151 +756,180 @@ export function SearchResultsClient({
     safeMark("load-more-start");
 
     try {
-      const requestQueryHash = latestQueryHashRef.current;
-      const result = await fetchMoreListings(
-        nextCursor,
-        rawParams,
-        requestQueryHash,
-        testScenario
-      );
+      // Cursor to fetch this iteration. On an all-duplicate page we advance to the
+      // server's next cursor and fetch again (bounded by MAX_CONSECUTIVE_EMPTY_PAGES)
+      // so "Show more" makes visible progress instead of advancing silently (#18).
+      let cursor: string | null = nextCursor;
+      let consecutiveEmptyPages = 0;
 
-      if (result.snapshotExpired) {
-        emitSearchClientMetric({
-          metric: "search_snapshot_expired_total",
-          route: "search-results-client",
-          queryHash: requestQueryHash,
-          reason: result.snapshotExpired.reason,
-        });
-        const currentListings = effectiveListingsRef.current;
-        setLoadError(null);
+      while (cursor) {
+        const requestQueryHash = latestQueryHashRef.current;
+        const result = await fetchMoreListings(
+          cursor,
+          rawParams,
+          requestQueryHash,
+          testScenario
+        );
+
+        if (result.snapshotExpired) {
+          emitSearchClientMetric({
+            metric: "search_snapshot_expired_total",
+            route: "search-results-client",
+            queryHash: requestQueryHash,
+            reason: result.snapshotExpired.reason,
+          });
+          const currentListings = effectiveListingsRef.current;
+          setLoadError(null);
+          setIsDegraded(false);
+          setExtraListings([]);
+          setNextCursor(null);
+          // Drop any client-fetched listings so effectiveListings falls back to the
+          // refreshed SSR data after router.refresh(); otherwise stale, possibly
+          // mis-ordered client-fetched results keep shadowing the refresh. Mirrors
+          // the PUBLIC_CACHE_INVALIDATED handler above.
+          setClientFetchedListings(null);
+          setClientFetchedTotal(null);
+          setClientFetchedNearMatch(undefined);
+          setClientFetchedVibeAdvisory(undefined);
+          totalCountRef.current =
+            dedupeListingsForDisplay(currentListings).length;
+          seenIdsRef.current = new Set(
+            currentListings.map((listing) => listing.id)
+          );
+          seenGroupKeysRef.current = getSeenGroupKeys(currentListings);
+          fetchedFavIdsRef.current = new Set();
+          setRefreshNotice("Results refreshed to keep ordering accurate.");
+          setLoadMoreAnnouncement("Results refreshed. Ordering changed.");
+          router.refresh();
+          return;
+        }
+
+        if (
+          result.meta?.queryHash &&
+          (result.meta.queryHash !== requestQueryHash ||
+            latestQueryHashRef.current !== requestQueryHash)
+        ) {
+          emitSearchClientMetric({
+            metric: "search_map_list_mismatch_total",
+            route: "search-results-client",
+            queryHash: requestQueryHash,
+            responseQueryHash: result.meta.queryHash,
+            reason:
+              result.meta.queryHash !== requestQueryHash
+                ? "stale-query-hash"
+                : "stale-request-key",
+          });
+          return;
+        }
+
+        // M14 FIX: Handle rate limit via discriminated field (not string matching)
+        if (result.rateLimited) {
+          setLoadError(
+            "Too many requests — please wait a moment and try again."
+          );
+          return;
+        }
+
+        // V2 unavailable — show error with working retry (cursor preserved for circuit breaker recovery)
+        if (result.degraded) {
+          setIsDegraded(true);
+          setLoadError("Can't load more right now. Try again in a moment.");
+          return;
+        }
+
         setIsDegraded(false);
-        setExtraListings([]);
-        setNextCursor(null);
-        // Drop any client-fetched listings so effectiveListings falls back to the
-        // refreshed SSR data after router.refresh(); otherwise stale, possibly
-        // mis-ordered client-fetched results keep shadowing the refresh. Mirrors
-        // the PUBLIC_CACHE_INVALIDATED handler above.
-        setClientFetchedListings(null);
-        setClientFetchedTotal(null);
-        setClientFetchedNearMatch(undefined);
-        setClientFetchedVibeAdvisory(undefined);
-        totalCountRef.current =
-          dedupeListingsForDisplay(currentListings).length;
-        seenIdsRef.current = new Set(
-          currentListings.map((listing) => listing.id)
-        );
-        seenGroupKeysRef.current = getSeenGroupKeys(currentListings);
-        fetchedFavIdsRef.current = new Set();
-        setRefreshNotice("Results refreshed to keep ordering accurate.");
-        setLoadMoreAnnouncement("Results refreshed. Ordering changed.");
-        router.refresh();
-        return;
-      }
+        setRefreshNotice(null);
 
-      if (
-        result.meta?.queryHash &&
-        (result.meta.queryHash !== requestQueryHash ||
-          latestQueryHashRef.current !== requestQueryHash)
-      ) {
-        emitSearchClientMetric({
-          metric: "search_map_list_mismatch_total",
-          route: "search-results-client",
-          queryHash: requestQueryHash,
-          responseQueryHash: result.meta.queryHash,
-          reason:
-            result.meta.queryHash !== requestQueryHash
-              ? "stale-query-hash"
-              : "stale-request-key",
+        // Defensive guard: ensure items is an array (protects against malformed server responses)
+        const items = Array.isArray(result.items) ? result.items : [];
+
+        let duplicateIdDrops = 0;
+        let duplicateGroupKeyDrops = 0;
+
+        // Deduplicate by ID and canonical group key.
+        const dedupedItems = items.filter((item) => {
+          const hasSeenId = seenIdsRef.current.has(item.id);
+          const hasSeenGroupKey = Boolean(
+            item.groupKey && seenGroupKeysRef.current.has(item.groupKey)
+          );
+
+          if (hasSeenId) {
+            duplicateIdDrops += 1;
+          }
+          if (hasSeenGroupKey) {
+            duplicateGroupKeyDrops += 1;
+          }
+
+          seenIdsRef.current.add(item.id);
+          if (item.groupKey) {
+            seenGroupKeysRef.current.add(item.groupKey);
+          }
+
+          return !hasSeenId && !hasSeenGroupKey;
         });
-        return;
-      }
 
-      // M14 FIX: Handle rate limit via discriminated field (not string matching)
-      if (result.rateLimited) {
-        setLoadError(
-          "Too many requests — please wait 30 seconds and try again."
+        if (
+          process.env.NODE_ENV !== "production" &&
+          (duplicateIdDrops > 0 || duplicateGroupKeyDrops > 0)
+        ) {
+          console.warn(
+            `[search-results-client] dropped duplicate paginated items ids=${duplicateIdDrops} groupKeys=${duplicateGroupKeyDrops}`
+          );
+        }
+
+        // Entirely-duplicate page: don't surface a misleading "Loaded 0 more"
+        // announcement. If the server has more pages and we're under the cap,
+        // advance the cursor and fetch again so the user sees real progress (#18).
+        if (dedupedItems.length === 0) {
+          consecutiveEmptyPages += 1;
+          if (
+            result.nextCursor != null &&
+            consecutiveEmptyPages < MAX_CONSECUTIVE_EMPTY_PAGES
+          ) {
+            setLoadMoreAnnouncement("No new listings on this page — loading more…");
+            cursor = result.nextCursor;
+            continue;
+          }
+          // Out of attempts (or no further pages): advance the cursor to reflect
+          // the server state and stop, without claiming "Loaded 0 more".
+          setNextCursor(result.nextCursor);
+          return;
+        }
+
+        safeMark("load-more-end");
+        safeMeasure("load-more", "load-more-start", "load-more-end");
+
+        setExtraListings((prev) => {
+          const next = [...prev, ...dedupedItems];
+          const currentEffectiveListings = effectiveListingsRef.current;
+          // F2 FIX: Update ref inside setState for deterministic count
+          totalCountRef.current = dedupeListingsForDisplay([
+            ...currentEffectiveListings,
+            ...next,
+          ]).length;
+          return next;
+        });
+        setNextCursor(result.nextCursor);
+
+        // Announce to screen readers (after state update).
+        // dedupedItems are unique vs every seen listing, so the new displayed count
+        // is the prior total + the appended count. Reading totalCountRef directly
+        // here would be stale — the setExtraListings updater that mutates it runs at
+        // commit, not at this call site.
+        const newCount = totalCountRef.current + dedupedItems.length;
+        const totalLabel =
+          effectiveTotal !== null ? ` of ~${effectiveTotal}` : "";
+        setLoadMoreAnnouncement(
+          `Loaded ${dedupedItems.length} more listing${dedupedItems.length === 1 ? "" : "s"}, showing ${newCount}${totalLabel}`
         );
         return;
       }
-
-      // V2 unavailable — show error with working retry (cursor preserved for circuit breaker recovery)
-      if (result.degraded) {
-        setIsDegraded(true);
-        setLoadError("Can't load more right now. Try again in a moment.");
-        return;
-      }
-
-      safeMark("load-more-end");
-      safeMeasure("load-more", "load-more-start", "load-more-end");
-      setIsDegraded(false);
-      setRefreshNotice(null);
-
-      // Defensive guard: ensure items is an array (protects against malformed server responses)
-      const items = Array.isArray(result.items) ? result.items : [];
-
-      let duplicateIdDrops = 0;
-      let duplicateGroupKeyDrops = 0;
-
-      // Deduplicate by ID and canonical group key.
-      const dedupedItems = items.filter((item) => {
-        const hasSeenId = seenIdsRef.current.has(item.id);
-        const hasSeenGroupKey = Boolean(
-          item.groupKey && seenGroupKeysRef.current.has(item.groupKey)
-        );
-
-        if (hasSeenId) {
-          duplicateIdDrops += 1;
-        }
-        if (hasSeenGroupKey) {
-          duplicateGroupKeyDrops += 1;
-        }
-
-        seenIdsRef.current.add(item.id);
-        if (item.groupKey) {
-          seenGroupKeysRef.current.add(item.groupKey);
-        }
-
-        return !hasSeenId && !hasSeenGroupKey;
-      });
-
-      if (
-        process.env.NODE_ENV !== "production" &&
-        (duplicateIdDrops > 0 || duplicateGroupKeyDrops > 0)
-      ) {
-        console.warn(
-          `[search-results-client] dropped duplicate paginated items ids=${duplicateIdDrops} groupKeys=${duplicateGroupKeyDrops}`
-        );
-      }
-
-      setExtraListings((prev) => {
-        const next = [...prev, ...dedupedItems];
-        const currentEffectiveListings = effectiveListingsRef.current;
-        // F2 FIX: Update ref inside setState for deterministic count
-        totalCountRef.current = dedupeListingsForDisplay([
-          ...currentEffectiveListings,
-          ...next,
-        ]).length;
-        return next;
-      });
-      setNextCursor(result.nextCursor);
-
-      // Announce to screen readers (after state update).
-      // dedupedItems are unique vs every seen listing, so the new displayed count
-      // is the prior total + the appended count. Reading totalCountRef directly
-      // here would be stale — the setExtraListings updater that mutates it runs at
-      // commit, not at this call site.
-      const newCount = totalCountRef.current + dedupedItems.length;
-      const totalLabel =
-        effectiveTotal !== null ? ` of ~${effectiveTotal}` : "";
-      setLoadMoreAnnouncement(
-        `Loaded ${dedupedItems.length} more listing${dedupedItems.length === 1 ? "" : "s"}, showing ${newCount}${totalLabel}`
-      );
     } catch (err) {
       const raw =
         err instanceof Error ? err.message : "Failed to load more results";
       const friendly =
         raw.includes("Rate limit") || raw.includes("Too many requests")
-          ? "Too many requests — please wait 30 seconds and try again."
+          ? "Too many requests — please wait a moment and try again."
           : raw.includes("fetch") ||
               raw.includes("network") ||
               raw.includes("Failed to fetch")
@@ -1028,7 +1090,7 @@ export function SearchResultsClient({
       data-search-backend-source={responseMeta.backendSource}
       data-response-version={responseMeta.responseVersion}
       data-search-response-version={responseMeta.responseVersion}
-      className="!outline-none pb-24 md:pb-0"
+      className="rounded-sm pb-24 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary md:pb-0"
     >
       {/* Screen reader announcement for search results */}
       <div
@@ -1198,29 +1260,28 @@ export function SearchResultsClient({
                     </>
                   )}
                   <ListingCardErrorBoundary listingId={listing.id}>
-                    <div
-                      className="animate-card-entrance"
-                      style={{
-                        animationDelay: `${Math.min(index, 6) * 40}ms`,
-                      }}
-                    >
-                      <ListingCard
-                        listing={listing}
-                        href={buildListingDetailHref(
-                          listing.id,
-                          listingDetailDateParams
-                        )}
-                        isSaved={savedIdsSet.has(listing.id)}
-                        priority={index === 0}
-                        showTotalPrice={effectiveShowTotalPrice}
-                        estimatedMonths={estimatedMonths}
-                        queryHashPrefix8={responseMeta.queryHash?.slice(0, 8)}
-                        desktopVariant="grid"
-                        ariaPosInSet={index + 1}
-                        ariaSetSize={total ?? -1}
-                        openInNewTab={openListingInNewTab}
-                      />
-                    </div>
+                    {/* Entrance animation lives on the card's <article> (via className)
+                        so the article is a direct role="feed" child — no wrapper div (#33). */}
+                    <ListingCard
+                      listing={listing}
+                      className={cn(
+                        "animate-card-entrance",
+                        CARD_ENTRANCE_DELAY_CLASSES[Math.min(index, 6)]
+                      )}
+                      href={buildListingDetailHref(
+                        listing.id,
+                        listingDetailDateParams
+                      )}
+                      isSaved={savedIdsSet.has(listing.id)}
+                      priority={index === 0}
+                      showTotalPrice={effectiveShowTotalPrice}
+                      estimatedMonths={estimatedMonths}
+                      queryHashPrefix8={responseMeta.queryHash?.slice(0, 8)}
+                      desktopVariant="grid"
+                      ariaPosInSet={index + 1}
+                      ariaSetSize={total ?? -1}
+                      openInNewTab={openListingInNewTab}
+                    />
                   </ListingCardErrorBoundary>
                 </Fragment>
               );
@@ -1251,8 +1312,10 @@ export function SearchResultsClient({
             </div>
           )}
 
-          {/* Load more section with progress indicator */}
-          {isHydrated && nextCursor && !reachedCap && !isDegraded && (
+          {/* Load more section with progress indicator.
+              Hidden whenever a load error (degraded or rate-limited) is showing so the
+              error's "Try again" link is the single CTA, not a second competing one (#17). */}
+          {isHydrated && nextCursor && !reachedCap && !isDegraded && !loadError && (
             <div className="mb-4 mt-8 flex flex-col items-center gap-2">
               <p className="text-xs text-on-surface-variant">
                 Showing {allListings.length} of{" "}
@@ -1313,14 +1376,14 @@ export function SearchResultsClient({
             </div>
           )}
 
-          {/* End of results indicator */}
-          {!nextCursor &&
-            allListings.length > 0 &&
-            extraListings.length > 0 && (
-              <p className="text-center text-sm text-on-surface-variant mt-8">
-                You&apos;ve seen all {allListings.length} results
-              </p>
-            )}
+          {/* End of results indicator. No extraListings gate so it also shows when the
+              first SSR page is already the complete set (#28). Zero-results is handled by
+              the separate effectiveZeroResults path; !nextCursor excludes mid-pagination. */}
+          {!nextCursor && allListings.length > 0 && (
+            <p className="text-center text-sm text-on-surface-variant mt-8">
+              You&apos;ve seen all {allListings.length} results
+            </p>
+          )}
 
           {/* Expansion suggestions for sparse results (1-5 listings) */}
           {total !== null && total > 0 && total <= 5 && (
