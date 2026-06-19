@@ -191,7 +191,7 @@ test.describe("Search URL Invalid/Malicious Params (P0)", () => {
     // The sort component is SSR-rendered alongside the heading; without this
     // wait, the check can fire before Next.js streaming delivers the content.
     // The #search-results-heading is sr-only (visually hidden), so use toBeAttached.
-    const resultsHeading = page.locator("#search-results-heading");
+    const resultsHeading = page.locator("#search-results-heading-desktop, #search-results-heading-mobile");
     const zeroResults = page.locator(
       'h2:has-text("No matches found"), h3:has-text("No exact matches")'
     );
@@ -248,7 +248,7 @@ test.describe("Search URL Invalid/Malicious Params (P0)", () => {
     // Wait for search results heading to render (sort component is in the same section).
     // This ensures SSR streaming has delivered the full search results block.
     // The #search-results-heading is sr-only (visually hidden), so use toBeAttached.
-    const resultsHeading = page.locator("#search-results-heading");
+    const resultsHeading = page.locator("#search-results-heading-desktop, #search-results-heading-mobile");
     const zeroResults = page.locator(
       'h2:has-text("No matches found"), h3:has-text("No exact matches")'
     );

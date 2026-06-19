@@ -39,7 +39,7 @@ test.describe("V2 State Reset on Bounds-Required Path", () => {
     // Wait for initial search to complete (results heading or zero-results attached)
     // SSR can be slow in CI — use the search-results-heading ID for reliability.
     // The #search-results-heading is sr-only (visually hidden), so use toBeAttached.
-    const resultsHeading = page.locator("#search-results-heading");
+    const resultsHeading = page.locator("#search-results-heading-desktop, #search-results-heading-mobile");
     const zeroResults = page.locator(
       'h2:has-text("No matches found"), h3:has-text("No exact matches")'
     );

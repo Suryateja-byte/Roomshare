@@ -11,7 +11,12 @@ describe("SearchResultsMobileHeading", () => {
       name: "7 places in San Francisco",
     });
 
-    expect(heading).toHaveAttribute("id", "search-results-heading");
+    // Regression for audit #48: the mobile heading must use a distinct id so it
+    // never collides with InlineFilterStrip's desktop h1 (which uses
+    // "search-results-heading-desktop"). A shared "search-results-heading" id
+    // produced invalid duplicate-id HTML on desktop.
+    expect(heading).toHaveAttribute("id", "search-results-heading-mobile");
+    expect(heading).not.toHaveAttribute("id", "search-results-heading");
     expect(heading).toHaveAttribute("tabindex", "-1");
     expect(heading).toHaveClass("sr-only", "md:hidden");
   });

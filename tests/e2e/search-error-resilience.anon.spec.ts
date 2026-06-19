@@ -931,7 +931,7 @@ test.describe("Group 6: Invalid Parameters", () => {
 
     // Should show either results or zero results -- not a server error
     const heading = page
-      .locator("#search-results-heading")
+      .locator("#search-results-heading-desktop, #search-results-heading-mobile")
       .or(page.locator('h2:has-text("No matches found")'));
     await expect(heading.first()).toBeAttached({
       timeout: timeouts.navigation,

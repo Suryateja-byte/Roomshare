@@ -530,7 +530,7 @@ export function InlineFilterStrip({
                 {desktopSummaryHeading ? (
                   <div className="flex flex-col gap-0.5">
                     <h1
-                      id="search-results-heading"
+                      id="search-results-heading-desktop"
                       tabIndex={-1}
                       className="text-[1.35rem] font-bold leading-tight tracking-normal text-on-surface focus:outline-none lg:text-[1.45rem]"
                     >
@@ -717,6 +717,7 @@ export function InlineFilterStrip({
         }
         activeFilterCount={showFilterDrawer ? pendingActiveCount : activeCount}
         moveInDate={moveInDate}
+        endDate={pending.endDate}
         leaseDuration={leaseDuration}
         roomType={roomType}
         amenities={amenities}
@@ -731,6 +732,7 @@ export function InlineFilterStrip({
         onMoveInDateChange={(value: string) =>
           setPending({ moveInDate: value })
         }
+        onEndDateChange={(value: string) => setPending({ endDate: value })}
         onLeaseDurationChange={(value: string) =>
           setPending({ leaseDuration: value === "any" ? "" : value })
         }
@@ -750,6 +752,7 @@ export function InlineFilterStrip({
         onLanguageSearchChange={setLanguageSearch}
         filteredLanguages={filteredLanguages}
         minMoveInDate={minMoveInDate}
+        minEndDate={pending.moveInDate || minMoveInDate}
         amenityOptions={VALID_AMENITIES}
         houseRuleOptions={VALID_HOUSE_RULES}
         minPrice={numericMinPrice}
