@@ -524,7 +524,7 @@ export default function MobileBottomSheet({
                 {/* P2-FIX (#123): Visible close button to dismiss sheet */}
                 <button
                   onClick={() => setSnapIndex(0)}
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-canvas text-on-surface-variant shadow-[inset_0_0_0_1px_rgba(220,193,185,0.45)] transition-colors hover:text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                  className="touch-target flex h-9 w-9 items-center justify-center rounded-full bg-surface-canvas text-on-surface-variant shadow-[inset_0_0_0_1px_rgba(220,193,185,0.45)] transition-colors hover:text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
                   aria-label="Minimize results panel"
                 >
                   <X className="w-4 h-4" />
@@ -538,7 +538,12 @@ export default function MobileBottomSheet({
         <div
           ref={contentRef}
           tabIndex={0}
-          aria-label="Search results"
+          aria-label="Results list"
+          // When collapsed (map-first), remove the off-screen list from the tab order
+          // AND the accessibility tree so keyboard/AT focus cannot land on clipped,
+          // out-of-view listing cards while the map is the active surface (audit #10).
+          // `inert` is removed at peek/expanded, restoring full interaction.
+          {...(isCollapsed ? { inert: true } : {})}
           className={`flex-1 overflow-y-auto hide-scrollbar-mobile ${
             // P2-FIX (#134): Add safe area padding for notched devices when expanded
             isExpanded ? "pb-[env(safe-area-inset-bottom,0px)]" : ""

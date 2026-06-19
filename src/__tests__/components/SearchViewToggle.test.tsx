@@ -242,6 +242,54 @@ describe("SearchViewToggle", () => {
     });
   });
 
+  it("does not re-clamp the sheet collapsed while the map preference persists (one-shot)", async () => {
+    // Audit #6: while the map viewport is empty, Map.tsx keeps
+    // mobileResultsViewPreference="map" for the entire empty-viewport duration.
+    // The initial collapse must still apply once, but subsequent user drags must
+    // NOT be re-clamped back to collapsed.
+    matchMediaMatches = false;
+    mockMobileSearchState.mobileResultsViewPreference = "map";
+
+    render(
+      <SearchViewToggle {...props}>
+        <TestChild />
+      </SearchViewToggle>
+    );
+
+    // One-shot: initial collapse to map mode (snap 0) still fires.
+    await waitFor(() => {
+      expect(screen.getByTestId("mobile-bottom-sheet")).toHaveAttribute(
+        "data-snap-index",
+        "0"
+      );
+    });
+
+    // The preference is still "map" (empty viewport persists). The user drags the
+    // sheet up to read results.
+    fireEvent.click(screen.getByTestId("expand-mobile-sheet"));
+
+    // The sheet must stay open (snap 2), not snap back to collapsed.
+    await waitFor(() => {
+      expect(screen.getByTestId("mobile-bottom-sheet")).toHaveAttribute(
+        "data-snap-index",
+        "2"
+      );
+    });
+    expect(screen.getByTestId("mobile-bottom-sheet")).toHaveAttribute(
+      "data-snap-index",
+      "2"
+    );
+
+    // A second drag (to peek) is likewise honored, confirming no persistent clamp.
+    fireEvent.click(screen.getByTestId("peek-mobile-sheet"));
+    await waitFor(() => {
+      expect(screen.getByTestId("mobile-bottom-sheet")).toHaveAttribute(
+        "data-snap-index",
+        "1"
+      );
+    });
+  });
+
   it("hides the floating toggle while a mobile map overlay is active", () => {
     matchMediaMatches = false;
     mockMobileSearchState.mobileMapOverlayActive = true;
