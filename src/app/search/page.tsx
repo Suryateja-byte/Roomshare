@@ -161,19 +161,30 @@ export async function generateMetadata({
   searchParams,
 }: SearchPageProps): Promise<Metadata> {
   const rawParams = await searchParams;
-  const { q, what, locationLabel, filterParams } = parseSearchParams(rawParams);
-  const hasPagination = Boolean(rawParams.page || rawParams.cursor);
+  const { q, what, locationLabel, filterParams, requestedPage } =
+    parseSearchParams(rawParams);
+  // requestedPage already resolves the legacy page/pageNumber aliases; also catch
+  // the legacy cursorStack alias so deep/paginated pages reached via old URLs get
+  // noindex like ?page=/?cursor= do.
+  const hasPagination =
+    requestedPage > 1 ||
+    Boolean(
+      rawParams.cursor || (rawParams as { cursorStack?: string }).cursorStack
+    );
   const activeFilterCount = [
     filterParams.minPrice !== undefined,
     filterParams.maxPrice !== undefined,
     Boolean(filterParams.roomType),
     Boolean(filterParams.moveInDate),
+    Boolean(filterParams.endDate),
     Boolean(filterParams.leaseDuration),
     (filterParams.amenities?.length ?? 0) > 0,
     (filterParams.houseRules?.length ?? 0) > 0,
     (filterParams.languages?.length ?? 0) > 0,
     Boolean(filterParams.genderPreference),
     Boolean(filterParams.householdGender),
+    Boolean(filterParams.bookingMode),
+    (filterParams.minAvailableSlots ?? 0) > 1,
     Boolean(filterParams.bounds),
   ].filter(Boolean).length;
   const isHighlyFiltered = activeFilterCount >= 3;

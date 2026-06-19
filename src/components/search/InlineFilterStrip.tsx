@@ -113,7 +113,10 @@ function countPendingActiveFilters(values: typeof emptyFilterValues): number {
   if (values.leaseDuration) count += 1;
   if (values.genderPreference) count += 1;
   if (values.householdGender) count += 1;
-  if (values.minSlots) count += 1;
+  // Only minSlots > 1 is an active narrowing filter (matches urlToFilterChips and
+  // the commit, which drop minSlots <= 1). The truthy string "1" must not count,
+  // or a crafted ?minSlots=1 URL makes the drawer badge disagree with the strip.
+  if (values.minSlots && parseInt(values.minSlots, 10) > 1) count += 1;
 
   count += values.amenities.length;
   count += values.houseRules.length;

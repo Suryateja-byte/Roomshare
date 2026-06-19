@@ -892,9 +892,23 @@ async function hydratePhase04Snapshot(input: {
     consideredCount: unitKeys.length,
   });
 
+  // Slice by absolute offset over the FROZEN unitKeys order, not the compacted
+  // visibleRows. Holes (units that dropped out since the snapshot) are removed
+  // only within each page window, so a hole on an earlier page can never shift a
+  // later listing into an already-served page — which would silently skip it.
+  const liveRowByUnitKey = new Map(
+    visibleRows.map((row) => [row.unitKey, row])
+  );
   const start = (input.cursor.page - 1) * input.cursor.pageSize;
-  const pageRows = visibleRows.slice(start, start + input.cursor.pageSize);
-  const hasNext = start + input.cursor.pageSize < visibleRows.length;
+  const pageRows = unitKeys
+    .slice(start, start + input.cursor.pageSize)
+    .map((key) => liveRowByUnitKey.get(key))
+    .filter((row): row is ProjectionUnitRow => row !== undefined);
+  // More results remain only if some non-hole unit exists past this window
+  // (avoids advertising a next page that would resolve to all holes).
+  const hasNext = unitKeys
+    .slice(start + input.cursor.pageSize)
+    .some((key) => liveRowByUnitKey.has(key));
   const nextCursor = hasNext
     ? buildSnapshotCursor({
         snapshotId: snapshot.id,
@@ -984,6 +998,15 @@ export async function executeProjectionSearchV2(input: {
         spec,
       });
     }
+    // A non-snapshot cursor reached the projection path (e.g. the engine switched
+    // mid-session after a page-1 freshness-hole fallback emitted a legacy/keyset
+    // cursor). Don't silently restart at page 1 — signal a contract change so the
+    // client resets cleanly, mirroring the inverse handling in search-v2-service.
+    return {
+      response: null,
+      paginatedResult: null,
+      snapshotExpired: buildSnapshotExpired(queryHash, "search_contract_changed"),
+    };
   }
 
   const rows = await queryProjectionUnitRows(spec);

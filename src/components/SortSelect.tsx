@@ -61,6 +61,15 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
   const handleSortChange = useCallback(
     (newSort: string) => {
       setDesktopOpen(false);
+      setMobileOpen(false);
+      // No-op when re-selecting the already-active sort. The desktop Radix Select
+      // doesn't fire onValueChange on a same-value click, but the mobile sheet has
+      // no such guard — without this, it kicks off a wasted transition/loading
+      // flicker. Treat undefined and "recommended" as equal.
+      const normalizedNew = newSort === "recommended" ? undefined : newSort;
+      const normalizedCurrent =
+        currentSort === "recommended" ? undefined : currentSort;
+      if (normalizedNew === normalizedCurrent) return;
       const currentQuery = normalizeSearchQuery(
         new URLSearchParams(searchParams.toString())
       );
@@ -75,9 +84,8 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
       } else {
         router.push(url);
       }
-      setMobileOpen(false);
     },
-    [searchParams, transitionContext, router]
+    [searchParams, transitionContext, router, currentSort]
   );
 
   const currentLabel =

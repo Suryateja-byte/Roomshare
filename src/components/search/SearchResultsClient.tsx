@@ -28,6 +28,7 @@ import { findSplitStays } from "@/lib/search/split-stay";
 import { getFilterSuggestions } from "@/app/actions/filter-suggestions";
 import { useMobileSearch } from "@/contexts/MobileSearchContext";
 import { useSearchMapUI } from "@/contexts/SearchMapUIContext";
+import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
 import { useSearchTestScenario } from "@/contexts/SearchTestScenarioContext";
 import type { FilterSuggestion } from "@/lib/data";
 import type { FilterParams, PublicSearchListing } from "@/lib/search-types";
@@ -162,6 +163,10 @@ export function SearchResultsClient({
   const { setV2MapData, dataVersion } = useV2MapDataSetter();
   const { setSearchResultsLabel, setMobileResultsState } = useMobileSearch();
   const { shouldShowMap } = useSearchMapUI();
+  // During a pending filter/sort/bounds transition the SearchResultsLoadingWrapper
+  // already announces "Updating results..."; gate the client-fetch announcement on
+  // this so screen readers don't hear two concurrent loading messages (L-20).
+  const isTransitionPending = useSearchTransitionSafe()?.isPending ?? false;
   const testScenario = useSearchTestScenario();
   const [isHydrated, setIsHydrated] = useState(false);
   // Airbnb-style: on desktop, open listings in a new tab so the search page + map
@@ -464,7 +469,7 @@ export function SearchResultsClient({
           );
           setClientFetchedListings(fullItems);
           setClientFetchedTotal(searchResponse.list.total ?? null);
-          setClientFetchedNearMatch(undefined);
+          setClientFetchedNearMatch(searchResponse.list.nearMatchExpansion);
           setClientFetchedVibeAdvisory(
             searchResponse.meta.warnings?.includes("VIBE_SOFT_FALLBACK")
               ? "Showing best matches for your vibe in this area"
@@ -738,6 +743,14 @@ export function SearchResultsClient({
         setIsDegraded(false);
         setExtraListings([]);
         setNextCursor(null);
+        // Drop any client-fetched listings so effectiveListings falls back to the
+        // refreshed SSR data after router.refresh(); otherwise stale, possibly
+        // mis-ordered client-fetched results keep shadowing the refresh. Mirrors
+        // the PUBLIC_CACHE_INVALIDATED handler above.
+        setClientFetchedListings(null);
+        setClientFetchedTotal(null);
+        setClientFetchedNearMatch(undefined);
+        setClientFetchedVibeAdvisory(undefined);
         totalCountRef.current =
           dedupeListingsForDisplay(currentListings).length;
         seenIdsRef.current = new Set(
@@ -838,9 +851,12 @@ export function SearchResultsClient({
       });
       setNextCursor(result.nextCursor);
 
-      // Announce to screen readers (after state update)
-      // F2 FIX: Use ref for count instead of stale allListings closure
-      const newCount = totalCountRef.current;
+      // Announce to screen readers (after state update).
+      // dedupedItems are unique vs every seen listing, so the new displayed count
+      // is the prior total + the appended count. Reading totalCountRef directly
+      // here would be stale — the setExtraListings updater that mutates it runs at
+      // commit, not at this call site.
+      const newCount = totalCountRef.current + dedupedItems.length;
       const totalLabel =
         effectiveTotal !== null ? ` of ~${effectiveTotal}` : "";
       setLoadMoreAnnouncement(
@@ -1042,8 +1058,9 @@ export function SearchResultsClient({
         {loadMoreAnnouncement}
       </div>
 
-      {/* Client-side fetch announcement */}
-      {isClientFetching && (
+      {/* Client-side fetch announcement — suppressed during a transition, which the
+          loading wrapper already announces, to avoid a double SR announcement. */}
+      {isClientFetching && !isTransitionPending && (
         <div role="status" aria-live="polite" className="sr-only">
           Updating search results
         </div>
@@ -1182,8 +1199,6 @@ export function SearchResultsClient({
                   )}
                   <ListingCardErrorBoundary listingId={listing.id}>
                     <div
-                      aria-setsize={total ?? -1}
-                      aria-posinset={index + 1}
                       className="animate-card-entrance"
                       style={{
                         animationDelay: `${Math.min(index, 6) * 40}ms`,
@@ -1201,6 +1216,8 @@ export function SearchResultsClient({
                         estimatedMonths={estimatedMonths}
                         queryHashPrefix8={responseMeta.queryHash?.slice(0, 8)}
                         desktopVariant="grid"
+                        ariaPosInSet={index + 1}
+                        ariaSetSize={total ?? -1}
                         openInNewTab={openListingInNewTab}
                       />
                     </div>

@@ -47,6 +47,7 @@ export function SplitStayCard({
     : estimatedMonths
       ? estimatedMonths - firstMonths
       : 0;
+  const totalMonths = firstMonths + secondMonths;
 
   return (
     <div className="rounded-xl border border-outline-variant/20/60 bg-surface-container-lowest overflow-hidden">
@@ -101,7 +102,9 @@ export function SplitStayCard({
 
       {/* Combined price footer */}
       <div className="px-4 py-3 border-outline-variant/20 flex items-baseline justify-between">
-        <span className="text-sm text-on-surface-variant">Combined total</span>
+        <span className="text-sm text-on-surface-variant">
+          Combined total{totalMonths > 0 ? ` · ${totalMonths} mo` : ""}
+        </span>
         <span className="font-bold text-lg text-on-surface">
           {formatPrice(combinedPrice)}
         </span>

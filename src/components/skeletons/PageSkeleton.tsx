@@ -236,11 +236,11 @@ function SearchLoadingListingRow({ index }: { index: number }) {
   return (
     <div
       data-testid="search-loading-listing-row"
-      className="relative mb-4 flex flex-col overflow-hidden rounded-2xl bg-surface-container-lowest shadow-ambient-sm md:grid md:grid-cols-[168px_minmax(0,1fr)] md:gap-4 md:overflow-visible md:bg-transparent md:p-2 md:shadow-none"
+      className="relative flex flex-col overflow-hidden rounded-2xl bg-surface-container-lowest shadow-ambient-sm md:overflow-visible md:bg-transparent md:p-1 md:shadow-none"
       aria-hidden="true"
       role="presentation"
     >
-      <div className="relative aspect-[4/3] overflow-hidden bg-surface-container-high/50 md:h-full md:min-h-[132px] md:rounded-xl">
+      <div className="relative aspect-[4/3] overflow-hidden bg-surface-container-high/50 md:aspect-[16/7] md:rounded-xl">
         <Skeleton
           variant="rectangular"
           animation="shimmer"
@@ -347,7 +347,7 @@ export function SearchResultsSkeleton({ count = 4 }: { count?: number }) {
       aria-label="Loading search results"
     >
       <span className="sr-only">Loading search results</span>
-      <div className="mx-auto max-w-[840px] pb-24 md:pb-6">
+      <div className="mx-auto max-w-[1180px] pb-24 md:pb-6">
         <div className="px-4 pt-0 sm:px-5 lg:px-8">
           <div className="border-b border-outline-variant/25 px-1 py-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -400,7 +400,7 @@ export function SearchResultsSkeleton({ count = 4 }: { count?: number }) {
           <div className="relative py-5">
             <div
               data-testid="search-loading-listing-list"
-              className="grid grid-cols-1 gap-2 sm:gap-3"
+              className="grid grid-cols-1 gap-4 sm:grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] xl:gap-5"
             >
               {Array.from({ length: count }).map((_, index) => (
                 <SearchLoadingListingRow key={index} index={index} />

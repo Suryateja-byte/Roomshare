@@ -592,8 +592,11 @@ export async function processSearchAlerts(): Promise<ProcessResult> {
       active: true,
       alertEnabled: true,
       OR: [
-        // Never alerted
-        { lastAlertAt: null },
+        // Never alerted — scheduled frequencies only. INSTANT alerts are delivered
+        // per-listing by triggerInstantAlerts, so they must NOT be swept into this
+        // scheduled (digest) cron, or a freshly-created INSTANT search (lastAlertAt
+        // null) would get a batched "N matching listings" email on the first run.
+        { alertFrequency: { in: ["DAILY", "WEEKLY"] }, lastAlertAt: null },
         // Daily alerts - last alert more than 24 hours ago
         {
           alertFrequency: "DAILY",

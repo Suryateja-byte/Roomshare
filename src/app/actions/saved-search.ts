@@ -29,6 +29,7 @@ interface SaveSearchInput {
 const savedSearchNameSchema = z.string().trim().min(1).max(100);
 const SAVED_SEARCH_LIMIT_ERROR =
   "You can only save up to 10 searches. Please delete some to save new ones.";
+const SAVED_SEARCH_DUPLICATE_ERROR = "You've already saved this search.";
 
 /**
  * Write-path schema: strips unknown fields to prevent arbitrary JSON from persisting.
@@ -125,6 +126,21 @@ export async function saveSearch(input: SaveSearchInput) {
     const saveResult = await prisma.$transaction(async (tx) => {
       await acquireSavedSearchLimitLock(tx, session.user.id);
 
+      // Dedup: an identical (canonical) saved search already exists. Reject instead
+      // of creating a second row — duplicates eat the 10-slot limit and fire
+      // duplicate alert emails (one per SavedSearch). Delete is a hard delete, so
+      // no stale rows block a legitimate re-save.
+      const duplicate = await tx.savedSearch.findFirst({
+        where: {
+          userId: session.user.id,
+          searchSpecHash: canonical.searchSpecHash,
+        },
+        select: { id: true },
+      });
+      if (duplicate) {
+        return { kind: "duplicate" as const };
+      }
+
       const existingCount = await tx.savedSearch.count({
         where: { userId: session.user.id },
       });
@@ -168,6 +184,10 @@ export async function saveSearch(input: SaveSearchInput) {
 
     if (saveResult.kind === "limit") {
       return { error: SAVED_SEARCH_LIMIT_ERROR };
+    }
+
+    if (saveResult.kind === "duplicate") {
+      return { error: SAVED_SEARCH_DUPLICATE_ERROR };
     }
 
     const { savedSearch } = saveResult;

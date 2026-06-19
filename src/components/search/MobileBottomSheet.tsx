@@ -15,7 +15,6 @@ import {
   useReducedMotion,
 } from "framer-motion";
 import { X } from "lucide-react";
-import PullToRefresh from "./PullToRefresh";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 // P2-18 FIX: Import snap points from shared constants so FloatingMapButton
@@ -42,8 +41,6 @@ interface MobileBottomSheetProps {
   snapIndex?: number;
   /** Callback when snap index changes */
   onSnapChange?: (index: number) => void;
-  /** Called when pull-to-refresh gesture completes */
-  onRefresh?: () => Promise<void>;
 }
 
 /**
@@ -76,7 +73,6 @@ export default function MobileBottomSheet({
   headerText,
   snapIndex: controlledSnap,
   onSnapChange,
-  onRefresh,
 }: MobileBottomSheetProps) {
   const reducedMotion = useReducedMotion();
   const [internalSnap, setInternalSnap] = useState(1); // Start at preview
@@ -314,8 +310,11 @@ export default function MobileBottomSheet({
 
       const content = contentRef.current;
       if (content && content.scrollTop <= 0) {
-        isScrollDrag.current = true;
+        // Set the content-drag flag AFTER handleTouchStart, which resets it to
+        // false. Setting it before would be clobbered, leaving the content-drag
+        // guards (scrolled-away abort + downward-only) in handleTouchMove dead.
         handleTouchStart(e);
+        isScrollDrag.current = true;
       }
     },
     [snapIndex, handleTouchStart]
@@ -575,22 +574,10 @@ export default function MobileBottomSheet({
           data-snap-expanded={SNAP_EXPANDED}
           data-snap-current={snapIndex}
         >
-          {/* P1-FIX (#75): Only enable PTR when fully expanded.
-              At preview position, drag-down collapses the sheet - PTR would conflict.
-              User must expand to full screen to access pull-to-refresh. */}
-          {/* P2-FIX (#162): Pass contentRef as scrollContainerRef so PullToRefresh
-              checks scrollTop on the actual scrollable element, not its wrapper. */}
-          {onRefresh ? (
-            <PullToRefresh
-              onRefresh={onRefresh}
-              enabled={isExpanded}
-              scrollContainerRef={contentRef}
-            >
-              {children}
-            </PullToRefresh>
-          ) : (
-            children
-          )}
+          {/* Pull-to-refresh was never wired (no caller passed onRefresh) and its
+              drag-down gesture conflicts with the documented "drag down at list-top
+              to collapse the sheet" behavior — so the sheet owns that gesture. */}
+          {children}
         </div>
       </m.div>
     </LazyMotion>

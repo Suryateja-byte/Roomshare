@@ -70,7 +70,6 @@ export default function SearchLayoutView({ children }: SearchLayoutViewProps) {
         }
         shouldShowMap={shouldShowMap}
         canShowMap={canShowMap}
-        onToggle={toggleMap}
         isLoading={isLoading}
       >
         {children}

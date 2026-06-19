@@ -3147,5 +3147,76 @@ describe("Map Component", () => {
       );
       expect(autoZoomCalls.length).toBe(0);
     });
+
+    // Regression: the per-search reset key must include the location identity
+    // (`locationLabel`), not just `q`. The real submit pipeline stores a selected
+    // place in `locationLabel` and often omits `q`, so without it a second empty
+    // location search reuses the first search's "already auto-zoomed" latch and
+    // never zooms out. (Codex P2, Map.tsx:2636.)
+    it("re-auto-zooms for a new location (locationLabel) search after the previous location auto-zoomed", async () => {
+      mockSearchParams = new URLSearchParams(
+        "locationLabel=Austin&minLat=37&maxLat=38&minLng=-123&maxLng=-122"
+      );
+
+      const { rerender } = render(<MapComponent listings={[]} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      // First location auto-zooms.
+      expect(mockMapInstance.flyTo).toHaveBeenCalledWith(
+        expect.objectContaining({ zoom: expect.any(Number), duration: 800 })
+      );
+
+      mockMapInstance.flyTo.mockClear();
+
+      // A brand-new location search (no `q`, no filters) must reset the latch and
+      // auto-zoom again — this is what the missing `locationLabel` key broke.
+      mockSearchParams = new URLSearchParams(
+        "locationLabel=Boston&minLat=42&maxLat=43&minLng=-72&maxLng=-71"
+      );
+
+      await act(async () => {
+        rerender(<MapComponent listings={[]} />);
+        jest.advanceTimersByTime(100);
+      });
+
+      expect(mockMapInstance.flyTo).toHaveBeenCalledWith(
+        expect.objectContaining({ zoom: expect.any(Number), duration: 800 })
+      );
+    });
+
+    // Regression: same gap for the vibe field, serialized as `what`.
+    it("re-auto-zooms for a new vibe (what) search after the previous one auto-zoomed", async () => {
+      mockSearchParams = new URLSearchParams(
+        "what=cozy&minLat=37&maxLat=38&minLng=-123&maxLng=-122"
+      );
+
+      const { rerender } = render(<MapComponent listings={[]} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      expect(mockMapInstance.flyTo).toHaveBeenCalledWith(
+        expect.objectContaining({ zoom: expect.any(Number), duration: 800 })
+      );
+
+      mockMapInstance.flyTo.mockClear();
+
+      mockSearchParams = new URLSearchParams(
+        "what=quiet&minLat=37&maxLat=38&minLng=-123&maxLng=-122"
+      );
+
+      await act(async () => {
+        rerender(<MapComponent listings={[]} />);
+        jest.advanceTimersByTime(100);
+      });
+
+      expect(mockMapInstance.flyTo).toHaveBeenCalledWith(
+        expect.objectContaining({ zoom: expect.any(Number), duration: 800 })
+      );
+    });
   });
 });

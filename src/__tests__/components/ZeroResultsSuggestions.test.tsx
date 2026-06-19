@@ -140,4 +140,38 @@ describe("ZeroResultsSuggestions", () => {
     expect(params.get("cursorStack")).toBeNull();
     expect(params.get("pageNumber")).toBeNull();
   });
+
+  // Regression (H-01): a bare `/search?q=Area` link is bounds-required and
+  // short-circuits to the "Please select a location" dead-end. The nearby-area
+  // chips MUST carry lat/lng so the point path derives bounds and shows results.
+  it("nearby-area chips carry lat/lng (no bounds-required dead-end)", () => {
+    mockSearchParams = new URLSearchParams("q=Nowhere");
+
+    render(
+      <ZeroResultsSuggestions suggestions={locationSuggestion} query="Nowhere" />
+    );
+
+    const areaLinks = screen.getAllByRole("link");
+    expect(areaLinks.length).toBeGreaterThan(0);
+    for (const link of areaLinks) {
+      const href = link.getAttribute("href") ?? "";
+      const params = new URLSearchParams(href.split("?")[1] ?? "");
+      expect(params.get("q")).toBeTruthy();
+      expect(Number.isFinite(parseFloat(params.get("lat") ?? ""))).toBe(true);
+      expect(Number.isFinite(parseFloat(params.get("lng") ?? ""))).toBe(true);
+    }
+  });
+
+  it("empty-state nearby-area chips carry lat/lng", () => {
+    render(<ZeroResultsSuggestions suggestions={[]} />);
+
+    const areaLinks = screen.getAllByRole("link");
+    expect(areaLinks.length).toBeGreaterThan(0);
+    for (const link of areaLinks) {
+      const href = link.getAttribute("href") ?? "";
+      const params = new URLSearchParams(href.split("?")[1] ?? "");
+      expect(params.get("lat")).toBeTruthy();
+      expect(params.get("lng")).toBeTruthy();
+    }
+  });
 });

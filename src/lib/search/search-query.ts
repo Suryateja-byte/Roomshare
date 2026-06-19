@@ -309,7 +309,13 @@ export function buildSeoCanonicalSearchUrl(
   query: NormalizedSearchQuery
 ): string {
   const params = new URLSearchParams();
-  if (query.query) params.set("q", query.query);
+  // The real search pipeline stores the place in `locationLabel` (+lat/lng) and
+  // leaves `query` undefined, so canonicalizing on `query` alone collapses every
+  // location search to bare /search while the page renders a location-specific
+  // <title>. Fall back to locationLabel so each location keeps a distinct,
+  // indexable ?q= canonical that matches its title.
+  const term = query.query ?? query.locationLabel;
+  if (term) params.set("q", term);
   const queryString = params.toString();
   return queryString ? `/search?${queryString}` : "/search";
 }

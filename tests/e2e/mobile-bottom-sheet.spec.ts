@@ -634,39 +634,6 @@ test.describe("Mobile Bottom Sheet - Flick Velocity (7.7)", () => {
   });
 });
 
-test.describe("Mobile Bottom Sheet - Pull to Refresh (7.8)", () => {
-  test("pull-to-refresh is available only when expanded", async ({ page }) => {
-    await page.goto(`/search?${boundsQS}`);
-    await expect(page.locator(selectors.listingCard).first()).toBeAttached({
-      timeout: 30_000,
-    });
-
-    const sheet = bottomSheet(page);
-    const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
-    test.skip(!sheetVisible, "Bottom sheet not visible");
-    if (!sheetVisible) return;
-
-    // Wait for header ResizeObserver + padding-top transition to settle
-    await waitForLayoutStable(page);
-
-    // Expand from peek -> list. PTR should only be available in full list mode.
-    const handle = page.locator(selectors.bottomSheetHandle);
-    await handle.focus();
-    await handle.press("ArrowUp");
-    await waitForSheetAnimation(page);
-
-    await expect(async () => {
-      expect(await getSnapIndex(page)).toBe(2);
-    }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
-
-    // Check that PullToRefresh component is enabled
-    // (Implementation detail: PTR is wrapped around children when onRefresh is provided)
-    const content = page.locator(selectors.contentArea);
-    const hasScrollContent = (await content.locator("> *").count()) > 0;
-    expect(hasScrollContent).toBeTruthy();
-  });
-});
-
 test.describe("Mobile Bottom Sheet - Keyboard Navigation (7.9)", () => {
   test.beforeEach(async ({ page }) => {
     // Keyboard navigation tests are unreliable on mobile device emulation

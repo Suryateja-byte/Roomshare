@@ -1428,6 +1428,12 @@ export default function MapComponent({
   const programmaticClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // Auto-zoom: fire once per search context when results are empty and no filters active
   const hasAutoZoomedRef = useRef(false);
+  // Tracks whether the user has manually panned/zoomed within the current search
+  // context. Unlike the `hasUserMoved` context state (which is reset to false on
+  // every searchParams change — including the pan's own URL write), this ref is
+  // only cleared when the search context (non-bounds params) changes, so it
+  // reliably suppresses auto-zoom-out after a deliberate pan into an empty area.
+  const hasUserMovedSinceSearchRef = useRef(false);
   // Ref for sourcedata handler cleanup
   const sourcedataHandlerRef = useRef<((e: MapSourceDataEvent) => void) | null>(
     null
@@ -2614,17 +2620,26 @@ export default function MapComponent({
   }, [hideMap]);
 
   // Auto-zoom-out: when map loads empty with no active filters, zoom out once
-  // Build a key from non-bounds params so we reset per search context
+  // Build a key from the search-identity params (everything that defines a *new*
+  // search) so the auto-zoom + pan latch reset per search context. This includes
+  // the location/vibe identity (`locationLabel`, `what`) — the normal submit
+  // pipeline stores a selected place in `locationLabel` and may omit `q`, so a
+  // fresh location/vibe search must still reset the latch. Bounds and `lat`/`lng`
+  // are deliberately excluded: a pure map pan rewrites bounds and clears lat/lng
+  // (see applySearchQueryChange "map-pan"), so the latch must survive pans.
   const nonBoundsParamsKey = useMemo(() => {
-    const keys = ["q", ...FILTER_PARAM_KEYS];
+    const keys = ["q", "locationLabel", "what", ...FILTER_PARAM_KEYS];
     return keys
       .map((k) => `${k}=${searchParams.getAll(k).sort().join(",")}`)
       .join("&");
   }, [searchParams]);
 
-  // Reset auto-zoom flag when search context (non-bounds filters) changes
+  // Reset auto-zoom flag when search context (non-bounds filters) changes.
+  // Also clear the manual-pan latch so auto-zoom is re-enabled for the new search
+  // (a pure pan does not change nonBoundsParamsKey, so the latch survives pans).
   useEffect(() => {
     hasAutoZoomedRef.current = false;
+    hasUserMovedSinceSearchRef.current = false;
   }, [nonBoundsParamsKey]);
 
   const handleZoomOut = useCallback(() => {
@@ -2666,7 +2681,10 @@ export default function MapComponent({
     if (listings.length > 0) return;
     if (hasAutoZoomedRef.current) return;
     if (hasAnyFilter(searchParams)) return;
-    if (hasUserMoved) return;
+    // `hasUserMoved` (context state) is reset on every URL change, so it cannot
+    // by itself distinguish a fresh empty search from a user pan into an empty
+    // area; the ref latch persists across the pan's own URL write and does.
+    if (hasUserMoved || hasUserMovedSinceSearchRef.current) return;
 
     hasAutoZoomedRef.current = true;
     handleZoomOut();
@@ -3333,6 +3351,9 @@ export default function MapComponent({
 
       // Mark that user has manually moved the map
       setHasUserMoved(true);
+      // Latch the pan for the current search context so auto-zoom-out won't yank
+      // the camera if this pan lands on an empty area (see hasUserMovedSinceSearchRef).
+      hasUserMovedSinceSearchRef.current = true;
 
       // Don't trigger search when zoomed out too far — viewport exceeds server max span
       const latSpan = bounds.maxLat - bounds.minLat;

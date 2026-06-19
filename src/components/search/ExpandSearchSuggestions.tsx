@@ -36,6 +36,13 @@ export function ExpandSearchSuggestions({
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
+    // Clear stale state from the previous query so the old "+N rooms" buttons
+    // (built from the prior params) can't be clicked during this refetch window.
+    // The component is not always remounted on param change (client-side search),
+    // so without this reset the buttons would relax the previous query.
+    setLoading(true);
+    setSuggestions([]);
+
     const params = new URLSearchParams(searchParamsString);
     const candidates: Suggestion[] = [];
 
@@ -126,12 +133,29 @@ export function ExpandSearchSuggestions({
         const withCounts: Suggestion[] = [];
         for (let i = 0; i < candidates.length; i++) {
           const result = results[i];
-          if (result.status === "fulfilled") {
-            const delta =
-              (result.value.count ?? 101) - currentCount;
+          if (result.status !== "fulfilled") continue;
+          const value = result.value as {
+            count?: number | null;
+            boundsRequired?: boolean;
+            browseMode?: boolean;
+            error?: string;
+          };
+          if (typeof value.count === "number") {
+            const delta = value.count - currentCount;
             if (delta > 0) {
               withCounts.push({ ...candidates[i], count: delta });
             }
+          } else if (
+            value.count === null &&
+            !value.boundsRequired &&
+            !value.browseMode &&
+            !value.error
+          ) {
+            // Explicit `count: null` with no qualifier = >100 results. Surface a
+            // "many more" suggestion without fabricating a precise number (the old
+            // `?? 101` showed e.g. "+98 rooms"). Skip error / bounds-required /
+            // browse-mode responses entirely so we never link to an empty page.
+            withCounts.push({ ...candidates[i], count: null });
           }
         }
 
@@ -186,8 +210,11 @@ export function ExpandSearchSuggestions({
                   </div>
                   <span className="text-sm">
                     <strong className="font-semibold text-primary">
-                      +{suggestion.count} room
-                      {suggestion.count !== 1 ? "s" : ""}
+                      {suggestion.count === null
+                        ? "Many more rooms"
+                        : `+${suggestion.count} room${
+                            suggestion.count !== 1 ? "s" : ""
+                          }`}
                     </strong>{" "}
                     {suggestion.label}
                   </span>
