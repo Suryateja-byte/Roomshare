@@ -68,6 +68,65 @@ describe("SearchUrlCanonicalizer", () => {
     expect(mockEmitSearchClientMetric).not.toHaveBeenCalled();
   });
 
+  // #24 regression: cursor/page must be stripped from the canonical shareable URL.
+  // "Load more" state is ephemeral — it must never survive a copy/bookmark cycle.
+  it("strips cursor from the canonical URL (#24)", async () => {
+    const replaceStateSpy = jest
+      .spyOn(window.history, "replaceState")
+      .mockImplementation(() => undefined);
+    mockSearchParams.mockReturnValue(
+      new URLSearchParams("q=austin&cursor=abc123")
+    );
+
+    render(<SearchUrlCanonicalizer />);
+
+    await waitFor(() => {
+      expect(replaceStateSpy).toHaveBeenCalledTimes(1);
+    });
+
+    const [, , calledUrl] = replaceStateSpy.mock.calls[0];
+    expect(calledUrl).not.toContain("cursor=");
+    expect(calledUrl).not.toContain("cursorStack=");
+  });
+
+  it("strips page token from the canonical URL (#24)", async () => {
+    const replaceStateSpy = jest
+      .spyOn(window.history, "replaceState")
+      .mockImplementation(() => undefined);
+    mockSearchParams.mockReturnValue(
+      new URLSearchParams("q=austin&page=3")
+    );
+
+    render(<SearchUrlCanonicalizer />);
+
+    await waitFor(() => {
+      expect(replaceStateSpy).toHaveBeenCalledTimes(1);
+    });
+
+    const [, , calledUrl] = replaceStateSpy.mock.calls[0];
+    expect(calledUrl).not.toContain("page=");
+    expect(calledUrl).not.toContain("pageNumber=");
+  });
+
+  it("strips legacy cursorStack alias from the canonical URL (#24)", async () => {
+    const replaceStateSpy = jest
+      .spyOn(window.history, "replaceState")
+      .mockImplementation(() => undefined);
+    mockSearchParams.mockReturnValue(
+      new URLSearchParams("q=austin&cursorStack=abc123")
+    );
+
+    render(<SearchUrlCanonicalizer />);
+
+    await waitFor(() => {
+      expect(replaceStateSpy).toHaveBeenCalledTimes(1);
+    });
+
+    const [, , calledUrl] = replaceStateSpy.mock.calls[0];
+    expect(calledUrl).not.toContain("cursor=");
+    expect(calledUrl).not.toContain("cursorStack=");
+  });
+
   it("counts and rewrites legacy where URLs", async () => {
     const replaceStateSpy = jest
       .spyOn(window.history, "replaceState")

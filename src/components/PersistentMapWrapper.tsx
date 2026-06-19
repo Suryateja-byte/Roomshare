@@ -57,6 +57,7 @@ import {
   LAT_MAX,
   LNG_MIN,
   LNG_MAX,
+  AREA_COUNT_CACHE_TTL_MS,
 } from "@/lib/constants";
 import { getScenarioHeaderValue } from "@/lib/search/testing/search-scenarios";
 import { emitSearchClientMetric } from "@/lib/search/search-telemetry-client";
@@ -587,7 +588,13 @@ export default function PersistentMapWrapper({
       }
       // Add from spatial cache entries that overlap current viewport
       const currentFilterKey = lastFilterKeyRef.current;
-      for (const entry of spatialCacheRef.current.values()) {
+      const now = Date.now();
+      for (const [cacheKey, entry] of spatialCacheRef.current) {
+        // #23: Enforce the documented 30s TTL — skip and lazily evict stale entries.
+        if (now - entry.timestamp > AREA_COUNT_CACHE_TTL_MS) {
+          spatialCacheRef.current.delete(cacheKey);
+          continue;
+        }
         if (entry.filterKey !== currentFilterKey) continue;
         for (const l of entry.listings) {
           if (!seenIds.has(l.id) && merged.length < MAX_MAP_MARKERS) {
