@@ -180,6 +180,26 @@ describe("readFiltersFromURL", () => {
     expect(result).not.toHaveProperty("q");
     expect(result).not.toHaveProperty("lat");
   });
+
+  // #36: read boundary must match the commit/badge/chip threshold (>= 2),
+  // so ?minSlots=1 must NOT surface a stray "1" in the drawer.
+  it("ignores minSlots=1 (treated as inactive, returns empty)", () => {
+    const params = new URLSearchParams({ minSlots: "1" });
+    const result = readFiltersFromURL(params);
+    expect(result.minSlots).toBe("");
+  });
+
+  it("reads minSlots >= 2 as active", () => {
+    const params = new URLSearchParams({ minSlots: "2" });
+    const result = readFiltersFromURL(params);
+    expect(result.minSlots).toBe("2");
+  });
+
+  it("ignores minSlots above the max (>20)", () => {
+    const params = new URLSearchParams({ minSlots: "21" });
+    const result = readFiltersFromURL(params);
+    expect(result.minSlots).toBe("");
+  });
 });
 
 // --- Tests for isDirty logic (test via filtersEqual indirectly) ---

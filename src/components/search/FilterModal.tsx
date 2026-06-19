@@ -20,6 +20,10 @@ import {
 } from "@/components/ui/select";
 import { PriceRangeFilter } from "@/components/search/PriceRangeFilter";
 import { DrawerZeroState } from "@/components/search/DrawerZeroState";
+import {
+  GENDER_PREFERENCE_LABELS,
+  HOUSEHOLD_GENDER_LABELS,
+} from "@/components/filters/filter-chip-utils";
 import type { PriceHistogramBucket } from "@/app/api/search/facets/route";
 import type { FilterSuggestion } from "@/lib/near-matches";
 
@@ -588,13 +592,13 @@ export function FilterModal({
                       <SelectContent>
                         <SelectItem value="any">Any</SelectItem>
                         <SelectItem value="MALE_ONLY">
-                          Male Identifying Only
+                          {GENDER_PREFERENCE_LABELS.MALE_ONLY}
                         </SelectItem>
                         <SelectItem value="FEMALE_ONLY">
-                          Female Identifying Only
+                          {GENDER_PREFERENCE_LABELS.FEMALE_ONLY}
                         </SelectItem>
                         <SelectItem value="NO_PREFERENCE">
-                          Any Gender / All Welcome
+                          {GENDER_PREFERENCE_LABELS.NO_PREFERENCE}
                         </SelectItem>
                       </SelectContent>
                     </Select>
@@ -620,9 +624,15 @@ export function FilterModal({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="any">Any</SelectItem>
-                        <SelectItem value="ALL_MALE">All Male</SelectItem>
-                        <SelectItem value="ALL_FEMALE">All Female</SelectItem>
-                        <SelectItem value="MIXED">Mixed (Co-ed)</SelectItem>
+                        <SelectItem value="ALL_MALE">
+                          {HOUSEHOLD_GENDER_LABELS.ALL_MALE}
+                        </SelectItem>
+                        <SelectItem value="ALL_FEMALE">
+                          {HOUSEHOLD_GENDER_LABELS.ALL_FEMALE}
+                        </SelectItem>
+                        <SelectItem value="MIXED">
+                          {HOUSEHOLD_GENDER_LABELS.MIXED}
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

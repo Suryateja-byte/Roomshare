@@ -54,6 +54,28 @@ const PRESERVED_PARAMS = [
 ] as const;
 
 /**
+ * Centralized gender-preference labels keyed by canonical uppercase value.
+ * Single source of truth consumed by both FilterModal SelectItems and
+ * urlToFilterChips so the applied chip text matches the drawer option exactly.
+ */
+export const GENDER_PREFERENCE_LABELS: Record<string, string> = {
+  MALE_ONLY: "Male Identifying Only",
+  FEMALE_ONLY: "Female Identifying Only",
+  NO_PREFERENCE: "Any Gender / All Welcome",
+};
+
+/**
+ * Centralized household-gender labels keyed by canonical uppercase value.
+ * Single source of truth consumed by both FilterModal SelectItems and
+ * urlToFilterChips so the applied chip text matches the drawer option exactly.
+ */
+export const HOUSEHOLD_GENDER_LABELS: Record<string, string> = {
+  ALL_MALE: "All Male",
+  ALL_FEMALE: "All Female",
+  MIXED: "Mixed (Co-ed)",
+};
+
+/**
  * Format a date string (YYYY-MM-DD) for display
  */
 function formatDate(dateStr: string): string {
@@ -139,6 +161,24 @@ export function urlToFilterChips(
         label: `Move-in: ${formatDate(trimmed)}`,
         paramKey: "moveInDate",
       });
+
+      // End date — only a valid filter when a move-in date is set and the end
+      // date is strictly after it (mirrors normalizeCommittedDateRange).
+      const endDate = searchParams.get("endDate");
+      if (endDate) {
+        const trimmedEnd = endDate.trim();
+        if (
+          /^\d{4}-\d{2}-\d{2}$/.test(trimmedEnd) &&
+          trimmedEnd > trimmed &&
+          !isNaN(new Date(trimmedEnd + "T00:00:00").getTime())
+        ) {
+          chips.push({
+            id: "endDate",
+            label: `End: ${formatDate(trimmedEnd)}`,
+            paramKey: "endDate",
+          });
+        }
+      }
     }
   }
 
@@ -251,17 +291,10 @@ export function urlToFilterChips(
     });
   }
 
-  // Gender preference filter (validated)
+  // Gender preference filter (validated) — chip text mirrors the drawer option
   const genderPreference = searchParams.get("genderPreference");
   if (genderPreference && genderPreference !== "any") {
-    const validGenderValues: Record<string, string> = {
-      female: "Female Only",
-      male: "Male Only",
-      female_only: "Female Only",
-      male_only: "Male Only",
-      no_preference: "No Preference",
-    };
-    const label = validGenderValues[genderPreference.toLowerCase()];
+    const label = GENDER_PREFERENCE_LABELS[genderPreference.toUpperCase()];
     if (label) {
       chips.push({
         id: "genderPreference",
@@ -271,17 +304,10 @@ export function urlToFilterChips(
     }
   }
 
-  // Household gender filter (validated)
+  // Household gender filter (validated) — chip text mirrors the drawer option
   const householdGender = searchParams.get("householdGender");
   if (householdGender && householdGender !== "any") {
-    const validHouseholdValues: Record<string, string> = {
-      female: "All Female",
-      male: "All Male",
-      all_female: "All Female",
-      all_male: "All Male",
-      mixed: "Mixed",
-    };
-    const label = validHouseholdValues[householdGender.toLowerCase()];
+    const label = HOUSEHOLD_GENDER_LABELS[householdGender.toUpperCase()];
     if (label) {
       chips.push({
         id: "householdGender",
@@ -358,19 +384,21 @@ export function removeFilterFromUrl(
           ? { maxPrice: undefined }
           : chip.paramKey === "moveInDate"
             ? { moveInDate: undefined }
-            : chip.paramKey === "roomType"
-              ? { roomType: undefined }
-              : chip.paramKey === "leaseDuration"
-                ? { leaseDuration: undefined }
-                : chip.paramKey === "genderPreference"
-                  ? { genderPreference: undefined }
-                  : chip.paramKey === "householdGender"
-                    ? { householdGender: undefined }
-                    : chip.paramKey === "minSlots"
-                      ? { minSlots: undefined }
-                      : chip.paramKey === "nearMatches"
-                        ? { nearMatches: undefined }
-                        : {};
+            : chip.paramKey === "endDate"
+              ? { endDate: undefined }
+              : chip.paramKey === "roomType"
+                ? { roomType: undefined }
+                : chip.paramKey === "leaseDuration"
+                  ? { leaseDuration: undefined }
+                  : chip.paramKey === "genderPreference"
+                    ? { genderPreference: undefined }
+                    : chip.paramKey === "householdGender"
+                      ? { householdGender: undefined }
+                      : chip.paramKey === "minSlots"
+                        ? { minSlots: undefined }
+                        : chip.paramKey === "nearMatches"
+                          ? { nearMatches: undefined }
+                          : {};
 
     nextQuery = applySearchQueryChange(currentQuery, "filter", simplePatch);
   }

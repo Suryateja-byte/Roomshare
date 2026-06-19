@@ -192,7 +192,9 @@ export function readFiltersFromURL(
       const raw = searchParams.get("minSlots");
       if (!raw) return "";
       const parsed = parseInt(raw.trim(), 10);
-      return Number.isFinite(parsed) && parsed >= 1 && parsed <= 20
+      // #36: align the read boundary with the commit/badge/chip threshold (>= 2)
+      // so a crafted ?minSlots=1 never shows a stray "1" the badge/chips ignore.
+      return Number.isFinite(parsed) && parsed >= 2 && parsed <= 20
         ? String(parsed)
         : "";
     })(),

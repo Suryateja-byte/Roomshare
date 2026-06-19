@@ -4,7 +4,8 @@
  * useFacets - Fetches facet counts and price histogram from /api/search/facets
  *
  * Key behaviors:
- * - Cache key EXCLUDES price params so price slider changes don't refetch
+ * - Cache key INCLUDES price params so non-price facet counts update after
+ *   price changes (#19); the price histogram stays price-sticky server-side
  * - 300ms debounce with AbortController
  * - 30s client-side cache
  * - Only fetches when drawer is open
@@ -59,8 +60,9 @@ export interface UseFacetsReturn {
 }
 
 /**
- * Generate cache key excluding price params.
- * This ensures price slider changes don't trigger a refetch.
+ * Generate cache key including price params (#19).
+ * This ensures non-price facet counts update after price changes; the price
+ * histogram stays price-sticky server-side.
  */
 function generateFacetsCacheKey(
   pending: BatchedFilterValues,
@@ -159,7 +161,7 @@ export function useFacets({
   const abortControllerRef = useRef<AbortController | null>(null);
   const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Cache key excludes price so price changes don't invalidate
+  // Cache key includes price so non-price facet counts update on price change (#19)
   const cacheKey = useMemo(
     () => generateFacetsCacheKey(pending, searchParams),
     [pending, searchParams]

@@ -25,6 +25,7 @@ import { setRateLimited } from "./useRateLimitStatus";
 interface CachedCount {
   count: number | null;
   boundsRequired: boolean;
+  browseMode: boolean;
 }
 
 const countCache = createTTLCache<CachedCount>(100);
@@ -78,6 +79,8 @@ export interface UseDebouncedFilterCountReturn {
   formattedCount: string;
   /** P3b: Whether bounds selection is required before showing count */
   boundsRequired: boolean;
+  /** #37: Whether the count reflects a capped top-listings browse (not a true >100) */
+  browseMode: boolean;
   /** Last fetch error, or null */
   error: Error | null;
 }
@@ -182,9 +185,14 @@ function getCachedEntry(cacheKey: string): CachedCount | undefined {
 function setCachedEntry(
   cacheKey: string,
   count: number | null,
-  boundsRequired: boolean
+  boundsRequired: boolean,
+  browseMode: boolean
 ): void {
-  countCache.set(cacheKey, { count, boundsRequired }, CACHE_TTL_MS);
+  countCache.set(
+    cacheKey,
+    { count, boundsRequired, browseMode },
+    CACHE_TTL_MS
+  );
 }
 
 export function useDebouncedFilterCount({
@@ -200,6 +208,9 @@ export function useDebouncedFilterCount({
   const [error, setError] = useState<Error | null>(null);
   // P3b: Track when API indicates bounds selection is required
   const [boundsRequired, setBoundsRequired] = useState(false);
+  // #37: Track when API indicates a capped top-listings browse (count is null
+  // but NOT a true >100; must not render "100+ listings").
+  const [browseMode, setBrowseMode] = useState(false);
 
   // Track if we've captured the baseline for this drawer session
   const baselineCapturedRef = useRef(false);
@@ -222,11 +233,12 @@ export function useDebouncedFilterCount({
       return;
     }
 
-    // Check cache first (restores both count and boundsRequired)
+    // Check cache first (restores count, boundsRequired, and browseMode)
     const cached = getCachedEntry(cacheKey);
     if (cached !== undefined) {
       setCount(cached.count);
       setBoundsRequired(cached.boundsRequired);
+      setBrowseMode(cached.browseMode);
       setIsLoading(false);
       return;
     }
@@ -262,14 +274,17 @@ export function useDebouncedFilterCount({
       const newCount = typeof data.count === "number" ? data.count : null;
       // P3b: Parse boundsRequired from API response
       const newBoundsRequired = data.boundsRequired === true;
+      // #37: Parse browseMode (capped top-listings browse) from API response
+      const newBrowseMode = data.browseMode === true;
 
-      // Cache the result (stores both count and boundsRequired)
-      setCachedEntry(cacheKey, newCount, newBoundsRequired);
+      // Cache the result (stores count, boundsRequired, and browseMode)
+      setCachedEntry(cacheKey, newCount, newBoundsRequired, newBrowseMode);
 
       // Only update state if not aborted
       if (!abortController.signal.aborted) {
         setCount(newCount);
         setBoundsRequired(newBoundsRequired);
+        setBrowseMode(newBrowseMode);
         setIsLoading(false);
       }
     } catch (err) {
@@ -299,6 +314,8 @@ export function useDebouncedFilterCount({
       setBaselineCount(null);
       // P3-NEW-a: Reset boundsRequired when drawer closes
       setBoundsRequired(false);
+      // #37: Reset browseMode when drawer closes
+      setBrowseMode(false);
     }
   }, [isDrawerOpen]);
 
@@ -317,6 +334,8 @@ export function useDebouncedFilterCount({
       setIsLoading(false);
       // P3-NEW-a: Reset boundsRequired when filters are not dirty
       setBoundsRequired(false);
+      // #37: Reset browseMode when filters are not dirty
+      setBrowseMode(false);
       return;
     }
 
@@ -326,11 +345,12 @@ export function useDebouncedFilterCount({
       baselineCapturedRef.current = true;
     }
 
-    // Check cache immediately (restores both count and boundsRequired)
+    // Check cache immediately (restores count, boundsRequired, and browseMode)
     const cached = getCachedEntry(cacheKey);
     if (cached !== undefined) {
       setCount(cached.count);
       setBoundsRequired(cached.boundsRequired);
+      setBrowseMode(cached.browseMode);
       setIsLoading(false);
       // Capture baseline from cache if we haven't yet
       if (!baselineCapturedRef.current) {
@@ -380,6 +400,13 @@ export function useDebouncedFilterCount({
     if (!isDirty && count === null) {
       return "";
     }
+    // #37: A capped top-listings browse returns count=null but is NOT a true
+    // >100 match, so don't render "100+ listings". Return "" so the consumer
+    // falls back to "Show Results" (matches InlineFilterStrip's "Showing top
+    // listings" intent).
+    if (browseMode) {
+      return "";
+    }
     if (count === null) {
       return "100+ listings";
     }
@@ -387,7 +414,7 @@ export function useDebouncedFilterCount({
       return "1 listing";
     }
     return `${count} listings`;
-  }, [boundsRequired, count, isLoading, isDirty]);
+  }, [boundsRequired, count, isLoading, isDirty, browseMode]);
 
   return {
     count,
@@ -396,6 +423,7 @@ export function useDebouncedFilterCount({
     isLoading,
     formattedCount,
     boundsRequired,
+    browseMode,
     error,
   };
 }
