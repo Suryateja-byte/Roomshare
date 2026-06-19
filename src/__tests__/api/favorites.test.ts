@@ -62,6 +62,7 @@ jest.mock("@/app/actions/suspension", () => ({
 import { POST } from "@/app/api/favorites/route";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { Prisma } from "@prisma/client";
 
 describe("POST /api/favorites", () => {
   const mockSession = {
@@ -180,6 +181,53 @@ describe("POST /api/favorites", () => {
       expect(prisma.savedListing.delete).toHaveBeenCalledWith({
         where: { id: "saved-123" },
       });
+    });
+
+    // Regression (#29): a concurrent double-unsave can race so the loser's
+    // delete throws P2025 (record not found). That must be treated as idempotent
+    // success — returning { saved: false }, not bubbling to a 500 that reverts
+    // the heart to "saved" while the row is actually deleted.
+    it("returns saved:false (idempotent) when delete throws P2025", async () => {
+      const existingSave = {
+        id: "saved-123",
+        userId: "user-123",
+        listingId: "listing-123",
+      };
+      (prisma.savedListing.findUnique as jest.Mock).mockResolvedValue(
+        existingSave
+      );
+      (prisma.savedListing.delete as jest.Mock).mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError("Record not found", {
+          code: "P2025",
+          clientVersion: "test",
+        })
+      );
+
+      const response = await POST(createRequest({ listingId: "listing-123" }));
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.saved).toBe(false);
+    });
+
+    it("still surfaces non-P2025 delete errors as 500", async () => {
+      const existingSave = {
+        id: "saved-123",
+        userId: "user-123",
+        listingId: "listing-123",
+      };
+      (prisma.savedListing.findUnique as jest.Mock).mockResolvedValue(
+        existingSave
+      );
+      (prisma.savedListing.delete as jest.Mock).mockRejectedValue(
+        new Error("DB Error")
+      );
+
+      const response = await POST(createRequest({ listingId: "listing-123" }));
+      const data = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(data.error).toBe("Internal server error");
     });
 
     it("checks for existing save with correct compound key", async () => {

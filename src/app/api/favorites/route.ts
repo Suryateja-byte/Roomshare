@@ -130,11 +130,24 @@ export async function POST(request: Request) {
 
     if (existing) {
       // Delete
-      await prisma.savedListing.delete({
-        where: {
-          id: existing.id,
-        },
-      });
+      try {
+        await prisma.savedListing.delete({
+          where: {
+            id: existing.id,
+          },
+        });
+      } catch (err) {
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === "P2025"
+        ) {
+          // Concurrent toggle already deleted the favorite — return idempotent success
+          const response = NextResponse.json({ saved: false });
+          response.headers.set("Cache-Control", "private, no-store");
+          return response;
+        }
+        throw err;
+      }
       // P2-1: User-specific toggle must not be cached
       const response = NextResponse.json({ saved: false });
       response.headers.set("Cache-Control", "private, no-store");

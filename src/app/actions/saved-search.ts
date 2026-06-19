@@ -54,7 +54,11 @@ const savedSearchFiltersWriteSchema = z
     bookingMode: z.string().optional(),
     minSlots: z.number().optional(),
     nearMatches: z.boolean().optional(),
-    sort: z.string().optional(),
+    // `sort` is intentionally NOT a write-schema field: it is ordering-only and
+    // not part of a saved search's identity (searchSpecHash omits it). It is
+    // already stripped upstream in buildCanonicalSavedSearchMetadata; omitting
+    // it here keeps .strip() from re-admitting it. The read-path parser still
+    // tolerates legacy `sort` on previously-stored rows.
     lat: z.number().optional(),
     lng: z.number().optional(),
     minLat: z.number().optional(),
