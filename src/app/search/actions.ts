@@ -6,8 +6,11 @@ import type { PublicSearchListing } from "@/lib/search-types";
 import { toPublicSearchListings } from "@/lib/search/public-listing-payload";
 import {
   buildRawParamsFromSearchParams,
+  parseSearchParams,
   type RawSearchParams,
 } from "@/lib/search-params";
+import { getListingsPaginated } from "@/lib/data";
+import { decodeCursor, encodeCursor } from "@/lib/search/hash";
 import { checkServerComponentRateLimit } from "@/lib/with-rate-limit";
 import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
 import { features } from "@/lib/env";
@@ -266,9 +269,43 @@ export async function fetchMoreListings(
       }
     }
 
-    // V1 fallback - cursor-based pagination not truly supported
-    // Signal degradation to client so it can show a user-friendly message
-    // instead of silently removing the "Load more" button
+    // V1 fallback. The keyset path is unavailable, but the SSR V1 fallback
+    // (page.tsx) hands out a legacy {p:N} offset cursor so "Load more" keeps
+    // working during a V2 outage. Decode it and continue offset pagination via
+    // getListingsPaginated instead of silently removing the button.
+    const legacyPage = decodeCursor(cursor);
+    if (legacyPage !== null && legacyPage > 1) {
+      // Clamp to prevent unbounded OFFSET from crafted cursors (mirrors
+      // executeSearchV2's legacy cursor clamp).
+      const requestedPage = Math.min(legacyPage, 100);
+      const paginatedResult = await getListingsPaginated({
+        ...parseSearchParams(rawParams as RawSearchParams).filterParams,
+        page: requestedPage,
+        limit: DEFAULT_PAGE_SIZE,
+      });
+      const hasNextPage = paginatedResult.page < paginatedResult.totalPages;
+      recordSearchRequestLatency({
+        route: "search-load-more",
+        durationMs: performance.now() - requestStartTime,
+        backendSource: fallbackMeta.backendSource,
+        stateKind: "degraded",
+        queryHash: queryHash || fallbackMeta.queryHash,
+        resultCount: paginatedResult.items.length,
+      });
+      return {
+        items: toPublicSearchListings(paginatedResult.items),
+        nextCursor: hasNextPage ? encodeCursor(requestedPage + 1) : null,
+        hasNextPage,
+        meta:
+          queryHash && queryHash.trim().length > 0
+            ? { ...fallbackMeta, queryHash }
+            : fallbackMeta,
+      };
+    }
+
+    // No legacy offset cursor to continue from — signal degradation to the
+    // client so it can show a user-friendly message instead of silently
+    // removing the "Load more" button.
     logger.sync.warn(
       "[fetchMoreListings] V1 fallback reached - cursor pagination not supported"
     );

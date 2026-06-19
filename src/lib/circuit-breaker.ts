@@ -234,7 +234,12 @@ export class CircuitBreaker {
 }
 
 /**
- * Pre-configured circuit breakers for common services
+ * Pre-configured circuit breakers for common services.
+ *
+ * NOTE: These are module-level singletons holding state in instance memory.
+ * On serverless (Vercel), each lambda instance has its own copy — counters are
+ * per-lambda-instance, NOT shared across the fleet. A breaker tripping reflects
+ * only the instance that observed the failures.
  */
 export const circuitBreakers = {
   redis: new CircuitBreaker({
@@ -281,7 +286,10 @@ export const circuitBreakers = {
 
   searchV2: new CircuitBreaker({
     name: "search-v2",
-    failureThreshold: 3, // Open after 3 consecutive failures (max 30s degraded = 3 × 10s timeout)
+    // Per-lambda-instance state (NOT fleet-wide): each serverless instance holds
+    // its own counters, so the breaker reflects only the instance that observed
+    // the failures — it does not aggregate across the fleet.
+    failureThreshold: 3, // Open after 3 consecutive failures (max ~30s degraded = 3 × 10s timeout)
     resetTimeout: 30000, // 30 seconds before retrying V2
     successThreshold: 1, // Close immediately on first success (V2 either works or doesn't)
   }),
