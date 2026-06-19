@@ -1,3 +1,16 @@
+- Date: 2026-06-18
+- Mistake / failure mode: During the parallel /search audit-fix campaign, the `searchV2` circuit breaker's `failureThreshold` was lowered 3→1 (audit #25). It typechecked/lint-clean but broke `actions.test.ts` — 3 pre-existing V2-path tests failed only in the full-file run (passed in isolation). The "falls back when V2 times out" test trips the breaker after a single failure; the breaker is a module-level singleton with no per-test reset, so every later V2 test in the file short-circuited to the degraded path (degraded result, NO "V2 failed" log because the circuit-open path logs differently).
+- Detection signal: failure reproduced with the whole file but not with `-t "<single test>"`; received output was the terminal degraded/v1-fallback return with no timeout warning ⇒ breaker open, not timeout.
+- Root cause: module-level singleton state (CircuitBreaker) persists across tests in a file; threshold=1 made one failing test poison the rest. Also threshold=1 is aggressive for prod (one transient V2 blip → 30s forced V1 on that warm instance).
+- Prevention rule: changing shared/singleton runtime state (circuit breakers, rate limiters, module caches) needs either a per-test reset hook OR conservative thresholds. Reverted threshold to 3 and kept only the honest per-lambda-instance doc comment (the low-value, non-controversial half of #25). When a "fix" changes a singleton's trip sensitivity, grep for tests that exercise the failure path in the same file before shipping.
+- Follow-up: reverted in circuit-breaker.ts; full suite 7447 pass.
+
+- Date: 2026-06-18
+- Mistake / failure mode: Parallel fix-agents using the Edit tool on CRLF-having files normalized line endings, producing massive spurious diffs: `data.ts` showed 1092 changed lines for a 4-line logical edit, `SplitStayCard.tsx` 142 lines for 4 className fixes. (The known data.ts EOL gotcha now also bit SplitStayCard.) Map.tsx/test files were NOT polluted (verified real change ≈ raw diff).
+- Detection signal: `git diff --stat` line count >> logical change; per-file `grep -c $'\r'` mismatch vs HEAD.
+- Prevention rule: after any agent edits a file that HEAD has CRLF in, check `git diff --stat`; if bloated, `git checkout HEAD -- <file>` and re-apply the logical change byte-level via a node script (string replace for in-line edits; preserve each line's existing `\r` when inserting lines). Detect polluted files quickly: compare `git diff --numstat` to a CR-stripped diff (`diff <(git show HEAD:f|tr -d '\r') <(tr -d '\r' <f)`).
+- Follow-up: both files restored to minimal diffs (data.ts 8/4, SplitStayCard 4/4).
+
 - Date: 2026-06-12
 - Mistake / failure mode: The new home-a11y focus-indicator e2e used `#search-what` as its "SearchForm loaded" sentinel. It passed locally but failed deterministically (3/3 retries) on its first CI run — the field only renders when `NEXT_PUBLIC_ENABLE_SEMANTIC_SEARCH=true`, which local `.env` sets but CI and prod (Vercel env) do not. NEXT_PUBLIC_ vars are inlined at build time, so the field simply doesn't exist in those builds.
 - Detection signal: `page.waitForSelector('#search-what')` 30s timeout on every retry in one CI shard while all sibling tests passed; same spec green locally.
