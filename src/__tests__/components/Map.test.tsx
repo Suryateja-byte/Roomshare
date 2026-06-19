@@ -1424,6 +1424,49 @@ describe("Map Component", () => {
       expect(pricePill).not.toHaveClass("text-on-surface");
     });
 
+    it("does not bleed viewed pin styling across an unrelated search (#40)", async () => {
+      // Search A: render all listings, click listing-1 so it becomes "viewed".
+      const { rerender } = render(<MapComponent listings={mockListings} />);
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getAllByTestId("map-marker")[0]);
+      });
+
+      // Sanity: listing-1 now renders with the muted "viewed" pill.
+      expect(
+        within(screen.getByTestId("map-pin-primary-listing-1")).getByText(
+          "$1,200"
+        )
+      ).toHaveClass("text-on-surface-variant");
+
+      // Search B: a different search context (changed non-bounds params) whose
+      // result set excludes listing-1. The nonBoundsParamsKey effect must
+      // intersect viewedIds with the active result set, pruning listing-1.
+      mockSearchParams = new URLSearchParams("minPrice=1500");
+      await act(async () => {
+        rerender(<MapComponent listings={[mockListings[1]]} />);
+        jest.advanceTimersByTime(100);
+      });
+
+      // Search C: listing-1 reappears in a fresh result set. Because it was
+      // pruned in search B (never clicked in C), it must render UNVIEWED — no
+      // stale "viewed" styling bleeding across searches.
+      mockSearchParams = new URLSearchParams("minPrice=900");
+      await act(async () => {
+        rerender(<MapComponent listings={mockListings} />);
+        jest.advanceTimersByTime(100);
+      });
+
+      const reappearedPill = within(
+        screen.getByTestId("map-pin-primary-listing-1")
+      ).getByText("$1,200");
+      expect(reappearedPill).toHaveClass("text-on-surface");
+      expect(reappearedPill).not.toHaveClass("text-on-surface-variant");
+    });
+
     it("uses strong contrast for active price marker pills", async () => {
       mockActiveId = "listing-1";
       await renderMapAndPopulateMarkers();

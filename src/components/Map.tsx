@@ -41,10 +41,7 @@ import {
 } from "@/lib/search/map-fly-to";
 import { useListingFocus } from "@/contexts/ListingFocusContext";
 import { useMobileSearch } from "@/contexts/MobileSearchContext";
-import {
-  usePendingMapFocus,
-  useSearchMapUI,
-} from "@/contexts/SearchMapUIContext";
+import { usePendingMapFocus } from "@/contexts/SearchMapUIContext";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
 import { useMapBounds } from "@/contexts/MapBoundsContext";
 import { useActivePanBoundsSetter } from "@/contexts/ActivePanBoundsContext";
@@ -132,22 +129,6 @@ function safeParseFloat(
 
 function normalizeMapNumber(value: number, fallback = 0): number {
   return Number.isFinite(value) ? value : fallback;
-}
-
-function getLongitudeSpan(bounds: MapBounds): number {
-  if (bounds.minLng <= bounds.maxLng) {
-    return bounds.maxLng - bounds.minLng;
-  }
-
-  return 180 - bounds.minLng + (bounds.maxLng + 180);
-}
-
-function isLongitudeWithinBounds(lng: number, bounds: MapBounds): boolean {
-  if (bounds.minLng <= bounds.maxLng) {
-    return lng >= bounds.minLng && lng <= bounds.maxLng;
-  }
-
-  return lng >= bounds.minLng || lng <= bounds.maxLng;
 }
 
 interface Listing {
@@ -399,13 +380,6 @@ export interface MapComponentProps {
   selectionPresentation?: "popup" | "sheet" | "preview";
 
   // --- Behavior Props ---
-
-  /**
-   * Whether to disable automatic fly-to behavior when listings change.
-   * Useful when parent controls viewport via viewState.
-   * @default false
-   */
-  disableAutoFit?: boolean;
 
   /**
    * Hide the "No listings in this area" overlay.
@@ -1118,7 +1092,6 @@ export default function MapComponent({
   selectedListingId: controlledSelectedId,
   onSelectedListingChange,
   selectionPresentation = "popup",
-  disableAutoFit = false,
   suppressEmptyState = false,
   hasFetchError = false,
 }: MapComponentProps) {
@@ -1206,6 +1179,11 @@ export default function MapComponent({
   const [isSearching, setIsSearching] = useState(false);
   const [showSearchStatus, setShowSearchStatus] = useState(false);
   const [viewedIds, setViewedIds] = useState<Set<string>>(new Set());
+  // Synchronous ref to the current listings for effects that must read the
+  // latest result set without re-running on every listings change (matches the
+  // markerPositionsRef pattern below).
+  const listingsRef = useRef(listings);
+  listingsRef.current = listings;
   const [viewportInfoMessage, setViewportInfoMessage] = useState<string | null>(
     null
   );
@@ -1214,7 +1192,6 @@ export default function MapComponent({
   const reducedMotion = useReducedMotion();
   const { hoveredId, activeId, setHovered, setActive, requestScrollTo } =
     useListingFocus();
-  const { hideMap } = useSearchMapUI();
   const { pendingFocus, acknowledgeFocus } = usePendingMapFocus();
   const pendingFocusListingIdRef = useRef<string | null>(null);
   pendingFocusListingIdRef.current = pendingFocus?.listingId ?? null;
@@ -2255,7 +2232,16 @@ export default function MapComponent({
   }, []);
 
   const getDesktopPopupPlacementForListing = useCallback(
-    (listing: Listing): DesktopPopupPlacement | null => {
+    (
+      listing: Listing,
+      // Anchor coords default to the listing's true location, but stacked
+      // co-located markers are rendered at an offset (markerPositions); pass the
+      // offset coords here so the placement projection matches the visible pin.
+      anchorCoords: { lng: number; lat: number } = {
+        lng: listing.location.lng,
+        lat: listing.location.lat,
+      }
+    ): DesktopPopupPlacement | null => {
       const mapInstance = mapRef.current?.getMap();
       const container = mapContainerRef.current;
       if (!mapInstance || !container) return null;
@@ -2274,8 +2260,8 @@ export default function MapComponent({
       }
 
       const projectedPoint = mapInstance.project([
-        listing.location.lng,
-        listing.location.lat,
+        anchorCoords.lng,
+        anchorCoords.lat,
       ]);
 
       const point = {
@@ -2355,16 +2341,38 @@ export default function MapComponent({
     ]
   );
 
+  // Resolve the selected listing's rendered marker coords. Co-located stacked
+  // markers are fanned out by markerPositions (~0.0015deg offset), so the popup
+  // must anchor to the offset coords of the visible pin, not the listing's true
+  // location. For single (non-stacked) markers the offset equals the true coords.
+  const selectedListingPopupCoords = useMemo(() => {
+    if (!selectedListing) return null;
+    const position = markerPositionById.get(selectedListing.id);
+    return {
+      lng: position?.lng ?? selectedListing.location.lng,
+      lat: position?.lat ?? selectedListing.location.lat,
+    };
+  }, [selectedListing, markerPositionById]);
+
   const desktopPopupPlacement = useMemo(() => {
-    if (!usesPopupSelection || isPhoneViewport === true || !selectedListing) {
+    if (
+      !usesPopupSelection ||
+      isPhoneViewport === true ||
+      !selectedListing ||
+      !selectedListingPopupCoords
+    ) {
       return null;
     }
 
-    return getDesktopPopupPlacementForListing(selectedListing);
+    return getDesktopPopupPlacementForListing(
+      selectedListing,
+      selectedListingPopupCoords
+    );
   }, [
     usesPopupSelection,
     isPhoneViewport,
     selectedListing,
+    selectedListingPopupCoords,
     getDesktopPopupPlacementForListing,
     popupPlacementRevision,
   ]);
@@ -2605,20 +2613,6 @@ export default function MapComponent({
     }
   }, []);
 
-  const handleHideMap = useCallback(async () => {
-    if (typeof document !== "undefined" && document.fullscreenElement) {
-      try {
-        await document.exitFullscreen();
-      } catch {
-        // Ignore fullscreen API failures and continue hiding the inline map.
-      }
-    }
-
-    setIsSearching(false);
-    setShowMobileToolsSheet(false);
-    hideMap();
-  }, [hideMap]);
-
   // Auto-zoom-out: when map loads empty with no active filters, zoom out once
   // Build a key from the search-identity params (everything that defines a *new*
   // search) so the auto-zoom + pan latch reset per search context. This includes
@@ -2640,6 +2634,20 @@ export default function MapComponent({
   useEffect(() => {
     hasAutoZoomedRef.current = false;
     hasUserMovedSinceSearchRef.current = false;
+    // Scope "viewed" pin styling to the active result set so it does not bleed
+    // across unrelated searches (the map persists across all /search navigations)
+    // and so the Set stays bounded. Intersect against the current listings;
+    // listingsRef is read to avoid re-running this latch reset on every SSR
+    // listings update (a pure pan must not reset the auto-zoom latch).
+    setViewedIds((prev) => {
+      if (prev.size === 0) return prev;
+      const currentIds = new Set(listingsRef.current.map((l) => l.id));
+      const next = new Set<string>();
+      prev.forEach((id) => {
+        if (currentIds.has(id)) next.add(id);
+      });
+      return next.size === prev.size ? prev : next;
+    });
   }, [nonBoundsParamsKey]);
 
   const handleZoomOut = useCallback(() => {
@@ -2748,6 +2756,13 @@ export default function MapComponent({
 
       // Mark as programmatic move to prevent follow-up auto-search from firing.
       setProgrammaticMove(true);
+      // Safety: clear+rearm the programmatic flag if moveEnd is never delivered
+      // (interrupted/coalesced fly-to), matching every other programmatic-move site.
+      if (programmaticClearTimeoutRef.current)
+        clearTimeout(programmaticClearTimeoutRef.current);
+      programmaticClearTimeoutRef.current = setTimeout(() => {
+        if (isProgrammaticMoveRef.current) setProgrammaticMove(false);
+      }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
 
       // If bbox (bounding box) is available, use fitBounds for a better view
       if (bbox) {
@@ -2782,7 +2797,7 @@ export default function MapComponent({
         handleFlyTo as EventListener
       );
     };
-  }, [setProgrammaticMove, fitBoundsPadding]);
+  }, [setProgrammaticMove, fitBoundsPadding, isProgrammaticMoveRef]);
 
   // Clear searching state when listings update from SSR
   // Also update E2E marker count tracking
@@ -4372,8 +4387,12 @@ export default function MapComponent({
 
         {usesPopupSelection && selectedListing && (
           <Popup
-            longitude={selectedListing.location.lng}
-            latitude={selectedListing.location.lat}
+            longitude={
+              selectedListingPopupCoords?.lng ?? selectedListing.location.lng
+            }
+            latitude={
+              selectedListingPopupCoords?.lat ?? selectedListing.location.lat
+            }
             anchor={desktopPopupPlacement?.anchor ?? "top"}
             offset={DESKTOP_POPUP_OFFSETS}
             onClose={() => handleSelectedListingClose(true)}
