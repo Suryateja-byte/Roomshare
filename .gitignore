@@ -56,6 +56,9 @@ test-output.txt
 # .env.test is tracked because it only holds non-secret test infra config (NODE_OPTIONS).
 !.env.test
 
+# Local-only Docker Compose override (machine-specific port remaps, etc.)
+docker-compose.override.yml
+
 # vercel
 .vercel
 
