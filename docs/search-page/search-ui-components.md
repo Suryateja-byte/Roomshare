@@ -16,7 +16,6 @@ Reference documentation for all components under `src/components/search/`.
 - [CategoryBar](#categorybar)
 - [CategoryTabs](#categorytabs)
 - [CompactSearchPill](#compactsearchpill)
-- [DatePills](#datepills)
 - [TotalPriceToggle](#totalpricetoggle)
 - [SuggestedSearches](#suggestedsearches)
 - [SearchResultsLoadingWrapper](#searchresultsloadingwrapper)
@@ -628,72 +627,6 @@ Both named and default exports:
 ```tsx
 export function CompactSearchPill({ ... }) { ... }
 export default CompactSearchPill;
-```
-
----
-
-## DatePills
-
-**File:** `src/components/search/DatePills.tsx`
-
-**Purpose:** Horizontal scrollable row of alternative date suggestions showing cheaper date ranges. Encourages flexibility by displaying lower-priced alternatives.
-
-### Props
-
-```tsx
-interface DatePillsProps {
-  suggestions: DateSuggestion[];
-}
-```
-
-| Prop | Type | Description |
-|------|------|-------------|
-| `suggestions` | `DateSuggestion[]` | Array of date options with label, avgPrice, and params |
-
-### DateSuggestion Interface
-
-Exported interface:
-
-```tsx
-export interface DateSuggestion {
-  /** Display label, e.g. "Feb 15 – Mar 15" */
-  label: string;
-  /** Average price for this date range */
-  avgPrice: number;
-  /** Search params to apply when selected */
-  params: string;
-}
-```
-
-### Hooks
-
-- `useRouter()` for navigation
-- `useSearchParams()` for current URL params
-
-### Behavior
-
-**`handleSelect(params)`**:
-- Creates new `URLSearchParams` from current params
-- Merges suggestion's params (iterates over new params and sets each)
-- Navigates to `/search?{mergedParams}`
-
-Returns `null` if `suggestions.length === 0`.
-
-### Display
-
-- Header text: "Flexible dates? Try these for lower prices:"
-- Each pill shows:
-  - Date range label (e.g., "Feb 15 – Mar 15") in `text-zinc-700`
-  - Price indicator in green: `~${avgPrice}/mo` formatted with `toLocaleString('en-US', { maximumFractionDigits: 0 })`
-- Horizontally scrollable container with `overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none`
-- Pills styled as rounded-full bordered buttons with hover states
-
-### Exports
-
-Both named and default exports:
-```tsx
-export function DatePills({ suggestions }: DatePillsProps) { ... }
-export default DatePills;
 ```
 
 ---
@@ -1338,4 +1271,4 @@ export { FilterModal } from './FilterModal';
 export { CategoryTabs } from './CategoryTabs';
 ```
 
-Other components (`CategoryBar`, `CompactSearchPill`, `SearchResultsClient`, `DatePills`, `TotalPriceToggle`, `SuggestedSearches`, `MobileBottomSheet`, `MobileSearchOverlay`, `MobileListingPreview`, `MobileCardLayout`, `PullToRefresh`, `V1PathResetSetter`, `V2MapDataSetter`, etc.) are imported directly by their consumers.
+Other components (`CategoryBar`, `CompactSearchPill`, `SearchResultsClient`, `TotalPriceToggle`, `SuggestedSearches`, `MobileBottomSheet`, `MobileSearchOverlay`, `MobileListingPreview`, `MobileCardLayout`, `PullToRefresh`, `V1PathResetSetter`, `V2MapDataSetter`, etc.) are imported directly by their consumers.

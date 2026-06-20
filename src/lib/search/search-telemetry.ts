@@ -481,13 +481,18 @@ export function getSearchTelemetrySnapshot() {
       // Lifetime totals — unbounded, reflect all requests since cold start.
       count: telemetryStore.requestLatencyCount,
       sum: Math.round(telemetryStore.requestLatencySum * 100) / 100,
-      // Windowed sample count — capped at MAX_REQUEST_LATENCY_SAMPLES (1000).
-      // The p50/p95/p99 percentiles are computed from this same window, so
-      // sampleCount and the quantiles always describe the same observation set.
+      // Windowed sample count + sum — over the SAME retained ring as the
+      // percentiles, so the Prometheus summary's _count, _sum and quantiles all
+      // describe one observation set (avoids mixing a windowed _count with a
+      // lifetime _sum — #6 review). sampleCount caps at MAX_REQUEST_LATENCY_SAMPLES.
       sampleCount: Math.min(
         telemetryStore.requestLatencyCount,
         MAX_REQUEST_LATENCY_SAMPLES
       ),
+      windowedSum:
+        Math.round(
+          validLatencies.reduce((total, value) => total + value, 0) * 100
+        ) / 100,
       p50: computePercentile(validLatencies, 50),
       p95: computePercentile(validLatencies, 95),
       p99: computePercentile(validLatencies, 99),

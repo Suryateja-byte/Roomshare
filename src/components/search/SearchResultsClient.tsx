@@ -394,15 +394,13 @@ export function SearchResultsClient({
           }
         );
 
-        if (response.status === 429) {
-          // Rate limited: surface a friendly message instead of silently degrading (#19).
-          setLoadError("Too many requests — please wait a moment and try again.");
-          setIsClientFetching(false);
-          return;
-        }
-
         if (!response.ok) {
-          // Non-OK response: silently degrade, SSR data remains visible
+          // Non-OK response (incl. 429): silently degrade, SSR/prior data stays
+          // visible. NOTE: audit #19 tried to surface a 429 message here via
+          // setLoadError, but loadError is the LOAD-MORE error surface — its
+          // "Try again" runs handleLoadMore (wrong recovery for an area search,
+          // and a dead no-op when there is no next cursor). Reverted to silent
+          // degrade; a dedicated area-search retry would need its own state.
           setIsClientFetching(false);
           return;
         }
@@ -819,6 +817,7 @@ export function SearchResultsClient({
                 ? "stale-query-hash"
                 : "stale-request-key",
           });
+          setLoadMoreAnnouncement("");
           return;
         }
 
@@ -827,6 +826,10 @@ export function SearchResultsClient({
           setLoadError(
             "Too many requests — please wait a moment and try again."
           );
+          // Clear any "…loading more…" interstitial from the auto-advance loop so
+          // the polite log doesn't end mid-sentence; the error is announced via
+          // its own role="alert" region (#4).
+          setLoadMoreAnnouncement("");
           return;
         }
 
@@ -834,6 +837,7 @@ export function SearchResultsClient({
         if (result.degraded) {
           setIsDegraded(true);
           setLoadError("Can't load more right now. Try again in a moment.");
+          setLoadMoreAnnouncement("");
           return;
         }
 
@@ -891,8 +895,10 @@ export function SearchResultsClient({
             continue;
           }
           // Out of attempts (or no further pages): advance the cursor to reflect
-          // the server state and stop, without claiming "Loaded 0 more".
+          // the server state and stop, without claiming "Loaded 0 more". Close out
+          // the polite log so it doesn't end on "…loading more…" (#4).
           setNextCursor(result.nextCursor);
+          setLoadMoreAnnouncement("No new listings to show right now.");
           return;
         }
 
