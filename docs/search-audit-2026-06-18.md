@@ -2,6 +2,23 @@
 
 Counts: {"confirmed":49,"uncertain":2,"falsePositives":37,"raw":88}
 
+## Resolution (PR #155, 2026-06-20)
+
+Shipped on `fix/search-audit-2026-06-18`. ~42 findings fixed. Adjusted after the PR's
+e2e shards flagged conflicts with existing intentional/tested behavior:
+
+- **#2 (noindex count)** — made SURGICAL: dropped only the always-derived `bounds`
+  term (the real harm: city+price pages de-indexed). Price still counts per-field so
+  e2e SEO-07 (q + price-range + roomType → noindex) still holds.
+- **#28 (end-of-results on single page)** — REVERTED. e2e pagination-core 4.2 asserts
+  the message must NOT show when all results fit on the first page (deliberate UX).
+- **#42 (drop redundant z-50)** — REVERTED. e2e mobile-toggle/mobile-ux assert the
+  FloatingMapButton carries `z-50` as its positioning marker.
+- **#14, #34, #44, U2** — deferred by design (see notes at each finding).
+
+Also fixed a build-breaking `totalPages` nullable type error (`next build` caught it;
+`pnpm typecheck` had passed on a stale incremental cache).
+
 ## [1] (medium/broken-feature) End Date field is dead in the /search results filter drawer (no editor, no clear)
 - **file**: src/components/search/InlineFilterStrip.tsx:707-774  (dim: filters-modal-schema)
 - **description**: InlineFilterStrip renders the results-page FilterModal but never passes endDate, onEndDateChange, or minEndDate. In FilterModal the End Date field is gated on showEndDateField = Boolean(onEndDateChange) (FilterModal.tsx:158), so on the /search results page the End Date control NEVER renders. Yet pending.endDate is still part of BatchedFilterValues and is fed into useDebouncedFilterCount/useFacets (which include endDate in the count/facet query) and into commit() via buildSearchFilterPatchFromPending (which writes endDate to the URL). A user who set an endDate on the homepage (HomeSearchBar passes onEndDateChange, confirmed HomeSearchBar.tsx:474) lands on /search with endDate active, but the results drawer gives them no way to see, edit, or clear it. The 'Clear all' path resets it, but there is no per-field control.

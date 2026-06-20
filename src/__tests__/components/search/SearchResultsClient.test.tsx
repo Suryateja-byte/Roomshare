@@ -1057,8 +1057,13 @@ describe("SearchResultsClient", () => {
     });
   });
 
-  describe("end-of-results indicator (audit #28)", () => {
-    it("shows 'You've seen all N results' when the first SSR page is the complete set", () => {
+  describe("end-of-results indicator", () => {
+    // Intentional UX (e2e: pagination-core 4.2): the "You've seen all N results"
+    // confirmation only appears AFTER at least one successful "Load more"
+    // (extraListings.length > 0). When the first SSR page is already the complete
+    // set there is no terminal message. (Audit #28 proposed showing it here but
+    // was reverted to respect this tested decision.)
+    it("does not show the indicator when the first SSR page is the complete set", () => {
       render(
         <SearchResultsClient
           {...defaultProps}
@@ -1068,11 +1073,9 @@ describe("SearchResultsClient", () => {
         />
       );
 
-      // No load-more click occurred (extraListings is empty), but the set is
-      // already complete (no next cursor), so the confirmation must render.
       expect(
-        screen.getByText(/you've seen all 2 results/i)
-      ).toBeInTheDocument();
+        screen.queryByText(/you've seen all/i)
+      ).not.toBeInTheDocument();
     });
 
     it("does not show the end-of-results indicator while a next cursor exists", () => {

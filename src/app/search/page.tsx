@@ -52,7 +52,6 @@ import {
   recordSearchV2Fallback,
   recordSearchZeroResults,
 } from "@/lib/search/search-telemetry";
-import { countActiveFilters } from "@/components/filters/filter-chip-utils";
 import { V2MapDataSetter } from "@/components/search/V2MapDataSetter";
 import { V1PathResetSetter } from "@/components/search/V1PathResetSetter";
 import type { SearchV2Response } from "@/lib/search/types";
@@ -173,15 +172,26 @@ export async function generateMetadata({
     Boolean(
       rawParams.cursor || (rawParams as { cursorStack?: string }).cursorStack
     );
-  // Use countActiveFilters (the documented single source of truth, via
-  // urlToFilterChips) so the noindex signal matches the visible chip count:
-  // price counts once and always-derived bounds / bookingMode / endDate do not
-  // push high-value city+price landing pages toward noindex.
-  const canonicalParams = serializeSearchQuery(
-    normalizeSearchQuery(rawParams as RawSearchParams),
-    { includePagination: false }
-  );
-  const activeFilterCount = countActiveFilters(canonicalParams);
+  // Count active filters for the noindex signal. IMPORTANT: exclude `bounds` —
+  // it is auto-derived from any lat/lng (search-params deriveSearchBoundsFromPoint),
+  // so it is present on essentially every real search. Counting it pushed
+  // high-value city+price landing pages (e.g. ?q=City&lat&lng&minPrice&maxPrice,
+  // one visible price chip) over the >=3 threshold and de-indexed them. (#2)
+  const activeFilterCount = [
+    filterParams.minPrice !== undefined,
+    filterParams.maxPrice !== undefined,
+    Boolean(filterParams.roomType),
+    Boolean(filterParams.moveInDate),
+    Boolean(filterParams.endDate),
+    Boolean(filterParams.leaseDuration),
+    (filterParams.amenities?.length ?? 0) > 0,
+    (filterParams.houseRules?.length ?? 0) > 0,
+    (filterParams.languages?.length ?? 0) > 0,
+    Boolean(filterParams.genderPreference),
+    Boolean(filterParams.householdGender),
+    Boolean(filterParams.bookingMode),
+    (filterParams.minAvailableSlots ?? 0) > 1,
+  ].filter(Boolean).length;
   const isHighlyFiltered = activeFilterCount >= 3;
   const shouldNoIndex = hasPagination || isHighlyFiltered;
 

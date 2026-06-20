@@ -1376,14 +1376,18 @@ export function SearchResultsClient({
             </div>
           )}
 
-          {/* End of results indicator. No extraListings gate so it also shows when the
-              first SSR page is already the complete set (#28). Zero-results is handled by
-              the separate effectiveZeroResults path; !nextCursor excludes mid-pagination. */}
-          {!nextCursor && allListings.length > 0 && (
-            <p className="text-center text-sm text-on-surface-variant mt-8">
-              You&apos;ve seen all {allListings.length} results
-            </p>
-          )}
+          {/* End of results indicator — only after at least one successful "Load
+              more" (extraListings.length > 0). When the first SSR page is already
+              the complete set there is intentionally no terminal message; this is a
+              deliberate, e2e-asserted UX decision (pagination-core 4.2), so audit
+              finding #28 was reverted to respect it. */}
+          {!nextCursor &&
+            allListings.length > 0 &&
+            extraListings.length > 0 && (
+              <p className="text-center text-sm text-on-surface-variant mt-8">
+                You&apos;ve seen all {allListings.length} results
+              </p>
+            )}
 
           {/* Expansion suggestions for sparse results (1-5 listings) */}
           {total !== null && total > 0 && total <= 5 && (
