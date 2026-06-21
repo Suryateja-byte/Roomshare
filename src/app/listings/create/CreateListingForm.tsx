@@ -86,6 +86,20 @@ function FieldError({
   );
 }
 
+// Visible "*" plus a screen-reader-only " required" so required status is
+// perceivable both visually and to assistive tech (WCAG 3.3.2).
+function RequiredMark() {
+  return (
+    <>
+      {" "}
+      <span className="text-red-500" aria-hidden="true">
+        *
+      </span>
+      <span className="sr-only"> required</span>
+    </>
+  );
+}
+
 interface ListingFormData {
   title: string;
   description: string;
@@ -229,12 +243,54 @@ export default function CreateListingForm({
     );
   }, [languageSearch]);
 
-  // Guard against all navigation vectors (beforeunload, pushState, popstate)
+  // Single source of truth for "is there meaningful user content worth
+  // persisting / guarding". Used by BOTH the autosave effect and the
+  // navigation guard so the two can never disagree about what counts as work.
+  const hasPersistableContent = useMemo(
+    () =>
+      Boolean(
+        title.trim() ||
+          description.trim() ||
+          price.trim() ||
+          address.trim() ||
+          city.trim() ||
+          state.trim() ||
+          zip.trim() ||
+          amenitiesValue.trim() ||
+          houseRulesValue.trim() ||
+          moveInDate ||
+          leaseDuration ||
+          roomType ||
+          genderPreference ||
+          householdGender ||
+          selectedLanguages.length > 0 ||
+          uploadedImages.some((img) => img.uploadedUrl && !img.error)
+      ),
+    [
+      title,
+      description,
+      price,
+      address,
+      city,
+      state,
+      zip,
+      amenitiesValue,
+      houseRulesValue,
+      moveInDate,
+      leaseDuration,
+      roomType,
+      genderPreference,
+      householdGender,
+      selectedLanguages,
+      uploadedImages,
+    ]
+  );
+
+  // Guard against all navigation vectors (beforeunload, pushState, popstate).
+  // Mirrors the autosave predicate so every persisted field also blocks
+  // navigation (previously only title/description/price/address fields did).
   const hasUnsavedWork =
-    !submitSucceededRef.current &&
-    (loading ||
-      uploadedImages.some((img) => img.uploadedUrl) ||
-      !!(title || description || price || address || city || state || zip));
+    !submitSucceededRef.current && (loading || hasPersistableContent);
 
   const navGuard = useNavigationGuard(
     hasUnsavedWork,
@@ -346,25 +402,6 @@ export default function CreateListingForm({
   useEffect(() => {
     if (submitSucceededRef.current) return;
     if (!isHydrated || (!draftRestored && hasDraft)) return;
-
-    const hasPersistableContent = Boolean(
-      title.trim() ||
-        description.trim() ||
-        price.trim() ||
-        address.trim() ||
-        city.trim() ||
-        state.trim() ||
-        zip.trim() ||
-        amenitiesValue.trim() ||
-        houseRulesValue.trim() ||
-        moveInDate ||
-        leaseDuration ||
-        roomType ||
-        genderPreference ||
-        householdGender ||
-        selectedLanguages.length > 0 ||
-        uploadedImages.some((img) => img.uploadedUrl && !img.error)
-    );
 
     if (!hasPersistableContent) {
       cancelSave();
@@ -948,11 +985,6 @@ export default function CreateListingForm({
         ref={formRef}
         onSubmit={handleSubmit}
         noValidate
-        onChange={() => {
-          if (!submitSucceededRef.current) {
-            saveData(collectFormData());
-          }
-        }}
         className="space-y-12"
       >
         {/* Section 1: The Basics */}
@@ -965,7 +997,10 @@ export default function CreateListingForm({
           </h3>
 
           <div>
-            <Label htmlFor="title">Listing Title</Label>
+            <Label htmlFor="title">
+              Listing Title
+              <RequiredMark />
+            </Label>
             <Input
               id="title"
               name="title"
@@ -983,7 +1018,10 @@ export default function CreateListingForm({
           </div>
 
           <div>
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description">
+              Description
+              <RequiredMark />
+            </Label>
             <textarea
               id="description"
               name="description"
@@ -1011,7 +1049,10 @@ export default function CreateListingForm({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="price">Monthly Rent ($)</Label>
+              <Label htmlFor="price">
+                Monthly Rent ($)
+                <RequiredMark />
+              </Label>
               <Input
                 id="price"
                 name="price"
@@ -1030,7 +1071,10 @@ export default function CreateListingForm({
               <FieldError field="price" fieldErrors={fieldErrors} />
             </div>
             <div>
-              <Label htmlFor="totalSlots">Total Roommates</Label>
+              <Label htmlFor="totalSlots">
+                Total Roommates
+                <RequiredMark />
+              </Label>
               <Input
                 id="totalSlots"
                 name="totalSlots"
@@ -1126,7 +1170,10 @@ export default function CreateListingForm({
           </h3>
 
           <div>
-            <Label htmlFor="address">Street Address</Label>
+            <Label htmlFor="address">
+              Street Address
+              <RequiredMark />
+            </Label>
             <AddressAutocompleteInput
               id="address"
               name="address"
@@ -1147,7 +1194,10 @@ export default function CreateListingForm({
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr] md:grid-cols-[2fr_1fr_1fr] gap-4">
             <div>
-              <Label htmlFor="city">City</Label>
+              <Label htmlFor="city">
+                City
+                <RequiredMark />
+              </Label>
               <Input
                 id="city"
                 name="city"
@@ -1167,7 +1217,10 @@ export default function CreateListingForm({
               <FieldError field="city" fieldErrors={fieldErrors} />
             </div>
             <div>
-              <Label htmlFor="state">State</Label>
+              <Label htmlFor="state">
+                State
+                <RequiredMark />
+              </Label>
               <Input
                 id="state"
                 name="state"
@@ -1187,7 +1240,10 @@ export default function CreateListingForm({
               <FieldError field="state" fieldErrors={fieldErrors} />
             </div>
             <div>
-              <Label htmlFor="zip">Zip Code</Label>
+              <Label htmlFor="zip">
+                Zip Code
+                <RequiredMark />
+              </Label>
               <Input
                 id="zip"
                 name="zip"
@@ -1219,8 +1275,8 @@ export default function CreateListingForm({
           >
             <Camera className="w-4 h-4 flex-shrink-0" /> Photos
           </h3>
-          <div id="images">
-            <Label>Upload Photos</Label>
+          <div id="images" role="group" aria-labelledby="photos-group-label">
+            <Label id="photos-group-label">Upload Photos</Label>
             <p className="text-xs text-on-surface-variant mt-1 mb-4">
               At least one photo required to publish your listing
             </p>
@@ -1271,11 +1327,8 @@ export default function CreateListingForm({
 
           <div>
             <Label htmlFor="moveInDate">
-              Move-In Date{" "}
-              <span className="text-red-500" aria-hidden="true">
-                *
-              </span>
-              <span className="sr-only"> required</span>
+              Move-In Date
+              <RequiredMark />
             </Label>
             <DatePicker
               id="moveInDate"
@@ -1337,8 +1390,14 @@ export default function CreateListingForm({
             </div>
           </div>
 
-          <div id="householdLanguages">
-            <Label>Languages Spoken in the House</Label>
+          <div
+            id="householdLanguages"
+            role="group"
+            aria-labelledby="languages-group-label"
+          >
+            <Label id="languages-group-label">
+              Languages Spoken in the House
+            </Label>
             <p className="text-xs text-on-surface-variant mt-1 mb-3">
               Select languages spoken by household members
             </p>

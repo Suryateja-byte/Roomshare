@@ -129,14 +129,12 @@ test.describe("Create Listing — Accessibility Tests", () => {
     const calendarContent = page.locator("[data-radix-popper-content-wrapper]");
     await expect(calendarContent).toBeVisible({ timeout: 10000 });
 
-    // Calendar popover may have additional a11y issues from Radix internals
+    // The calendar now exposes full grid semantics (role=grid/row/gridcell),
+    // per-day aria-labels, and aria-current/aria-selected — so the previously
+    // masked `button-name` and `aria-required-children` rules must pass.
     const results = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa"])
-      .disableRules([
-        ...EXCLUDED_RULES,
-        "button-name",
-        "aria-required-children",
-      ])
+      .disableRules(EXCLUDED_RULES)
       .analyze();
 
     expect(results.violations).toEqual([]);
