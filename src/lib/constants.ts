@@ -95,9 +95,6 @@ export const LNG_MAX = 180;
 /** Auto-clear timeout for programmatic map move flag (ms) */
 export const PROGRAMMATIC_MOVE_TIMEOUT_MS = 2500;
 
-/** Debounce delay for area count requests on map move (ms) */
-export const AREA_COUNT_DEBOUNCE_MS = 600;
-
 /** Client-side cache TTL for area count responses (ms) */
 export const AREA_COUNT_CACHE_TTL_MS = 30000;
 

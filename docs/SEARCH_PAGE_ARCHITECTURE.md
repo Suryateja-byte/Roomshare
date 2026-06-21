@@ -174,7 +174,7 @@ The Roomshare search page implements a **URL-first state management** architectu
     ├── Results Section
     │   └── Results Grid (2-column)
     │       └── ListingCard[] (server-rendered)
-    │           ├── ListingCardCarousel (if multiple images)
+    │           ├── ImageCarousel (Embla, if multiple images)
     │           │   ├── Next.js Image[] (first 2 eager, rest lazy)
     │           │   ├── Navigation Buttons (hover on desktop)
     │           │   └── Dot Indicators (max 5)
@@ -280,7 +280,6 @@ src/components/
 │
 ├── listings/
 │   ├── ListingCard.tsx               # 303 lines - Result card
-│   ├── ListingCardCarousel.tsx       # ~120 lines - Photo carousel (CSS scroll-snap)
 │   └── ListScrollBridge.tsx          # Scroll-to-card behavior
 │
 ├── map/
@@ -2523,108 +2522,6 @@ const placeholderIndex =
 | Border      | `border-zinc-200/60` | `border-zinc-300`  |
 | Image scale | `scale(1)`           | `scale(1.05)`      |
 
-### 14.11 Photo Carousel Component
-
-**File:** `src/components/listings/ListingCardCarousel.tsx`
-**Purpose:** Multi-image carousel with CSS scroll-snap navigation
-
-#### Props Interface
-
-```typescript
-interface ListingCardCarouselProps {
-  images: string[];
-  alt: string;
-}
-```
-
-#### Visual Structure
-
-```
-┌───────────────────────────────────────────────────────┐
-│                                                        │
-│  ←  │        Image 1 of N (snap-scroll)        │  →   │
-│                                                        │
-│                     ● ○ ○ ○ ○                          │
-│                  (dot indicators)                      │
-└───────────────────────────────────────────────────────┘
-```
-
-#### Key Features
-
-| Feature       | Implementation                             |
-| ------------- | ------------------------------------------ |
-| Navigation    | CSS `scroll-snap-type: x mandatory`        |
-| Controls      | Prev/Next buttons with `stopPropagation()` |
-| Lazy Loading  | First 2 images eager, rest lazy            |
-| Touch Support | Native scroll-snap swipe behavior          |
-| Keyboard      | ArrowLeft/ArrowRight navigation            |
-| Max Images    | Limited to first 5 images                  |
-
-#### Lazy Loading Strategy
-
-```typescript
-// Load strategy prevents network overhead
-<Image
-  src={image}
-  loading={index < 2 ? "eager" : "lazy"}  // First 2 eager, rest lazy
-  priority={index === 0}                   // First image prioritized
-/>
-```
-
-#### Control Visibility
-
-| Context  | Behavior                                             |
-| -------- | ---------------------------------------------------- |
-| Desktop  | Controls appear on hover (`group-hover:opacity-100`) |
-| Mobile   | Controls always visible for touch users              |
-| Keyboard | Controls visible on focus                            |
-
-#### CSS Classes
-
-```typescript
-// Carousel container
-const containerClasses = cn(
-  "relative aspect-[4/3] overflow-hidden",
-  "bg-zinc-100 dark:bg-zinc-800",
-  "group",
-);
-
-// Scroll container
-const scrollClasses = cn(
-  "flex snap-x snap-mandatory overflow-x-auto",
-  "scrollbar-hide h-full",
-);
-
-// Individual slide
-const slideClasses = "snap-center shrink-0 w-full h-full relative";
-
-// Navigation button
-const navButtonClasses = cn(
-  "absolute top-1/2 -translate-y-1/2 z-10",
-  "p-1.5 rounded-full",
-  "bg-white/90 dark:bg-zinc-800/90",
-  "shadow-lg backdrop-blur-sm",
-  "opacity-0 group-hover:opacity-100",
-  "transition-opacity duration-200",
-  "hover:bg-white dark:hover:bg-zinc-700",
-);
-
-// Dot indicator
-const dotClasses = (active: boolean) =>
-  cn(
-    "w-1.5 h-1.5 rounded-full transition-all",
-    active ? "bg-white scale-110" : "bg-white/60 hover:bg-white/80",
-  );
-```
-
-#### Accessibility
-
-| Feature       | Implementation                                           |
-| ------------- | -------------------------------------------------------- |
-| Button Labels | `aria-label="Previous image"`, `aria-label="Next image"` |
-| Screen Reader | `aria-live="polite"` announces image position changes    |
-| Keyboard Nav  | ArrowLeft/ArrowRight when focused                        |
-| Focus Ring    | `focus-visible:ring-2 focus-visible:ring-blue-500`       |
 
 ### 14.12 List-Map Sync Integration
 

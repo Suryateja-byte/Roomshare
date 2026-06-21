@@ -68,7 +68,6 @@ function WebGLFallback() {
  * Passes through all MapComponent props including controlled mode props:
  * - viewState / onViewStateChange for controlled viewport
  * - selectedListingId / onSelectedListingChange for controlled selection
- * - disableAutoFit to prevent automatic viewport changes
  *
  * @see MapComponent for full prop documentation
  */

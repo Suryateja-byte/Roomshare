@@ -76,8 +76,27 @@ export default function SearchViewToggle({
     prevActiveIdRef.current = activeId;
   }, [activeId, isDesktop]);
 
+  // Apply the view-preference hint as a ONE-SHOT: only act when the preference
+  // TRANSITIONS to a new non-null value (e.g. Map.tsx requests "map" on entering
+  // the empty-viewport state). mobileSnap is intentionally NOT a dependency — if it
+  // were, every user drag-up while the preference persists ("map" stays set for the
+  // whole empty-viewport duration) would re-run this effect and re-clamp the sheet
+  // back to collapsed, locking the user out of the results list (audit #6).
+  const prevPreferenceRef = useRef<typeof mobileResultsViewPreference>(null);
   useEffect(() => {
-    if (isDesktop !== false || mobileResultsViewPreference == null) return;
+    // Wait until the viewport resolves to mobile before consuming the hint. We must
+    // NOT advance prevPreferenceRef while isDesktop is still undefined (the
+    // pre-resolution render), otherwise the initial transition would be swallowed
+    // and the one-time collapse on entering the empty state would never fire.
+    if (isDesktop !== false) return;
+
+    const prevPreference = prevPreferenceRef.current;
+    prevPreferenceRef.current = mobileResultsViewPreference;
+
+    if (mobileResultsViewPreference == null) return;
+    // Only react to an actual transition to a new preference value, so subsequent
+    // user drags are not re-clamped while the same preference remains set.
+    if (mobileResultsViewPreference === prevPreference) return;
 
     const preferredSnap =
       mobileResultsViewPreference === "map"
@@ -86,10 +105,8 @@ export default function SearchViewToggle({
           ? MOBILE_SNAP_PEEK
           : MOBILE_SNAP_LIST;
 
-    if (mobileSnap !== preferredSnap) {
-      setMobileSnap(preferredSnap);
-    }
-  }, [isDesktop, mobileResultsViewPreference, mobileSnap]);
+    setMobileSnap(preferredSnap);
+  }, [isDesktop, mobileResultsViewPreference]);
 
   useEffect(() => {
     if (isDesktop === false) {

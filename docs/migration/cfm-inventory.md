@@ -67,7 +67,7 @@
 | `src/components/SlotSelector.tsx` | client component | writer (legacy) | inventory | 1, 10 | not_started | Same as BookingForm. |
 | `src/components/listings/SlotBadge.tsx` | client component | reader | listing | 6 | partially_done | CFM-603 APPROVED: freshness-aware labels + `publicAvailability` prop. |
 | `src/components/listings/ListingCard.tsx` | client component | reader | listing | 6 | partially_done | CFM-603 APPROVED: prefers `publicAvailability`. |
-| `src/components/listings/ListingCardCarousel.tsx` | client component | reader | listing | 6 | done_needs_audit | Wraps ListingCard; passive. |
+| ~~`src/components/listings/ListingCardCarousel.tsx`~~ | ~~client component~~ | ~~reader~~ | ~~listing~~ | ~~6~~ | **deleted** | Dead code — zero importers; superseded by `ImageCarousel` (Embla). File removed. |
 | `src/components/listings/ImageCarousel.tsx` / `RoomPlaceholder.tsx` / `NearMatchSeparator.tsx` / `ImageUploader.tsx` / `ListScrollBridge.tsx` | client component | reader / writer (images) | listing | — | n/a | Unaffected by CFM semantics. |
 | `src/components/ContactHostButton.tsx` | client component | writer (messaging) | messaging | 0, 1, 7 | not_started | Target of CFM-003 dedup precondition. Phase 1 guarantees it is the primary CTA. |
 | `src/components/ReviewForm.tsx` | client component | writer (review) | review | 7 | ✅ done | Listing review UI now consumes `reviewEligibility` directly and uses confirmed-stay copy. |

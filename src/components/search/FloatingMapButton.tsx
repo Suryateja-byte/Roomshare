@@ -52,6 +52,9 @@ export default function FloatingMapButton({
               ? { duration: 0 }
               : { type: "spring", stiffness: 500, damping: 30 }
           }
+          // z-50 is redundant (z-[1201] wins the cascade) but kept: e2e
+          // mobile-toggle/mobile-ux assert it as the positioning-class marker.
+          // Audit nit #42 (drop z-50) was reverted to respect those tests.
           className="fixed inset-x-0 z-50 z-[1201] mx-auto flex w-max items-center justify-center gap-2 rounded-full border border-on-surface/10 bg-on-surface px-5 py-3 text-surface-container-lowest shadow-ghost shadow-on-surface/25 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 active:scale-95 md:hidden"
           style={{
             bottom: isListMode

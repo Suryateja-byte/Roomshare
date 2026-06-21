@@ -115,14 +115,12 @@ export function buildSearchIntentParams(
     lng: undefined,
   });
 
-  if (trimmedVibe.length >= 2) {
-    // Vibe-only search with no selected location: keep any current map bounds,
-    // but never inject a hardcoded city. With no bounds the server shows the
-    // location-required prompt instead of silently defaulting to San Francisco.
-    nextQuery.bounds = currentQuery.bounds ?? undefined;
-  } else {
-    nextQuery.bounds = undefined;
-  }
+  // Preserve current map bounds so a too-short or empty vibe does not destroy
+  // the user's current search area (fix #12). With no bounds the server shows
+  // the location-required prompt; with bounds it keeps searching the same area.
+  // The vibe is still dropped below the >=2 character UI gate — only bounds
+  // survival changes here. With no selected location, never inject coordinates.
+  nextQuery.bounds = currentQuery.bounds ?? undefined;
   nextQuery.lat = undefined;
   nextQuery.lng = undefined;
 

@@ -834,6 +834,18 @@ export default function LocationSearchInput({
       (noResults && !isLoading) ||
       showTypeMoreHint);
 
+  // True only when an actual listbox element (id="${listboxId}-listbox") is
+  // rendered in the portal — i.e. the suggestions branch, the recent/fallback
+  // branch, or the unavailable-with-fallback branch. The type-more hint,
+  // no-results status, and unavailable-without-fallback panels render
+  // role="status" containers and must NOT advertise aria-expanded/aria-controls
+  // on the combobox input (fix #13).
+  const isListboxOpen =
+    showSuggestions &&
+    ((suggestions.length > 0 && !showTypeMoreHint) ||
+      showRecentList ||
+      showFallbackOptions);
+
   useEffect(() => {
     if (!isPopupOpen) return;
 
@@ -877,8 +889,8 @@ export default function LocationSearchInput({
           autoFocus={autoFocus}
           autoComplete="off"
           role="combobox"
-          aria-expanded={isPopupOpen}
-          aria-controls={isPopupOpen ? `${listboxId}-listbox` : undefined}
+          aria-expanded={isListboxOpen}
+          aria-controls={isListboxOpen ? `${listboxId}-listbox` : undefined}
           aria-activedescendant={
             showSuggestions && selectedIndex >= 0
               ? `${listboxId}-option-${selectedIndex}`

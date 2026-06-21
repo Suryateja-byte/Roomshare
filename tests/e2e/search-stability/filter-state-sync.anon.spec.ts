@@ -67,7 +67,7 @@ async function waitForSearchReady(page: Page): Promise<void> {
   // Use .first() to handle dual-container rendering
   await page
     .locator(
-      '[data-testid="listing-card"], [data-testid="empty-state"], #search-results-heading'
+      '[data-testid="listing-card"], [data-testid="empty-state"], #search-results-heading-desktop, #search-results-heading-mobile'
     )
     .first()
     .waitFor({ state: "attached", timeout: 30_000 });

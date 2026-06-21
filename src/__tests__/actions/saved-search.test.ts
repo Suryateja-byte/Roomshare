@@ -144,6 +144,140 @@ describe("Saved Search Actions", () => {
       expect(prisma.savedSearch.create).not.toHaveBeenCalled();
     });
 
+    // Regression (#8): viewport bounds must NOT be part of the dedup identity.
+    // Saving "the same" search after panning/zooming the map (bounds differing by
+    // >110m) used to produce a different searchSpecHash and bypass the duplicate
+    // guard — burning the 10-slot cap and creating a second alert subscription.
+    it("produces the same searchSpecHash when only map bounds differ (>110m)", async () => {
+      (prisma.savedSearch.count as jest.Mock).mockResolvedValue(0);
+      (prisma.savedSearch.create as jest.Mock).mockResolvedValue({
+        id: "search-123",
+        alertEnabled: true,
+      });
+
+      const baseFilters = {
+        query: "apartment",
+        lat: 42.3601,
+        lng: -71.0589,
+        locationLabel: "Boston, MA",
+      };
+
+      await saveSearch({
+        name: "First",
+        filters: {
+          ...baseFilters,
+          minLat: 42.34,
+          maxLat: 42.38,
+          minLng: -71.08,
+          maxLng: -71.03,
+        },
+      });
+      // Pan the map well beyond the ~110m quantization bucket.
+      await saveSearch({
+        name: "Second",
+        filters: {
+          ...baseFilters,
+          minLat: 42.5,
+          maxLat: 42.6,
+          minLng: -71.3,
+          maxLng: -71.2,
+        },
+      });
+
+      const firstHash = (prisma.savedSearch.findFirst as jest.Mock).mock
+        .calls[0][0].where.searchSpecHash;
+      const secondHash = (prisma.savedSearch.findFirst as jest.Mock).mock
+        .calls[1][0].where.searchSpecHash;
+
+      expect(firstHash).toEqual(secondHash);
+    });
+
+    it("rejects the second save as a duplicate when only map bounds differ", async () => {
+      (prisma.savedSearch.count as jest.Mock).mockResolvedValue(0);
+      (prisma.savedSearch.create as jest.Mock).mockResolvedValue({
+        id: "search-123",
+        alertEnabled: true,
+      });
+
+      const baseFilters = {
+        query: "apartment",
+        lat: 42.3601,
+        lng: -71.0589,
+        locationLabel: "Boston, MA",
+      };
+
+      // First save succeeds and we capture its canonical hash.
+      await saveSearch({
+        name: "First",
+        filters: {
+          ...baseFilters,
+          minLat: 42.34,
+          maxLat: 42.38,
+          minLng: -71.08,
+          maxLng: -71.03,
+        },
+      });
+      const firstHash = (prisma.savedSearch.findFirst as jest.Mock).mock
+        .calls[0][0].where.searchSpecHash;
+
+      // Second save (panned map) finds the same-hash row → duplicate rejection.
+      (prisma.savedSearch.findFirst as jest.Mock).mockImplementation(
+        async ({ where }: { where: { searchSpecHash: string } }) =>
+          where.searchSpecHash === firstHash ? { id: "existing-search" } : null
+      );
+      (prisma.savedSearch.create as jest.Mock).mockClear();
+
+      const result = await saveSearch({
+        name: "Second",
+        filters: {
+          ...baseFilters,
+          minLat: 42.5,
+          maxLat: 42.6,
+          minLng: -71.3,
+          maxLng: -71.2,
+        },
+      });
+
+      expect(result).toEqual({ error: "You've already saved this search." });
+      expect(prisma.savedSearch.create).not.toHaveBeenCalled();
+    });
+
+    // Regression (#30): sort is ordering-only and is intentionally not part of the
+    // saved-search identity. It must be stripped from the persisted filters so the
+    // stored state agrees with the (sort-agnostic) dedup hash. Two saves differing
+    // only by sort therefore collapse to the same hash and the second is a dup.
+    it("strips sort from persisted filters and dedups across sort changes", async () => {
+      (prisma.savedSearch.count as jest.Mock).mockResolvedValue(0);
+      (prisma.savedSearch.create as jest.Mock).mockResolvedValue({
+        id: "search-123",
+        alertEnabled: true,
+      });
+
+      await saveSearch({
+        name: "Cheapest first",
+        filters: { ...mockFilters, sort: "price_asc" },
+      });
+
+      const createArgs = (prisma.savedSearch.create as jest.Mock).mock
+        .calls[0][0];
+      expect(createArgs.data.filters).not.toHaveProperty("sort");
+      expect(createArgs.data.searchSpecJson.filters).not.toHaveProperty("sort");
+
+      const firstHash = (prisma.savedSearch.findFirst as jest.Mock).mock
+        .calls[0][0].where.searchSpecHash;
+
+      // Same filters, different sort → identical hash.
+      (prisma.savedSearch.create as jest.Mock).mockClear();
+      await saveSearch({
+        name: "Newest first",
+        filters: { ...mockFilters, sort: "newest" },
+      });
+      const secondHash = (prisma.savedSearch.findFirst as jest.Mock).mock
+        .calls[1][0].where.searchSpecHash;
+
+      expect(secondHash).toEqual(firstHash);
+    });
+
     it("saves search successfully", async () => {
       (prisma.savedSearch.count as jest.Mock).mockResolvedValue(5);
       (prisma.savedSearch.create as jest.Mock).mockResolvedValue({

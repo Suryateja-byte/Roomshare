@@ -446,4 +446,107 @@ describe("useDebouncedFilterCount", () => {
       expect(result.current.boundsRequired).toBe(false);
     });
   });
+
+  describe("#37 - browseMode handling", () => {
+    it("parses browseMode from the API response", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ count: null, browseMode: true }),
+      });
+
+      const { result } = renderHook(() =>
+        useDebouncedFilterCount({
+          pending: defaultPending,
+          isDirty: true,
+          isDrawerOpen: true,
+        })
+      );
+
+      act(() => {
+        jest.advanceTimersByTime(350);
+      });
+
+      await waitFor(() => {
+        expect(result.current.browseMode).toBe(true);
+      });
+    });
+
+    it("does NOT label a capped browse as '100+ listings'", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ count: null, browseMode: true }),
+      });
+
+      const { result } = renderHook(() =>
+        useDebouncedFilterCount({
+          pending: defaultPending,
+          isDirty: true,
+          isDrawerOpen: true,
+        })
+      );
+
+      act(() => {
+        jest.advanceTimersByTime(350);
+      });
+
+      await waitFor(() => {
+        expect(result.current.browseMode).toBe(true);
+      });
+
+      // Empty string → consumer falls back to "Show Results"
+      expect(result.current.formattedCount).toBe("");
+      expect(result.current.formattedCount).not.toBe("100+ listings");
+    });
+
+    it("still shows '100+ listings' when count is null without browseMode", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ count: null }),
+      });
+
+      const { result } = renderHook(() =>
+        useDebouncedFilterCount({
+          pending: defaultPending,
+          isDirty: true,
+          isDrawerOpen: true,
+        })
+      );
+
+      act(() => {
+        jest.advanceTimersByTime(350);
+      });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.browseMode).toBe(false);
+      expect(result.current.formattedCount).toBe("100+ listings");
+    });
+
+    it("defaults browseMode to false when absent from the response", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ count: 25 }),
+      });
+
+      const { result } = renderHook(() =>
+        useDebouncedFilterCount({
+          pending: defaultPending,
+          isDirty: true,
+          isDrawerOpen: true,
+        })
+      );
+
+      act(() => {
+        jest.advanceTimersByTime(350);
+      });
+
+      await waitFor(() => {
+        expect(result.current.count).toBe(25);
+      });
+
+      expect(result.current.browseMode).toBe(false);
+    });
+  });
 });

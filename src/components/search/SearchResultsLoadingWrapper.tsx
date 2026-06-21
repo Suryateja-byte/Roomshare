@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
 import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -62,22 +62,11 @@ export function SearchResultsLoadingWrapper({
       isInitialMount.current = false;
       return;
     }
-    document.getElementById("search-results-heading")?.focus();
+    (
+      document.getElementById("search-results-heading-desktop") ??
+      document.getElementById("search-results-heading-mobile")
+    )?.focus();
   }, [filterParamsKey]);
-
-  // Announce result count to screen readers when transition completes
-  const prevPendingRef = useRef(false);
-  const [srAnnouncement, setSrAnnouncement] = useState("");
-
-  useEffect(() => {
-    if (prevPendingRef.current && !isPending) {
-      const heading = document.getElementById("search-results-heading");
-      if (heading?.textContent) {
-        setSrAnnouncement(heading.textContent);
-      }
-    }
-    prevPendingRef.current = isPending;
-  }, [isPending]);
 
   return (
     <div
@@ -85,11 +74,6 @@ export function SearchResultsLoadingWrapper({
       aria-busy={isPending}
       data-testid="search-results-pending-region"
     >
-      {/* Explicit SR announcement for result count changes */}
-      <span className="sr-only" aria-live="polite" role="status">
-        {srAnnouncement}
-      </span>
-
       {isPending && (
         <span
           className="sr-only"

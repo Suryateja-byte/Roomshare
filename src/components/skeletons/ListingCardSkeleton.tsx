@@ -5,7 +5,7 @@ import { Skeleton } from "./Skeleton";
  *
  * CLS-critical dimensions (sync with ListingCard.tsx):
  * - Card shell: rounded-2xl with shadow-ambient-sm and no visible border
- * - Image: aspect-[4/3]
+ * - Image: aspect-[4/3] md:aspect-[16/7]
  * - Title row: mb-0.5
  * - Content padding: p-4
  * - Overlay actions: top-right controls + top-left badges reserve the same footprint
@@ -18,7 +18,7 @@ export function ListingCardSkeleton() {
       aria-hidden="true"
       role="presentation"
     >
-      <div className="relative overflow-hidden aspect-[4/3] bg-surface-canvas">
+      <div className="relative overflow-hidden aspect-[4/3] md:aspect-[16/7] bg-surface-canvas">
         <Skeleton variant="rectangular" className="h-full w-full" />
 
         <div className="absolute z-20 top-3 right-3 flex items-center gap-1.5">

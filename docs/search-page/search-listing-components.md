@@ -26,7 +26,6 @@ Comprehensive reference for all components, types, and server actions involved i
   - [TrustBadge](#trustbadge)
   - [NearMatchSeparator](#nearmatchseparator)
   - [ImageCarousel (Embla)](#imagecarousel-embla)
-  - [ListingCardCarousel (CSS Scroll-Snap)](#listingcardcarousel-css-scroll-snap)
   - [ListingCardSkeleton](#listingcardskeleton)
   - [ImageUploader](#imageuploader)
 - [Action Buttons](#action-buttons)
@@ -918,57 +917,6 @@ Edge dots (first and last in visible window) render smaller (`w-1 h-1 bg-white/4
 
 ---
 
-### ListingCardCarousel (CSS Scroll-Snap)
-
-**File**: `/mnt/d/Documents/roomshare/src/components/listings/ListingCardCarousel.tsx`
-
-An alternative carousel implementation using CSS scroll-snap (no external library). **Not currently used by ListingCard** (which uses the Embla-based ImageCarousel) but available as a lightweight option.
-
-#### Props
-
-```ts
-interface ListingCardCarouselProps {
-  images: string[];
-  alt: string;
-  maxImages?: number;   // default: 5
-  onImageError?: () => void;
-}
-```
-
-#### Key Differences from ImageCarousel
-
-| Feature | ListingCardCarousel | ImageCarousel |
-|---------|-------------------|---------------|
-| Engine | CSS `scroll-snap` | Embla Carousel |
-| Looping | No | Yes |
-| Max images | Configurable (default 5) | All images |
-| Lazy loading | Manual adjacency tracking via `loadedImages` Set | Via `loading="lazy"` attribute |
-| Bundle cost | Zero dependencies | ~20KB (embla-carousel) |
-| Live region | `aria-live="polite"` announces slide changes | None (relies on aria-label) |
-| Touch targets | 44px minimum for buttons | 44px minimum for buttons |
-
-#### Lazy Loading Strategy
-
-```ts
-const [loadedImages, setLoadedImages] = useState<Set<number>>(
-  () => new Set(totalImages > 1 ? [0, 1] : [0])
-);
-// On navigation, preload current + adjacent:
-newSet.add(targetIndex);
-if (targetIndex > 0) newSet.add(targetIndex - 1);
-if (targetIndex < totalImages - 1) newSet.add(targetIndex + 1);
-```
-
-Unloaded images show a pulsing placeholder div.
-
-#### Interaction Controls
-
-- Arrow buttons appear on hover (desktop) or touch interaction (mobile)
-- Controls auto-hide after 150ms timeout following interaction end
-- Navigation dots always visible at bottom
-- Keyboard navigation (ArrowLeft/ArrowRight) when focused
-
----
 
 ### ListingCardSkeleton
 

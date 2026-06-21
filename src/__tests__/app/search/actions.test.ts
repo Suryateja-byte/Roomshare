@@ -85,9 +85,18 @@ jest.mock("@/lib/search/search-v2-service", () => ({
   executeSearchV2: (...args: unknown[]) => mockExecuteSearchV2(...args),
 }));
 
-// Mock V1 fallback (not used when V2 is enabled, but required for import)
+// Mock V1 fallback (used by the legacy-cursor degraded path)
 jest.mock("@/lib/data", () => ({
   getListingsPaginated: jest.fn(),
+}));
+
+// Mock the legacy cursor codec deterministically (avoids depending on the real
+// env/CURSOR_SECRET, which is stubbed away by the env mock above). The real
+// codec round-trips {p:N}; this mirrors that contract for the V1 fallback path.
+jest.mock("@/lib/search/hash", () => ({
+  encodeCursor: (page: number) => `legacy:${page}`,
+  decodeCursor: (cursor: string) =>
+    cursor.startsWith("legacy:") ? Number(cursor.slice("legacy:".length)) : null,
 }));
 
 // Mock timeout-wrapper — pass through by default, controllable per test
@@ -103,6 +112,11 @@ jest.mock("@/lib/timeout-wrapper", () => {
 import { fetchMoreListings } from "@/app/search/actions";
 import { TimeoutError, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
 import { buildPublicAvailability } from "@/lib/search/public-availability";
+import { getListingsPaginated } from "@/lib/data";
+
+const mockGetListingsPaginated = getListingsPaginated as jest.MockedFunction<
+  typeof getListingsPaginated
+>;
 
 describe("fetchMoreListings", () => {
   beforeEach(() => {
@@ -288,5 +302,121 @@ describe("fetchMoreListings", () => {
       })
     );
     expect(result.meta).toBeTruthy();
+  });
+
+  // Regression for search-audit-2026-06-18 finding #7: during a V2 outage the
+  // SSR V1 fallback hands out a legacy {p:N} offset cursor; "Load more" must keep
+  // working by decoding it and continuing offset pagination via getListingsPaginated.
+  describe("V1 fallback with legacy offset cursor (degraded mode)", () => {
+    const v1Listing = {
+      id: "v1-listing-1",
+      title: "V1 listing",
+      description: "",
+      price: 1000,
+      images: ["img.jpg"],
+      availableSlots: 1,
+      totalSlots: 2,
+      amenities: [],
+      houseRules: [],
+      householdLanguages: [],
+      ownerId: "owner-1",
+      location: {
+        address: "1 Main St",
+        city: "Austin",
+        state: "TX",
+        zip: "78701",
+        lat: 30.26721,
+        lng: -97.74312,
+      },
+      publicAvailability: buildPublicAvailability({
+        availableSlots: 1,
+        totalSlots: 2,
+      }),
+      groupKey: "v1-unit:1",
+    };
+
+    it("continues pagination and emits a next cursor when more V1 pages remain", async () => {
+      // V2 fails -> falls through to the V1 legacy-cursor branch.
+      mockWithTimeout.mockRejectedValue(
+        new TimeoutError(
+          "fetchMoreListings-executeSearchV2",
+          DEFAULT_TIMEOUTS.DATABASE
+        )
+      );
+      mockGetListingsPaginated.mockResolvedValue({
+        items: [v1Listing],
+        total: 80,
+        page: 2,
+        limit: 12,
+        totalPages: 7,
+      } as never);
+      const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+      // cursor "legacy:2" decodes to page 2 via the mocked codec.
+      const result = await fetchMoreListings("legacy:2", { q: "test" });
+
+      expect(mockGetListingsPaginated).toHaveBeenCalledWith(
+        expect.objectContaining({ page: 2, limit: 12 })
+      );
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].id).toBe("v1-listing-1");
+      // page 2 < totalPages 7 -> next cursor for page 3, NOT degraded.
+      expect(result.nextCursor).toBe("legacy:3");
+      expect(result.hasNextPage).toBe(true);
+      expect(result.degraded).toBeUndefined();
+
+      warnSpy.mockRestore();
+    });
+
+    it("returns no next cursor on the last V1 page", async () => {
+      mockWithTimeout.mockRejectedValue(
+        new TimeoutError(
+          "fetchMoreListings-executeSearchV2",
+          DEFAULT_TIMEOUTS.DATABASE
+        )
+      );
+      mockGetListingsPaginated.mockResolvedValue({
+        items: [v1Listing],
+        total: 80,
+        page: 7,
+        limit: 12,
+        totalPages: 7,
+      } as never);
+      const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+      const result = await fetchMoreListings("legacy:7", { q: "test" });
+
+      expect(result.items).toHaveLength(1);
+      expect(result.nextCursor).toBeNull();
+      expect(result.hasNextPage).toBe(false);
+      expect(result.degraded).toBeUndefined();
+
+      warnSpy.mockRestore();
+    });
+
+    it("still signals degraded when the cursor is not a legacy offset cursor", async () => {
+      mockWithTimeout.mockRejectedValue(
+        new TimeoutError(
+          "fetchMoreListings-executeSearchV2",
+          DEFAULT_TIMEOUTS.DATABASE
+        )
+      );
+      const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+      // "cursor-1" is not decodable as legacy -> keeps the existing degraded path.
+      const result = await fetchMoreListings("cursor-1", { q: "test" });
+
+      expect(mockGetListingsPaginated).not.toHaveBeenCalled();
+      expect(result).toEqual(
+        expect.objectContaining({
+          items: [],
+          nextCursor: null,
+          hasNextPage: false,
+          degraded: true,
+        })
+      );
+
+      warnSpy.mockRestore();
+    });
   });
 });

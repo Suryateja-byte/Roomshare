@@ -19,6 +19,7 @@ import {
   type RawSearchParams,
 } from "@/lib/search-params";
 import { executeSearchV2 } from "@/lib/search/search-v2-service";
+import { encodeCursor } from "@/lib/search/hash";
 import { SearchResultsLoadingWrapper } from "@/components/search/SearchResultsLoadingWrapper";
 import { InlineFilterStrip } from "@/components/search/InlineFilterStrip";
 import { features } from "@/lib/env";
@@ -171,6 +172,11 @@ export async function generateMetadata({
     Boolean(
       rawParams.cursor || (rawParams as { cursorStack?: string }).cursorStack
     );
+  // Count active filters for the noindex signal. IMPORTANT: exclude `bounds` —
+  // it is auto-derived from any lat/lng (search-params deriveSearchBoundsFromPoint),
+  // so it is present on essentially every real search. Counting it pushed
+  // high-value city+price landing pages (e.g. ?q=City&lat&lng&minPrice&maxPrice,
+  // one visible price chip) over the >=3 threshold and de-indexed them. (#2)
   const activeFilterCount = [
     filterParams.minPrice !== undefined,
     filterParams.maxPrice !== undefined,
@@ -185,7 +191,6 @@ export async function generateMetadata({
     Boolean(filterParams.householdGender),
     Boolean(filterParams.bookingMode),
     (filterParams.minAvailableSlots ?? 0) > 1,
-    Boolean(filterParams.bounds),
   ].filter(Boolean).length;
   const isHighlyFiltered = activeFilterCount >= 3;
   const shouldNoIndex = hasPagination || isHighlyFiltered;
@@ -314,7 +319,10 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       backendSource: scenarioState.meta.backendSource,
       stateKind: scenarioState.kind,
       queryHash: scenarioState.meta.queryHash,
-      resultCount: scenarioResultCount,
+      // Omit resultCount for non-list states (location-required/rate-limited)
+      // instead of logging an explicit null — mirrors the non-scenario
+      // location-required path.
+      resultCount: scenarioResultCount ?? undefined,
     });
 
     if (scenarioState.kind === "location-required") {
@@ -448,8 +456,10 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         )
       );
 
-      // P0 FIX: Circuit breaker + timeout protection to prevent SSR hangs
-      // Circuit breaker skips V2 entirely after 3 consecutive failures (saves 10s/request during outage)
+      // P0 FIX: Circuit breaker + timeout protection to prevent SSR hangs.
+      // The breaker is per-lambda-instance (NOT fleet-wide): after 3 consecutive
+      // V2 failures it skips V2 entirely on that instance, saving ~10s/request for
+      // subsequent requests handled by the same warm instance during an outage.
       // V1 fallback (catch block below) IS the retry mechanism — no withRetry needed
       // P0-1 FIX: Throw on V2 error-returns so circuit breaker correctly tracks failures.
       // Previously, executeSearchV2 swallowed errors into { error: "..." } return values,
@@ -560,12 +570,26 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   }).toString();
   const normalizedKeyString = searchParamsString;
 
-  // Extract nextCursor: prefer V2 response cursor, fallback to paginatedResult for keyset path
+  // Extract nextCursor: prefer V2 response cursor, fallback to paginatedResult for keyset path.
+  // V1 fallback (PaginatedResult, no nextCursor) synthesizes a legacy {p:N} offset cursor so
+  // "Load more" keeps working during a V2 outage — fetchMoreListings decodes it and continues
+  // offset pagination via getListingsPaginated. encodeCursor is the same encoder the V2 offset
+  // path emits, so the cursor round-trips through fetchMoreListings' decodeCursor.
+  const hasNextV1 =
+    !("nextCursor" in paginatedResult) &&
+    "totalPages" in paginatedResult &&
+    typeof paginatedResult.page === "number" &&
+    // PaginatedResultHybrid.totalPages is `number | null` (null = unknown count);
+    // only synthesize an offset cursor when we have a concrete page count.
+    typeof paginatedResult.totalPages === "number" &&
+    paginatedResult.page < paginatedResult.totalPages;
   const initialNextCursor =
     v2NextCursor ??
     ("nextCursor" in paginatedResult
       ? (paginatedResult.nextCursor ?? null)
-      : null);
+      : hasNextV1
+        ? encodeCursor(requestedPage + 1)
+        : null);
 
   const displayLocation = locationLabel || q || "";
   const responseMeta = createSearchResponseMeta(

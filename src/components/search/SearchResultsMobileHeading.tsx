@@ -9,7 +9,7 @@ export default function SearchResultsMobileHeading({
 }: SearchResultsMobileHeadingProps) {
   return (
     <h1
-      id="search-results-heading"
+      id="search-results-heading-mobile"
       tabIndex={-1}
       className="sr-only md:hidden"
     >

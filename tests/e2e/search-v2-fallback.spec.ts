@@ -32,7 +32,7 @@ async function waitForResults(page: import("@playwright/test").Page) {
   // Wait for the search results heading OR zero-results heading to appear in DOM.
   // The #search-results-heading is sr-only (visually hidden), so use toBeAttached.
   // SSR can be slow in CI — use navigation timeout (30s) instead of 15s.
-  const resultsHeading = page.locator("#search-results-heading");
+  const resultsHeading = page.locator("#search-results-heading-desktop, #search-results-heading-mobile");
   const zeroResults = page.locator(
     'h2:has-text("No matches found"), h3:has-text("No exact matches")'
   );
@@ -221,7 +221,7 @@ test.describe("Search V2/V1 Fallback Behavior", () => {
 
     // Page should render results regardless of which path was used
     // The heading is sr-only (visually hidden for accessibility), so use toBeAttached
-    const heading = page.locator("#search-results-heading").first();
+    const heading = page.locator("#search-results-heading-desktop, #search-results-heading-mobile").first();
     await expect(heading).toBeAttached();
 
     const headingText = await heading.textContent();
@@ -299,7 +299,7 @@ test.describe("Search V2/V1 Fallback Behavior", () => {
     await page.goto(SEARCH_URL);
     await waitForResults(page);
 
-    const heading = page.locator("#search-results-heading").first();
+    const heading = page.locator("#search-results-heading-desktop, #search-results-heading-mobile").first();
 
     // Navigate to a different search (add filter)
     await page.goto(`${SEARCH_URL}&roomType=Private+Room`);

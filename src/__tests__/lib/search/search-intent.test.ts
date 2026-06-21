@@ -60,7 +60,10 @@ describe("search-intent helpers", () => {
     expect(params.get("cursor")).toBeNull();
   });
 
-  it("clears stale coordinates when no selected location remains", () => {
+  it("clears stale coordinates but preserves map bounds when no selected location remains", () => {
+    // lat/lng (the point pin) are cleared, but the map bounds are preserved so
+    // the user's current search area survives a submit with no selected location
+    // (fix #12: previously bounds were cleared in the no-location/short-vibe path).
     const params = buildSearchIntentParams(
       new URLSearchParams(
         "where=Chicago&lat=41.8781&lng=-87.6298&minLng=-88&minLat=41&maxLng=-87&maxLat=42"
@@ -73,10 +76,72 @@ describe("search-intent helpers", () => {
     );
 
     expect(params.get("locationLabel")).toBeNull();
+    // Point coordinates are cleared (no selected location)
     expect(params.get("lat")).toBeNull();
     expect(params.get("lng")).toBeNull();
-    expect(params.get("minLng")).toBeNull();
-    expect(params.get("maxLat")).toBeNull();
+    // Map bounds are preserved so the search area survives
+    expect(params.get("minLng")).toBe("-88.000");
+    expect(params.get("maxLat")).toBe("42.000");
+  });
+
+  // Regression for fix #12: sub-2-char vibe with active map bounds must not
+  // clear bounds (previously the else branch set nextQuery.bounds = undefined,
+  // destroying the user's search area and dead-ending to location-required).
+  it("preserves current map bounds when vibe is too short (< 2 chars) and no location is selected", () => {
+    const currentParams = new URLSearchParams(
+      "minLng=-122.6&minLat=37.6&maxLng=-122.2&maxLat=37.9"
+    );
+    const params = buildSearchIntentParams(currentParams, {
+      location: "",
+      vibe: "a", // 1 character — below the >=2 gate, will be dropped
+      selectedLocation: null,
+    });
+
+    // Vibe below threshold is dropped
+    expect(params.get("what")).toBeNull();
+    // But the map bounds must survive so the search area is not lost
+    expect(params.get("minLng")).toBe("-122.600");
+    expect(params.get("minLat")).toBe("37.600");
+    expect(params.get("maxLng")).toBe("-122.200");
+    expect(params.get("maxLat")).toBe("37.900");
+    // No coordinates injected (no selected location)
+    expect(params.get("lat")).toBeNull();
+    expect(params.get("lng")).toBeNull();
+  });
+
+  it("preserves current map bounds when vibe is exactly empty and no location is selected", () => {
+    const currentParams = new URLSearchParams(
+      "minLng=-87.9&minLat=41.6&maxLng=-87.5&maxLat=42.0"
+    );
+    const params = buildSearchIntentParams(currentParams, {
+      location: "",
+      vibe: "",
+      selectedLocation: null,
+    });
+
+    expect(params.get("what")).toBeNull();
+    expect(params.get("minLng")).toBe("-87.900");
+    expect(params.get("minLat")).toBe("41.600");
+    expect(params.get("maxLng")).toBe("-87.500");
+    expect(params.get("maxLat")).toBe("42.000");
+    expect(params.get("lat")).toBeNull();
+    expect(params.get("lng")).toBeNull();
+  });
+
+  it("preserves current map bounds when vibe is long enough (>= 2 chars) and no location is selected", () => {
+    const currentParams = new URLSearchParams(
+      "minLng=-122.6&minLat=37.6&maxLng=-122.2&maxLat=37.9"
+    );
+    const params = buildSearchIntentParams(currentParams, {
+      location: "",
+      vibe: "co", // exactly 2 chars — meets the gate
+      selectedLocation: null,
+    });
+
+    expect(params.get("what")).toBe("co");
+    expect(params.get("minLng")).toBe("-122.600");
+    expect(params.get("maxLat")).toBe("37.900");
+    expect(params.get("lat")).toBeNull();
   });
 
   it("treats legacy q-plus-point URLs as a selected location state", () => {

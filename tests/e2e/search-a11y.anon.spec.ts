@@ -173,7 +173,7 @@ test.describe("Search A11y: Landmarks & Semantic Structure", () => {
 
       // Search results heading should exist
       // page.tsx renders: <h1 id="search-results-heading">
-      const searchHeading = page.locator("#search-results-heading").first();
+      const searchHeading = page.locator("#search-results-heading-desktop, #search-results-heading-mobile").first();
       await expect(searchHeading).toBeAttached();
 
       // Check for skipped heading levels among visible headings

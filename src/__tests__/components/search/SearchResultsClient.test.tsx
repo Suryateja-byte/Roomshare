@@ -929,6 +929,164 @@ describe("SearchResultsClient", () => {
     });
   });
 
+  describe("rate-limited load-more (audit #17)", () => {
+    it("hides the primary 'Show more' button when a load error is showing, leaving only 'Try again'", async () => {
+      const mockFetch = fetchMoreListings as jest.Mock;
+      // Discriminated rate-limit result: sets loadError but NOT isDegraded.
+      mockFetch.mockResolvedValueOnce({
+        items: [],
+        nextCursor: "cursor-2",
+        hasNextPage: true,
+        rateLimited: true,
+      });
+
+      render(<SearchResultsClient {...defaultProps} />);
+
+      fireEvent.click(screen.getByRole("button", { name: /show more/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Too many requests/i)).toBeInTheDocument();
+      });
+
+      // The primary "Show more places" button must be gone (only the inline
+      // "Try again" link remains), so the user does not see two competing CTAs.
+      expect(
+        screen.queryByRole("button", { name: /show more/i })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /try again/i })
+      ).toBeInTheDocument();
+    });
+
+    it("restores the primary button after a successful retry clears the error", async () => {
+      const mockFetch = fetchMoreListings as jest.Mock;
+      mockFetch
+        .mockResolvedValueOnce({
+          items: [],
+          nextCursor: "cursor-2",
+          hasNextPage: true,
+          rateLimited: true,
+        })
+        .mockResolvedValueOnce({
+          items: [createMockListing("3")],
+          nextCursor: "cursor-3",
+          hasNextPage: true,
+        });
+
+      render(<SearchResultsClient {...defaultProps} />);
+
+      fireEvent.click(screen.getByRole("button", { name: /show more/i }));
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole("button", { name: /try again/i })
+        ).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: /try again/i }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("listing-3")).toBeInTheDocument();
+      });
+      // Error cleared and the primary CTA is back (still has a next cursor).
+      expect(screen.queryByText(/Too many requests/i)).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /show more/i })
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("all-duplicate load-more page (audit #18)", () => {
+    it("auto-fetches the next page and does not announce 'Loaded 0 more' when a page is entirely de-duplicated", async () => {
+      const mockFetch = fetchMoreListings as jest.Mock;
+      // First page: every item duplicates an already-seen initial listing (1, 2),
+      // but the server still reports a next cursor.
+      mockFetch
+        .mockResolvedValueOnce({
+          items: [createMockListing("1"), createMockListing("2")],
+          nextCursor: "cursor-2",
+          hasNextPage: true,
+        })
+        // Second page (auto-fetched): real new listings.
+        .mockResolvedValueOnce({
+          items: [createMockListing("3"), createMockListing("4")],
+          nextCursor: "cursor-3",
+          hasNextPage: true,
+        });
+
+      render(<SearchResultsClient {...defaultProps} />);
+
+      fireEvent.click(screen.getByRole("button", { name: /show more/i }));
+
+      // The all-duplicate page should trigger a second fetch automatically.
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledTimes(2);
+        expect(screen.getByTestId("listing-3")).toBeInTheDocument();
+      });
+
+      // The misleading "Loaded 0 more listings" must never be announced.
+      const logRegion = screen.getByRole("log");
+      expect(logRegion).not.toHaveTextContent(/loaded 0 more/i);
+      expect(logRegion).toHaveTextContent(/loaded 2 more listings/i);
+    });
+
+    it("stops auto-fetching after the consecutive-empty-page cap and does not announce 'Loaded 0 more'", async () => {
+      const mockFetch = fetchMoreListings as jest.Mock;
+      // Two consecutive all-duplicate pages with a non-null next cursor. The cap
+      // (MAX_CONSECUTIVE_EMPTY_PAGES = 2) means: fetch #1 (empty) -> auto-fetch
+      // #2 (empty) -> stop. Exactly two fetches, no third.
+      mockFetch.mockResolvedValue({
+        items: [createMockListing("1"), createMockListing("2")],
+        nextCursor: "cursor-next",
+        hasNextPage: true,
+      });
+
+      render(<SearchResultsClient {...defaultProps} />);
+
+      fireEvent.click(screen.getByRole("button", { name: /show more/i }));
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledTimes(2);
+      });
+
+      // No misleading "Loaded 0 more" announcement after exhausting attempts.
+      const logRegion = screen.getByRole("log");
+      expect(logRegion).not.toHaveTextContent(/loaded 0 more/i);
+      // Cap respected — no runaway third fetch.
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("end-of-results indicator", () => {
+    // Intentional UX (e2e: pagination-core 4.2): the "You've seen all N results"
+    // confirmation only appears AFTER at least one successful "Load more"
+    // (extraListings.length > 0). When the first SSR page is already the complete
+    // set there is no terminal message. (Audit #28 proposed showing it here but
+    // was reverted to respect this tested decision.)
+    it("does not show the indicator when the first SSR page is the complete set", () => {
+      render(
+        <SearchResultsClient
+          {...defaultProps}
+          initialListings={[createMockListing("1"), createMockListing("2")]}
+          initialNextCursor={null}
+          initialTotal={2}
+        />
+      );
+
+      expect(
+        screen.queryByText(/you've seen all/i)
+      ).not.toBeInTheDocument();
+    });
+
+    it("does not show the end-of-results indicator while a next cursor exists", () => {
+      render(<SearchResultsClient {...defaultProps} initialNextCursor="cursor-1" />);
+
+      expect(
+        screen.queryByText(/you've seen all/i)
+      ).not.toBeInTheDocument();
+    });
+  });
+
   describe("loading state", () => {
     it("shows loading indicator while fetching", async () => {
       const mockFetch = fetchMoreListings as jest.Mock;

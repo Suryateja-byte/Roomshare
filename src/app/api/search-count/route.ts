@@ -96,7 +96,10 @@ export async function GET(request: NextRequest) {
 
       if (
         isPhase04ProjectionReadsEnabled() &&
-        getProjectionReadEligibility(parsed).supported
+        // Count is sort-independent — don't let the recommended/rating/newest
+        // sort gate (ordering-only) disable the projection count fast-path,
+        // which would otherwise be dead for the default "recommended" sort (#2 review).
+        getProjectionReadEligibility(parsed, { ignoreSort: true }).supported
       ) {
         const projectionCount = await getProjectionSearchCount({
           parsed,

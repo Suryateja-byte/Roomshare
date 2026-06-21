@@ -273,7 +273,7 @@ describe("DesktopHeaderSearch", () => {
         <>
           <DesktopHeaderSearch />
           <SearchResultsLoadingWrapper>
-            <h2 id="search-results-heading" tabIndex={-1}>
+            <h2 id="search-results-heading-desktop" tabIndex={-1}>
               12 rooms
             </h2>
           </SearchResultsLoadingWrapper>

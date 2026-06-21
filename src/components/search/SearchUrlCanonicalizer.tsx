@@ -28,8 +28,11 @@ export function SearchUrlCanonicalizer() {
 
     const currentUrl = searchParamsString ? `${pathname}?${searchParamsString}` : pathname;
     // CFM-604: canonical-on-write guarantee — canonical rewrites stay on the shared builder path.
+    // #24: Strip pagination tokens (cursor/page) from the shareable URL — "Load more" state
+    // is ephemeral client state and must never persist in a copy/bookmarkable URL.
     const canonicalUrl = buildCanonicalSearchUrl(
-      normalizeSearchQuery(new URLSearchParams(searchParamsString))
+      normalizeSearchQuery(new URLSearchParams(searchParamsString)),
+      { includePagination: false }
     );
     if (canonicalUrl === currentUrl) {
       return;

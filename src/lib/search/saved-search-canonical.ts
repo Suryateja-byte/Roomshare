@@ -42,7 +42,15 @@ function removeUndefined<T>(value: T): T {
 export function buildCanonicalSavedSearchMetadata(
   rawFilters: SearchFilters
 ): CanonicalSavedSearchMetadata {
-  const filters = removeUndefined(normalizeSearchFilters(rawFilters));
+  // `sort` is ordering-only and intentionally NOT part of a saved search's
+  // identity (searchSpecHash omits it). Strip it here so every persisted
+  // representation (returned filters, searchSpecJson.filters, and the DB-bound
+  // stripped filters) agrees that sort is not stored — otherwise two saves
+  // differing only by sort would dedup to one hash yet persist divergent state.
+  const { sort: _sort, ...filtersWithoutSort } = normalizeSearchFilters(
+    rawFilters
+  );
+  const filters = removeUndefined(filtersWithoutSort as SearchFilters);
   const requestedOccupants = requestedOccupantsFromFilters(filters);
   const embeddingVersionAtSave = getReadEmbeddingVersion();
   const rankerProfileVersionAtSave = RANKING_VERSION;
@@ -77,18 +85,12 @@ export function buildCanonicalSavedSearchMetadata(
       bookingMode: filters.bookingMode,
       minAvailableSlots: requestedOccupants,
       nearMatches: filters.nearMatches,
-      bounds:
-        filters.minLat !== undefined &&
-        filters.maxLat !== undefined &&
-        filters.minLng !== undefined &&
-        filters.maxLng !== undefined
-          ? {
-              minLat: filters.minLat,
-              maxLat: filters.maxLat,
-              minLng: filters.minLng,
-              maxLng: filters.maxLng,
-            }
-          : undefined,
+      // Viewport bounds are intentionally excluded from the dedup identity: a
+      // saved search is defined by its query + filters, not the exact map
+      // viewport. Including bounds let a map pan/zoom produce a new hash and
+      // bypass the duplicate guard (burning the 10-slot cap + spawning a second
+      // alert subscription). Bounds remain in searchSpecJson.filters for
+      // reopen/alert-matching; they just don't define identity.
       embeddingVersion: embeddingVersionAtSave,
       rankerProfileVersion: rankerProfileVersionAtSave,
       unitIdentityEpochFloor,

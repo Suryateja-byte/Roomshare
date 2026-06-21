@@ -207,7 +207,6 @@ Draggable bottom sheet for mobile search results. Overlays the map with 3 snap p
 | `FilterPill` | `search/FilterPill.tsx` | Individual active filter chip (removable) |
 | `PriceRangeFilter` | `search/PriceRangeFilter.tsx` | Price range slider with histogram overlay |
 | `PriceHistogram` | `search/PriceHistogram.tsx` | Price distribution histogram |
-| `DatePills` | `search/DatePills.tsx` | Quick date selection pills |
 | `TotalPriceToggle` | `search/TotalPriceToggle.tsx` | Toggle between monthly and total price display |
 | `SortSelect` | `SortSelect.tsx` | Sort option dropdown |
 | `CompactSearchPill` | `search/CompactSearchPill.tsx` | Collapsed search summary pill |
@@ -289,7 +288,6 @@ Card component for search results and listing lists. Features:
 |---|---|---|
 | `ImageCarousel` | `listings/ImageCarousel.tsx` | Embla-based image carousel with navigation |
 | `ImageUploader` | `listings/ImageUploader.tsx` | Image upload with preview and drag-drop |
-| `ListingCardCarousel` | `listings/ListingCardCarousel.tsx` | Horizontal carousel of listing cards (homepage) |
 | `ListingCardSkeleton` | `listings/ListingCardSkeleton.tsx` | Loading skeleton for listing cards |
 | `RoomPlaceholder` | `listings/RoomPlaceholder.tsx` | Placeholder image for listings without photos |
 | `NearMatchSeparator` | `listings/NearMatchSeparator.tsx` | Visual separator between exact and near matches |

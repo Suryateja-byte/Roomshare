@@ -92,8 +92,35 @@ jest.mock("@/hooks/useDebouncedFilterCount", () => ({
 
 jest.mock("@/components/search/FilterModal", () => ({
   __esModule: true,
-  default: ({ isOpen }: { isOpen: boolean }) =>
-    isOpen ? <div data-testid="filter-modal">Filters modal</div> : null,
+  default: ({
+    isOpen,
+    endDate,
+    onEndDateChange,
+    minEndDate,
+  }: {
+    isOpen: boolean;
+    endDate?: string;
+    onEndDateChange?: (value: string) => void;
+    minEndDate?: string;
+  }) =>
+    isOpen ? (
+      <div data-testid="filter-modal">
+        Filters modal
+        {/* Mirror FilterModal's showEndDateField = Boolean(onEndDateChange) gate */}
+        {onEndDateChange ? (
+          <div data-testid="filter-modal-end-date" data-min-end-date={minEndDate}>
+            <span data-testid="filter-modal-end-date-value">{endDate}</span>
+            <button
+              type="button"
+              data-testid="filter-modal-end-date-clear"
+              onClick={() => onEndDateChange("")}
+            >
+              Clear end date
+            </button>
+          </div>
+        ) : null}
+      </div>
+    ) : null,
 }));
 
 jest.mock("@/components/search/PriceRangeFilter", () => ({
@@ -202,6 +229,35 @@ describe("InlineFilterStrip", () => {
     fireEvent.click(screen.getByTestId("quick-filter-more-filters"));
 
     expect(screen.getByTestId("filter-modal")).toBeInTheDocument();
+  });
+
+  it("renders an End Date control in the results drawer when a move-in date is set, and clears it", () => {
+    // Regression for audit #1: InlineFilterStrip must pass endDate/onEndDateChange/
+    // minEndDate to FilterModal so the End Date field renders, is visible, and is
+    // individually clearable on the /search results page (not just via "Clear all").
+    const endDate = futureDateInput(45);
+    Object.assign(mockPending, {
+      moveInDate: FILTER_MOVE_IN_DATE,
+      endDate,
+    });
+
+    render(<InlineFilterStrip />);
+
+    fireEvent.click(screen.getByTestId("quick-filter-more-filters"));
+
+    // End Date field renders (gated on onEndDateChange being passed)
+    const endDateField = screen.getByTestId("filter-modal-end-date");
+    expect(endDateField).toBeInTheDocument();
+    // The current endDate value flows through
+    expect(screen.getByTestId("filter-modal-end-date-value")).toHaveTextContent(
+      endDate
+    );
+    // minEndDate is the pending move-in date (mirrors HomeSearchBar wiring)
+    expect(endDateField).toHaveAttribute("data-min-end-date", FILTER_MOVE_IN_DATE);
+
+    // Clearing the End Date field updates pending without wiping other filters
+    fireEvent.click(screen.getByTestId("filter-modal-end-date-clear"));
+    expect(mockSetPending).toHaveBeenCalledWith({ endDate: "" });
   });
 
   it("commits room type immediately from the desktop quick filter", () => {

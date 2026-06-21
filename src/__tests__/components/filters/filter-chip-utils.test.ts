@@ -89,6 +89,62 @@ describe("filter-chip-utils", () => {
       });
     });
 
+    // #1: end date chip — paired with move-in date
+    describe("end date handling", () => {
+      beforeEach(() => {
+        jest.useFakeTimers();
+        jest.setSystemTime(new Date("2026-01-01T12:00:00Z"));
+      });
+
+      afterEach(() => {
+        jest.useRealTimers();
+      });
+
+      it("creates an end-date chip when move-in and a later end date are set", () => {
+        const params = new URLSearchParams(
+          "moveInDate=2026-02-15&endDate=2026-06-15"
+        );
+        const chips = urlToFilterChips(params);
+
+        expect(chips).toHaveLength(2);
+        expect(chips[0]).toEqual({
+          id: "moveInDate",
+          label: "Move-in: Feb 15, 2026",
+          paramKey: "moveInDate",
+        });
+        expect(chips[1]).toEqual({
+          id: "endDate",
+          label: "End: Jun 15, 2026",
+          paramKey: "endDate",
+        });
+      });
+
+      it("does not create an end-date chip without a move-in date", () => {
+        const params = new URLSearchParams("endDate=2026-06-15");
+        const chips = urlToFilterChips(params);
+
+        expect(chips.map((c) => c.id)).not.toContain("endDate");
+        expect(chips).toHaveLength(0);
+      });
+
+      it("does not create an end-date chip when end date is not after move-in", () => {
+        const params = new URLSearchParams(
+          "moveInDate=2026-02-15&endDate=2026-02-15"
+        );
+        const chips = urlToFilterChips(params);
+
+        expect(chips.map((c) => c.id)).not.toContain("endDate");
+        expect(chips).toHaveLength(1); // moveInDate only
+      });
+
+      it("counts an end-date chip in countActiveFilters", () => {
+        const params = new URLSearchParams(
+          "moveInDate=2026-02-15&endDate=2026-06-15"
+        );
+        expect(countActiveFilters(params)).toBe(2);
+      });
+    });
+
     describe("room type handling", () => {
       it("creates chip for room type", () => {
         const params = new URLSearchParams("roomType=Private%20Room");
@@ -270,6 +326,84 @@ describe("filter-chip-utils", () => {
       });
     });
 
+    // #15: gender chip text must match the FilterModal drawer option exactly
+    describe("gender preference handling", () => {
+      it("uses the inclusive drawer label for MALE_ONLY", () => {
+        const params = new URLSearchParams("genderPreference=MALE_ONLY");
+        const chips = urlToFilterChips(params);
+
+        expect(chips).toHaveLength(1);
+        expect(chips[0]).toEqual({
+          id: "genderPreference",
+          label: "Male Identifying Only",
+          paramKey: "genderPreference",
+        });
+      });
+
+      it("uses the inclusive drawer label for FEMALE_ONLY", () => {
+        const params = new URLSearchParams("genderPreference=FEMALE_ONLY");
+        const chips = urlToFilterChips(params);
+
+        expect(chips[0].label).toBe("Female Identifying Only");
+      });
+
+      it("uses the inclusive drawer label for NO_PREFERENCE", () => {
+        const params = new URLSearchParams("genderPreference=NO_PREFERENCE");
+        const chips = urlToFilterChips(params);
+
+        expect(chips[0].label).toBe("Any Gender / All Welcome");
+      });
+
+      it("does not create a chip for 'any'", () => {
+        const params = new URLSearchParams("genderPreference=any");
+        const chips = urlToFilterChips(params);
+
+        expect(chips).toHaveLength(0);
+      });
+
+      it("ignores dropped legacy lowercase keys (male/female)", () => {
+        const params = new URLSearchParams("genderPreference=male");
+        const chips = urlToFilterChips(params);
+
+        expect(chips).toHaveLength(0);
+      });
+    });
+
+    // #15: household gender chip text must match the drawer option exactly
+    describe("household gender handling", () => {
+      it("uses the drawer label for ALL_MALE", () => {
+        const params = new URLSearchParams("householdGender=ALL_MALE");
+        const chips = urlToFilterChips(params);
+
+        expect(chips[0]).toEqual({
+          id: "householdGender",
+          label: "All Male",
+          paramKey: "householdGender",
+        });
+      });
+
+      it("uses the drawer label for ALL_FEMALE", () => {
+        const params = new URLSearchParams("householdGender=ALL_FEMALE");
+        const chips = urlToFilterChips(params);
+
+        expect(chips[0].label).toBe("All Female");
+      });
+
+      it("uses the drawer label 'Mixed (Co-ed)' for MIXED", () => {
+        const params = new URLSearchParams("householdGender=MIXED");
+        const chips = urlToFilterChips(params);
+
+        expect(chips[0].label).toBe("Mixed (Co-ed)");
+      });
+
+      it("ignores dropped legacy lowercase keys (all_male/mixed lowercase)", () => {
+        const params = new URLSearchParams("householdGender=female");
+        const chips = urlToFilterChips(params);
+
+        expect(chips).toHaveLength(0);
+      });
+    });
+
     describe("preserved params are ignored", () => {
       it("does not create chips for location params", () => {
         const params = new URLSearchParams(
@@ -360,6 +494,31 @@ describe("filter-chip-utils", () => {
         const result = removeFilterFromUrl(params, chip);
 
         expect(result).toBe("");
+      });
+
+      // #1: end-date chip is removable, leaving the move-in date intact.
+      // Fake the clock so the fixture dates are in the future (normalizeSearchQuery
+      // drops past move-in dates), matching the date-handling describes above.
+      it("removes endDate while preserving moveInDate", () => {
+        jest.useFakeTimers();
+        jest.setSystemTime(new Date("2026-01-01T12:00:00Z"));
+        try {
+          const params = new URLSearchParams(
+            "moveInDate=2026-02-15&endDate=2026-06-15"
+          );
+          const chip: FilterChipData = {
+            id: "endDate",
+            label: "End: Jun 15, 2026",
+            paramKey: "endDate",
+          };
+
+          const result = removeFilterFromUrl(params, chip);
+
+          expect(result).toContain("moveInDate=2026-02-15");
+          expect(result).not.toContain("endDate");
+        } finally {
+          jest.useRealTimers();
+        }
       });
     });
 

@@ -1115,7 +1115,11 @@ export async function getProjectionSearchCount(input: {
     versions,
   });
   if (!specResult.ok) return { ok: false, error: specResult.error };
-  const eligibility = getProjectionReadEligibility(input.parsed);
+  // Count is sort-independent: ignore the recommended/rating/newest sort gate so
+  // the projection count fast-path stays available for the default sort (#2 review).
+  const eligibility = getProjectionReadEligibility(input.parsed, {
+    ignoreSort: true,
+  });
   if (!eligibility.supported) {
     return { ok: false, error: buildProjectionUnsupportedError(eligibility) };
   }
