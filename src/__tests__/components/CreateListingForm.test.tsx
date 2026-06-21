@@ -397,6 +397,65 @@ describe("CreateListingForm", () => {
 
       expect(screen.getByText(/draft saved/i)).toBeInTheDocument();
     });
+
+    it("does not overwrite an unrestored draft when the user types before resuming", () => {
+      const saveDataMock = jest.fn();
+      (useFormPersistence as jest.Mock).mockReturnValue({
+        persistedData: {
+          title: "Rich Draft",
+          description: "Lots of carefully written detail",
+          price: "2400",
+        },
+        hasDraft: true,
+        savedAt: new Date(),
+        saveData: saveDataMock,
+        cancelSave: jest.fn(),
+        clearPersistedData: jest.fn(),
+        isHydrated: true,
+        crossTabConflict: false,
+        dismissCrossTabConflict: jest.fn(),
+      });
+
+      render(<CreateListingForm />);
+
+      // Draft banner is visible and the user has NOT clicked "Resume Draft".
+      expect(screen.getByText(/you have a saved draft/i)).toBeInTheDocument();
+
+      // Typing into a field before restoring must not trigger a save — doing so
+      // would clobber the stored draft with near-empty current state.
+      fireEvent.change(screen.getByLabelText(/listing title/i), {
+        target: { value: "X" },
+      });
+
+      expect(saveDataMock).not.toHaveBeenCalled();
+    });
+
+    it("resumes autosaving once the draft has been restored", async () => {
+      const saveDataMock = jest.fn();
+      (useFormPersistence as jest.Mock).mockReturnValue({
+        persistedData: {
+          title: "Rich Draft",
+          description: "Lots of detail",
+          price: "2400",
+          images: [],
+        },
+        hasDraft: true,
+        savedAt: new Date(),
+        saveData: saveDataMock,
+        cancelSave: jest.fn(),
+        clearPersistedData: jest.fn(),
+        isHydrated: true,
+        crossTabConflict: false,
+        dismissCrossTabConflict: jest.fn(),
+      });
+
+      render(<CreateListingForm />);
+
+      fireEvent.click(screen.getByRole("button", { name: /resume draft/i }));
+
+      // After restore, the gate opens and the populated form persists again.
+      await waitFor(() => expect(saveDataMock).toHaveBeenCalled());
+    });
   });
 
   describe("image upload", () => {
@@ -912,6 +971,36 @@ describe("CreateListingForm", () => {
       );
     });
 
+    it("activates guard for detail-only fields the old predicate ignored (amenities)", async () => {
+      render(<CreateListingForm />);
+
+      // Amenities is a "Finer Details" field that the previous guard predicate
+      // did not track — filling only it must still block navigation.
+      fireEvent.change(screen.getByLabelText(/amenities/i), {
+        target: { value: "Wifi, Gym" },
+      });
+
+      await waitFor(() => {
+        expect(useNavigationGuard as jest.Mock).toHaveBeenLastCalledWith(
+          true,
+          expect.stringContaining("unsaved")
+        );
+      });
+    });
+
+    it("activates guard when only a language is selected", async () => {
+      render(<CreateListingForm />);
+
+      fireEvent.click(screen.getByRole("button", { name: "English" }));
+
+      await waitFor(() => {
+        expect(useNavigationGuard as jest.Mock).toHaveBeenLastCalledWith(
+          true,
+          expect.stringContaining("unsaved")
+        );
+      });
+    });
+
     it("uses loading message during submission", async () => {
       // Make fetch hang so loading state persists
       fetchSpy.mockImplementationOnce(() => new Promise(() => {}));
@@ -929,6 +1018,36 @@ describe("CreateListingForm", () => {
         true,
         expect.stringContaining("still being created")
       );
+    });
+  });
+
+  describe("accessibility", () => {
+    it("associates the Photos and Languages sections with their group labels", () => {
+      render(<CreateListingForm />);
+
+      expect(
+        screen.getByRole("group", { name: /upload photos/i })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("group", { name: /languages spoken in the house/i })
+      ).toBeInTheDocument();
+    });
+
+    it("marks required fields with a visible and sr-only required indicator", () => {
+      render(<CreateListingForm />);
+
+      // Native required attribute is set on the controls...
+      expect(screen.getByLabelText(/listing title/i)).toBeRequired();
+      expect(screen.getByLabelText(/monthly rent/i)).toBeRequired();
+      expect(screen.getByLabelText(/total roommates/i)).toBeRequired();
+      expect(screen.getByLabelText(/city/i)).toBeRequired();
+      expect(screen.getByLabelText(/state/i)).toBeRequired();
+      expect(screen.getByLabelText(/zip code/i)).toBeRequired();
+
+      // ...and every required field exposes an sr-only " required" suffix
+      // (title, description, price, totalSlots, address, city, state, zip,
+      // moveInDate).
+      expect(screen.getAllByText("required").length).toBeGreaterThanOrEqual(8);
     });
   });
 

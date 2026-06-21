@@ -19,6 +19,15 @@ interface DatePickerProps {
 }
 
 const DAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+const FULL_DAYS = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
 const MONTHS = [
   "January",
   "February",
@@ -33,6 +42,34 @@ const MONTHS = [
   "November",
   "December",
 ];
+
+function isSameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function addDays(date: Date, amount: number): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + amount);
+}
+
+// Move by whole months, clamping the day to the target month's last day so
+// PageUp/PageDown from e.g. Mar 31 lands on Feb 28, not an overflow into March.
+function addMonths(date: Date, amount: number): Date {
+  const target = new Date(date.getFullYear(), date.getMonth() + amount, 1);
+  const lastDay = new Date(
+    target.getFullYear(),
+    target.getMonth() + 1,
+    0
+  ).getDate();
+  return new Date(
+    target.getFullYear(),
+    target.getMonth(),
+    Math.min(date.getDate(), lastDay)
+  );
+}
 
 export function DatePicker({
   value,
@@ -54,6 +91,11 @@ export function DatePicker({
     }
     return new Date();
   });
+  // The calendar day that currently holds keyboard focus (roving tabindex).
+  const [focusedDate, setFocusedDate] = React.useState<Date | null>(null);
+  const gridRef = React.useRef<HTMLDivElement>(null);
+  // Set when a keyboard action should move DOM focus to the new roving day.
+  const shouldFocusDayRef = React.useRef(false);
 
   // Prevent hydration mismatch by only rendering Popover on client
   React.useEffect(() => {
@@ -65,6 +107,17 @@ export function DatePicker({
       setOpen(false);
     }
   }, [disabled]);
+
+  // After a keyboard navigation (or popover open), move DOM focus onto the
+  // day that now holds the roving tabindex.
+  React.useEffect(() => {
+    if (!open || !shouldFocusDayRef.current) return;
+    shouldFocusDayRef.current = false;
+    const el = gridRef.current?.querySelector<HTMLButtonElement>(
+      '[data-roving="true"]'
+    );
+    el?.focus();
+  }, [open, focusedDate, viewDate]);
 
   const selectedDate = value ? parseLocalDate(value) : null;
   const today = new Date();
@@ -217,8 +270,92 @@ export function DatePicker({
     );
   }
 
+  const formatFullDate = (date: Date) =>
+    date.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+
+  // Exactly one day in the visible month carries the roving tabindex so the
+  // grid is reachable with a single Tab: the focused day, else the selected
+  // day, else today, else the first enabled (or first) day of the month.
+  const rovingBase = focusedDate ?? selectedDate ?? today;
+  const currentMonthDays = calendarDays.filter((d) => d.isCurrentMonth);
+  const rovingMatch =
+    currentMonthDays.find((d) => isSameDay(d.date, rovingBase)) ??
+    currentMonthDays.find((d) => !d.isDisabled) ??
+    currentMonthDays[0];
+  const rovingDate = rovingMatch ? rovingMatch.date : null;
+
+  // Split the flat 42-cell list into week rows for proper grid semantics.
+  const weeks: (typeof calendarDays)[] = [];
+  for (let i = 0; i < calendarDays.length; i += 7) {
+    weeks.push(calendarDays.slice(i, i + 7));
+  }
+
+  const applyKeyboardFocus = (next: Date) => {
+    shouldFocusDayRef.current = true;
+    setFocusedDate(next);
+    if (
+      next.getFullYear() !== viewDate.getFullYear() ||
+      next.getMonth() !== viewDate.getMonth()
+    ) {
+      setViewDate(new Date(next.getFullYear(), next.getMonth(), 1));
+    }
+  };
+
+  const handleGridKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const base = focusedDate ?? rovingDate ?? today;
+    switch (e.key) {
+      case "ArrowLeft":
+        e.preventDefault();
+        applyKeyboardFocus(addDays(base, -1));
+        break;
+      case "ArrowRight":
+        e.preventDefault();
+        applyKeyboardFocus(addDays(base, 1));
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        applyKeyboardFocus(addDays(base, -7));
+        break;
+      case "ArrowDown":
+        e.preventDefault();
+        applyKeyboardFocus(addDays(base, 7));
+        break;
+      case "Home":
+        e.preventDefault();
+        applyKeyboardFocus(addDays(base, -base.getDay()));
+        break;
+      case "End":
+        e.preventDefault();
+        applyKeyboardFocus(addDays(base, 6 - base.getDay()));
+        break;
+      case "PageUp":
+        e.preventDefault();
+        applyKeyboardFocus(addMonths(base, -1));
+        break;
+      case "PageDown":
+        e.preventDefault();
+        applyKeyboardFocus(addMonths(base, 1));
+        break;
+      default:
+        break;
+    }
+  };
+
   return (
-    <Popover.Root open={open} onOpenChange={setOpen}>
+    <Popover.Root
+      open={open}
+      onOpenChange={(next) => {
+        // Reset roving focus on close so a re-open always re-seeds from the
+        // selected day / today rather than a stale prior-session date.
+        if (!next) setFocusedDate(null);
+        setOpen(next);
+      }}
+    >
       <Popover.Trigger
         type="button"
         id={id}
@@ -283,6 +420,17 @@ export function DatePicker({
           )}
           sideOffset={8}
           align="start"
+          onOpenAutoFocus={(e) => {
+            // Override Radix's default (focus the Previous-month button) and
+            // land focus on the selected day, else today, else the first
+            // selectable day.
+            e.preventDefault();
+            const initial =
+              selectedDate ?? (minDateObj && today < minDateObj ? minDateObj : today);
+            setViewDate(new Date(initial.getFullYear(), initial.getMonth(), 1));
+            setFocusedDate(initial);
+            shouldFocusDayRef.current = true;
+          }}
         >
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
@@ -315,47 +463,78 @@ export function DatePicker({
             </button>
           </div>
 
-          {/* Day headers */}
-          <div className="grid grid-cols-7 gap-1 mb-2">
-            {DAYS.map((day) => (
-              <div
-                key={day}
-                className="h-8 flex items-center justify-center text-xs font-medium text-on-surface-variant uppercase tracking-[0.05em]"
-              >
-                {day}
+          {/* Calendar grid */}
+          <div
+            ref={gridRef}
+            role="grid"
+            aria-label={`${MONTHS[viewDate.getMonth()]} ${viewDate.getFullYear()}`}
+            onKeyDown={handleGridKeyDown}
+            className="flex flex-col gap-1"
+          >
+            {/* Day headers */}
+            <div role="row" className="grid grid-cols-7 gap-1 mb-1">
+              {DAYS.map((day, i) => (
+                <div
+                  key={day}
+                  role="columnheader"
+                  aria-label={FULL_DAYS[i]}
+                  className="h-8 flex items-center justify-center text-xs font-medium text-on-surface-variant uppercase tracking-[0.05em]"
+                >
+                  {day}
+                </div>
+              ))}
+            </div>
+
+            {weeks.map((week, weekIndex) => (
+              <div role="row" key={weekIndex} className="grid grid-cols-7 gap-1">
+                {week.map((day, dayIndex) => {
+                  const selected = isSelected(day.date);
+                  const todayDate = isToday(day.date);
+                  const roving = Boolean(
+                    day.isCurrentMonth &&
+                      rovingDate &&
+                      isSameDay(day.date, rovingDate)
+                  );
+                  const dateKey = `${day.date.getFullYear()}-${String(
+                    day.date.getMonth() + 1
+                  ).padStart(2, "0")}-${String(day.date.getDate()).padStart(2, "0")}`;
+
+                  return (
+                    <div
+                      role="gridcell"
+                      aria-selected={selected ? true : undefined}
+                      key={dayIndex}
+                      className="flex items-center justify-center"
+                    >
+                      <button
+                        type="button"
+                        data-date={dateKey}
+                        data-roving={roving ? "true" : undefined}
+                        tabIndex={roving ? 0 : -1}
+                        disabled={disabled || day.isDisabled}
+                        aria-label={formatFullDate(day.date)}
+                        aria-current={todayDate ? "date" : undefined}
+                        onClick={() => handleDateSelect(day.date)}
+                        className={cn(
+                          "h-9 w-9 flex items-center justify-center text-sm rounded-lg transition-all duration-200",
+                          !day.isCurrentMonth && "text-on-surface-variant",
+                          day.isCurrentMonth &&
+                            !selected &&
+                            !day.isDisabled &&
+                            "text-on-surface hover:bg-surface-container-high",
+                          day.isDisabled &&
+                            "text-on-surface-variant cursor-not-allowed",
+                          todayDate && !selected && "ring-2 ring-on-surface/20",
+                          selected && "bg-primary text-on-primary font-medium"
+                        )}
+                      >
+                        {day.date.getDate()}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             ))}
-          </div>
-
-          {/* Calendar grid */}
-          <div className="grid grid-cols-7 gap-1">
-            {calendarDays.map((day, index) => {
-              const selected = isSelected(day.date);
-              const todayDate = isToday(day.date);
-
-              return (
-                <button
-                  key={index}
-                  type="button"
-                  disabled={disabled || day.isDisabled}
-                  onClick={() => handleDateSelect(day.date)}
-                  className={cn(
-                    "h-9 w-9 flex items-center justify-center text-sm rounded-lg transition-all duration-200",
-                    !day.isCurrentMonth && "text-on-surface-variant",
-                    day.isCurrentMonth &&
-                      !selected &&
-                      !day.isDisabled &&
-                      "text-on-surface hover:bg-surface-container-high",
-                    day.isDisabled &&
-                      "text-on-surface-variant cursor-not-allowed",
-                    todayDate && !selected && "ring-2 ring-on-surface/20",
-                    selected && "bg-primary text-on-primary font-medium"
-                  )}
-                >
-                  {day.date.getDate()}
-                </button>
-              );
-            })}
           </div>
 
           {/* Footer */}
