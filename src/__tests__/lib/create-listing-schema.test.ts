@@ -1241,4 +1241,43 @@ describe("createListingApiSchema", () => {
       expect(r.success).toBe(true);
     });
   });
+
+  describe("createSeparateReason", () => {
+    const reason = "These are two separate rooms in the same house.";
+
+    it("accepts a valid 10–500 char justification", () => {
+      const r = createListingApiSchema.safeParse({
+        ...validApi,
+        createSeparateReason: reason,
+      });
+      expect(r.success).toBe(true);
+      if (r.success) {
+        expect(r.data.createSeparateReason).toBe(reason);
+      }
+    });
+
+    it("is optional — absent input is valid", () => {
+      const r = createListingApiSchema.safeParse({ ...validApi });
+      expect(r.success).toBe(true);
+      if (r.success) {
+        expect(r.data.createSeparateReason).toBeUndefined();
+      }
+    });
+
+    it("rejects a justification shorter than 10 characters", () => {
+      const r = createListingApiSchema.safeParse({
+        ...validApi,
+        createSeparateReason: "too short",
+      });
+      expect(r.success).toBe(false);
+    });
+
+    it("rejects a justification longer than 500 characters", () => {
+      const r = createListingApiSchema.safeParse({
+        ...validApi,
+        createSeparateReason: "x".repeat(501),
+      });
+      expect(r.success).toBe(false);
+    });
+  });
 });

@@ -285,6 +285,16 @@ export const createListingApiSchema = createListingSchema.extend({
     .max(4096, "Address suggestion token is invalid")
     .optional()
     .transform((value) => (value && value.length > 0 ? value : undefined)),
+  // Justification supplied when a host overrides a duplicate-listing collision
+  // via "Create a separate listing anyway". Validated here so it is no longer
+  // silently stripped; the raw text is never logged (PII), only its presence
+  // and length are recorded in collision telemetry.
+  createSeparateReason: z
+    .string()
+    .trim()
+    .min(10, "Please explain why this should be a separate listing.")
+    .max(500, "Reason must be 500 characters or fewer.")
+    .optional(),
 });
 
 export type CreateListingApiInput = z.infer<typeof createListingApiSchema>;
