@@ -685,9 +685,12 @@ test.describe("Map Marker Interactions", () => {
       const markerInner = marker.locator('[role="button"]');
       await expect(markerInner).toBeVisible();
 
-      // Check tabIndex for keyboard accessibility
+      // Check tabIndex for keyboard accessibility.
+      // Roving tabindex: every marker is keyboard-focusable; exactly one is
+      // "0" (the tabbable group entry) and the rest are "-1" (reachable via
+      // arrow keys / programmatic focus). The first DOM marker may be either.
       const tabIndex = await markerInner.getAttribute("tabindex");
-      expect(tabIndex).toBe("0");
+      expect(["0", "-1"]).toContain(tabIndex);
 
       // Check aria-label contains price and navigation hint
       // Format: "$1200 per month, Title, N spots available. Use arrow keys to navigate between markers."
@@ -940,15 +943,21 @@ test.describe("Map Marker Interactions", () => {
       const markerCount = await waitForMarkersWithClusterExpansion(page);
       test.skip(markerCount === 0, "No markers available");
 
-      // All marker inner elements should have tabindex="0"
+      // Roving tabindex: every marker is keyboard-focusable, but exactly ONE
+      // is the tabbable group entry (tabindex="0") and the rest are "-1", so
+      // Tab enters/exits the marker group as a single stop and arrow keys move
+      // within it.
       const markerButtons = page.locator('.maplibregl-marker [role="button"]');
       const count = await markerButtons.count();
 
       if (count > 0) {
-        for (let i = 0; i < Math.min(count, 5); i++) {
-          const tabIndex = await markerButtons.nth(i).getAttribute("tabindex");
-          expect(tabIndex).toBe("0");
-        }
+        const tabIndexes = await markerButtons.evaluateAll((els) =>
+          els.map((el) => el.getAttribute("tabindex"))
+        );
+        // Every marker is focusable (0 or -1), none missing/other.
+        expect(tabIndexes.every((t) => t === "0" || t === "-1")).toBe(true);
+        // Exactly one tabbable entry point into the group.
+        expect(tabIndexes.filter((t) => t === "0")).toHaveLength(1);
       }
     });
 

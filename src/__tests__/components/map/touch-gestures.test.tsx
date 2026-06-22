@@ -815,7 +815,9 @@ describe("Map Touch Gestures", () => {
       // which may not fully execute in JSDOM environment.
       // Full hover behavior should be verified in Playwright E2E tests.
       expect(markerContent).toHaveAttribute("role", "button");
-      expect(markerContent).toHaveAttribute("tabIndex", "0");
+      // Roving tabindex: every marker is keyboard-focusable; exactly one is
+      // "0" (tabbable) and the rest are "-1" (reachable via arrow keys/.focus()).
+      expect(["0", "-1"]).toContain(markerContent!.getAttribute("tabindex"));
     });
 
     it("should handle marker tap/click on touch devices", async () => {
@@ -1151,9 +1153,10 @@ describe("Map Touch Gestures", () => {
       const markers = screen.getAllByTestId("map-marker");
       const markerContent = markers[0].querySelector("[data-listing-id]");
 
-      // Marker content should have role="button" and aria-label
+      // Marker content should have role="button" and aria-label.
+      // Roving tabindex: each marker is "0" (tabbable) or "-1" (focusable).
       expect(markerContent).toHaveAttribute("role", "button");
-      expect(markerContent).toHaveAttribute("tabIndex", "0");
+      expect(["0", "-1"]).toContain(markerContent!.getAttribute("tabindex"));
       expect(markerContent).toHaveAttribute("aria-label");
     });
 

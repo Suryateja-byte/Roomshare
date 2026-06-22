@@ -173,6 +173,14 @@ interface MarkerPosition {
   lng: number;
 }
 
+/** A rendered MapLibre cluster, surfaced for keyboard-accessible DOM markers. */
+interface ClusterPosition {
+  clusterId: number;
+  pointCount: number;
+  lat: number;
+  lng: number;
+}
+
 type PinDisplayMode = "dots" | "tiered" | "all";
 
 interface ClusterFeatureProperties {
@@ -253,6 +261,74 @@ function areMarkerListingSetsEqual(a: Listing[], b: Listing[]): boolean {
       listing.location.lng === next.location.lng
     );
   });
+}
+
+function areClusterSetsEqual(
+  a: ClusterPosition[],
+  b: ClusterPosition[]
+): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((cluster, index) => {
+    const next = b[index];
+    return (
+      cluster.clusterId === next.clusterId &&
+      cluster.pointCount === next.pointCount &&
+      cluster.lat === next.lat &&
+      cluster.lng === next.lng
+    );
+  });
+}
+
+/**
+ * Roving keyboard navigation: given a position-sorted list and the current
+ * index, return the index of the spatially-nearest item in the arrow-key
+ * direction (or the Home/End target), or null if there is none. Shared by the
+ * marker and cluster keyboard-navigation handlers so the nearest-neighbor
+ * logic lives in exactly one place.
+ */
+function findAdjacentByDirection(
+  positions: { lat: number; lng: number }[],
+  currentIndex: number,
+  key: string
+): number | null {
+  if (currentIndex < 0 || currentIndex >= positions.length) return null;
+  const current = positions[currentIndex];
+  const nearestWhere = (
+    predicate: (p: { lat: number; lng: number }) => boolean
+  ): number | null => {
+    let bestIndex = -1;
+    let bestDistance = Infinity;
+    for (let i = 0; i < positions.length; i++) {
+      if (i === currentIndex) continue;
+      const pos = positions[i];
+      if (!predicate(pos)) continue;
+      const distance = Math.sqrt(
+        Math.pow(pos.lat - current.lat, 2) +
+          Math.pow(pos.lng - current.lng, 2)
+      );
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestIndex = i;
+      }
+    }
+    return bestIndex === -1 ? null : bestIndex;
+  };
+  switch (key) {
+    case "ArrowUp":
+      return nearestWhere((p) => p.lat > current.lat);
+    case "ArrowDown":
+      return nearestWhere((p) => p.lat < current.lat);
+    case "ArrowLeft":
+      return nearestWhere((p) => p.lng < current.lng);
+    case "ArrowRight":
+      return nearestWhere((p) => p.lng > current.lng);
+    case "Home":
+      return 0;
+    case "End":
+      return positions.length - 1;
+    default:
+      return null;
+  }
 }
 
 /**
@@ -395,6 +471,14 @@ export interface MapComponentProps {
    * @default false
    */
   hasFetchError?: boolean;
+
+  /**
+   * A map-data fetch is currently in flight (the wrapper is showing its
+   * loading bar). Gates the empty state so an in-flight fetch never presents
+   * as "No listings in this area" mid-load.
+   * @default false
+   */
+  isFetchingData?: boolean;
 }
 
 
@@ -878,6 +962,13 @@ interface MapMarkerItemProps {
   isActive: boolean;
   isDimmed: boolean;
   isKeyboardFocused: boolean;
+  /**
+   * Whether this marker is the single tabbable member of the roving-tabindex
+   * group. Exactly one marker is tabbable at a time (the keyboard-focused one,
+   * or the first marker when none is focused) so Tab enters/exits the marker
+   * group as one stop and arrow keys move within it.
+   */
+  isTabbable: boolean;
   isViewed: boolean;
   onClickById: (id: string) => void;
   onPointerEnter: (e: React.PointerEvent<HTMLDivElement>) => void;
@@ -900,6 +991,7 @@ const MapMarkerItem = React.memo(function MapMarkerItem({
   isActive,
   isDimmed,
   isKeyboardFocused,
+  isTabbable,
   isViewed,
   onClickById,
   onPointerEnter,
@@ -989,7 +1081,7 @@ const MapMarkerItem = React.memo(function MapMarkerItem({
                 : "none"
         }
         role="button"
-        tabIndex={0}
+        tabIndex={isTabbable ? 0 : -1}
         aria-label={ariaLabel}
         aria-describedby="map-marker-instructions"
         onFocus={handleFocus}
@@ -1026,6 +1118,103 @@ const MapMarkerItem = React.memo(function MapMarkerItem({
           />
         )}
       </div>
+    </Marker>
+  );
+});
+
+interface ClusterMarkerItemProps {
+  clusterId: number;
+  pointCount: number;
+  lng: number;
+  lat: number;
+  /** Whether this cluster is the single tabbable member of the cluster roving group. */
+  isTabbable: boolean;
+  onExpand: (clusterId: number, center: [number, number]) => void;
+  onKeyboardNav: (
+    e: ReactKeyboardEvent<HTMLButtonElement>,
+    clusterId: number
+  ) => void;
+  onFocusChange: React.Dispatch<React.SetStateAction<number | null>>;
+  clusterRefsMap: React.RefObject<globalThis.Map<number, HTMLButtonElement>>;
+}
+
+/**
+ * ClusterMarkerItem — a keyboard-operable DOM button overlaying a GL cluster
+ * circle. The GL layers still draw the visible bubble + count; this transparent
+ * 44px button gives keyboard/AT users a focusable target that expands the
+ * cluster on Enter/Space (mirroring the mouse path) and participates in the
+ * cluster roving-tabindex group.
+ */
+const ClusterMarkerItem = React.memo(function ClusterMarkerItem({
+  clusterId,
+  pointCount,
+  lng,
+  lat,
+  isTabbable,
+  onExpand,
+  onKeyboardNav,
+  onFocusChange,
+  clusterRefsMap,
+}: ClusterMarkerItemProps) {
+  const refCallback = useCallback(
+    (el: HTMLButtonElement | null) => {
+      if (el) {
+        clusterRefsMap.current.set(clusterId, el);
+      } else {
+        clusterRefsMap.current.delete(clusterId);
+      }
+    },
+    [clusterId, clusterRefsMap]
+  );
+
+  const handleFocus = useCallback(() => {
+    onFocusChange(clusterId);
+  }, [clusterId, onFocusChange]);
+
+  const handleBlur = useCallback(() => {
+    onFocusChange((current) => (current === clusterId ? null : current));
+  }, [clusterId, onFocusChange]);
+
+  const handleKeyDown = useCallback(
+    (e: ReactKeyboardEvent<HTMLButtonElement>) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        e.stopPropagation();
+        onExpand(clusterId, [lng, lat]);
+      } else if (
+        ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End"].includes(
+          e.key
+        )
+      ) {
+        onKeyboardNav(e, clusterId);
+      }
+    },
+    [clusterId, lng, lat, onExpand, onKeyboardNav]
+  );
+
+  const handleClick = useCallback(
+    (e: { originalEvent: { stopPropagation: () => void } }) => {
+      e.originalEvent.stopPropagation();
+      onExpand(clusterId, [lng, lat]);
+    },
+    [clusterId, lng, lat, onExpand]
+  );
+
+  return (
+    <Marker longitude={lng} latitude={lat} anchor="center" onClick={handleClick}>
+      <button
+        ref={refCallback}
+        type="button"
+        data-cluster-id={clusterId}
+        data-testid={`map-cluster-${clusterId}`}
+        tabIndex={isTabbable ? 0 : -1}
+        aria-label={`Group of ${pointCount} listings. Press Enter to zoom in.`}
+        aria-describedby="map-cluster-instructions"
+        onKeyDown={handleKeyDown}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        className="min-w-[44px] min-h-[44px] cursor-pointer rounded-full border-0 bg-transparent p-0 outline-none focus-visible:ring-2 focus-visible:ring-[#9a4027] focus-visible:ring-offset-2"
+      />
     </Marker>
   );
 });
@@ -1094,6 +1283,7 @@ export default function MapComponent({
   selectionPresentation = "popup",
   suppressEmptyState = false,
   hasFetchError = false,
+  isFetchingData = false,
 }: MapComponentProps) {
   // --- Controlled vs Uncontrolled View State ---
   // When viewState prop is provided, map runs in controlled mode
@@ -1200,6 +1390,15 @@ export default function MapComponent({
     null
   );
   const markerRefs = useRef<globalThis.Map<string, HTMLDivElement>>(
+    new globalThis.Map()
+  );
+  // Keyboard-accessible cluster markers (their own roving-tabindex group,
+  // independent of the marker group above).
+  const [clusterPositions, setClusterPositions] = useState<ClusterPosition[]>(
+    []
+  );
+  const [clusterFocusedId, setClusterFocusedId] = useState<number | null>(null);
+  const clusterMarkerRefs = useRef<globalThis.Map<number, HTMLButtonElement>>(
     new globalThis.Map()
   );
   const {
@@ -1561,16 +1760,15 @@ export default function MapComponent({
   }, [listings]);
 
   // Handle cluster click to zoom in and expand
-  const onClusterClick = useCallback(
-    async (event: MapLayerMouseEvent) => {
-      const feature = event.features?.[0];
-      if (!feature || !mapRef.current) return;
-
+  // Core cluster-expansion logic, shared by the mouse path (onClusterClick) and
+  // the keyboard path (ClusterMarkerItem Enter/Space). Zooms to the cluster's
+  // expansion zoom and flags the move programmatic so the follow-up auto-search
+  // is suppressed.
+  const expandCluster = useCallback(
+    async (clusterId: number, center: [number, number]) => {
+      if (!mapRef.current) return;
       // Guard: skip if already expanding a cluster to prevent multiple simultaneous flyTo calls
       if (isClusterExpandingRef.current) return;
-
-      const clusterId = feature.properties?.cluster_id;
-      if (!clusterId) return;
 
       const mapboxSource = mapRef.current.getSource("listings") as
         | GeoJSONSource
@@ -1579,7 +1777,6 @@ export default function MapComponent({
 
       try {
         const zoom = await mapboxSource.getClusterExpansionZoom(clusterId);
-        if (!feature.geometry || feature.geometry.type !== "Point") return;
         // P0 Issue #25: Guard against stale callback after unmount
         if (!isMountedRef.current) return;
 
@@ -1601,7 +1798,7 @@ export default function MapComponent({
           }
         }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
         mapRef.current?.flyTo({
-          center: feature.geometry.coordinates as [number, number],
+          center,
           zoom: zoom,
           duration: 700,
           padding: { top: 50, bottom: 50, left: 50, right: 50 },
@@ -1613,6 +1810,21 @@ export default function MapComponent({
       }
     },
     [setProgrammaticMove, isProgrammaticMoveRef]
+  );
+
+  const onClusterClick = useCallback(
+    (event: MapLayerMouseEvent) => {
+      const feature = event.features?.[0];
+      if (!feature) return;
+      const clusterId = feature.properties?.cluster_id;
+      if (clusterId == null) return;
+      if (!feature.geometry || feature.geometry.type !== "Point") return;
+      void expandCluster(
+        clusterId,
+        feature.geometry.coordinates as [number, number]
+      );
+    },
+    [expandCluster]
   );
 
   // Update unclustered listings when map moves (for rendering individual markers)
@@ -1704,6 +1916,36 @@ export default function MapComponent({
     setUnclusteredListings((current) =>
       areMarkerListingSetsEqual(current, unique) ? current : unique
     );
+
+    // Surface rendered clusters so keyboard users get focusable DOM cluster
+    // markers (the GL layers stay the visible bubble). Rides this same
+    // sourcedata/onIdle-driven refresh — no separate lifecycle wiring.
+    const clusterFeatures = map.querySourceFeatures("listings", {
+      filter: ["has", "point_count"],
+    });
+    const nextClusters: ClusterPosition[] = [];
+    const seenClusters = new Set<number>();
+    for (const f of clusterFeatures) {
+      const props = (f.properties ?? {}) as {
+        cluster_id?: number;
+        point_count?: number;
+      };
+      const clusterId = props.cluster_id;
+      if (clusterId == null || seenClusters.has(clusterId)) continue;
+      if (!f.geometry || f.geometry.type !== "Point") continue;
+      const [lng, lat] = f.geometry.coordinates as [number, number];
+      seenClusters.add(clusterId);
+      nextClusters.push({
+        clusterId,
+        pointCount: Number(props.point_count) || 0,
+        lat,
+        lng,
+      });
+    }
+    setClusterPositions((current) =>
+      areClusterSetsEqual(current, nextClusters) ? current : nextClusters
+    );
+
     return unique.length;
   }, [imagesByListingId, listings.length, useClustering]);
 
@@ -1896,6 +2138,68 @@ export default function MapComponent({
     });
   }, [markerPositions]);
 
+  // Roving tabindex: the single marker that is tabbable when no marker is
+  // keyboard-focused, so Tab can still enter the marker group as one stop.
+  // Defaults to the first sorted marker (northwesternmost).
+  const defaultTabbableMarkerId = sortedMarkerPositions[0]?.listing.id ?? null;
+
+  // Cluster roving group (mirrors the marker group: same sort, same default
+  // tabbable rule). Kept separate from the marker nav state machine per design.
+  const sortedClusterPositions = useMemo(() => {
+    return [...clusterPositions].sort((a, b) => {
+      const latDiff = b.lat - a.lat;
+      if (Math.abs(latDiff) > 0.001) return latDiff; // ~100m threshold for "same row"
+      return a.lng - b.lng;
+    });
+  }, [clusterPositions]);
+  const defaultTabbableClusterId =
+    sortedClusterPositions[0]?.clusterId ?? null;
+
+  // Drop cluster focus when the focused cluster is no longer rendered (e.g. it
+  // split into markers after a zoom), mirroring the marker-focus cleanup.
+  useEffect(() => {
+    if (
+      clusterFocusedId != null &&
+      !clusterPositions.some((c) => c.clusterId === clusterFocusedId)
+    ) {
+      setClusterFocusedId(null);
+    }
+  }, [clusterFocusedId, clusterPositions]);
+
+  const handleClusterKeyboardNavigation = useCallback(
+    (e: ReactKeyboardEvent<HTMLButtonElement>, currentClusterId: number) => {
+      const currentIndex = sortedClusterPositions.findIndex(
+        (c) => c.clusterId === currentClusterId
+      );
+      if (currentIndex === -1) return;
+
+      const nextIndex = findAdjacentByDirection(
+        sortedClusterPositions,
+        currentIndex,
+        e.key
+      );
+      if (nextIndex === null || nextIndex === currentIndex) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      const next = sortedClusterPositions[nextIndex];
+      setClusterFocusedId(next.clusterId);
+
+      const el = clusterMarkerRefs.current.get(next.clusterId);
+      if (el) {
+        el.focus();
+      }
+
+      if (mapRef.current) {
+        mapRef.current.easeTo({
+          center: [next.lng, next.lat],
+          duration: 300,
+        });
+      }
+    },
+    [sortedClusterPositions]
+  );
+
   // Find marker index in sorted list
   const findMarkerIndex = useCallback(
     (id: string | null): number => {
@@ -1905,140 +2209,40 @@ export default function MapComponent({
     [sortedMarkerPositions]
   );
 
-  // Keyboard navigation handler for arrow keys
+  // Keyboard navigation handler for arrow keys (shares findAdjacentByDirection
+  // with the cluster group so the nearest-neighbor logic lives in one place).
   const handleMarkerKeyboardNavigation = useCallback(
     (e: ReactKeyboardEvent<HTMLDivElement>, currentListingId: string) => {
       const currentIndex = findMarkerIndex(currentListingId);
       if (currentIndex === -1 || sortedMarkerPositions.length === 0) return;
 
-      let nextIndex: number | null = null;
-      const currentPos = sortedMarkerPositions[currentIndex];
+      const nextIndex = findAdjacentByDirection(
+        sortedMarkerPositions,
+        currentIndex,
+        e.key
+      );
+      if (nextIndex === null || nextIndex === currentIndex) return;
 
-      switch (e.key) {
-        case "ArrowUp": {
-          // Find the nearest marker above (higher latitude)
-          let bestIndex = -1;
-          let bestDistance = Infinity;
-          for (let i = 0; i < sortedMarkerPositions.length; i++) {
-            if (i === currentIndex) continue;
-            const pos = sortedMarkerPositions[i];
-            if (pos.lat > currentPos.lat) {
-              const distance = Math.sqrt(
-                Math.pow(pos.lat - currentPos.lat, 2) +
-                  Math.pow(pos.lng - currentPos.lng, 2)
-              );
-              if (distance < bestDistance) {
-                bestDistance = distance;
-                bestIndex = i;
-              }
-            }
-          }
-          if (bestIndex !== -1) nextIndex = bestIndex;
-          break;
-        }
-        case "ArrowDown": {
-          // Find the nearest marker below (lower latitude)
-          let bestIndex = -1;
-          let bestDistance = Infinity;
-          for (let i = 0; i < sortedMarkerPositions.length; i++) {
-            if (i === currentIndex) continue;
-            const pos = sortedMarkerPositions[i];
-            if (pos.lat < currentPos.lat) {
-              const distance = Math.sqrt(
-                Math.pow(pos.lat - currentPos.lat, 2) +
-                  Math.pow(pos.lng - currentPos.lng, 2)
-              );
-              if (distance < bestDistance) {
-                bestDistance = distance;
-                bestIndex = i;
-              }
-            }
-          }
-          if (bestIndex !== -1) nextIndex = bestIndex;
-          break;
-        }
-        case "ArrowLeft": {
-          // Find the nearest marker to the left (lower longitude)
-          let bestIndex = -1;
-          let bestDistance = Infinity;
-          for (let i = 0; i < sortedMarkerPositions.length; i++) {
-            if (i === currentIndex) continue;
-            const pos = sortedMarkerPositions[i];
-            if (pos.lng < currentPos.lng) {
-              const distance = Math.sqrt(
-                Math.pow(pos.lat - currentPos.lat, 2) +
-                  Math.pow(pos.lng - currentPos.lng, 2)
-              );
-              if (distance < bestDistance) {
-                bestDistance = distance;
-                bestIndex = i;
-              }
-            }
-          }
-          if (bestIndex !== -1) nextIndex = bestIndex;
-          break;
-        }
-        case "ArrowRight": {
-          // Find the nearest marker to the right (higher longitude)
-          let bestIndex = -1;
-          let bestDistance = Infinity;
-          for (let i = 0; i < sortedMarkerPositions.length; i++) {
-            if (i === currentIndex) continue;
-            const pos = sortedMarkerPositions[i];
-            if (pos.lng > currentPos.lng) {
-              const distance = Math.sqrt(
-                Math.pow(pos.lat - currentPos.lat, 2) +
-                  Math.pow(pos.lng - currentPos.lng, 2)
-              );
-              if (distance < bestDistance) {
-                bestDistance = distance;
-                bestIndex = i;
-              }
-            }
-          }
-          if (bestIndex !== -1) nextIndex = bestIndex;
-          break;
-        }
-        case "Home": {
-          // Jump to first marker
-          if (sortedMarkerPositions.length > 0) {
-            nextIndex = 0;
-          }
-          break;
-        }
-        case "End": {
-          // Jump to last marker
-          if (sortedMarkerPositions.length > 0) {
-            nextIndex = sortedMarkerPositions.length - 1;
-          }
-          break;
-        }
-        default:
-          return; // Don't prevent default for other keys
+      e.preventDefault();
+      e.stopPropagation();
+      const nextMarker = sortedMarkerPositions[nextIndex];
+      const nextId = nextMarker.listing.id;
+
+      // Update keyboard focus state
+      setKeyboardFocusedId(nextId);
+
+      // Focus the marker element
+      const markerEl = markerRefs.current.get(nextId);
+      if (markerEl) {
+        markerEl.focus();
       }
 
-      if (nextIndex !== null && nextIndex !== currentIndex) {
-        e.preventDefault();
-        e.stopPropagation();
-        const nextMarker = sortedMarkerPositions[nextIndex];
-        const nextId = nextMarker.listing.id;
-
-        // Update keyboard focus state
-        setKeyboardFocusedId(nextId);
-
-        // Focus the marker element
-        const markerEl = markerRefs.current.get(nextId);
-        if (markerEl) {
-          markerEl.focus();
-        }
-
-        // Pan map to show the focused marker
-        if (mapRef.current) {
-          mapRef.current.easeTo({
-            center: [nextMarker.lng, nextMarker.lat],
-            duration: 300,
-          });
-        }
+      // Pan map to show the focused marker
+      if (mapRef.current) {
+        mapRef.current.easeTo({
+          center: [nextMarker.lng, nextMarker.lat],
+          duration: 300,
+        });
       }
     },
     [findMarkerIndex, sortedMarkerPositions]
@@ -3475,6 +3679,7 @@ export default function MapComponent({
     isSearching,
     suppressEmptyState,
     hasFetchError,
+    isFetchingData,
     listingsCount: listings.length,
   });
   const mobileMapStatus = useMemo<MobileMapStatus | null>(() => {
@@ -3945,6 +4150,30 @@ export default function MapComponent({
           })()}
       </div>
 
+      {/* Screen reader instructions for cluster keyboard navigation */}
+      <div id="map-cluster-instructions" className="sr-only">
+        Use arrow keys to move between listing groups based on their position on
+        the map. Press Enter or Space to zoom into a group.
+      </div>
+
+      {/* Screen reader announcement for cluster keyboard navigation */}
+      <div
+        className="sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {clusterFocusedId != null &&
+          (() => {
+            const index = sortedClusterPositions.findIndex(
+              (c) => c.clusterId === clusterFocusedId
+            );
+            if (index === -1) return "";
+            const cluster = sortedClusterPositions[index];
+            return `Listing group ${index + 1} of ${sortedClusterPositions.length}: ${cluster.pointCount} listings. Press Enter to zoom in.`;
+          })()}
+      </div>
+
       <Map
         key={mapRemountKey}
         ref={mapRef}
@@ -4215,9 +4444,13 @@ export default function MapComponent({
           // P2-FIX (#110): Check if click originated from a marker element.
           // stopPropagation on Marker's onClick stops DOM bubbling, but
           // mapbox-gl still detects the click via canvas hit-testing.
-          // Skip cluster handling if click was on a marker to prevent both firing.
+          // Skip cluster handling if click was on a marker (or on a DOM cluster
+          // button, which handles its own expansion) to prevent both firing.
           const target = e.originalEvent?.target as HTMLElement | undefined;
-          if (target?.closest("[data-listing-id]")) {
+          if (
+            target?.closest("[data-listing-id]") ||
+            target?.closest("[data-cluster-id]")
+          ) {
             return;
           }
           if (
@@ -4363,6 +4596,11 @@ export default function MapComponent({
                     ? position.memberIds.includes(keyboardFocusedId)
                     : false
                 }
+                isTabbable={
+                  keyboardFocusedId
+                    ? position.memberIds.includes(keyboardFocusedId)
+                    : position.listing.id === defaultTabbableMarkerId
+                }
                 isViewed={viewedIds.has(position.listing.id)}
                 onClickById={handleMarkerClickById}
                 onPointerEnter={handleMarkerPointerEnter}
@@ -4384,6 +4622,28 @@ export default function MapComponent({
           markerPositionIds={markerPositionIds}
           listings={listings}
         />
+
+        {/* Keyboard-accessible cluster markers: transparent DOM buttons over
+            the GL cluster circles. Their own roving-tabindex group; Enter/Space
+            expands via the same logic as a mouse click. */}
+        {sortedClusterPositions.map((cluster) => (
+          <ClusterMarkerItem
+            key={cluster.clusterId}
+            clusterId={cluster.clusterId}
+            pointCount={cluster.pointCount}
+            lng={cluster.lng}
+            lat={cluster.lat}
+            isTabbable={
+              clusterFocusedId != null
+                ? cluster.clusterId === clusterFocusedId
+                : cluster.clusterId === defaultTabbableClusterId
+            }
+            onExpand={expandCluster}
+            onKeyboardNav={handleClusterKeyboardNavigation}
+            onFocusChange={setClusterFocusedId}
+            clusterRefsMap={clusterMarkerRefs}
+          />
+        ))}
 
         {usesPopupSelection && selectedListing && (
           <Popup

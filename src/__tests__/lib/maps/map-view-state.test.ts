@@ -20,6 +20,7 @@ const settledEmpty: EmptyStateInput = {
   isSearching: false,
   suppressEmptyState: false,
   hasFetchError: false,
+  isFetchingData: false,
   listingsCount: 0,
 };
 
@@ -42,6 +43,22 @@ describe("shouldShowEmptyState", () => {
     expect(shouldShowEmptyState(afterRetry)).toBe(true);
   });
 
+  it("REGRESSION: never shows while a fetch is in flight, even with 0 listings", () => {
+    // A filter/query change after a prior zero-result can leave listings=[] with
+    // a refetch in flight; the overlay must wait, not flash "No listings".
+    expect(
+      shouldShowEmptyState({ ...settledEmpty, isFetchingData: true })
+    ).toBe(false);
+  });
+
+  it("shows again once an in-flight fetch settles to zero results", () => {
+    const duringFetch = { ...settledEmpty, isFetchingData: true };
+    expect(shouldShowEmptyState(duringFetch)).toBe(false);
+
+    const afterSettle = { ...duringFetch, isFetchingData: false };
+    expect(shouldShowEmptyState(afterSettle)).toBe(true);
+  });
+
   it("never shows when listings are present, regardless of error state", () => {
     expect(
       shouldShowEmptyState({ ...settledEmpty, listingsCount: 44 })
@@ -61,6 +78,7 @@ describe("shouldShowEmptyState", () => {
       ["map not initialized", { isMapInitialized: false }],
       ["tiles loading", { areTilesLoading: true }],
       ["search in flight", { isSearching: true }],
+      ["data fetch in flight", { isFetchingData: true }],
       ["caller suppression (info banner)", { suppressEmptyState: true }],
     ];
 

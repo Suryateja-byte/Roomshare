@@ -13,11 +13,29 @@ jest.mock("next/navigation", () => ({
   useSearchParams: () => mockSearchParams,
 }));
 
-// Mock the DynamicMap component (lazy loaded)
+// Mock the DynamicMap component (lazy loaded).
+// Surfaces the empty-state-gating props (not just listings.length) so tests can
+// assert they actually reach the map, per the map-subsystem audit.
 jest.mock("@/components/DynamicMap", () => ({
   __esModule: true,
-  default: ({ listings }: { listings: unknown[] }) => (
-    <div data-testid="dynamic-map" data-listings-count={listings.length}>
+  default: ({
+    listings,
+    isFetchingData,
+    hasFetchError,
+    suppressEmptyState,
+  }: {
+    listings: unknown[];
+    isFetchingData?: boolean;
+    hasFetchError?: boolean;
+    suppressEmptyState?: boolean;
+  }) => (
+    <div
+      data-testid="dynamic-map"
+      data-listings-count={listings.length}
+      data-is-fetching={String(Boolean(isFetchingData))}
+      data-has-fetch-error={String(Boolean(hasFetchError))}
+      data-suppress-empty={String(Boolean(suppressEmptyState))}
+    >
       Map with {listings.length} listings
     </div>
   ),
@@ -269,6 +287,41 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
       expect(reactWarnings.length).toBe(0);
 
       consoleError.mockRestore();
+    });
+  });
+
+  describe("In-flight empty-state gating", () => {
+    it("passes isFetchingData=true to the map while a fetch is in flight", async () => {
+      // A fetch that never resolves keeps isFetchingMapData truthy. This is the
+      // signal that prevents the map from flashing "No listings in this area"
+      // mid-load (see shouldShowEmptyState + map-view-state.test.ts).
+      mockFetch.mockImplementation(() => new Promise(() => {}));
+
+      render(<PersistentMapWrapper shouldRenderMap={true} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
+      });
+
+      expect(mockFetch).toHaveBeenCalled();
+      const map = screen.getByTestId("dynamic-map");
+      expect(map).toHaveAttribute("data-is-fetching", "true");
+      // In flight is NOT an error state.
+      expect(map).toHaveAttribute("data-has-fetch-error", "false");
+    });
+
+    it("passes isFetchingData=false once the fetch resolves", async () => {
+      render(<PersistentMapWrapper shouldRenderMap={true} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
+      });
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      const map = screen.getByTestId("dynamic-map");
+      expect(map).toHaveAttribute("data-is-fetching", "false");
     });
   });
 

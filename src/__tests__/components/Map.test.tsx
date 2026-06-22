@@ -2646,6 +2646,89 @@ describe("Map Component", () => {
         expect(screen.queryByTestId("map-popup")).not.toBeInTheDocument();
       });
     });
+
+    it("roving tabindex: exactly one marker is tabbable, the rest are -1", async () => {
+      await renderMapAndPopulateMarkers();
+
+      const markerEls = Array.from(
+        document.querySelectorAll<HTMLElement>("[data-listing-id]")
+      );
+      expect(markerEls.length).toBeGreaterThan(1);
+
+      const tabbable = markerEls.filter(
+        (el) => el.getAttribute("tabindex") === "0"
+      );
+      expect(tabbable).toHaveLength(1);
+      expect(
+        markerEls.filter((el) => el.getAttribute("tabindex") === "-1")
+      ).toHaveLength(markerEls.length - 1);
+      // Default tabbable marker is the first sorted (northernmost) listing.
+      expect(tabbable[0].getAttribute("data-listing-id")).toBe("listing-2");
+    });
+
+    it("ArrowDown moves the single tabbable marker to a neighbor", async () => {
+      await renderMapAndPopulateMarkers();
+
+      const tabbableBefore = document.querySelector<HTMLElement>(
+        '[data-listing-id][tabindex="0"]'
+      );
+      expect(tabbableBefore?.getAttribute("data-listing-id")).toBe("listing-2");
+
+      await act(async () => {
+        fireEvent.keyDown(tabbableBefore!, { key: "ArrowDown" });
+      });
+
+      const tabbableAfter = Array.from(
+        document.querySelectorAll<HTMLElement>(
+          '[data-listing-id][tabindex="0"]'
+        )
+      );
+      expect(tabbableAfter).toHaveLength(1);
+      expect(tabbableAfter[0].getAttribute("data-listing-id")).not.toBe(
+        "listing-2"
+      );
+      expect(mockMapInstance.easeTo).toHaveBeenCalled();
+    });
+
+    it("renders a keyboard-operable cluster button that expands on Enter", async () => {
+      const clusterZoomSpy = jest.fn(() => Promise.resolve(15));
+      mockMapInstance.getSource = jest.fn(() => ({
+        getClusterExpansionZoom: clusterZoomSpy,
+      }));
+      // Listing features + one rendered cluster (with point_count + geometry).
+      mockQuerySourceFeaturesData = [
+        ...listingsToFeatures(mockListings),
+        {
+          properties: { cluster_id: 1, point_count: 5 },
+          geometry: { type: "Point", coordinates: [-122.42, 37.78] },
+        },
+      ] as unknown as typeof mockQuerySourceFeaturesData;
+
+      render(<MapComponent listings={mockListings} />);
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+      const handlers = (
+        window as unknown as Record<string, { onIdle?: () => void }>
+      ).__mapHandlers;
+      await act(async () => {
+        handlers?.onIdle?.();
+      });
+
+      const clusterButton = screen.getByTestId("map-cluster-1");
+      expect(clusterButton).toHaveAttribute(
+        "aria-label",
+        "Group of 5 listings. Press Enter to zoom in."
+      );
+      // Sole cluster → it is the default tabbable member of the cluster group.
+      expect(clusterButton).toHaveAttribute("tabindex", "0");
+
+      await act(async () => {
+        fireEvent.keyDown(clusterButton, { key: "Enter" });
+      });
+      // Enter routes through the shared expandCluster path (same as a click).
+      expect(clusterZoomSpy).toHaveBeenCalledWith(1);
+    });
   });
 
   describe("accessibility", () => {
