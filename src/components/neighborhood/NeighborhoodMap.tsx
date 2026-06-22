@@ -408,20 +408,28 @@ export function NeighborhoodMap({
     }
   }, [onPoiHover]);
 
-  // Fly to selected POI
+  // Fly to selected POI.
+  // Read the live zoom via mapRef inside the effect rather than depending on
+  // viewState.zoom: onMove writes viewState every frame, so depending on it
+  // would re-fire this effect on every user zoom while a POI is selected and
+  // snap the camera back to the POI. Now it fires only when the selection
+  // (selectedPlaceId / poiLookup) changes.
   useEffect(() => {
     if (selectedPlaceId && mapRef.current) {
       const poi = poiLookup.get(selectedPlaceId);
       if (poi) {
+        const currentZoom = mapRef.current.getZoom?.() ?? viewState.zoom;
         mapRef.current.flyTo({
           center: [poi.lng, poi.lat],
-          zoom: Math.max(viewState.zoom, 15),
+          zoom: Math.max(currentZoom, 15),
           duration: 300,
         });
         setPopupPoi(poi);
       }
     }
-  }, [selectedPlaceId, poiLookup, viewState.zoom]);
+    // viewState.zoom intentionally omitted — read live via getZoom() above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPlaceId, poiLookup]);
 
   // Close popup when selection changes
   useEffect(() => {

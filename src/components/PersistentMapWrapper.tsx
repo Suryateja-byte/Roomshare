@@ -1258,6 +1258,9 @@ export default function PersistentMapWrapper({
             listings={stableEffectiveListings}
             suppressEmptyState={Boolean(infoMessage)}
             hasFetchError={Boolean(error)}
+            isFetchingData={
+              isFetchingMapData || isListTransitioning || showV2LoadingOverlay
+            }
             selectionPresentation={isDesktop === false ? "preview" : "popup"}
           />
         </Suspense>

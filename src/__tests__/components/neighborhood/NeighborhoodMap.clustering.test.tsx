@@ -5,6 +5,7 @@ import type { POI } from "@/lib/places/types";
 
 let lastMapProps: Record<string, unknown> = {};
 const mockFlyTo = jest.fn();
+const mockGetZoom = jest.fn(() => 16);
 const mockGetCanvas = jest.fn(() => ({ style: { cursor: "" } }));
 const mockGetSource = jest.fn(() => ({
   getClusterExpansionZoom: jest.fn().mockResolvedValue(15),
@@ -18,6 +19,7 @@ jest.mock("react-map-gl/maplibre", () => {
       lastMapProps = props;
       React.useImperativeHandle(ref, () => ({
         flyTo: mockFlyTo,
+        getZoom: mockGetZoom,
         getCanvas: mockGetCanvas,
         getSource: mockGetSource,
       }));
@@ -113,5 +115,62 @@ describe("NeighborhoodMap clustering", () => {
     expect(onPoiClick).toHaveBeenCalledWith(
       expect.objectContaining({ placeId: "place-3" })
     );
+  });
+
+  describe("fly to selected POI", () => {
+    it("flies to the selected POI once, reading the live zoom (not viewState)", () => {
+      render(
+        <NeighborhoodMap
+          center={{ lat: 37.77, lng: -122.42 }}
+          pois={makePois(15)}
+          selectedPlaceId="place-3"
+        />
+      );
+
+      // place-3 → lat 37.773, lng -122.417; zoom = max(getZoom()=16, 15) = 16.
+      expect(mockFlyTo).toHaveBeenCalledTimes(1);
+      expect(mockFlyTo).toHaveBeenCalledWith(
+        expect.objectContaining({
+          center: [-122.417, 37.773],
+          zoom: 16,
+        })
+      );
+      expect(mockGetZoom).toHaveBeenCalled();
+    });
+
+    it("does not re-fly when only the viewport zoom changes (no snap-back)", () => {
+      render(
+        <NeighborhoodMap
+          center={{ lat: 37.77, lng: -122.42 }}
+          pois={makePois(15)}
+          selectedPlaceId="place-3"
+        />
+      );
+
+      expect(mockFlyTo).toHaveBeenCalledTimes(1);
+
+      // Simulate the user zooming: onMove updates viewState every frame. The
+      // fly-to effect must NOT re-fire (that was the snap-back bug).
+      act(() => {
+        (
+          lastMapProps.onMove as
+            | ((evt: { viewState: Record<string, number> }) => void)
+            | undefined
+        )?.({
+          viewState: { longitude: -122.42, latitude: 37.77, zoom: 11 },
+        });
+      });
+      act(() => {
+        (
+          lastMapProps.onMove as
+            | ((evt: { viewState: Record<string, number> }) => void)
+            | undefined
+        )?.({
+          viewState: { longitude: -122.42, latitude: 37.77, zoom: 18 },
+        });
+      });
+
+      expect(mockFlyTo).toHaveBeenCalledTimes(1);
+    });
   });
 });
