@@ -58,6 +58,7 @@ import { BoundaryLayer } from "./map/BoundaryLayer";
 import { UserMarker, useUserPin } from "./map/UserMarker";
 import DesktopMapControls from "./map/DesktopMapControls";
 import DesktopListingPreviewCard from "./map/DesktopListingPreviewCard";
+import { FocusTrap } from "./ui/FocusTrap";
 import HostIdentityBadge from "./HostIdentityBadge";
 import MobileMapToolsSheet from "./map/MobileMapToolsSheet";
 import { POILayer, usePOILayerState } from "./map/POILayer";
@@ -4661,15 +4662,23 @@ export default function MapComponent({
             subpixelPositioning
             className="z-[60] [&_.maplibregl-popup-content]:rounded-xl [&_.maplibregl-popup-content]:p-0 [&_.maplibregl-popup-content]:!bg-transparent [&_.maplibregl-popup-content]:!shadow-none [&_.maplibregl-popup-close-button]:hidden [&_.maplibregl-popup-tip]:hidden"
           >
-            <DesktopListingPreviewCard
-              key={selectedListing.id}
-              listing={selectedListing}
-              href={selectedListingHref ?? `/listings/${selectedListing.id}`}
-              isDarkMode={isDarkMode}
-              onClose={() => handleSelectedListingClose(true)}
-              cardRef={selectedPopupCardRef}
-              closeButtonRef={selectedPopupCloseButtonRef}
-            />
+            {/* Tab-containment only: close-time focus restoration stays owned by
+                restoreDesktopPopupOriginFocus (marker/list-aware), so returnFocus={false}. */}
+            <FocusTrap
+              active
+              initialFocusRef={selectedPopupCloseButtonRef}
+              returnFocus={false}
+            >
+              <DesktopListingPreviewCard
+                key={selectedListing.id}
+                listing={selectedListing}
+                href={selectedListingHref ?? `/listings/${selectedListing.id}`}
+                isDarkMode={isDarkMode}
+                onClose={() => handleSelectedListingClose(true)}
+                cardRef={selectedPopupCardRef}
+                closeButtonRef={selectedPopupCloseButtonRef}
+              />
+            </FocusTrap>
           </Popup>
         )}
 
@@ -4718,7 +4727,7 @@ export default function MapComponent({
                 <button
                   type="button"
                   onClick={() => handleSelectedListingClose(true)}
-                  className="absolute top-3 right-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-on-surface/55 text-white backdrop-blur-sm transition-colors hover:bg-on-surface/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                  className="absolute top-3 right-3 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-on-surface/55 text-white backdrop-blur-sm transition-colors hover:bg-on-surface/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
                   aria-label="Close listing preview"
                 >
                   <X className="w-4 h-4" />
