@@ -92,13 +92,19 @@ test.describe("Create Listing – Resilience", () => {
     const formData = toPomData(listingData);
     createPage = await setupFilledForm(page, formData);
 
+    // Realistic limiter response: generic error/message + a retryAfter window.
     await createPage.mockListingApiError(429, {
-      error: "Rate limit exceeded. Try again later.",
+      error: "Too many requests",
+      message: "Please wait before making more requests",
+      retryAfter: 120,
     });
 
     await createPage.submitAndWaitForResponse();
 
-    await createPage.expectErrorBanner(/rate limit/i);
+    // The client surfaces a friendly, time-aware limit message built from
+    // retryAfter (120s → "2 minutes") rather than echoing the terse server error.
+    await createPage.expectErrorBanner(/try again in 2 minutes/i);
+    await expect(createPage.errorBanner).not.toContainText(/too many requests/i);
     await createPage.expectOnCreatePage();
     await expect(createPage.titleInput).toHaveValue(listingData.title);
   });

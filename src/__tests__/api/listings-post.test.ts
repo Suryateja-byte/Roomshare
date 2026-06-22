@@ -1058,9 +1058,15 @@ describe("POST /api/listings — extended edge cases", () => {
       );
       const data = await response.json();
 
-      expect(response.status).toBe(503);
+      // Flag-off is a permanent config state, not a transient outage: return a
+      // 400 address field error (retrying the manual address can never succeed)
+      // rather than a misleading "try again" 503.
+      expect(response.status).toBe(400);
       expect(data.error).toBe(
-        "Address verification temporarily unavailable. Please try again."
+        "Please select an address from the suggestions to publish your listing."
+      );
+      expect(data.fields.address).toBe(
+        "Please select an address from the suggestions to publish your listing."
       );
       expect(geocodeAddress).not.toHaveBeenCalled();
     });

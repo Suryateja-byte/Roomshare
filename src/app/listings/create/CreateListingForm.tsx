@@ -156,6 +156,21 @@ function focusFirstFieldError(errors: Record<string, string>) {
   }
 }
 
+// Turn a Retry-After value (seconds) into a human phrase for 429 messaging.
+function formatRetryAfter(retryAfter: string | number | null | undefined): string {
+  const seconds = Number(retryAfter);
+  if (!Number.isFinite(seconds) || seconds <= 0) return "a little while";
+  if (seconds < 60) return `${Math.ceil(seconds)} seconds`;
+  // Branch on raw seconds (not on a ceiled minute count) so a ~59-minute wait
+  // is not rounded up to "1 hour". Ceil keeps the estimate from under-promising.
+  if (seconds < 3600) {
+    const minutes = Math.ceil(seconds / 60);
+    return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+  }
+  const hours = Math.ceil(seconds / 3600);
+  return `${hours} hour${hours === 1 ? "" : "s"}`;
+}
+
 interface CreateListingFormProps {
   enableWholeUnitMode?: boolean;
 }
@@ -457,6 +472,8 @@ export default function CreateListingForm({
   const performCollisionAckResubmit = async (
     bodyObj: Record<string, unknown>
   ) => {
+    // Remember siblings so a transient failure can re-open the modal for retry.
+    const previousSiblings = collisionSiblings;
     setCollisionSiblings(null);
     setLoading(true);
     isSubmittingRef.current = true;
@@ -501,7 +518,13 @@ export default function CreateListingForm({
           json && typeof json === "object" && typeof json.error === "string"
             ? json.error
             : "Failed to create listing";
-        showError(msg);
+        // Keep the collision modal available so the user can retry their choice
+        // instead of being stranded behind a page-level error banner.
+        toast.error(msg);
+        if (previousSiblings) {
+          setCollisionSiblings(previousSiblings);
+          setCollisionBody(bodyObj);
+        }
         if (
           res.status >= 400 &&
           res.status < 500 &&
@@ -521,6 +544,7 @@ export default function CreateListingForm({
       clearPersistedData();
       navGuard.disable();
       idempotencyKeyRef.current = crypto.randomUUID();
+      setCollisionSiblings(null);
       setCollisionBody(null);
       toast.success("Listing published successfully!", {
         description:
@@ -534,9 +558,24 @@ export default function CreateListingForm({
       }, 1000);
     } catch (err: unknown) {
       if (err instanceof Error && err.name === "AbortError") return;
+      Sentry.captureException(err, {
+        tags: {
+          component: "CreateListingForm",
+          action: "collision-ack-resubmit",
+        },
+      });
+      // Intentionally do NOT regenerate the idempotency key here: a network
+      // error may mean the request committed but its response was lost, so a
+      // retry with the same key returns the cached 201 instead of double-creating.
+      // Re-open the collision modal so the choice can be retried, surfacing the
+      // error as a toast rather than the page-level banner.
+      if (previousSiblings) {
+        setCollisionSiblings(previousSiblings);
+        setCollisionBody(bodyObj);
+      }
       const msg =
         err instanceof Error ? err.message : "An unexpected error occurred";
-      showError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
       isSubmittingRef.current = false;
@@ -704,7 +743,9 @@ export default function CreateListingForm({
       if (abortController.signal.aborted) return;
 
       if (!res.ok) {
-        const json = await res.json();
+        // Guard against non-JSON error bodies (502/504/HTML/empty) so a parser
+        // error doesn't mask the real failure with "Unexpected token <".
+        const json = await res.json().catch(() => ({}));
 
         // Collision warning path: server returned 409 COLLISION_CANDIDATES
         // with a siblings payload. Open the modal and pause submission;
@@ -720,6 +761,18 @@ export default function CreateListingForm({
           setLoading(false);
           isSubmittingRef.current = false;
           return;
+        }
+
+        // Rate limited: surface a time-aware message instead of the bare
+        // "Too many requests" the server returns.
+        if (res.status === 429) {
+          idempotencyKeyRef.current = crypto.randomUUID();
+          const retryPhrase = formatRetryAfter(
+            json?.retryAfter ?? res.headers.get("Retry-After")
+          );
+          throw new Error(
+            `You've reached the listing creation limit. Please try again in ${retryPhrase}.`
+          );
         }
 
         // Regenerate key when the server definitively rejected (no listing created).

@@ -363,14 +363,22 @@ export function recordListingCreateCollisionDetected({
 export function recordListingCreateCollisionResolved({
   ownerHashPrefix8,
   action,
+  reasonProvided = false,
+  reasonLength,
 }: {
   ownerHashPrefix8: string;
   action: "proceed" | "moderation_gated";
+  // Whether a "create separate" justification accompanied the override, and its
+  // length. The raw reason text is intentionally NOT logged (may contain PII).
+  reasonProvided?: boolean;
+  reasonLength?: number;
 }): void {
   telemetryStore.listingCreateCollisionResolvedTotal += 1;
   logger.sync.info("listing_create_collision_resolved_total", {
     ownerHashPrefix8,
     action,
+    reasonProvided,
+    ...(reasonLength !== undefined ? { reasonLength } : {}),
     total: telemetryStore.listingCreateCollisionResolvedTotal,
   });
 }

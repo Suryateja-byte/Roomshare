@@ -284,6 +284,7 @@ export async function POST(request: Request) {
       moveInDate,
       bookingMode,
       addressSuggestionToken,
+      createSeparateReason,
     } = validatedFields.data;
 
     // 8. Language compliance check on title AND description (2G)
@@ -384,12 +385,14 @@ export async function POST(request: Request) {
         city,
         state,
       });
+      // Flag-off is a persistent config state, not a transient outage — a
+      // bare manual address can never be verified here, so retrying is futile.
+      // Direct the user to the only path that works: pick a suggested address.
+      const message =
+        "Please select an address from the suggestions to publish your listing.";
       return NextResponse.json(
-        {
-          error:
-            "Address verification temporarily unavailable. Please try again.",
-        },
-        { status: 503, headers: { "Retry-After": "10" } }
+        { error: message, field: "address", fields: { address: message } },
+        { status: 400 }
       );
     }
 
@@ -527,6 +530,8 @@ export async function POST(request: Request) {
           recordListingCreateCollisionResolved({
             ownerHashPrefix8,
             action: "proceed",
+            reasonProvided: Boolean(createSeparateReason),
+            reasonLength: createSeparateReason?.length,
           });
         }
       }

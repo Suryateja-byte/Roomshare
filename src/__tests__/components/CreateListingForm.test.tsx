@@ -744,6 +744,88 @@ describe("CreateListingForm", () => {
       // No error banner should appear for AbortError
       expect(screen.queryByTestId("form-error-banner")).not.toBeInTheDocument();
     });
+
+    it("surfaces a friendly, time-aware message on a 429 rate limit", async () => {
+      fetchSpy.mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        headers: { get: () => "120" },
+        json: () =>
+          Promise.resolve({
+            error: "Too many requests",
+            message: "Please wait before making more requests",
+            retryAfter: 120,
+          }),
+      } as unknown as Response);
+
+      render(<CreateListingForm />);
+      await addImageAndSubmit();
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/listing creation limit.*try again in 2 minutes/i)
+        ).toBeInTheDocument();
+      });
+      // The bare server error must not be what the user sees.
+      expect(screen.queryByText("Too many requests")).not.toBeInTheDocument();
+    });
+
+    it("shows a friendly fallback (not a parser error) when the error body is not JSON", async () => {
+      fetchSpy.mockResolvedValueOnce({
+        ok: false,
+        status: 502,
+        headers: { get: () => null },
+        json: () =>
+          Promise.reject(
+            new SyntaxError("Unexpected token < in JSON at position 0")
+          ),
+      } as unknown as Response);
+
+      render(<CreateListingForm />);
+      await addImageAndSubmit();
+
+      await waitFor(() => {
+        expect(screen.getByText("Failed to create listing")).toBeInTheDocument();
+      });
+      expect(screen.queryByText(/Unexpected token/i)).not.toBeInTheDocument();
+    });
+
+    it("re-opens the collision modal so the choice can be retried after a transient resubmit failure", async () => {
+      const sibling = {
+        id: "listing-existing",
+        title: "Existing Listing",
+        createdAt: "2026-06-01",
+        moveInDate: "2026-07-01",
+        canUpdate: true,
+      };
+      fetchSpy
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 409,
+          headers: { get: () => null },
+          json: () =>
+            Promise.resolve({
+              error: "COLLISION_CANDIDATES",
+              siblings: [sibling],
+            }),
+        } as unknown as Response)
+        .mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+      render(<CreateListingForm />);
+      await addImageAndSubmit();
+
+      // The 409 opens the collision modal; pick "additional start date" + continue.
+      const modal = await screen.findByTestId("collision-modal");
+      fireEvent.click(within(modal).getByTestId("collision-radio-add-date"));
+      fireEvent.click(within(modal).getByTestId("collision-continue"));
+
+      // The resubmit fails transiently — the modal must return for a retry
+      // instead of stranding the user, with the error shown as a toast.
+      await waitFor(() => {
+        expect(screen.getByTestId("collision-modal")).toBeInTheDocument();
+      });
+      expect(toast.error).toHaveBeenCalled();
+    });
   });
 
   describe("submission guards", () => {

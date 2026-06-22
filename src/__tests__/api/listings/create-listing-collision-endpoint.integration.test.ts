@@ -379,7 +379,35 @@ describe("POST /api/listings collision flow", () => {
     expect(recordListingCreateCollisionResolved).toHaveBeenCalledWith({
       ownerHashPrefix8: "deadbeef",
       action: "proceed",
+      reasonProvided: false,
     });
+  });
+
+  it("threads create-separate justification metadata (not raw text) into telemetry", async () => {
+    process.env.FEATURE_LISTING_CREATE_COLLISION_WARN = "true";
+    const { tx } = createTx();
+    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) =>
+      callback(tx)
+    );
+
+    const reason = "These are two genuinely separate rooms in the same house.";
+    const response = await POST(
+      makeRequest(
+        { ...validBody, createSeparateReason: reason },
+        { "x-collision-ack": "1" }
+      )
+    );
+
+    expect(response.status).toBe(201);
+    expect(recordListingCreateCollisionResolved).toHaveBeenCalledWith({
+      ownerHashPrefix8: "deadbeef",
+      action: "proceed",
+      reasonProvided: true,
+      reasonLength: reason.length,
+    });
+    // The raw justification text must never be handed to telemetry (PII).
+    const calls = (recordListingCreateCollisionResolved as jest.Mock).mock.calls;
+    expect(JSON.stringify(calls)).not.toContain(reason);
   });
 
   it("blocks the fourth acked collision in 24 hours", async () => {
