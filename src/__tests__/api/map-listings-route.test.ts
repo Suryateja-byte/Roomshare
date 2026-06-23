@@ -67,6 +67,9 @@ jest.mock("@/lib/timeout-wrapper", () => ({
 
 jest.mock("@/lib/validation", () => ({
   validateAndParseBounds: jest.fn(),
+  // Route clamps derived bounds; identity pass-through is enough here (real
+  // clamp behavior is covered in lib/search/location-bounds.test.ts).
+  clampBoundsToMaxSpan: jest.fn((bounds: unknown) => bounds),
 }));
 
 jest.mock("@/lib/request-context", () => ({

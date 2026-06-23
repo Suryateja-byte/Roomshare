@@ -101,6 +101,11 @@ export function sanitizeMapListing(
     return null;
   }
   const publicCoordinates = toPublicCoordinates({ lat, lng });
+  // Re-validate after rounding: near-origin coords pass the raw guard but can
+  // round to (0,0) (null island) at the public 2dp precision and must be dropped.
+  if (!hasValidCoordinateRange(publicCoordinates.lat, publicCoordinates.lng)) {
+    return null;
+  }
 
   const publicAvailability =
     listing.publicAvailability ??

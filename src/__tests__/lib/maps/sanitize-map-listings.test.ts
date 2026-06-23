@@ -32,6 +32,27 @@ describe("sanitize-map-listings", () => {
     ]);
   });
 
+  it("drops near-origin coordinates that round to (0,0) at public precision", () => {
+    // 0.001 passes the raw !(lat===0 && lng===0) guard but rounds to 0.00 at
+    // 2dp -> null island, so it must be dropped after rounding.
+    expect(
+      sanitizeMapListing({
+        id: "near-origin",
+        availableSlots: 1,
+        location: { lat: 0.001, lng: 0.001 },
+      })
+    ).toBeNull();
+
+    // A coordinate far enough from the origin to survive 2dp rounding stays.
+    expect(
+      sanitizeMapListing({
+        id: "near-but-valid",
+        availableSlots: 1,
+        location: { lat: 0.02, lng: 0.02 },
+      })?.location
+    ).toEqual(expect.objectContaining({ lat: 0.02, lng: 0.02 }));
+  });
+
   it("normalizes numeric fields and image arrays into safe map values", () => {
     const listing = sanitizeMapListing({
       id: "listing-1",
