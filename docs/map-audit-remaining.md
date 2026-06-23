@@ -6,7 +6,7 @@ A multi-dimension adversarial audit of the map subsystem produced 41 verified fi
 a11y items (roving tabindex for markers, keyboard-operable clusters), the NeighborhoodMap zoom-snap bug,
 and the in-flight empty-state flash were fixed and merged in **PR #159** (squash commit `df3bbcfb`).
 
-Two follow-up batches have also already landed on `main`:
+Completed follow-up batches already landed on `main`:
 
 - **PR #161** (commit `16c1787f`) fixed the a11y quick wins: desktop popup dialog/focus containment,
   desktop empty-state live-region semantics, mobile preview close target size, and the MapGestureHint
@@ -96,13 +96,18 @@ This doc is the remaining **29**: 6 medium, 19 low, 4 nit. Use it as the brief f
 - `/api/map-listings` snapshot ok-path returns the stored set bypassing bounds re-check (privacy intact;
   add a comment + optional `MAX_MAP_MARKERS` cap assertion).
 
-## Suggested batching (one PR each)
+## Suggested batching (future PRs)
+
+Completed batches are noted above: **PR #161** covered the a11y quick wins, and **PR #162** covered the
+correctness fixes. Do not schedule those completed batches as future work.
 
 1. **perf** — medium #1 (hover), low (`getListingStabilityKey`, NearbyPlacesMap highlight, onLoad
    fitBounds, optional trailing prefetch flush).
-2. **state/correctness leftovers** — low `PersistentMapWrapper` dedup/retry races and the remaining
-   `toFiniteNumber` Decimal/BigInt divergence.
-3. **dedup/refactor** — shared sanitize helpers, cluster-layer factory, `mapAdapter`/`MAP_RELEVANT_KEYS`/
-   magic-numbers cleanup, zoom-controls extraction.
-4. **god-component split** — medium #2 (extract popup geometry + hooks). Largest; keep isolated.
-5. **test hardening** — mediums #3–#6 + low test items (abort race, source-text greps).
+2. **dedup/refactor** — shared sanitize helpers including the still-open `toFiniteNumber` Decimal/BigInt
+   divergence, cluster-layer factory, `mapAdapter`/`MAP_RELEVANT_KEYS`/magic-numbers cleanup, zoom-controls
+   extraction.
+3. **god-component split** — medium #2 (extract popup geometry + hooks). Largest; keep isolated.
+4. **test hardening** — mediums #3–#6 + low test items (abort race, source-text greps).
+5. **state/lifecycle/security/nit cleanup** — remaining low/nit cleanup (`PersistentMapWrapper` dedup/retry
+   races, Stadia helper/API over-fetch, style-sanitize monkeypatch docs, comments/caps) if it does not fit
+   cleanly into the themed PRs above.
