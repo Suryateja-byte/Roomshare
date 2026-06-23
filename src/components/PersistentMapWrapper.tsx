@@ -53,12 +53,9 @@ import { searchV2MapToListings } from "@/lib/search/v2-map-data";
 import {
   MAP_FETCH_MAX_LAT_SPAN,
   MAP_FETCH_MAX_LNG_SPAN,
-  LAT_MIN,
-  LAT_MAX,
-  LNG_MIN,
-  LNG_MAX,
   AREA_COUNT_CACHE_TTL_MS,
 } from "@/lib/constants";
+import { padBounds } from "@/lib/maps/pad-bounds";
 import { getScenarioHeaderValue } from "@/lib/search/testing/search-scenarios";
 import { emitSearchClientMetric } from "@/lib/search/search-telemetry-client";
 
@@ -73,7 +70,6 @@ const MAP_FETCH_TIMEOUT_MS = 15_000;
 // Spatial cache constants
 const SPATIAL_CACHE_MAX_ENTRIES = 20;
 const MAX_MAP_MARKERS = 200;
-const FETCH_BOUNDS_PADDING = 0.2;
 
 // ============================================
 // Spatial Cache Types & Utilities
@@ -124,38 +120,6 @@ function isViewportContained(
   const overlapArea =
     (overlapMaxLat - overlapMinLat) * (overlapMaxLng - overlapMinLng);
   return overlapArea / innerArea >= threshold;
-}
-
-/**
- * Pad viewport bounds by a percentage to pre-fetch nearby listings.
- * Clamps to LAT/LNG limits and map fetch max spans.
- */
-function padBounds(
-  bounds: ViewportBounds,
-  padding = FETCH_BOUNDS_PADDING
-): ViewportBounds {
-  const latSpan = bounds.maxLat - bounds.minLat;
-  const lngSpan = bounds.maxLng - bounds.minLng;
-  const padded = {
-    minLat: Math.max(LAT_MIN, bounds.minLat - latSpan * padding),
-    maxLat: Math.min(LAT_MAX, bounds.maxLat + latSpan * padding),
-    minLng: Math.max(LNG_MIN, bounds.minLng - lngSpan * padding),
-    maxLng: Math.min(LNG_MAX, bounds.maxLng + lngSpan * padding),
-  };
-  // Clamp padded result to map fetch max spans
-  const paddedLatSpan = padded.maxLat - padded.minLat;
-  const paddedLngSpan = padded.maxLng - padded.minLng;
-  if (paddedLatSpan > MAP_FETCH_MAX_LAT_SPAN) {
-    const center = (padded.minLat + padded.maxLat) / 2;
-    padded.minLat = center - MAP_FETCH_MAX_LAT_SPAN / 2;
-    padded.maxLat = center + MAP_FETCH_MAX_LAT_SPAN / 2;
-  }
-  if (paddedLngSpan > MAP_FETCH_MAX_LNG_SPAN) {
-    const center = (padded.minLng + padded.maxLng) / 2;
-    padded.minLng = center - MAP_FETCH_MAX_LNG_SPAN / 2;
-    padded.maxLng = center + MAP_FETCH_MAX_LNG_SPAN / 2;
-  }
-  return padded;
 }
 
 /** Build a filter-only key (excludes viewport params) for cache invalidation */

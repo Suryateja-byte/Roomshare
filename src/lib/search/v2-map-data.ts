@@ -146,6 +146,13 @@ export function searchV2MapToListings(mapData: SearchV2Map): MapListingData[] {
       }
 
       const publicCoordinates = toPublicCoordinates({ lat, lng });
+      // Re-validate after rounding: near-origin coords pass the raw guard but
+      // can round to (0,0) (null island) at the public 2dp precision.
+      if (
+        !hasValidCoordinateRange(publicCoordinates.lat, publicCoordinates.lng)
+      ) {
+        return listings;
+      }
       const publicAvailability = toMapPublicAvailability(properties);
 
       listings.push({
