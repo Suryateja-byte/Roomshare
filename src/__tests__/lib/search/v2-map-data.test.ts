@@ -129,4 +129,40 @@ describe("searchV2MapToListings", () => {
     });
     expect(JSON.stringify(listings[0])).not.toContain("raw-unit-key");
   });
+
+  it("drops near-origin features that round to (0,0) at public precision", () => {
+    // GeoJSON is [lng, lat]; 0.001 passes the raw guard but rounds to 0.00.
+    const listings = searchV2MapToListings({
+      geojson: {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            geometry: { type: "Point", coordinates: [0.001, 0.001] },
+            properties: {
+              id: "near-origin",
+              title: "Near origin",
+              price: 1000,
+              availableSlots: 1,
+              image: "x.jpg",
+            },
+          },
+          {
+            type: "Feature",
+            geometry: { type: "Point", coordinates: [0.02, 0.02] },
+            properties: {
+              id: "near-but-valid",
+              title: "Near but valid",
+              price: 1000,
+              availableSlots: 1,
+              image: "y.jpg",
+            },
+          },
+        ],
+      },
+    } as any);
+
+    expect(listings.map((l) => l.id)).toEqual(["near-but-valid"]);
+    expect(listings[0].location).toEqual({ lat: 0.02, lng: 0.02 });
+  });
 });

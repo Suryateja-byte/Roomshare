@@ -90,11 +90,15 @@ export default function DesktopListingPreviewCard({
   });
   const hasRating =
     Number.isFinite(listing.avgRating) && (listing.reviewCount ?? 0) > 0;
+  const titleId = `map-popup-title-${listing.id}`;
 
   return (
     <div
       key={listing.id}
       ref={cardRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
       data-testid="map-popup-card"
       className={`w-[320px] overflow-hidden rounded-[1.25rem] border animate-in fade-in slide-in-from-bottom-2 duration-200 ${
         isDarkMode
@@ -166,6 +170,7 @@ export default function DesktopListingPreviewCard({
           ) : null}
 
           <h3
+            id={titleId}
             className={`line-clamp-2 text-[15px] font-semibold leading-tight ${
               isDarkMode ? "text-white" : "text-on-surface"
             }`}

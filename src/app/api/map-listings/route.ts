@@ -14,7 +14,7 @@ import {
 import { features } from "@/lib/env";
 import { withRateLimitRedis } from "@/lib/with-rate-limit-redis";
 import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
-import { validateAndParseBounds } from "@/lib/validation";
+import { validateAndParseBounds, clampBoundsToMaxSpan } from "@/lib/validation";
 import {
   createContextFromHeaders,
   runWithRequestContext,
@@ -257,7 +257,14 @@ export async function GET(request: NextRequest) {
           lng >= -180 &&
           lng <= 180
         ) {
-          bounds = boundsTupleToObject(deriveSearchBoundsFromPoint(lat, lng));
+          // Clamp the derived bounds to the same max spans the explicit-bounds
+          // path applies (no-op for realistic latitudes; guards the near-pole
+          // longitude widening in deriveSearchBoundsFromPoint).
+          bounds = clampBoundsToMaxSpan(
+            boundsTupleToObject(deriveSearchBoundsFromPoint(lat, lng)),
+            MAP_FETCH_MAX_LAT_SPAN,
+            MAP_FETCH_MAX_LNG_SPAN
+          );
         }
       }
 

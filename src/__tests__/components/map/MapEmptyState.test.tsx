@@ -56,6 +56,13 @@ describe("MapEmptyState", () => {
     expect(onZoomOut).toHaveBeenCalledTimes(1);
   });
 
+  it("is a polite live region so it announces on appearance (parity with the mobile twin)", () => {
+    render(<MapEmptyState {...defaultProps} />);
+    const status = screen.getByRole("status");
+    expect(status).toHaveAttribute("aria-live", "polite");
+    expect(status).toHaveTextContent("No listings in this area");
+  });
+
   // --- Task 1.2: Filter chips and clear-filters ---
 
   it("shows active filter chips when URL has filters", () => {
