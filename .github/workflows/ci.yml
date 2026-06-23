@@ -90,7 +90,7 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - run: pnpm jest --ci --maxWorkers=2 --coverage --testPathPatterns="src/__tests__/lib/" --testPathPatterns="src/__tests__/hooks/" --testPathIgnorePatterns="filter-regression|test-utils"
-      - uses: codecov/codecov-action@v6
+      - uses: codecov/codecov-action@v7
         if: always() && github.event_name != 'pull_request'
         with:
           files: ./coverage/lcov.info
