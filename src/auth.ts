@@ -1,4 +1,4 @@
-import NextAuth from "next-auth";
+import NextAuth, { customFetch } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
@@ -41,6 +41,36 @@ async function getUser(email: string) {
     throw new Error("Failed to fetch user.");
   }
 }
+
+/**
+ * Google's OpenID discovery document advertises RFC 9207 issuer identification
+ * (`authorization_response_iss_parameter_supported: true`). oauth4webapi@3.x — pulled
+ * in by the next-auth beta.31 bump — therefore hard-requires an `iss` query parameter on
+ * the OAuth callback. Google's callback in this deployment arrives without it, which
+ * surfaces as `CallbackRouteError` → `/login?error=Configuration` and blocks ALL Google
+ * sign-in. Strip the advertised support from the discovery response so Auth.js does not
+ * require `iss`. PKCE and the `signIn` callback checks still protect the flow; this
+ * restores the behavior that worked before the dependency bump.
+ */
+const googleDiscoveryFetch: typeof fetch = async (input, init) => {
+  const response = await fetch(input, init);
+  const url =
+    typeof input === "string"
+      ? input
+      : input instanceof URL
+        ? input.href
+        : input.url;
+  if (!url.includes("/.well-known/openid-configuration")) {
+    return response;
+  }
+  try {
+    const metadata = await response.clone().json();
+    delete metadata.authorization_response_iss_parameter_supported;
+    return Response.json(metadata, { status: response.status });
+  } catch {
+    return response;
+  }
+};
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   basePath: "/api/auth",
@@ -248,6 +278,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // Enable account linking for users who registered with password then try Google OAuth
       // SAFE: email_verified === true is enforced in signIn callback above
       allowDangerousEmailAccountLinking: true,
+      // Drop RFC 9207 `iss` enforcement for Google (see googleDiscoveryFetch above).
+      [customFetch]: googleDiscoveryFetch,
     }),
     Credentials({
       async authorize(credentials, request) {
