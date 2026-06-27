@@ -78,6 +78,17 @@ test.describe("Search release gate - mobile", () => {
 
     await dialog.getByLabel(/minimum budget/i).fill("1000");
     await dialog.getByLabel(/maximum budget/i).fill("1500");
+
+    // The location autocomplete opens with the dialog and, on Mobile Safari, can
+    // linger as a fixed z-[9999] popup over the Search button — intercepting the
+    // click. Dismiss it via the component's outside-click handler (a real
+    // pointer-down on a field above the popup) before submitting. Escape is not
+    // usable here: it bubbles up and closes the whole dialog.
+    await dialog.getByLabel(/minimum budget/i).click();
+    await expect(
+      page.locator('[data-location-search-popup="true"]')
+    ).toBeHidden({ timeout: 5_000 });
+
     await dialog.getByRole("button", { name: /^search$/i }).click();
 
     await waitForSearchResolution(page);
