@@ -33,6 +33,11 @@ export interface RefundQueueOptions {
   maxBatch?: number;
   maxTickMs?: number;
   maxAttempts?: number;
+  /**
+   * Age after which a row stuck in PROCESSING is presumed orphaned by a crashed
+   * worker and reclaimed back to PENDING. Defaults to 5 minutes.
+   */
+  staleProcessingMs?: number;
   now?: () => Date;
 }
 
@@ -48,6 +53,7 @@ export interface RefundQueueResult {
 const DEFAULT_MAX_BATCH = 10;
 const DEFAULT_MAX_TICK_MS = 8000;
 const DEFAULT_MAX_ATTEMPTS = 5;
+const DEFAULT_STALE_PROCESSING_MS = 5 * 60_000;
 
 function retryDelayMs(attemptCount: number): number {
   const baseMs = 60_000;
@@ -304,6 +310,27 @@ async function releaseUnprocessedRows(rowIds: string[]) {
   `;
 }
 
+/**
+ * Reclaim rows orphaned in PROCESSING by a crashed/killed worker. A row is set
+ * to PROCESSING (and attempt_count incremented) before the Stripe call; if the
+ * process dies between the Stripe refund and the local commit, the row would
+ * otherwise stay PROCESSING forever — money moved at Stripe but never recorded,
+ * and never retried (the claim query only ever selects PENDING). Reclaiming back
+ * to PENDING is safe because the refund uses a deterministic idempotency key
+ * (`auto-refund:{paymentId}:{reason}`), so Stripe will not double-refund on
+ * re-processing. Mirrors releaseUnprocessedRows but keyed on staleness, not id.
+ */
+async function reclaimStaleProcessingRows(staleCutoff: Date) {
+  await prisma.$executeRaw`
+    UPDATE refund_queue_items
+    SET status = 'PENDING',
+        attempt_count = GREATEST(attempt_count - 1, 0),
+        updated_at = NOW()
+    WHERE status = 'PROCESSING'
+      AND updated_at < ${staleCutoff}
+  `;
+}
+
 async function scheduleRetry(
   row: RefundQueueRow,
   input: { maxAttempts: number; error: unknown }
@@ -357,6 +384,7 @@ export async function processRefundQueueOnce(
     maxBatch = DEFAULT_MAX_BATCH,
     maxTickMs = DEFAULT_MAX_TICK_MS,
     maxAttempts = DEFAULT_MAX_ATTEMPTS,
+    staleProcessingMs = DEFAULT_STALE_PROCESSING_MS,
     now = () => new Date(),
   } = opts;
   const startedAt = Date.now();
@@ -364,6 +392,10 @@ export async function processRefundQueueOnce(
   let refunded = 0;
   let retryScheduled = 0;
   let manualReview = 0;
+
+  // Recover rows stranded in PROCESSING by a crashed worker before claiming new
+  // work, so a mid-flight crash on a money path self-heals on the next tick.
+  await reclaimStaleProcessingRows(new Date(now().getTime() - staleProcessingMs));
 
   const rows = await prisma.$transaction(async (tx) => {
     const claimed = await tx.$queryRaw<RefundQueueRow[]>`

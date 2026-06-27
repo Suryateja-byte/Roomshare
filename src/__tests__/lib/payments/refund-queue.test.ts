@@ -374,4 +374,47 @@ describe("processRefundQueueOnce", () => {
       data: { autoRefundStatus: "MANUAL_REVIEW_BANNED_USER" },
     });
   });
+
+  describe("stale-PROCESSING reaper (crash recovery)", () => {
+    // Regression: a worker that dies between the Stripe refund and the local
+    // commit leaves the row stuck in PROCESSING forever (money moved, never
+    // recorded, never retried). Every tick must first reclaim stale PROCESSING
+    // rows back to PENDING. The deterministic idempotency key makes re-claim
+    // safe. See full-site review 2026-06-26, top risk #2.
+    it("reclaims rows stranded in PROCESSING before claiming new work", async () => {
+      tx.$queryRaw.mockResolvedValue([]); // nothing new to claim this tick
+      const fixedNow = new Date("2026-06-26T12:00:00.000Z");
+
+      await processRefundQueueOnce({
+        maxBatch: 5,
+        staleProcessingMs: 5 * 60_000,
+        now: () => fixedNow,
+      });
+
+      // The reaper runs as a single top-level $executeRaw (outside the claim tx).
+      expect(prisma.$executeRaw as jest.Mock).toHaveBeenCalledTimes(1);
+      const [strings, cutoff] = (prisma.$executeRaw as jest.Mock).mock.calls[0];
+      const sql = (strings as TemplateStringsArray).join("?");
+      expect(sql).toContain("UPDATE refund_queue_items");
+      expect(sql).toContain("status = 'PENDING'");
+      expect(sql).toContain("status = 'PROCESSING'");
+      expect(sql).toContain("GREATEST(attempt_count - 1, 0)");
+      // Cutoff is exactly `now - staleProcessingMs`.
+      expect(cutoff).toBeInstanceOf(Date);
+      expect((cutoff as Date).toISOString()).toBe("2026-06-26T11:55:00.000Z");
+    });
+
+    it("honors a custom staleProcessingMs window for the reaper cutoff", async () => {
+      tx.$queryRaw.mockResolvedValue([]);
+      const fixedNow = new Date("2026-06-26T12:00:00.000Z");
+
+      await processRefundQueueOnce({
+        staleProcessingMs: 60_000,
+        now: () => fixedNow,
+      });
+
+      const [, cutoff] = (prisma.$executeRaw as jest.Mock).mock.calls[0];
+      expect((cutoff as Date).toISOString()).toBe("2026-06-26T11:59:00.000Z");
+    });
+  });
 });
