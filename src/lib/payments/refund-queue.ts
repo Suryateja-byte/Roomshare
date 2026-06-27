@@ -215,6 +215,34 @@ async function recordQueuedRefund(
   return "refunded" as const;
 }
 
+/**
+ * Reconcile against a refund this queue item already created for the payment
+ * intent, matched on the idempotency tuple (paymentId + reason) we stamp into
+ * refund metadata. Stripe retains idempotency keys for only ~24h, so a row
+ * reclaimed by the stale-PROCESSING reaper after that window could otherwise
+ * create a DUPLICATE refund. Looking the refund up makes recovery correct no
+ * matter how long the row sat stranded — independent of how often the queue is
+ * scheduled to run.
+ */
+async function findExistingQueuedRefund(input: {
+  paymentIntentId: string;
+  paymentId: string;
+  reason: string;
+}): Promise<Stripe.Refund | null> {
+  const refunds = await getStripeClient().refunds.list({
+    payment_intent: input.paymentIntentId,
+    limit: 100,
+  });
+
+  return (
+    refunds.data.find(
+      (refund) =>
+        refund.metadata?.paymentId === input.paymentId &&
+        refund.metadata?.reason === input.reason
+    ) ?? null
+  );
+}
+
 async function processRefundQueueRow(row: RefundQueueRow) {
   if (!row.paymentId) {
     await prisma.$transaction((tx) =>
@@ -274,15 +302,26 @@ async function processRefundQueueRow(row: RefundQueueRow) {
     data: { autoRefundStatus: "REFUND_PROCESSING_BANNED_USER" },
   });
 
-  const refund = await getStripeClient().refunds.create(
-    {
-      payment_intent: payment.stripePaymentIntentId,
-      metadata: buildStripeRefundMetadata(row, payment.id),
-    },
-    {
-      idempotencyKey: `auto-refund:${payment.id}:${row.reason}`,
-    }
-  );
+  // Reconcile first: if this queue item already produced a refund on the intent
+  // (e.g. it was reclaimed after a crash, possibly past Stripe's ~24h
+  // idempotency-key window), reuse it instead of issuing a duplicate refund.
+  const existingRefund = await findExistingQueuedRefund({
+    paymentIntentId: payment.stripePaymentIntentId,
+    paymentId: payment.id,
+    reason: row.reason,
+  });
+
+  const refund =
+    existingRefund ??
+    (await getStripeClient().refunds.create(
+      {
+        payment_intent: payment.stripePaymentIntentId,
+        metadata: buildStripeRefundMetadata(row, payment.id),
+      },
+      {
+        idempotencyKey: `auto-refund:${payment.id}:${row.reason}`,
+      }
+    ));
 
   const outcome = await prisma.$transaction((tx) =>
     recordQueuedRefund(tx, {

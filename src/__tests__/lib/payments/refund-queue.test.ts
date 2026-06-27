@@ -11,10 +11,12 @@ jest.mock("@/lib/logger", () => ({
 }));
 
 const mockCreateRefund = jest.fn();
+const mockListRefunds = jest.fn();
 jest.mock("@/lib/payments/stripe", () => ({
   getStripeClient: () => ({
     refunds: {
       create: (...args: unknown[]) => mockCreateRefund(...args),
+      list: (...args: unknown[]) => mockListRefunds(...args),
     },
   }),
 }));
@@ -88,6 +90,8 @@ describe("processRefundQueueOnce", () => {
       payment_intent: "pi_123",
       charge: "ch_123",
     });
+    // Default: no pre-existing refund on the intent → the create path runs.
+    mockListRefunds.mockResolvedValue({ data: [] });
   });
 
   it("creates a Stripe refund with deterministic idempotency and completes the queue item", async () => {
@@ -372,6 +376,84 @@ describe("processRefundQueueOnce", () => {
     expect(tx.payment.updateMany).toHaveBeenCalledWith({
       where: { id: "payment-123", userId: "user-123" },
       data: { autoRefundStatus: "MANUAL_REVIEW_BANNED_USER" },
+    });
+  });
+
+  describe("idempotency-window reconciliation", () => {
+    // Regression for PR #164 review (P1): Stripe retains idempotency keys for
+    // only ~24h, so a row reclaimed by the reaper after that window could create
+    // a DUPLICATE refund. The worker must reconcile against an existing refund
+    // (matched on paymentId + reason metadata) before issuing a new one.
+    it("reuses an existing Stripe refund instead of issuing a duplicate", async () => {
+      mockListRefunds.mockResolvedValue({
+        data: [
+          {
+            id: "re_existing",
+            amount: 499,
+            currency: "usd",
+            status: "succeeded",
+            reason: null,
+            payment_intent: "pi_123",
+            charge: "ch_123",
+            metadata: {
+              paymentId: "payment-123",
+              reason: "banned_user_inflight",
+            },
+          },
+        ],
+      });
+
+      const result = await processRefundQueueOnce({ maxBatch: 1 });
+
+      expect(result).toMatchObject({
+        processed: 1,
+        refunded: 1,
+        manualReview: 0,
+      });
+      // No duplicate refund — the pre-existing one is reused.
+      expect(mockCreateRefund).not.toHaveBeenCalled();
+      expect(mockListRefunds).toHaveBeenCalledWith({
+        payment_intent: "pi_123",
+        limit: 100,
+      });
+      expect(tx.refund.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { stripeRefundId: "re_existing" },
+          create: expect.objectContaining({
+            paymentId: "payment-123",
+            status: "SUCCEEDED",
+            source: "AUTO_REFUND_QUEUE",
+          }),
+        })
+      );
+      expect(tx.refundQueueItem.update).toHaveBeenCalledWith({
+        where: { id: "queue-1" },
+        data: expect.objectContaining({
+          status: "COMPLETED",
+          stripeRefundId: "re_existing",
+        }),
+      });
+    });
+
+    it("ignores refunds on the intent not created by this queue item", async () => {
+      mockListRefunds.mockResolvedValue({
+        data: [
+          {
+            id: "re_unrelated",
+            status: "succeeded",
+            payment_intent: "pi_123",
+            metadata: {
+              paymentId: "other-payment",
+              reason: "banned_user_inflight",
+            },
+          },
+        ],
+      });
+
+      await processRefundQueueOnce({ maxBatch: 1 });
+
+      // Metadata does not match → a fresh refund is created (with the key).
+      expect(mockCreateRefund).toHaveBeenCalledTimes(1);
     });
   });
 
