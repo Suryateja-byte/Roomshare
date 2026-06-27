@@ -56,6 +56,7 @@ jest.mock("@/lib/payments/telemetry", () => ({
     mockRecordStripeEventReplayIgnored(...args),
 }));
 
+import { Prisma } from "@prisma/client";
 import { POST } from "@/app/api/stripe/webhook/route";
 import { prisma } from "@/lib/prisma";
 
@@ -213,5 +214,49 @@ describe("POST /api/stripe/webhook", () => {
     );
     expect(invalid.status).toBe(400);
     expect(prisma.stripeEvent.create).not.toHaveBeenCalled();
+  });
+
+  // Regression: when two deliveries of the same event race, the loser hits a
+  // P2002 unique violation on stripeEventId. It must recover as already-captured
+  // and must NOT enqueue a duplicate outbox row. See full-site review
+  // 2026-06-26, top risk #3.
+  it("treats a P2002 capture race as already-captured without enqueueing duplicate work", async () => {
+    mockConstructEvent.mockReturnValue({
+      id: "evt_race",
+      type: "payment_intent.succeeded",
+      created: 1776900000,
+      livemode: true,
+      data: { object: { id: "pi_123" } },
+    });
+    // Pre-create check misses; the concurrent writer wins; the re-fetch in the
+    // P2002 branch finds the row.
+    (prisma.stripeEvent.findUnique as jest.Mock)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: "stripe-row-concurrent",
+        processedAt: null,
+      });
+    (prisma.stripeEvent.create as jest.Mock).mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+        code: "P2002",
+        clientVersion: "test",
+      })
+    );
+
+    const response = await POST(
+      new Request("http://localhost/api/stripe/webhook", {
+        method: "POST",
+        headers: { "stripe-signature": "sig_test" },
+        body: JSON.stringify({ id: "evt_race" }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ received: true });
+    // The losing writer must not double-enqueue async work.
+    expect(prisma.outboxEvent.create).not.toHaveBeenCalled();
+    // Row is still pending (not processed) → no replay telemetry.
+    expect(mockRecordStripeEventReplayIgnored).not.toHaveBeenCalled();
+    expect(prisma.stripeEvent.findUnique).toHaveBeenCalledTimes(2);
   });
 });
