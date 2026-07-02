@@ -89,12 +89,22 @@ export default function MobileSearchOverlay({
     if (!isOpen) return;
 
     const focusLocationInput = () => {
-      if (
-        state.locationInputRef.current &&
-        document.activeElement !== state.locationInputRef.current
-      ) {
-        state.locationInputRef.current.focus();
+      const input = state.locationInputRef.current;
+      if (!input || document.activeElement === input) {
+        return;
       }
+      // Enforce initial focus only while nothing interactive holds it (WebKit
+      // drops focus to <body> during the slide-in animation). Never yank focus
+      // away from a control the user has already moved to — doing so re-opens
+      // the location popup over the rest of the form.
+      const active = document.activeElement;
+      if (
+        active instanceof HTMLElement &&
+        active.matches("input, textarea, select, button, a[href]")
+      ) {
+        return;
+      }
+      input.focus();
     };
 
     const rafId = window.requestAnimationFrame(focusLocationInput);

@@ -388,7 +388,7 @@ describe("LocationSearchInput - Integration Tests", () => {
       });
     });
 
-    it("keeps dropdown open when clicking inside dropdown", async () => {
+    it("keeps dropdown open when pressing a suggestion, dismisses on dead chrome", async () => {
       renderInput();
       const input = screen.getByRole("combobox");
 
@@ -399,12 +399,17 @@ describe("LocationSearchInput - Integration Tests", () => {
         expect(screen.getByRole("listbox")).toBeInTheDocument();
       });
 
-      // Click on the listbox area (not on an option)
-      const listbox = screen.getByRole("listbox");
-      fireEvent.mouseDown(listbox);
-
-      // Dropdown should still be open
+      // Mousedown on an option keeps the popup open (click-selection works).
+      fireEvent.mouseDown(screen.getByText("San Francisco"));
       expect(screen.getByRole("listbox")).toBeInTheDocument();
+
+      // Mousedown on dead chrome (listbox padding, not an option) dismisses —
+      // the fixed-position popup must not silently swallow presses aimed at
+      // form controls underneath it (mobile Search button intercept fix).
+      fireEvent.mouseDown(screen.getByRole("listbox"));
+      await waitFor(() => {
+        expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+      });
     });
   });
 

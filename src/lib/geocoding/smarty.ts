@@ -113,7 +113,7 @@ function hasSmartyAddressAutocompleteConfig(): boolean {
   return features.smartyAddressAutocomplete;
 }
 
-function assertSmartyAddressCaptureAvailable() {
+async function assertSmartyAddressCaptureAvailable(): Promise<void> {
   if (!hasSmartyAddressAutocompleteConfig()) {
     recordGeocodingProviderSkipped({
       provider: "smarty",
@@ -127,7 +127,7 @@ function assertSmartyAddressCaptureAvailable() {
   }
 
   if (
-    isProviderMonthlyCapReached({
+    await isProviderMonthlyCapReached({
       provider: "smarty",
       surface: "address_capture",
       monthlyCap: parseMonthlyCap(
@@ -355,7 +355,7 @@ export async function suggestSmartyAddresses(
     signal?: AbortSignal;
   }
 ): Promise<AddressAutocompleteSuggestion[]> {
-  assertSmartyAddressCaptureAvailable();
+  await assertSmartyAddressCaptureAvailable();
 
   const search = query.trim().slice(0, SMARTY_SEARCH_MAX_LENGTH);
   const params = new URLSearchParams({
@@ -394,7 +394,7 @@ export async function suggestSmartyAddresses(
       );
     }
 
-    recordGeocodingProviderUsage({
+    await recordGeocodingProviderUsage({
       provider: "smarty",
       surface: "address_capture",
       operation: selected
@@ -430,7 +430,7 @@ export async function suggestSmartyAddresses(
 export async function validateSmartyAddressSuggestionForToken(
   input: SmartyAddressValidationInput
 ): Promise<AddressAutocompleteSuggestion | null> {
-  assertSmartyAddressCaptureAvailable();
+  await assertSmartyAddressCaptureAvailable();
 
   const params = new URLSearchParams({
     street: input.address,
@@ -466,7 +466,7 @@ export async function validateSmartyAddressSuggestionForToken(
       );
     }
 
-    recordGeocodingProviderUsage({
+    await recordGeocodingProviderUsage({
       provider: "smarty",
       surface: "address_capture",
       operation: "us_street_address_validation",

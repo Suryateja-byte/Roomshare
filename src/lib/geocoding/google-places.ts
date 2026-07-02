@@ -318,7 +318,7 @@ async function autocompleteByPrimaryType(
       fieldMask: DESTINATION_FIELD_MASK,
     }
   );
-  recordGeocodingProviderUsage({
+  await recordGeocodingProviderUsage({
     provider: "google",
     surface: "public_autocomplete",
     operation: "places_autocomplete",
@@ -408,7 +408,7 @@ export async function resolveDestination(
     method: "GET",
     fieldMask: PLACE_DETAILS_FIELD_MASK,
   });
-  recordGeocodingProviderUsage({
+  await recordGeocodingProviderUsage({
     provider: "google",
     surface: "public_details",
     operation: "place_details_essentials",
@@ -507,7 +507,7 @@ async function validateAddressForToken(input: {
     );
   }
   if (
-    isProviderMonthlyCapReached({
+    await isProviderMonthlyCapReached({
       provider: "google",
       surface: "address_capture",
       monthlyCap: parseMonthlyCap(
@@ -548,7 +548,7 @@ async function validateAddressForToken(input: {
       fieldMask: ADDRESS_VALIDATION_FIELD_MASK,
     }
   );
-  recordGeocodingProviderUsage({
+  await recordGeocodingProviderUsage({
     provider: "google",
     surface: "address_capture",
     operation: "address_validation",
@@ -611,7 +611,7 @@ export async function suggestAddresses(
       fieldMask: DESTINATION_FIELD_MASK,
     }
   );
-  recordGeocodingProviderUsage({
+  await recordGeocodingProviderUsage({
     provider: "google",
     surface: "address_capture",
     operation: "places_address_autocomplete",
@@ -683,7 +683,7 @@ export async function resolveAddressSuggestion(
       fieldMask: PLACE_DETAILS_FIELD_MASK,
     }
   );
-  recordGeocodingProviderUsage({
+  await recordGeocodingProviderUsage({
     provider: "google",
     surface: "address_capture",
     operation: "place_details_essentials",
