@@ -31,7 +31,10 @@ jest.mock("@/lib/outbox/handlers", () => ({
     CACHE_INVALIDATE: jest.fn(),
     GEOCODE_NEEDED: jest.fn(),
     EMBED_NEEDED: jest.fn(),
+    ALERT_MATCH: jest.fn(),
+    ALERT_DELIVER: jest.fn(),
   },
+  SELF_TRANSACTIONAL_KINDS: new Set(["ALERT_MATCH", "ALERT_DELIVER"]),
 }));
 
 jest.mock("@/lib/outbox/dlq", () => ({
@@ -428,6 +431,84 @@ describe("drainOutboxOnce() - exception from handler", () => {
     const result = await drainOutboxOnce();
     expect(result.processed).toBe(1);
     expect(result.completed).toBe(1);
+  });
+});
+
+describe("drainOutboxOnce() - self-transactional kinds", () => {
+  // Regression: ALERT_DELIVER sends email with retry/backoff; wrapping it in
+  // the drain's SERIALIZABLE withActor transaction held a pooled connection
+  // open for the duration (review finding, 2026-07-01).
+  it("invokes ALERT_DELIVER directly with the root client, bypassing withActor", async () => {
+    const row = makeOutboxRow({
+      kind: "ALERT_DELIVER",
+      aggregateType: "ALERT_DELIVERY",
+      attemptCount: 0,
+    });
+
+    (mockPrisma.$transaction as jest.Mock).mockImplementationOnce(
+      async (fn: Function) => {
+        return fn({
+          $queryRaw: jest.fn().mockResolvedValue([row]),
+          $executeRaw: jest.fn().mockResolvedValue(1),
+        });
+      }
+    );
+
+    (mockHandlers.ALERT_DELIVER as jest.Mock).mockResolvedValueOnce({
+      outcome: "completed",
+    });
+
+    const result = await drainOutboxOnce();
+
+    expect(result.completed).toBe(1);
+    expect(mockWithActor).not.toHaveBeenCalled();
+    expect(mockHandlers.ALERT_DELIVER).toHaveBeenCalledWith(
+      mockPrisma,
+      expect.objectContaining({ id: row.id })
+    );
+  });
+
+  it("still wraps non-self-transactional kinds in withActor", async () => {
+    const row = makeOutboxRow({ kind: "INVENTORY_UPSERTED", attemptCount: 0 });
+
+    (mockPrisma.$transaction as jest.Mock).mockImplementationOnce(
+      async (fn: Function) => {
+        return fn({
+          $queryRaw: jest.fn().mockResolvedValue([row]),
+          $executeRaw: jest.fn().mockResolvedValue(1),
+        });
+      }
+    );
+
+    mockWithActor.mockResolvedValueOnce({ outcome: "completed" });
+
+    const result = await drainOutboxOnce();
+
+    expect(result.completed).toBe(1);
+    expect(mockWithActor).toHaveBeenCalledTimes(1);
+    expect(mockHandlers.ALERT_DELIVER).not.toHaveBeenCalled();
+  });
+
+  it("treats a thrown self-transactional handler as transient_error", async () => {
+    const row = makeOutboxRow({ kind: "ALERT_DELIVER", attemptCount: 0 });
+
+    (mockPrisma.$transaction as jest.Mock).mockImplementationOnce(
+      async (fn: Function) => {
+        return fn({
+          $queryRaw: jest.fn().mockResolvedValue([row]),
+          $executeRaw: jest.fn().mockResolvedValue(1),
+        });
+      }
+    );
+
+    (mockHandlers.ALERT_DELIVER as jest.Mock).mockRejectedValueOnce(
+      new Error("resend down")
+    );
+
+    const result = await drainOutboxOnce();
+
+    expect(result.retryScheduled).toBe(1);
+    expect(result.dlq).toBe(0);
   });
 });
 

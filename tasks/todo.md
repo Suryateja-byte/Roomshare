@@ -1,4 +1,59 @@
-# Fix critical issues from search & map review (2026-07-01)
+# Move alert-email send out of the SERIALIZABLE outbox transaction (2026-07-02)
+
+## Goal + acceptance criteria
+Review finding (high, reliability): `drainOutboxOnce` wraps every handler in a
+30s SERIALIZABLE `withActor` transaction; `ALERT_DELIVER` sends the Resend
+email (up to 3 retries + backoff) INSIDE it, holding a pooled connection for
+seconds under provider latency — risking pool starvation for bookings/holds.
+`ALERT_MATCH` has the same defect (handler ignores its tx entirely but the
+wrapper still holds one open for the whole sweep).
+AC: email send happens outside any DB transaction; all DB writes keep actor
+GUCs via short `withActor` transactions; delivery idempotency preserved
+(status re-check on retry); regression tests prove ALERT kinds bypass the
+drain's transaction wrapper while other kinds keep it.
+
+## Scope
+- src/lib/outbox/handlers.ts — export SELF_TRANSACTIONAL_KINDS; pass-through client
+- src/lib/outbox/drain.ts — route ALERT kinds around withActor
+- src/lib/search-alerts.ts — deliverQueuedSearchAlert → 3 phases
+  (prepare tx / email no-tx / record tx)
+- tests: drain.test.ts (mock + regression), search-alerts.test.ts (mock $executeRaw)
+
+## Risks
+- Actor GUC loss on writes → keep withActor for both write phases.
+- Crash between email send and record → outbox retry re-runs phase-1 status
+  check; duplicate-email window is the SAME as the old single-tx version
+  (which could abort after a successful send). No new failure mode.
+- Phase split loses cross-phase atomicity → each phase internally atomic;
+  terminal states (DROPPED/DELIVERED) all single-phase.
+
+## Checklist
+- [x] search-alerts.ts 3-phase restructure
+- [x] handlers.ts + drain.ts routing
+- [x] test updates + regression tests
+- [x] jest (outbox + search-alerts suites) + lint + typecheck
+
+## Results + verification story
+- `deliverQueuedSearchAlert` now takes a TransactionHost (root prisma) and runs
+  prepare (withActor tx) → sendNotificationEmail (NO tx) → record (withActor tx).
+  All eligibility/drop/record semantics preserved verbatim; actor GUCs kept for
+  every DB phase.
+- `SELF_TRANSACTIONAL_KINDS` (ALERT_MATCH, ALERT_DELIVER) exported from
+  handlers.ts; drain routes those kinds around its 30s SERIALIZABLE withActor
+  wrapper and passes the root client. ALERT_MATCH previously ignored its tx
+  while the wrapper held a connection through the whole sweep — same defect,
+  fixed by the same routing.
+- Regression tests: drain.test.ts proves ALERT_DELIVER bypasses withActor
+  (called with root client), non-alert kinds still wrapped, and a thrown
+  self-transactional handler still maps to transient_error.
+- Verification: outbox suites + search-alerts + cron routes + phase02
+  integration = 150 tests green (NODE_OPTIONS=--experimental-vm-modules
+  required for PGlite suites — bare `npx jest` false-fails them); eslint 0
+  errors; typecheck clean. NOT run: full e2e (CI).
+
+---
+
+# ARCHIVED: Fix critical issues from search & map review (2026-07-01)
 
 ## Goal + acceptance criteria
 Fix the 3 critical findings from the search/map discovery review:
