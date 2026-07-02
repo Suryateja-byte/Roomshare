@@ -59,6 +59,7 @@ import {
   evaluateMessageStartPaywall,
 } from "@/lib/payments/contact-paywall";
 import { prisma } from "@/lib/prisma";
+import { FREE_MESSAGE_START_CONTACTS } from "@/lib/payments/catalog";
 
 describe("contact paywall evaluator", () => {
   const originalPaywall = process.env.ENABLE_CONTACT_PAYWALL;
@@ -328,5 +329,198 @@ describe("contact paywall evaluator", () => {
     expect(prisma.auditEvent.create).not.toHaveBeenCalled();
     expect(prisma.fraudAuditJob.create).not.toHaveBeenCalled();
     expect(prisma.contactConsumption.create).not.toHaveBeenCalled();
+  });
+
+  // Regression: the actual credit-deduction paths (FREE/PASS/PACK) and the two
+  // dedup branches were previously only asserted via `.not.toHaveBeenCalled()`,
+  // so a bug consuming 0 credits (revenue leak), 2 credits (overcharge), or
+  // selecting an exhausted PACK grant would have passed CI. See full-site
+  // review 2026-06-26, top risk #3.
+  describe("credit deduction (consumeContactEntitlement)", () => {
+    it("consumes exactly one FREE credit (source FREE, no grant) when free remains", async () => {
+      const result = await consumeMessageStartEntitlement(prisma as any, {
+        userId: "user-123",
+        listingId: "listing-123",
+        physicalUnitId: "unit-123",
+        clientIdempotencyKey: "idem-free-1",
+      });
+
+      expect(result).toMatchObject({
+        ok: true,
+        source: "FREE",
+        consumptionId: "consumption-123",
+      });
+      expect(prisma.contactConsumption.create).toHaveBeenCalledTimes(1);
+      expect(prisma.contactConsumption.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          userId: "user-123",
+          listingId: "listing-123",
+          unitId: "unit-123",
+          unitIdentityEpoch: 4,
+          contactKind: "MESSAGE_START",
+          source: "FREE",
+          consumedCreditFrom: "FREE",
+          clientIdempotencyKey: "idem-free-1",
+          entitlementGrantId: null,
+        }),
+        select: { id: true },
+      });
+    });
+
+    it("consumes against an active PASS (source PASS, bound to the pass grant, unlimited)", async () => {
+      (prisma.entitlementGrant.findFirst as jest.Mock).mockResolvedValue({
+        id: "grant-pass",
+        activeUntil: new Date(Date.now() + 60 * 60 * 1000),
+      });
+
+      const result = await consumeMessageStartEntitlement(prisma as any, {
+        userId: "user-123",
+        listingId: "listing-123",
+        physicalUnitId: "unit-123",
+        clientIdempotencyKey: "idem-pass-1",
+      });
+
+      expect(result).toMatchObject({ ok: true, source: "PASS" });
+      expect(prisma.contactConsumption.create).toHaveBeenCalledTimes(1);
+      expect(prisma.contactConsumption.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          source: "PASS",
+          consumedCreditFrom: "NONE_PASS_UNLIMITED",
+          entitlementGrantId: "grant-pass",
+        }),
+        select: { id: true },
+      });
+    });
+
+    it("consumes from the oldest PACK grant with capacity, skipping an exhausted older grant", async () => {
+      (prisma.contactConsumption.count as jest.Mock).mockResolvedValue(
+        FREE_MESSAGE_START_CONTACTS
+      );
+      (prisma.entitlementGrant.findFirst as jest.Mock).mockResolvedValue(null);
+      // Ordered oldest-first (matching the orderBy createdAt: asc in source).
+      (prisma.entitlementGrant.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: "pack-old",
+          creditCount: 3,
+          createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        },
+        {
+          id: "pack-new",
+          creditCount: 3,
+          createdAt: new Date("2026-02-01T00:00:00.000Z"),
+        },
+      ]);
+      // pack-old is fully used (3/3); pack-new still has capacity.
+      (prisma.contactConsumption.groupBy as jest.Mock).mockResolvedValue([
+        { entitlementGrantId: "pack-old", _count: { _all: 3 } },
+      ]);
+
+      const result = await consumeMessageStartEntitlement(prisma as any, {
+        userId: "user-123",
+        listingId: "listing-123",
+        physicalUnitId: "unit-123",
+        clientIdempotencyKey: "idem-pack-1",
+      });
+
+      expect(result).toMatchObject({ ok: true, source: "PACK" });
+      expect(prisma.contactConsumption.create).toHaveBeenCalledTimes(1);
+      expect(prisma.contactConsumption.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          source: "PACK",
+          consumedCreditFrom: "PACK",
+          entitlementGrantId: "pack-new",
+        }),
+        select: { id: true },
+      });
+    });
+
+    it("returns PAYWALL_REQUIRED without consuming when free and all packs are exhausted", async () => {
+      (prisma.contactConsumption.count as jest.Mock).mockResolvedValue(
+        FREE_MESSAGE_START_CONTACTS
+      );
+      (prisma.entitlementGrant.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.entitlementGrant.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: "pack-1",
+          creditCount: 1,
+          createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        },
+      ]);
+      (prisma.contactConsumption.groupBy as jest.Mock).mockResolvedValue([
+        { entitlementGrantId: "pack-1", _count: { _all: 1 } },
+      ]);
+
+      const result = await consumeMessageStartEntitlement(prisma as any, {
+        userId: "user-123",
+        listingId: "listing-123",
+        physicalUnitId: "unit-123",
+        clientIdempotencyKey: "idem-exhausted-1",
+      });
+
+      expect(result).toMatchObject({ ok: false, code: "PAYWALL_REQUIRED" });
+      expect(prisma.contactConsumption.create).not.toHaveBeenCalled();
+    });
+
+    it("treats a repeated clientIdempotencyKey as the same consumption (double-click defense)", async () => {
+      // First findUnique = idempotency-key lookup → hit.
+      (prisma.contactConsumption.findUnique as jest.Mock).mockResolvedValueOnce({
+        id: "consumption-idem",
+      });
+
+      const result = await consumeMessageStartEntitlement(prisma as any, {
+        userId: "user-123",
+        listingId: "listing-123",
+        physicalUnitId: "unit-123",
+        clientIdempotencyKey: "idem-dup",
+      });
+
+      expect(result).toMatchObject({
+        ok: true,
+        source: "EXISTING_CONSUMPTION",
+        consumptionId: "consumption-idem",
+      });
+      expect(prisma.contactConsumption.create).not.toHaveBeenCalled();
+      expect(prisma.contactConsumption.findUnique).toHaveBeenCalledWith({
+        where: {
+          userId_clientIdempotencyKey: {
+            userId: "user-123",
+            clientIdempotencyKey: "idem-dup",
+          },
+        },
+        select: { id: true },
+      });
+    });
+
+    it("dedupes on unit identity even when the idempotency key is new", async () => {
+      // 1st findUnique (idempotency key) misses; 2nd (unit identity) hits.
+      (prisma.contactConsumption.findUnique as jest.Mock)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: "consumption-unit" });
+
+      const result = await consumeMessageStartEntitlement(prisma as any, {
+        userId: "user-123",
+        listingId: "listing-123",
+        physicalUnitId: "unit-123",
+        clientIdempotencyKey: "idem-fresh",
+      });
+
+      expect(result).toMatchObject({
+        ok: true,
+        source: "EXISTING_CONSUMPTION",
+        consumptionId: "consumption-unit",
+      });
+      expect(prisma.contactConsumption.create).not.toHaveBeenCalled();
+      expect(prisma.contactConsumption.findUnique).toHaveBeenNthCalledWith(2, {
+        where: {
+          userId_unitId_unitIdentityEpoch_contactKind: {
+            userId: "user-123",
+            unitId: "unit-123",
+            unitIdentityEpoch: 4,
+            contactKind: "MESSAGE_START",
+          },
+        },
+        select: { id: true },
+      });
+    });
   });
 });

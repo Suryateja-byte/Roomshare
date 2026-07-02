@@ -365,4 +365,47 @@ describe("processCapturedStripeEvent", () => {
       }),
     });
   });
+
+  // Regression: entitlement-grant idempotency guards were unexercised, so a
+  // replayed event could have double-granted. See full-site review 2026-06-26,
+  // top risk #3.
+  describe("grant idempotency", () => {
+    it("is a no-op when the event was already processed (processedAt guard)", async () => {
+      const client = buildClient(succeededIntent());
+      client.stripeEvent.findUnique.mockResolvedValue({
+        id: "stripe-row-1",
+        stripeEventId: "evt_1",
+        eventType: "payment_intent.succeeded",
+        payload: succeededIntent(),
+        livemode: true,
+        processedAt: new Date("2026-04-23T00:00:00.000Z"),
+      });
+
+      await processCapturedStripeEvent(client, "stripe-row-1");
+
+      expect(client.payment.create).not.toHaveBeenCalled();
+      expect(client.payment.update).not.toHaveBeenCalled();
+      expect(client.entitlementGrant.create).not.toHaveBeenCalled();
+      // Early return before the PROCESSING/PROCESSED status writes.
+      expect(client.stripeEvent.update).not.toHaveBeenCalled();
+    });
+
+    it("does not create a second grant when one already exists for the payment", async () => {
+      const client = buildClient(succeededIntent());
+      client.entitlementGrant.findUnique.mockResolvedValue({
+        id: "grant-existing",
+      });
+
+      await processCapturedStripeEvent(client, "stripe-row-1");
+
+      expect(client.entitlementGrant.create).not.toHaveBeenCalled();
+      // The existing-grant guard fires before the suspended-user lookup.
+      expect(client.user.findUnique).not.toHaveBeenCalled();
+      // The event still completes successfully (idempotent replay).
+      expect(client.stripeEvent.update).toHaveBeenLastCalledWith({
+        where: { id: "stripe-row-1" },
+        data: expect.objectContaining({ processingStatus: "PROCESSED" }),
+      });
+    });
+  });
 });
