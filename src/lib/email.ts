@@ -4,7 +4,7 @@
 // Uses Resend API for sending emails
 
 import { emailTemplates } from "./email-templates";
-import { logger } from "@/lib/logger";
+import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { hashIdForLog } from "@/lib/messaging/cfm-messaging-telemetry";
 import { prisma } from "@/lib/prisma";
 import { fetchWithTimeout, FetchTimeoutError } from "./fetch-with-timeout";
@@ -69,15 +69,15 @@ export async function sendEmail({
 }: EmailOptions): Promise<{ success: boolean; error?: string }> {
   const RESEND_API_KEY = process.env.RESEND_API_KEY;
   if (!RESEND_API_KEY) {
-    console.warn("RESEND_API_KEY not configured. Email not sent:", { subject });
+    logger.sync.warn("email.not_configured", { subject });
     return { success: true }; // Return success in dev mode
   }
 
   // P0-06 FIX: Check circuit breaker state first - fail fast if email service is unhealthy
   if (!circuitBreakers.email.isAllowingRequests()) {
-    console.warn(
-      "Email circuit breaker is open - service unavailable, skipping email"
-    );
+    logger.sync.warn("email.circuit_breaker_open", {
+      reason: "skipping_send",
+    });
     return {
       success: false,
       error: "Email service temporarily unavailable (circuit breaker open)",
@@ -123,22 +123,37 @@ export async function sendEmail({
 
             // Don't retry 4xx client errors (validation failures, etc.)
             if (response.status >= 400 && response.status < 500) {
-              console.error("Failed to send email (non-retryable):", errorText);
+              // Resend 4xx bodies echo the recipient address; route through the
+              // redacting logger and never log `to` (PII non-negotiable).
+              logger.sync.error("email.send_failed", {
+                status: response.status,
+                retryable: false,
+                recipientHash: hashIdForLog(to),
+                error: sanitizeErrorMessage(errorText),
+              });
               return { success: false, error: errorText };
             }
 
             // 5xx errors are retryable
             if (isRetryableError(null, response) && attempt < MAX_RETRIES - 1) {
               const delay = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
-              console.warn(
-                `Email send failed (attempt ${attempt + 1}/${MAX_RETRIES}), retrying in ${delay}ms...`
-              );
+              logger.sync.warn("email.send_retry", {
+                attempt: attempt + 1,
+                maxRetries: MAX_RETRIES,
+                delayMs: delay,
+                status: response.status,
+              });
               await sleep(delay);
               lastError = errorText;
               continue;
             }
 
-            console.error("Failed to send email:", errorText);
+            logger.sync.error("email.send_failed", {
+              status: response.status,
+              retryable: true,
+              recipientHash: hashIdForLog(to),
+              error: sanitizeErrorMessage(errorText),
+            });
             return { success: false, error: errorText };
           }
 
@@ -152,15 +167,21 @@ export async function sendEmail({
           // Check if error is retryable
           if (isRetryableError(error) && attempt < MAX_RETRIES - 1) {
             const delay = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
-            console.warn(
-              `Email send error (attempt ${attempt + 1}/${MAX_RETRIES}): ${errorMessage}, retrying in ${delay}ms...`
-            );
+            logger.sync.warn("email.send_retry", {
+              attempt: attempt + 1,
+              maxRetries: MAX_RETRIES,
+              delayMs: delay,
+              error: sanitizeErrorMessage(error),
+            });
             await sleep(delay);
             lastError = errorMessage;
             continue;
           }
 
-          console.error("Error sending email:", error);
+          logger.sync.error("email.send_error", {
+            recipientHash: hashIdForLog(to),
+            error: sanitizeErrorMessage(error),
+          });
           return { success: false, error: errorMessage };
         }
       }
@@ -174,13 +195,13 @@ export async function sendEmail({
   } catch (error) {
     // P0-06 FIX: Handle circuit breaker errors gracefully
     if (isCircuitOpenError(error)) {
-      console.warn(
-        "Email circuit breaker opened during request - service unhealthy"
-      );
+      logger.sync.warn("email.circuit_breaker_opened", {});
       return { success: false, error: "Email service temporarily unavailable" };
     }
     // Re-throw unexpected errors
-    console.error("Unexpected error in sendEmail:", error);
+    logger.sync.error("email.unexpected_error", {
+      error: sanitizeErrorMessage(error),
+    });
     return { success: false, error: String(error) };
   }
 }
@@ -200,7 +221,10 @@ export async function sendNotificationEmail(
       html: template.html,
     });
   } catch (error) {
-    console.error(`Error sending ${type} email:`, error);
+    logger.sync.error("email.notification_error", {
+      type,
+      error: sanitizeErrorMessage(error),
+    });
     return { success: false, error: String(error) };
   }
 }
@@ -264,10 +288,10 @@ export async function sendNotificationEmailWithPreference(
     // Send the email
     return await sendNotificationEmail(type, email, data);
   } catch (error) {
-    console.error(
-      `Error in sendNotificationEmailWithPreference for ${type}:`,
-      error
-    );
+    logger.sync.error("email.notification_preference_error", {
+      type,
+      error: sanitizeErrorMessage(error),
+    });
     return { success: false, error: String(error) };
   }
 }
