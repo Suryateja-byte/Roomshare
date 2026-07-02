@@ -74,12 +74,27 @@ function parsePositiveFloat(value: string | undefined): number | null {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
-export function buildPhase04SearchSpec(input: {
+/**
+ * Engine-independent admission caps (P2-3).
+ *
+ * The occupants>20 and deep-page>20 rejections are pure cost/perf gates that
+ * must run on EVERY read engine, not just the dev-default projection path —
+ * otherwise a request that 400s in dev (projection ON) runs an expensive scan
+ * in prod (SearchDoc, flag OFF). executeSearchV2 hoists this ahead of the engine
+ * branch; buildPhase04SearchSpec still calls it so the projection count fast-path
+ * (getProjectionSearchCount) keeps rejecting these independently.
+ *
+ * Reads the RAW occupants value (unclamped) so occupants>20 is a hard 400 even
+ * though the parser clamps the canonical capacity filter to <=20.
+ *
+ * NOTE: the bounds-span cap is deliberately NOT hoisted — wide-view default-sort
+ * browse is a supported prod UX on the list path (the map query clamps its own
+ * bounds separately), so the span limit stays projection-only, below.
+ */
+export function evaluateSearchAdmissionCaps(input: {
   parsed: ParsedSearchParams;
   rawParams: RawSearchParams | Record<string, string | string[] | undefined>;
-  pageSize: number;
-  versions: SearchSpecVersionTokens;
-}): { ok: true; spec: SearchSpec } | { ok: false; error: SearchAdmissionError } {
+}): SearchAdmissionError | null {
   const rawOccupants = parsePositiveInt(
     getFirstRaw(input.rawParams, [
       "requested_occupants",
@@ -90,17 +105,37 @@ export function buildPhase04SearchSpec(input: {
       "minAvailableSlots",
     ])
   );
-  const requestedOccupants =
-    rawOccupants ?? input.parsed.filterParams.minAvailableSlots ?? 1;
-  if (requestedOccupants > PHASE04_MAX_OCCUPANTS) {
+  if (rawOccupants !== null && rawOccupants > PHASE04_MAX_OCCUPANTS) {
     return {
-      ok: false,
-      error: {
-        code: "requested_occupants_too_high",
-        message: `requested_occupants must be <= ${PHASE04_MAX_OCCUPANTS}`,
-        status: 400,
-      },
+      code: "requested_occupants_too_high",
+      message: `requested_occupants must be <= ${PHASE04_MAX_OCCUPANTS}`,
+      status: 400,
     };
+  }
+
+  if (input.parsed.requestedPage > PHASE04_DEEP_PAGE_CAP) {
+    return {
+      code: "deep_paging_capped",
+      message: `page must be <= ${PHASE04_DEEP_PAGE_CAP}`,
+      status: 400,
+    };
+  }
+
+  return null;
+}
+
+export function buildPhase04SearchSpec(input: {
+  parsed: ParsedSearchParams;
+  rawParams: RawSearchParams | Record<string, string | string[] | undefined>;
+  pageSize: number;
+  versions: SearchSpecVersionTokens;
+}): { ok: true; spec: SearchSpec } | { ok: false; error: SearchAdmissionError } {
+  const admissionError = evaluateSearchAdmissionCaps({
+    parsed: input.parsed,
+    rawParams: input.rawParams,
+  });
+  if (admissionError) {
+    return { ok: false, error: admissionError };
   }
 
   const maxGapDays =
@@ -132,18 +167,6 @@ export function buildPhase04SearchSpec(input: {
     };
   }
 
-  const page = input.parsed.requestedPage;
-  if (page > PHASE04_DEEP_PAGE_CAP) {
-    return {
-      ok: false,
-      error: {
-        code: "deep_paging_capped",
-        message: `page must be <= ${PHASE04_DEEP_PAGE_CAP}`,
-        status: 400,
-      },
-    };
-  }
-
   const bounds = input.parsed.filterParams.bounds;
   if (bounds) {
     const latSpan = Math.abs(bounds.maxLat - bounds.minLat);
@@ -163,6 +186,13 @@ export function buildPhase04SearchSpec(input: {
     }
   }
 
+  // P2-4: single source of truth — the parser resolves every occupants alias
+  // (occupants/guests/requested_occupants/minSlots) into
+  // filterParams.minAvailableSlots, so the projection SQL, the SearchDoc filter,
+  // and the query hash all read the same canonical capacity value. Pathological
+  // occupants>20 is rejected above via the raw, unclamped admission read.
+  const requestedOccupants = input.parsed.filterParams.minAvailableSlots ?? 1;
+  const page = input.parsed.requestedPage;
   const pageSize = Math.max(1, Math.min(input.pageSize, MAX_PAGE_SIZE));
   return {
     ok: true,

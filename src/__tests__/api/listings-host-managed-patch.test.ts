@@ -55,6 +55,10 @@ jest.mock("@/lib/search/search-doc-dirty", () => ({
   markListingDirtyInTx: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock("@/lib/search/search-cache", () => ({
+  invalidateSearchCaches: jest.fn(),
+}));
+
 jest.mock("@/lib/api-error-handler", () => ({
   captureApiError: jest
     .fn()
@@ -151,6 +155,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyAddressSuggestionToken } from "@/lib/geocoding/address-suggestion-token";
 import { syncCanonicalListingInventory } from "@/lib/listings/canonical-inventory";
 import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
+import { invalidateSearchCaches } from "@/lib/search/search-cache";
 import { createClient } from "@supabase/supabase-js";
 
 const ownerSession = {
@@ -868,6 +873,130 @@ describe("PATCH /api/listings/[id] contact-first availability contract", () => {
       expect(mockValidateAddressForPublish).not.toHaveBeenCalled();
       expect(update).toHaveBeenCalled();
     });
+  });
+
+  it("threads the validated coordinates into canonical sync on an address change (P2-2)", async () => {
+    (verifyAddressSuggestionToken as jest.Mock).mockReturnValue({
+      valid: true,
+      coords: { lat: 40.7128, lng: -74.006 },
+    });
+    mockTransaction({
+      lockedRows: [
+        lockedListing({
+          normalizedAddress: "123 main st san francisco ca 94102",
+          physicalUnitId: "unit-123",
+        }),
+      ],
+    });
+
+    const response = await PATCH(
+      new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify(
+          validPatchPayload({
+            address: "456 Oak Ave",
+            city: "San Francisco",
+            state: "CA",
+            zip: "94103",
+            addressSuggestionToken: "valid-token",
+          })
+        ),
+      }),
+      { params: Promise.resolve({ id: "listing-abc" }) }
+    );
+
+    expect(response.status).toBe(200);
+    // The just-validated coords must reach canonical sync so the unit is not
+    // recreated PENDING_GEOCODE (parity with POST create).
+    expect(syncCanonicalListingInventory).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        trustedCoordinates: { lat: 40.7128, lng: -74.006 },
+      })
+    );
+  });
+
+  it("does not thread trustedCoordinates when a profile edit leaves the address unchanged", async () => {
+    mockTransaction();
+
+    const response = await PATCH(
+      new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify(validPatchPayload()),
+      }),
+      { params: Promise.resolve({ id: "listing-abc" }) }
+    );
+
+    expect(response.status).toBe(200);
+    const syncArgs = (syncCanonicalListingInventory as jest.Mock).mock
+      .calls[0][1];
+    expect(syncArgs.trustedCoordinates).toBeUndefined();
+  });
+
+  it("invalidates search caches after a successful availability PATCH (P2-18)", async () => {
+    mockTransaction();
+
+    const response = await PATCH(
+      new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify({
+          expectedVersion: 3,
+          openSlots: 1,
+          totalSlots: 2,
+          moveInDate: "2026-05-01",
+          availableUntil: "2026-09-01",
+          minStayMonths: 2,
+          status: "ACTIVE",
+        }),
+      }),
+      { params: Promise.resolve({ id: "listing-abc" }) }
+    );
+
+    expect(response.status).toBe(200);
+    expect(invalidateSearchCaches).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not fail the availability PATCH when search-cache revalidation throws (P2-18)", async () => {
+    (invalidateSearchCaches as jest.Mock).mockImplementationOnce(() => {
+      throw new Error("revalidateTag boom");
+    });
+    const { update } = mockTransaction();
+
+    const response = await PATCH(
+      new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify({
+          expectedVersion: 3,
+          openSlots: 1,
+          totalSlots: 2,
+          moveInDate: "2026-05-01",
+          availableUntil: "2026-09-01",
+          minStayMonths: 2,
+          status: "ACTIVE",
+        }),
+      }),
+      { params: Promise.resolve({ id: "listing-abc" }) }
+    );
+
+    expect(response.status).toBe(200);
+    // The write committed even though revalidation threw.
+    expect(update).toHaveBeenCalled();
+    expect(invalidateSearchCaches).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not invalidate search caches for a non-availability profile edit (P2-18 scope)", async () => {
+    mockTransaction();
+
+    const response = await PATCH(
+      new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify(validPatchPayload()),
+      }),
+      { params: Promise.resolve({ id: "listing-abc" }) }
+    );
+
+    expect(response.status).toBe(200);
+    expect(invalidateSearchCaches).not.toHaveBeenCalled();
   });
 
   it("survives a phase01 canonical-sync skip: PATCH succeeds, physicalUnitId falls back, dirty mark still fires (H2)", async () => {

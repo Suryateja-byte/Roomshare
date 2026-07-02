@@ -1,8 +1,10 @@
 import {
+  buildHostManagedPublicAvailability,
   buildPublicAvailability,
   isListingEligibleForPublicSearch,
   resolvePublicAvailability,
   resolvePublicAvailabilityForListings,
+  toPublicAvailabilityPayload,
 } from "@/lib/search/public-availability";
 
 describe("search/public-availability", () => {
@@ -459,5 +461,54 @@ describe("search/public-availability", () => {
     expect(resolved.get("legacy-1")?.searchEligible).toBe(false);
     expect(resolved.get("host-1")?.availabilitySource).toBe("HOST_MANAGED");
     expect(resolved.get("host-1")?.effectiveAvailableSlots).toBe(2);
+  });
+
+  describe("toPublicAvailabilityPayload", () => {
+    it("keeps only the nine public fields from a fully resolved availability", () => {
+      const resolved = buildHostManagedPublicAvailability(
+        {
+          status: "ACTIVE",
+          statusReason: null,
+          availabilitySource: "HOST_MANAGED",
+          openSlots: 2,
+          totalSlots: 4,
+          moveInDate: "2026-06-01",
+          availableUntil: "2026-12-01",
+          minStayMonths: 3,
+          lastConfirmedAt: "2026-04-15T12:30:00.000Z",
+        },
+        new Date("2026-04-20T00:00:00.000Z")
+      );
+
+      // Guard the premise: the resolved object carries the internal fields.
+      expect(resolved.searchEligible).toBe(true);
+      expect(resolved.staleAt).not.toBeNull();
+
+      expect(toPublicAvailabilityPayload(resolved)).toEqual({
+        availabilitySource: "HOST_MANAGED",
+        openSlots: 2,
+        totalSlots: 4,
+        availableFrom: "2026-06-01",
+        availableUntil: "2026-12-01",
+        minStayMonths: 3,
+        lastConfirmedAt: "2026-04-15T12:30:00.000Z",
+        freshnessBucket: "NORMAL",
+        publicStatus: "AVAILABLE",
+      });
+    });
+
+    it("passes a narrow availability through without adding freshness fields", () => {
+      const narrow = buildPublicAvailability({
+        availableSlots: 1,
+        totalSlots: 2,
+      });
+      const payload = toPublicAvailabilityPayload(narrow);
+
+      expect(payload).toEqual(narrow);
+      expect(payload.freshnessBucket).toBeUndefined();
+      expect(payload.publicStatus).toBeUndefined();
+      expect(Object.keys(payload)).not.toContain("freshnessBucket");
+      expect(Object.keys(payload)).not.toContain("publicStatus");
+    });
   });
 });

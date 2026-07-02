@@ -13,6 +13,7 @@ import {
 } from "@/lib/search/public-availability";
 import {
   buildPrivacyFirstViewerContract,
+  resolvePublicListingVisibilityState,
   type ContactDisabledReason,
 } from "@/lib/listings/public-contact-contract";
 import {
@@ -75,7 +76,7 @@ export async function GET(request: Request, { params }: RouteContext) {
   const { id } = await params;
   const session = await auth();
 
-  const listing = await prisma.listing.findUnique({
+  const rawListing = await prisma.listing.findUnique({
     where: { id },
     select: {
       ownerId: true,
@@ -92,7 +93,21 @@ export async function GET(request: Request, { params }: RouteContext) {
     },
   });
 
-  const isOwner = !!session?.user?.id && listing?.ownerId === session.user.id;
+  const isOwner = !!session?.user?.id && rawListing?.ownerId === session.user.id;
+  const isAdmin = session?.user?.isAdmin === true;
+
+  // P2-1: viewer-state must not leak the availability (or existence) of
+  // hidden/moderated listings. Mirror the detail-page/status gate: when the
+  // listing is not publicly visible and the viewer can't manage it, treat it
+  // as not-found so the response is indistinguishable from a missing listing.
+  const rawVisibility = rawListing
+    ? resolvePublicListingVisibilityState(rawListing)
+    : null;
+  const listing =
+    rawListing && (isOwner || isAdmin || rawVisibility?.isPubliclyVisible)
+      ? rawListing
+      : null;
+
   const isEmailVerified = !!session?.user?.emailVerified;
   const needsMigrationReview = false;
   const paywallSummaryPromise = listing

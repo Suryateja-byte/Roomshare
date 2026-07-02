@@ -79,6 +79,10 @@ function projectionRow(overrides: Record<string, unknown> = {}) {
     display_title: overrides.display_title ?? `Room in ${unitId}`,
     display_subtitle: overrides.display_subtitle ?? "Projection-safe summary",
     hero_image_url: overrides.hero_image_url ?? null,
+    representative_status: overrides.representative_status ?? "ACTIVE",
+    representative_status_reason:
+      overrides.representative_status_reason ?? null,
+    last_confirmed_at: overrides.last_confirmed_at ?? null,
     projection_epoch: overrides.projection_epoch ?? BigInt(1),
     source_version: overrides.source_version ?? BigInt(1),
   };
@@ -822,6 +826,108 @@ describe("Phase 04 projection search", () => {
         code: "projection_read_unsupported",
         unsupportedReasons: ["amenities"],
       },
+    });
+  });
+
+  // Regression (P1-4): gender/household-gender filters must use strict equality
+  // (matching the SearchDoc engine), so a row with an unspecified (NULL)
+  // preference is excluded rather than included. Cross-engine parity.
+  it("filters gender/household-gender with strict equality (excludes NULL-preference rows)", async () => {
+    mockQueryRawUnsafe.mockResolvedValueOnce([projectionRow()]);
+
+    await executeProjectionSearchV2({
+      parsed: parsed({
+        sortOption: "price_asc",
+        filterParams: {
+          sort: "price_asc",
+          genderPreference: "female",
+          householdGender: "female",
+        },
+      }),
+      params: { rawParams: {}, limit: 12 },
+    });
+
+    const sql = String(mockQueryRawUnsafe.mock.calls[0][0]);
+    expect(sql).toContain("isp.gender_preference = $");
+    expect(sql).toContain("isp.household_gender = $");
+    expect(sql).not.toContain("isp.gender_preference IS NULL");
+    expect(sql).not.toContain("isp.household_gender IS NULL");
+  });
+
+  // Regression (P2-7): the default move-in match is exact (0-day gap), matching
+  // the SearchDoc engine; an explicit max_gap_days is honored as a near-match
+  // window. The gap-days value is bound as the SQL param following the move-in
+  // date param.
+  it("uses an exact move-in match by default and honors an explicit max_gap_days", async () => {
+    mockQueryRawUnsafe.mockResolvedValueOnce([projectionRow()]);
+    await executeProjectionSearchV2({
+      parsed: parsed({
+        sortOption: "price_asc",
+        filterParams: { sort: "price_asc", moveInDate: "2026-05-01" },
+      }),
+      params: { rawParams: {}, limit: 12 },
+    });
+    const defaultArgs = mockQueryRawUnsafe.mock.calls[0].slice(1);
+    const defaultMoveInIdx = defaultArgs.indexOf("2026-05-01");
+    expect(defaultMoveInIdx).toBeGreaterThanOrEqual(0);
+    expect(defaultArgs[defaultMoveInIdx + 1]).toBe(0);
+
+    jest.clearAllMocks();
+    createSnapshotMock();
+    mockQueryRawUnsafe.mockResolvedValueOnce([projectionRow()]);
+    await executeProjectionSearchV2({
+      parsed: parsed({
+        sortOption: "price_asc",
+        filterParams: { sort: "price_asc", moveInDate: "2026-05-01" },
+      }),
+      params: { rawParams: { max_gap_days: "45" }, limit: 12 },
+    });
+    const explicitArgs = mockQueryRawUnsafe.mock.calls[0].slice(1);
+    const explicitMoveInIdx = explicitArgs.indexOf("2026-05-01");
+    expect(explicitMoveInIdx).toBeGreaterThanOrEqual(0);
+    expect(explicitArgs[explicitMoveInIdx + 1]).toBe(45);
+  });
+
+  // Regression (P2-11): projection list items must carry the RESOLVED
+  // public-availability shape (freshnessBucket/publicStatus/searchEligible), the
+  // same object the SearchDoc engine emits, so dev and prod render identical
+  // freshness UI.
+  it("emits the resolved public-availability shape for projection list items", async () => {
+    mockQueryRawUnsafe.mockResolvedValueOnce([
+      projectionRow({
+        unit_id: "unit-a",
+        representative_inventory_id: "inv-a1",
+        representative_status: "ACTIVE",
+        last_confirmed_at: null,
+      }),
+    ]);
+
+    const result = await executeProjectionSearchV2({
+      parsed: parsed({
+        sortOption: "price_asc",
+        filterParams: { sort: "price_asc" },
+      }),
+      params: { rawParams: {}, limit: 12 },
+    });
+
+    // Raw ListingData (pre public-payload boundary) carries the FULL resolved
+    // read-model, including the internal searchEligible flag.
+    const resolved = result.paginatedResult?.items?.[0]?.publicAvailability;
+    expect(resolved).toMatchObject({
+      availabilitySource: "HOST_MANAGED",
+      publicStatus: "AVAILABLE",
+      freshnessBucket: "UNCONFIRMED",
+      searchEligible: true,
+    });
+
+    // The public payload keeps the UI-consumed display fields
+    // (freshnessBucket/publicStatus) so dev renders the same freshness UI as prod.
+    const publicAvailability =
+      result.response?.list.fullItems?.[0]?.publicAvailability;
+    expect(publicAvailability).toMatchObject({
+      availabilitySource: "HOST_MANAGED",
+      publicStatus: "AVAILABLE",
+      freshnessBucket: "UNCONFIRMED",
     });
   });
 });

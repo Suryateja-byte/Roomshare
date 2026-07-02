@@ -72,6 +72,15 @@ export interface SearchPaginationSnapshot {
   responseVersion: string;
   projectionVersion: number;
   embeddingVersion: string | null;
+  /**
+   * Bare filter query hash the cursor was minted under (P2-20). Binds the keyset
+   * cursor to its filter set so a cursor from query A cannot be replayed against
+   * query B's WHERE (same sort), which would silently duplicate/skip rows.
+   * Optional for backward compat: cursors minted before this field shipped decode
+   * without it and are treated as stale (rejected on first use, mirroring the
+   * snapshot-cursor queryHash check).
+   */
+  qh?: string;
 }
 
 export interface SnapshotCursorV3 {
@@ -142,6 +151,7 @@ const SearchPaginationSnapshotSchema = z
     responseVersion: z.string().min(1),
     projectionVersion: z.number().int().nonnegative(),
     embeddingVersion: z.string().nullable(),
+    qh: z.string().min(1).optional(),
   })
   .strict();
 

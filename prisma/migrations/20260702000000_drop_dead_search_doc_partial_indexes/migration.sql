@@ -1,0 +1,44 @@
+-- Drop three unusable partial indexes on listing_search_docs (review P2-16).
+--
+-- Why they are dead weight:
+--   The hot list/map/count queries filter status and slots on the LIVE "Listing"
+--   table (l.status = 'ACTIVE', l."openSlots" >= $N), never on the denormalized
+--   doc columns d.status / d.available_slots (see buildPublicSearchEligibilityConditions
+--   in src/lib/search/search-doc-queries.ts). A Postgres partial index is only
+--   usable when the query WHERE provably implies the index predicate, so an index
+--   predicated on d.status = 'ACTIVE' AND d.available_slots > 0 can never be chosen
+--   by any hot query. Confirmed by static analysis of every hot WHERE builder.
+--
+-- Why no replacement index is added:
+--   Every real access path is already covered by existing indexes —
+--     * bounds (the selective driver): search_doc_location_geog_idx (GIST location_geog)
+--     * price range: search_doc_price_idx (price)
+--     * per-sort keyset pagination: search_doc_keyset_recommended / _price_asc /
+--       _price_desc / _newest / _rating (all leading with the sort column +
+--       listing_created_at DESC + id)
+--   A new (price, listing_created_at) btree would duplicate search_doc_price_idx and
+--   the price keyset indexes — pure write amplification with no read benefit, i.e.
+--   exactly the anti-pattern this finding flags. So we drop and add nothing.
+--
+-- LEAD DECISION: do NOT add d.status = 'ACTIVE' to the search WHERE to "revive"
+--   these indexes — the doc status can lag the live listing (sync delay), so keying
+--   search on d.status could hide a just-unpaused listing. Eligibility stays on the
+--   live "Listing" row; the dead doc-side indexes are removed instead.
+--
+-- Data safety: dropping an index takes a brief ACCESS EXCLUSIVE lock on the index
+--   only; on this pre-launch dataset (dummy data) the risk is nil. Plain DROP INDEX
+--   (not CONCURRENTLY) so the statement stays inside Prisma's migration transaction.
+--
+-- Rollback (reversible — recreate exactly as originally defined):
+--   CREATE INDEX "search_doc_status_idx"
+--     ON "listing_search_docs" ("status") WHERE "status" = 'ACTIVE';
+--   CREATE INDEX "search_doc_available_idx"
+--     ON "listing_search_docs" ("available_slots")
+--     WHERE "available_slots" > 0 AND "status" = 'ACTIVE';
+--   CREATE INDEX "search_doc_active_available_price_idx"
+--     ON "listing_search_docs" ("price", "listing_created_at" DESC)
+--     WHERE "status" = 'ACTIVE' AND "available_slots" > 0;
+
+DROP INDEX IF EXISTS "search_doc_status_idx";
+DROP INDEX IF EXISTS "search_doc_available_idx";
+DROP INDEX IF EXISTS "search_doc_active_available_price_idx";

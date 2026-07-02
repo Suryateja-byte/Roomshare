@@ -19,6 +19,7 @@ import { VALID_AMENITIES, VALID_HOUSE_RULES } from "@/lib/filter-schema";
 import { checkListingLanguageCompliance } from "@/lib/listing-language-guard";
 import { isValidLanguageCode } from "@/lib/languages";
 import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
+import { invalidateSearchCaches } from "@/lib/search/search-cache";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { captureApiError } from "@/lib/api-error-handler";
 import { validateCsrf } from "@/lib/csrf";
@@ -845,6 +846,26 @@ export async function PATCH(
         }
 
         result = availabilityPatchResult.updatedListing;
+
+        // Capacity/openSlots changes affect search results; refresh the
+        // SearchDoc list/map/count/facet caches. Best-effort — a revalidation
+        // failure must never fail the availability write.
+        try {
+          invalidateSearchCaches();
+        } catch (revalidateError) {
+          logger.sync.warn(
+            "Failed to invalidate search caches after availability patch",
+            {
+              route: "/api/listings/[id]",
+              method: "PATCH",
+              listingId: id,
+              error:
+                revalidateError instanceof Error
+                  ? revalidateError.message
+                  : String(revalidateError),
+            }
+          );
+        }
       } catch (error) {
         if (error instanceof Error) {
           if (error.message === "NOT_FOUND") {
@@ -1251,6 +1272,7 @@ export async function PATCH(
             listing: updatedListing,
             address: { address, city, state, zip },
             actor: { role: "host", id: userId },
+            trustedCoordinates: coords ?? undefined,
           });
 
           return {

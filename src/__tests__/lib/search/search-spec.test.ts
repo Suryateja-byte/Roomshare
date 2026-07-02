@@ -25,10 +25,14 @@ const versions = {
 };
 
 describe("Phase 04 SearchSpec", () => {
-  it("derives requested occupants from legacy minSlots aliases", () => {
+  it("derives requested occupants from the parsed canonical capacity (P2-4)", () => {
+    // P2-4: the parser is the single source of truth. Every occupants alias
+    // (occupants/guests/requested_occupants/minSlots) is resolved into
+    // filterParams.minAvailableSlots upstream; the spec reads that canonical
+    // value rather than re-reading raw aliases.
     const result = buildPhase04SearchSpec({
-      parsed: parsed(),
-      rawParams: { minSlots: "3" },
+      parsed: parsed({ filterParams: { minAvailableSlots: 3 } }),
+      rawParams: {},
       pageSize: 12,
       versions,
     });

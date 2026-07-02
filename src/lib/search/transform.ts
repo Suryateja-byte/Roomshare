@@ -25,7 +25,8 @@ import {
 } from "./types";
 import {
   buildPublicAvailability,
-  type PublicAvailability,
+  toPublicAvailabilityPayload,
+  type PublicAvailabilityPayload,
 } from "./public-availability";
 import { toPublicCoordinates } from "./public-coordinates";
 import { toPublicGroupMetadata } from "./public-listing-payload";
@@ -45,19 +46,19 @@ type AvailabilityLike = Pick<
 
 function getNormalizedPublicAvailability(
   listing: AvailabilityLike
-): PublicAvailability {
-  return (
+): PublicAvailabilityPayload {
+  return toPublicAvailabilityPayload(
     listing.publicAvailability ??
-    buildPublicAvailability({
-      availabilitySource: listing.availabilitySource,
-      openSlots: listing.openSlots,
-      availableSlots: listing.availableSlots,
-      totalSlots: listing.totalSlots,
-      moveInDate: listing.moveInDate,
-      availableUntil: listing.availableUntil,
-      minStayMonths: listing.minStayMonths,
-      lastConfirmedAt: listing.lastConfirmedAt,
-    })
+      buildPublicAvailability({
+        availabilitySource: listing.availabilitySource,
+        openSlots: listing.openSlots,
+        availableSlots: listing.availableSlots,
+        totalSlots: listing.totalSlots,
+        moveInDate: listing.moveInDate,
+        availableUntil: listing.availableUntil,
+        minStayMonths: listing.minStayMonths,
+        lastConfirmedAt: listing.lastConfirmedAt,
+      })
   );
 }
 
@@ -258,9 +259,11 @@ export function transformToPins(
     );
     const publicAvailability = sourceListing
       ? getNormalizedPublicAvailability(sourceListing)
-      : buildPublicAvailability({
-          availableSlots: bestListing.availableSlots,
-        });
+      : toPublicAvailabilityPayload(
+          buildPublicAvailability({
+            availableSlots: bestListing.availableSlots,
+          })
+        );
     const publicCoordinates = toPublicCoordinates({
       lat: group.lat,
       lng: group.lng,

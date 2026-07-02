@@ -37,6 +37,14 @@ jest.mock("@/lib/with-rate-limit-redis", () => ({
   withRateLimitRedis: jest.fn().mockResolvedValue(null),
 }));
 
+// Mock the rate-limit identifier so the route (and this test) don't pull in
+// @/auth (next-auth ESM breaks the Jest transform). Both the route and the
+// top-level test import resolve to this same mock, so reference-equality
+// assertions on getIdentifier still hold.
+jest.mock("@/lib/search-rate-limit-identifier", () => ({
+  getSearchRateLimitIdentifier: jest.fn().mockResolvedValue("127.0.0.1"),
+}));
+
 // Mock request context
 jest.mock("@/lib/request-context", () => ({
   createContextFromHeaders: jest.fn().mockReturnValue({}),
@@ -77,6 +85,7 @@ const preImportListenerCount = process.listeners("unhandledRejection").length;
 
 import { GET } from "@/app/api/search/facets/route";
 import { prisma } from "@/lib/prisma";
+import { getSearchRateLimitIdentifier } from "@/lib/search-rate-limit-identifier";
 import type { NextRequest } from "next/server";
 
 const mockQueryRawUnsafe = prisma.$queryRawUnsafe as jest.Mock;
@@ -817,5 +826,96 @@ describe("cache key regression (gender filters)", () => {
     const none = await cacheKeyFor(boundsParams);
 
     expect(explicitAny).toBe(none);
+  });
+});
+
+describe("cache key bounds quantization (P2-5 cost amplification)", () => {
+  function queueEmptyFacetResults() {
+    // 4 queries when no price data (histogram skipped on null min/max):
+    // amenities, houseRules, roomTypes, priceRanges
+    mockQueryRawUnsafe
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ min: null, max: null, median: null }]);
+  }
+
+  // Runs one GET and returns the serialized filter portion of the
+  // unstable_cache key (["search-facets", <key>]) it was invoked with.
+  async function cacheKeyFor(params: Record<string, string>): Promise<string> {
+    const { unstable_cache } = await import("next/cache");
+    const mockUnstableCache = jest.mocked(unstable_cache);
+    const callsBefore = mockUnstableCache.mock.calls.length;
+    queueEmptyFacetResults();
+    await GET(createRequest(params));
+    const call = mockUnstableCache.mock.calls[callsBefore];
+    expect(call).toBeDefined();
+    const keyParts = call[1] as unknown as string[];
+    return keyParts[1];
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockExecuteRawUnsafe.mockResolvedValue(undefined);
+  });
+
+  it("coalesces sub-quantization-step pans onto one cache entry", async () => {
+    // Two bounds differing only in the 4th decimal (< BOUNDS_EPSILON=0.001,
+    // ~100m). The old toFixed(4) key (~11m) treated these as distinct and
+    // busted the cache on every jitter; the quantized key must coalesce them.
+    const a = await cacheKeyFor({
+      minLng: "-97.8003",
+      maxLng: "-97.6003",
+      minLat: "30.2003",
+      maxLat: "30.4003",
+    });
+    const b = await cacheKeyFor({
+      minLng: "-97.8001",
+      maxLng: "-97.6001",
+      minLat: "30.2001",
+      maxLat: "30.4001",
+    });
+
+    expect(a).toBe(b);
+  });
+
+  it("keys a full-quantization-step pan to a distinct cache entry", async () => {
+    const base = await cacheKeyFor({
+      minLng: "-97.8003",
+      maxLng: "-97.6003",
+      minLat: "30.2003",
+      maxLat: "30.4003",
+    });
+    // minLng shifted by a full BOUNDS_EPSILON step → different ~100m cell
+    const shifted = await cacheKeyFor({
+      minLng: "-97.8013",
+      maxLng: "-97.6003",
+      minLat: "30.2003",
+      maxLat: "30.4003",
+    });
+
+    expect(shifted).not.toBe(base);
+  });
+});
+
+describe("rate limit identity (P2-5 shared-NAT starvation)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("keys the search-count bucket by ip:userId via getSearchRateLimitIdentifier", async () => {
+    const { withRateLimitRedis } = await import("@/lib/with-rate-limit-redis");
+
+    // Empty request hits the unbounded early-return, but the rate-limit check
+    // runs first and unconditionally — that's what we assert on.
+    await GET(createRequest());
+
+    expect(withRateLimitRedis).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        type: "search-count",
+        getIdentifier: getSearchRateLimitIdentifier,
+      })
+    );
   });
 });

@@ -10,7 +10,8 @@ import type {
 import { toPublicCoordinates } from "@/lib/search/public-coordinates";
 import {
   buildPublicAvailability,
-  type PublicAvailability,
+  toPublicAvailabilityPayload,
+  type PublicAvailabilityPayload,
 } from "@/lib/search/public-availability";
 
 export const PUBLIC_GROUP_KEY_PREFIX = "pg1_";
@@ -117,19 +118,19 @@ export function toPublicGroupMetadata(
 
 function normalizePublicAvailability(
   listing: ListingData | MapListingData
-): PublicAvailability {
-  return (
+): PublicAvailabilityPayload {
+  return toPublicAvailabilityPayload(
     listing.publicAvailability ??
-    buildPublicAvailability({
-      availabilitySource: listing.availabilitySource,
-      openSlots: listing.openSlots,
-      availableSlots: listing.availableSlots,
-      totalSlots: listing.totalSlots,
-      moveInDate: listing.moveInDate,
-      availableUntil: listing.availableUntil,
-      minStayMonths: listing.minStayMonths,
-      lastConfirmedAt: listing.lastConfirmedAt,
-    })
+      buildPublicAvailability({
+        availabilitySource: listing.availabilitySource,
+        openSlots: listing.openSlots,
+        availableSlots: listing.availableSlots,
+        totalSlots: listing.totalSlots,
+        moveInDate: listing.moveInDate,
+        availableUntil: listing.availableUntil,
+        minStayMonths: listing.minStayMonths,
+        lastConfirmedAt: listing.lastConfirmedAt,
+      })
   );
 }
 
@@ -187,6 +188,7 @@ export function toPublicSearchListings(
 export function toPublicMapListing(listing: MapListingData): MapListingData {
   const publicCoordinates = toPublicCoordinates(listing.location);
   const publicGroupMetadata = toPublicGroupMetadata(listing);
+  const publicAvailability = normalizePublicAvailability(listing);
 
   return {
     ...listing,
@@ -195,6 +197,7 @@ export function toPublicMapListing(listing: MapListingData): MapListingData {
       lat: publicCoordinates.lat,
       lng: publicCoordinates.lng,
     },
+    publicAvailability,
     groupKey: publicGroupMetadata.groupKey,
     groupSummary: publicGroupMetadata.groupSummary,
     groupContext: publicGroupMetadata.groupContext,

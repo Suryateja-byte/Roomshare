@@ -189,11 +189,11 @@ export async function fetchMoreListings(
         });
 
         if (v2Result.snapshotExpired) {
-          const meta = createSearchResponseMeta(normalizedQuery, "v2");
-          const finalMeta =
-            queryHash && queryHash.trim().length > 0
-              ? { ...meta, queryHash }
-              : meta;
+          // P1-5: meta is built from the same normalized query the client uses,
+          // so meta.queryHash already equals the client's bare hash — the old
+          // client-hash override was papering over the pre-fix service divergence
+          // and is now redundant.
+          const finalMeta = createSearchResponseMeta(normalizedQuery, "v2");
           recordSearchLoadMoreError({
             route: "search-load-more",
             queryHash: finalMeta.queryHash,
@@ -218,7 +218,11 @@ export async function fetchMoreListings(
 
         if (v2Result.paginatedResult) {
           const responseMeta = v2Result.response?.meta;
-          const meta = responseMeta
+          // P1-5: meta.queryHash is the bare client-facing hash derived from the
+          // same normalized query the client computed, so it already matches the
+          // client's request hash — no client-hash override needed. Version tokens
+          // still flow through the dedicated meta fields below.
+          const finalMeta = responseMeta
             ? createSearchResponseMeta(normalizedQuery, "v2", {
                 querySnapshotId: responseMeta.querySnapshotId,
                 projectionVersion: responseMeta.projectionVersion,
@@ -226,10 +230,6 @@ export async function fetchMoreListings(
                 rankerProfileVersion: responseMeta.rankerProfileVersion,
               })
             : createSearchResponseMeta(normalizedQuery, "v2");
-          const finalMeta =
-            queryHash && queryHash.trim().length > 0
-              ? { ...meta, queryHash }
-              : meta;
           recordSearchRequestLatency({
             route: "search-load-more",
             durationMs: performance.now() - requestStartTime,
@@ -296,10 +296,8 @@ export async function fetchMoreListings(
         items: toPublicSearchListings(paginatedResult.items),
         nextCursor: hasNextPage ? encodeCursor(requestedPage + 1) : null,
         hasNextPage,
-        meta:
-          queryHash && queryHash.trim().length > 0
-            ? { ...fallbackMeta, queryHash }
-            : fallbackMeta,
+        // P1-5: fallbackMeta.queryHash is already the bare client-facing hash.
+        meta: fallbackMeta,
       };
     }
 
@@ -327,10 +325,8 @@ export async function fetchMoreListings(
       nextCursor: null,
       hasNextPage: false,
       degraded: true,
-      meta:
-        queryHash && queryHash.trim().length > 0
-          ? { ...fallbackMeta, queryHash }
-          : fallbackMeta,
+      // P1-5: fallbackMeta.queryHash is already the bare client-facing hash.
+      meta: fallbackMeta,
     };
   } catch (error) {
     recordSearchLoadMoreError({

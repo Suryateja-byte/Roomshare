@@ -43,6 +43,19 @@ export interface ResolvedPublicAvailability
   isPubliclyAvailable: boolean;
 }
 
+/**
+ * The exact availability shape that may leave the server for anonymous clients.
+ * Equals the seven base {@link PublicAvailability} fields plus the two
+ * UI-consumed display fields (`freshnessBucket`, `publicStatus`). Every internal
+ * lifecycle/eligibility field on {@link ResolvedPublicAvailability} — `staleAt`,
+ * `autoPauseAt`, `searchEligible`, `isValid`, `isPubliclyAvailable`,
+ * `effectiveAvailableSlots` — is intentionally excluded from the public payload.
+ */
+export interface PublicAvailabilityPayload extends PublicAvailability {
+  freshnessBucket?: FreshnessBucket;
+  publicStatus?: PublicStatus;
+}
+
 export interface PublicSearchEligibilityInput {
   needsMigrationReview?: boolean | null;
   statusReason?: string | null;
@@ -268,6 +281,41 @@ export function buildPublicAvailability(
     minStayMonths: Math.max(1, toSafeCount(input.minStayMonths, 1)),
     lastConfirmedAt: toIsoString(input.lastConfirmedAt),
   };
+}
+
+type PublicAvailabilityPayloadInput = PublicAvailability &
+  Partial<Pick<FreshnessReadModel, "freshnessBucket" | "publicStatus">>;
+
+/**
+ * Field-pick the public availability boundary shape for serialization to
+ * anonymous clients. Accepts either the narrow seven-field
+ * {@link PublicAvailability} or a fully {@link ResolvedPublicAvailability} and
+ * returns only the fields safe to expose: the seven base fields plus
+ * `freshnessBucket`/`publicStatus` when present. All other resolved fields
+ * (`staleAt`, `autoPauseAt`, `searchEligible`, `isValid`, `isPubliclyAvailable`,
+ * `effectiveAvailableSlots`) are dropped so they never widen a public payload.
+ */
+export function toPublicAvailabilityPayload(
+  availability: PublicAvailabilityPayloadInput
+): PublicAvailabilityPayload {
+  const payload: PublicAvailabilityPayload = {
+    availabilitySource: availability.availabilitySource,
+    openSlots: availability.openSlots,
+    totalSlots: availability.totalSlots,
+    availableFrom: availability.availableFrom,
+    availableUntil: availability.availableUntil,
+    minStayMonths: availability.minStayMonths,
+    lastConfirmedAt: availability.lastConfirmedAt,
+  };
+
+  if (availability.freshnessBucket !== undefined) {
+    payload.freshnessBucket = availability.freshnessBucket;
+  }
+  if (availability.publicStatus !== undefined) {
+    payload.publicStatus = availability.publicStatus;
+  }
+
+  return payload;
 }
 
 function isFutureOrSameDay(

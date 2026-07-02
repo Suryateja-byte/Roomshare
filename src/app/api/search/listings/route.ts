@@ -150,6 +150,10 @@ export async function GET(request: NextRequest) {
               "api-search-listings-v2"
             );
             if (result.unboundedSearch) return result;
+            // Structured signals (admission caps, expired snapshot) carry
+            // response:null with no error. Surface them so their dedicated
+            // handlers below run instead of throwing into the V1 fallback.
+            if (result.admissionError || result.snapshotExpired) return result;
             if (!result.response || result.error) {
               throw new Error(result.error || "V2 search returned no response");
             }

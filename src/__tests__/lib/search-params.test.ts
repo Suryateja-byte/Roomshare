@@ -398,6 +398,32 @@ describe("parseSearchParams - booking mode cases", () => {
   });
 });
 
+describe("parseSearchParams - occupants/capacity cases (P2-4)", () => {
+  const cases: Array<[string, Record<string, string>, number | undefined]> = [
+    ["minSlots", { minSlots: "3" }, 3],
+    ["minAvailableSlots legacy alias", { minAvailableSlots: "3" }, 3],
+    ["occupants alias", { occupants: "3" }, 3],
+    ["guests alias", { guests: "3" }, 3],
+    ["requestedOccupants alias", { requestedOccupants: "3" }, 3],
+    ["requested_occupants alias", { requested_occupants: "3" }, 3],
+    // Occupants aliases take precedence over minSlots when both present.
+    ["occupants beats minSlots", { occupants: "4", minSlots: "2" }, 4],
+    // >20 is clamped away by the normalizer (admission layer 400s it separately).
+    ["above cap dropped", { occupants: "21" }, undefined],
+  ];
+
+  test.each(cases)("%s", (_label, raw, expected) => {
+    const result = parseSearchParams(raw);
+    expect(result.filterParams.minAvailableSlots).toBe(expected);
+  });
+
+  it("occupants=3 and minSlots=3 resolve to the same canonical capacity", () => {
+    expect(parseSearchParams({ occupants: "3" }).filterParams.minAvailableSlots).toBe(
+      parseSearchParams({ minSlots: "3" }).filterParams.minAvailableSlots
+    );
+  });
+});
+
 describe("parseSearchParams - date cases", () => {
   const cases: Array<[string, string | undefined, string | undefined]> = [
     ["today valid", today, today],

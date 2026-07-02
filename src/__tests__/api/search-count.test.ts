@@ -55,6 +55,7 @@ jest.mock("@/lib/flags/phase04", () => ({
 
 jest.mock("@/lib/search/projection-search", () => ({
   getProjectionSearchCount: jest.fn(),
+  hasProjectionFreshnessHoles: jest.fn(),
 }));
 
 jest.mock("@/lib/public-cache/headers", () => ({
@@ -69,6 +70,7 @@ jest.mock("@/lib/logger", () => ({
   logger: {
     debug: jest.fn(),
     error: jest.fn(),
+    sync: { warn: jest.fn() },
   },
   sanitizeErrorMessage: jest.fn((err: unknown) =>
     err instanceof Error ? err.message : String(err)
@@ -82,7 +84,10 @@ import { withRateLimitRedis } from "@/lib/with-rate-limit-redis";
 import { parseSearchParams, hasActiveFilters } from "@/lib/search-params";
 import { getLimitedCount } from "@/lib/data";
 import { isPhase04ProjectionReadsEnabled } from "@/lib/flags/phase04";
-import { getProjectionSearchCount } from "@/lib/search/projection-search";
+import {
+  getProjectionSearchCount,
+  hasProjectionFreshnessHoles,
+} from "@/lib/search/projection-search";
 import * as Sentry from "@sentry/nextjs";
 import { NextRequest } from "next/server";
 
@@ -103,6 +108,8 @@ const mockWithRateLimitRedis = withRateLimitRedis as jest.Mock;
 const mockIsPhase04ProjectionReadsEnabled =
   isPhase04ProjectionReadsEnabled as jest.Mock;
 const mockGetProjectionSearchCount = getProjectionSearchCount as jest.Mock;
+const mockHasProjectionFreshnessHoles =
+  hasProjectionFreshnessHoles as jest.Mock;
 
 // --- Test suite ---
 
@@ -113,6 +120,8 @@ describe("GET /api/search-count", () => {
     mockWithRateLimitRedis.mockResolvedValue(null);
     mockIsPhase04ProjectionReadsEnabled.mockReturnValue(false);
     mockGetProjectionSearchCount.mockResolvedValue({ ok: true, count: 0 });
+    // Default: no projection freshness holes → projection count path stays live
+    mockHasProjectionFreshnessHoles.mockResolvedValue(false);
     // Default: no active filters, no query, no bounds
     mockParseSearchParams.mockReturnValue({ filterParams: {} });
     mockHasActiveFilters.mockReturnValue(false);
@@ -284,6 +293,136 @@ describe("GET /api/search-count", () => {
     expect(mockGetLimitedCount).toHaveBeenCalledWith(
       expect.objectContaining({ query: "sunny room" })
     );
+  });
+
+  // P1-2: count/list engine parity. Under the default "recommended" sort the
+  // list is projection-INELIGIBLE (SearchDoc, counts listings). The count must
+  // use the SAME engine, not the projection unit-count fast-path — otherwise
+  // "Show N listings" mismatches the rendered list for multi-inventory units.
+  // (Before the fix, { ignoreSort: true } forced this onto getProjectionSearchCount.)
+  it("uses the SearchDoc count (not projection) for a projection-eligible-except-sort query under the default recommended sort", async () => {
+    mockIsPhase04ProjectionReadsEnabled.mockReturnValue(true);
+    mockParseSearchParams.mockReturnValue({
+      filterParams: {
+        // Projection-eligible on every dimension EXCEPT sort. "recommended" is
+        // the default sort and is not projection-rankable, so the list falls to
+        // SearchDoc — and the count must follow it.
+        sort: "recommended",
+        bounds: { minLat: 37.7, maxLat: 37.8, minLng: -122.5, maxLng: -122.4 },
+        minPrice: 500,
+      },
+    });
+    mockGetLimitedCount.mockResolvedValue(23);
+
+    const request = createRequest({
+      minLat: "37.7",
+      maxLat: "37.8",
+      minLng: "-122.5",
+      maxLng: "-122.4",
+      minPrice: "500",
+    });
+    const response = await GET(request);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ count: 23 });
+    expect(mockGetProjectionSearchCount).not.toHaveBeenCalled();
+    expect(mockGetLimitedCount).toHaveBeenCalled();
+    // Sort-ineligible: never even reaches the freshness guard.
+    expect(mockHasProjectionFreshnessHoles).not.toHaveBeenCalled();
+  });
+
+  // P1-2: freshness-hole parity. A projection-ELIGIBLE query (no query/amenities,
+  // projection-rankable sort) whose bounds contain freshness holes is served by
+  // SearchDoc on the list (search-v2-service.ts:672-690), so the count must fall
+  // back to the SearchDoc count too.
+  it("falls back to the SearchDoc count when a projection-eligible query has freshness holes", async () => {
+    mockIsPhase04ProjectionReadsEnabled.mockReturnValue(true);
+    mockParseSearchParams.mockReturnValue({
+      filterParams: {
+        // Projection-eligible: no unsupported sort/query/amenities.
+        bounds: { minLat: 37.7, maxLat: 37.8, minLng: -122.5, maxLng: -122.4 },
+        minPrice: 500,
+      },
+    });
+    mockHasProjectionFreshnessHoles.mockResolvedValue(true);
+    mockGetLimitedCount.mockResolvedValue(13);
+
+    const request = createRequest({
+      minLat: "37.7",
+      maxLat: "37.8",
+      minLng: "-122.5",
+      maxLng: "-122.4",
+      minPrice: "500",
+    });
+    const response = await GET(request);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ count: 13 });
+    expect(mockHasProjectionFreshnessHoles).toHaveBeenCalled();
+    expect(mockGetProjectionSearchCount).not.toHaveBeenCalled();
+    expect(mockGetLimitedCount).toHaveBeenCalled();
+  });
+
+  // Positive parity: projection-eligible + rankable sort + no holes → projection
+  // count (units), the same engine the list uses for this query. Locks in that
+  // the freshness guard is consulted before committing to the projection count.
+  it("uses the projection count when eligible with no freshness holes", async () => {
+    mockIsPhase04ProjectionReadsEnabled.mockReturnValue(true);
+    mockParseSearchParams.mockReturnValue({
+      filterParams: {
+        sort: "price_asc",
+        bounds: { minLat: 37.7, maxLat: 37.8, minLng: -122.5, maxLng: -122.4 },
+        minPrice: 500,
+      },
+    });
+    mockHasProjectionFreshnessHoles.mockResolvedValue(false);
+    mockGetProjectionSearchCount.mockResolvedValueOnce({ ok: true, count: 9 });
+
+    const request = createRequest({
+      minLat: "37.7",
+      maxLat: "37.8",
+      minLng: "-122.5",
+      maxLng: "-122.4",
+      minPrice: "500",
+    });
+    const response = await GET(request);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ count: 9 });
+    expect(mockHasProjectionFreshnessHoles).toHaveBeenCalled();
+    expect(mockGetProjectionSearchCount).toHaveBeenCalled();
+    expect(mockGetLimitedCount).not.toHaveBeenCalled();
+  });
+
+  // Guard-failure parity with the list path's catch branch: if the freshness
+  // guard query itself throws, stay on the projection engine (do NOT 500).
+  it("stays on the projection count when the freshness guard throws", async () => {
+    mockIsPhase04ProjectionReadsEnabled.mockReturnValue(true);
+    mockParseSearchParams.mockReturnValue({
+      filterParams: {
+        sort: "price_asc",
+        bounds: { minLat: 37.7, maxLat: 37.8, minLng: -122.5, maxLng: -122.4 },
+        minPrice: 500,
+      },
+    });
+    mockHasProjectionFreshnessHoles.mockRejectedValue(
+      new Error("freshness probe failed")
+    );
+    mockGetProjectionSearchCount.mockResolvedValueOnce({ ok: true, count: 4 });
+
+    const request = createRequest({
+      minLat: "37.7",
+      maxLat: "37.8",
+      minLng: "-122.5",
+      maxLng: "-122.4",
+      minPrice: "500",
+    });
+    const response = await GET(request);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ count: 4 });
+    expect(mockGetProjectionSearchCount).toHaveBeenCalled();
+    expect(mockGetLimitedCount).not.toHaveBeenCalled();
   });
 
   // 7. Rate limit exceeded → 429

@@ -295,11 +295,121 @@ async function handleCacheInvalidate(
   }
 }
 
+function coerceSourceVersion(value: bigint | number | string): bigint {
+  return typeof value === "bigint" ? value : BigInt(value);
+}
+
+/**
+ * Re-point an affected unit's inventories to its post-mutation identity epoch and
+ * rebuild the unit's projections there.
+ *
+ * recordIdentityMutation() bumps physical_units.unit_identity_epoch to the new
+ * epoch but leaves listing_inventories.unit_identity_epoch_written_at — and the
+ * projection rows keyed off it — at the old epoch. rebuildUnitPublicProjection
+ * aggregates strictly at a single epoch (`WHERE unit_identity_epoch_written_at =
+ * <epoch>`), so without this step the unit's public projection would aggregate
+ * zero inventories at the new epoch and the old-epoch inventory/unit projection
+ * rows would orphan (P2-8).
+ *
+ * Idempotent + epoch-safe:
+ *   - Re-reads the unit's current epoch instead of trusting the event payload; a
+ *     stale event (unit already advanced to a newer epoch, e.g. a later mutation)
+ *     is skipped so the authoritative event for the current epoch owns the
+ *     re-point. A retry of the current-epoch event re-runs harmlessly.
+ *   - The listing_inventories UPDATE only touches rows still stranded at an older
+ *     epoch, so a retry after success is a no-op (no repeated version churn).
+ *   - source_version is deliberately NOT bumped here: it mirrors the host listing
+ *     version (see canonical-inventory.ts's toBigIntVersion), and bumping it
+ *     out-of-band would make a later host edit look stale. The projection CAS
+ *     accepts an equal version (`source_version <= EXCLUDED.source_version`), so
+ *     the rebuild lands without desynchronising the host-version counter.
+ */
+async function reprojectUnitAfterIdentityMutation(
+  tx: TransactionClient,
+  unitId: string,
+  eventEpoch: number
+): Promise<void> {
+  const unitRows = await tx.$queryRaw<
+    { unit_identity_epoch: number | string }[]
+  >`
+    SELECT unit_identity_epoch
+    FROM physical_units
+    WHERE id = ${unitId}
+    LIMIT 1
+  `;
+  const currentEpoch = unitRows[0]
+    ? Number(unitRows[0].unit_identity_epoch)
+    : null;
+
+  // Unit gone, or a newer mutation already advanced it past this event's epoch:
+  // the event is stale for this unit and the current-epoch event owns the
+  // re-point. Skipping keeps retries and out-of-order delivery safe.
+  if (currentEpoch === null || currentEpoch !== eventEpoch) {
+    return;
+  }
+
+  // (a) Re-point the unit's inventories still stranded at an older epoch. Gating
+  //     on `< currentEpoch` makes a retry a no-op (rows already at the new epoch
+  //     are untouched, so row_version does not churn).
+  await tx.$executeRaw`
+    UPDATE listing_inventories
+    SET unit_identity_epoch_written_at = ${currentEpoch},
+        row_version = row_version + 1,
+        updated_at = NOW()
+    WHERE unit_id = ${unitId}
+      AND unit_identity_epoch_written_at < ${currentEpoch}
+  `;
+
+  // (b) Rebuild each inventory's search projection at the new epoch — same path
+  //     as INVENTORY_UPSERTED. Hidden/missing inventories are skipped inside the
+  //     rebuild (their projection rows were already tombstoned).
+  const inventoryRows = await tx.$queryRaw<
+    { id: string; source_version: bigint | number | string }[]
+  >`
+    SELECT id, source_version
+    FROM listing_inventories
+    WHERE unit_id = ${unitId}
+  `;
+
+  for (const inventory of inventoryRows) {
+    await rebuildInventorySearchProjection(tx, {
+      unitId,
+      inventoryId: inventory.id,
+      sourceVersion: coerceSourceVersion(inventory.source_version),
+      unitIdentityEpoch: currentEpoch,
+    });
+  }
+
+  // (c) Drop any inventory projection rows still stranded at an older epoch for
+  //     this unit (defensive — re-pointed rows now sit at currentEpoch).
+  await tx.$executeRaw`
+    DELETE FROM inventory_search_projection
+    WHERE unit_id = ${unitId}
+      AND unit_identity_epoch_written_at < ${currentEpoch}
+  `;
+
+  // Rebuild the unit public projection at the new epoch (takes the per-unit
+  // advisory lock and aggregates the re-pointed inventory rows).
+  await rebuildUnitPublicProjection(tx, unitId, currentEpoch);
+
+  // (c) Remove the orphaned old-epoch unit projection row(s). unit_public_projection
+  //     is keyed by (unit_id, unit_identity_epoch), so the new-epoch rebuild above
+  //     inserts a fresh row and leaves the pre-mutation row behind.
+  await tx.$executeRaw`
+    DELETE FROM unit_public_projection
+    WHERE unit_id = ${unitId}
+      AND unit_identity_epoch < ${currentEpoch}
+  `;
+}
+
 async function handleIdentityMutation(
   tx: TransactionClient,
   event: OutboxRow
 ): Promise<HandlerResult> {
-  // Phase 02: Identity mutations fan out cache invalidations to every affected unit.
+  // Phase 02: Identity mutations fan out cache invalidations to every affected
+  // unit and re-point that unit's inventories/projections to the new identity
+  // epoch (recordIdentityMutation bumped the unit epoch but left the projection
+  // rows at the old epoch — see reprojectUnitAfterIdentityMutation).
   try {
     if (features.pauseIdentityReconcile) {
       return {
@@ -321,6 +431,14 @@ async function handleIdentityMutation(
     const projectionEpoch = currentProjectionEpoch();
 
     for (const unitId of affectedUnitIds) {
+      // Re-point inventories + rebuild projections at the unit's current epoch
+      // before invalidating caches, so cache consumers observe the rebuilt rows.
+      await reprojectUnitAfterIdentityMutation(
+        tx,
+        unitId,
+        event.unitIdentityEpoch
+      );
+
       const ciId = randomUUID();
       await tx.$executeRaw`
         INSERT INTO cache_invalidations (id, unit_id, projection_epoch, unit_identity_epoch, reason, enqueued_at)

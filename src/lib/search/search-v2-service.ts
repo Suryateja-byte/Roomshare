@@ -85,7 +85,6 @@ import {
   isPhase04ForceListOnlyActive,
   isPhase04ProjectionReadsEnabled,
 } from "@/lib/flags/phase04";
-import { getReadEmbeddingVersion } from "@/lib/embeddings/version";
 import {
   executeProjectionSearchV2,
   hasProjectionFreshnessHoles,
@@ -94,7 +93,10 @@ import {
   getProjectionReadEligibility,
   type ProjectionReadEligibility,
 } from "@/lib/search/projection-read-eligibility";
-import type { SearchAdmissionError } from "@/lib/search/search-spec";
+import {
+  evaluateSearchAdmissionCaps,
+  type SearchAdmissionError,
+} from "@/lib/search/search-spec";
 
 const VIBE_SOFT_FALLBACK_WARNING = "VIBE_SOFT_FALLBACK";
 const SEARCH_PAGINATION_SNAPSHOT_VERSION = `${SEARCH_RESPONSE_VERSION}.searchdoc-keyset`;
@@ -629,18 +631,28 @@ export async function executeSearchV2(
       };
     }
 
+    // P2-3: enforce the engine-independent admission caps (occupants>20,
+    // page>20) BEFORE the engine branch so prod's SearchDoc path rejects the
+    // same pathological requests the dev-default projection path already did.
+    // The routes surface this via their existing admissionError handling.
+    const admissionError = evaluateSearchAdmissionCaps({
+      parsed,
+      rawParams: params.rawParams,
+    });
+    if (admissionError) {
+      return { response: null, paginatedResult: null, admissionError };
+    }
+
     // Get sort option from parsed params (default to recommended)
     const sortOption: SortOption =
       (parsed.filterParams.sort as SortOption) || "recommended";
-    const hashVibeQuery = parsed.filterParams.vibeQuery?.trim();
-    const hashEmbeddingVersion =
-      features.semanticSearch &&
-      hashVibeQuery &&
-      hashVibeQuery.length >= 3 &&
-      sortOption === "recommended"
-        ? getReadEmbeddingVersion()
-        : undefined;
 
+    // P1-5: meta.queryHash is the client-facing contract and MUST be the bare
+    // filters hash (no version tokens). The client discards any response whose
+    // meta.queryHash != the bare hash it computes from the same URL params, so
+    // adding embeddingVersion here made every semantic response get dropped.
+    // Version staleness lives in dedicated meta fields (embeddingVersion,
+    // projectionVersion, …) and, for pagination, inside cursor/snapshot records.
     const queryHash = generateQueryHash({
       query: parsed.filterParams.query,
       vibeQuery: parsed.filterParams.vibeQuery,
@@ -659,9 +671,6 @@ export async function executeSearchV2(
       minAvailableSlots: parsed.filterParams.minAvailableSlots,
       bounds: parsed.filterParams.bounds,
       nearMatches: parsed.filterParams.nearMatches,
-      ...(hashEmbeddingVersion
-        ? { embeddingVersion: hashEmbeddingVersion }
-        : {}),
     });
 
     if (isPhase04ProjectionReadsEnabled()) {
@@ -728,6 +737,9 @@ export async function executeSearchV2(
           responseVersion: SEARCH_PAGINATION_SNAPSHOT_VERSION,
           projectionVersion: SEARCH_DOC_PROJECTION_VERSION,
           embeddingVersion: null,
+          // P2-20: bind the keyset cursor to the bare filter hash so a cursor
+          // minted under one filter set is rejected when replayed under another.
+          qh: queryHash,
         }
       : undefined;
 
@@ -742,6 +754,13 @@ export async function executeSearchV2(
       if (decoded?.type === "snapshot") {
         snapshotCursor = decoded.cursor;
       } else if (useKeyset && decoded?.type === "keyset") {
+        // P2-20: bind V2 keyset cursors to the bare filter hash (`qh`) in
+        // addition to the existing engine/version snapshot checks — a cursor
+        // minted under filter set A replayed under filter set B (same sort) must
+        // not be honored, since B's WHERE + A's boundary duplicates/skips rows.
+        // A cursor minted before `qh` shipped decodes without it (undefined) and
+        // is treated as stale. (Legacy V1 cursors carry no snapshot and are never
+        // minted on this path; they remain tolerated for backward compat.)
         if (
           keysetSnapshot &&
           decoded.cursor.v === 2 &&
@@ -751,7 +770,8 @@ export async function executeSearchV2(
             decoded.cursor.snapshot.projectionVersion !==
               keysetSnapshot.projectionVersion ||
             decoded.cursor.snapshot.embeddingVersion !==
-              keysetSnapshot.embeddingVersion)
+              keysetSnapshot.embeddingVersion ||
+            decoded.cursor.snapshot.qh !== keysetSnapshot.qh)
         ) {
           return {
             response: null,
@@ -963,10 +983,7 @@ export async function executeSearchV2(
         listSettled.value);
     } else {
       logger.sync.error("[SearchV2] List query failed", {
-        error:
-          listSettled.reason instanceof Error
-            ? listSettled.reason.message
-            : "Unknown",
+        error: sanitizeErrorMessage(listSettled.reason),
       });
       return {
         response: null,
@@ -989,10 +1006,7 @@ export async function executeSearchV2(
       }
     } else if (mapSettled?.status === "rejected") {
       logger.sync.error("[SearchV2] Map query failed", {
-        error:
-          mapSettled.reason instanceof Error
-            ? mapSettled.reason.message
-            : "Unknown",
+        error: sanitizeErrorMessage(mapSettled.reason),
       });
       mapListings = [];
       warnings.push("MAP_QUERY_FAILED");

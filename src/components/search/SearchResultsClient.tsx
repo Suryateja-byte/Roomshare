@@ -202,6 +202,14 @@ export function SearchResultsClient({
   );
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const isLoadingRef = useRef(false);
+  // P2-15: Focus management for the "Show more" terminal transition. When the
+  // button unmounts (all results seen / client cap) native focus falls to
+  // <body>; if the load was started while the button held focus we move focus to
+  // whichever terminal message rendered so keyboard users aren't reset to the top.
+  const loadMoreButtonRef = useRef<HTMLButtonElement>(null);
+  const seenAllMessageRef = useRef<HTMLParagraphElement>(null);
+  const refineNudgeRef = useRef<HTMLParagraphElement>(null);
+  const pendingLoadMoreFocusRef = useRef(false);
   // F2 FIX: Ref for total count avoids allListings in handleLoadMore deps
   const totalCountRef = useRef(
     dedupeListingsForDisplay(initialListings).length
@@ -747,6 +755,13 @@ export function SearchResultsClient({
   const handleLoadMore = useCallback(async () => {
     if (!nextCursor || isLoadingRef.current) return;
 
+    // P2-15: Record whether this load was initiated while the "Show more" button
+    // held focus, so a terminal transition can move focus rather than yanking it
+    // from elsewhere (e.g. a mouse user typing in a filter, or the "Try again"
+    // link which is a different element).
+    pendingLoadMoreFocusRef.current =
+      document.activeElement === loadMoreButtonRef.current;
+
     isLoadingRef.current = true;
     setIsLoadingMore(true);
     setLoadError(null);
@@ -948,6 +963,30 @@ export function SearchResultsClient({
     }
     // F2 FIX: Removed allListings dep — count read from totalCountRef instead
   }, [nextCursor, rawParams, effectiveTotal, router, testScenario]);
+
+  // P2-15: Single source of truth for the load-more/terminal render conditions so
+  // the focus effect and the JSX below can never disagree about what is on screen.
+  const showLoadMoreButton =
+    isHydrated && !!nextCursor && !reachedCap && !isDegraded && !loadError;
+  const showSeenAllMessage =
+    !nextCursor && allListings.length > 0 && extraListings.length > 0;
+  const showRefineNudge = reachedCap && !!nextCursor;
+
+  // P2-15: After the terminal transition renders, move focus to the message that
+  // replaced the button — but only when the load was started from the focused
+  // button (pending flag) so we never steal focus from a mouse user elsewhere.
+  useEffect(() => {
+    if (!pendingLoadMoreFocusRef.current) return;
+    const target = showSeenAllMessage
+      ? seenAllMessageRef.current
+      : showRefineNudge
+        ? refineNudgeRef.current
+        : null;
+    if (target) {
+      target.focus({ preventScroll: true });
+      pendingLoadMoreFocusRef.current = false;
+    }
+  }, [showSeenAllMessage, showRefineNudge]);
 
   const total = effectiveTotal;
   const effectiveLocationRequired = searchStateKind === "location-required";
@@ -1321,13 +1360,14 @@ export function SearchResultsClient({
           {/* Load more section with progress indicator.
               Hidden whenever a load error (degraded or rate-limited) is showing so the
               error's "Try again" link is the single CTA, not a second competing one (#17). */}
-          {isHydrated && nextCursor && !reachedCap && !isDegraded && !loadError && (
+          {showLoadMoreButton && (
             <div className="mb-4 mt-8 flex flex-col items-center gap-2">
               <p className="text-xs text-on-surface-variant">
                 Showing {allListings.length} of{" "}
                 {total !== null ? `~${total}` : "100+"} listings
               </p>
               <button
+                ref={loadMoreButtonRef}
                 onClick={handleLoadMore}
                 disabled={isLoadingMore}
                 aria-busy={isLoadingMore}
@@ -1354,8 +1394,12 @@ export function SearchResultsClient({
           )}
 
           {/* Cap reached — nudge user to refine */}
-          {reachedCap && nextCursor && (
-            <p className="text-center text-sm text-on-surface-variant mt-6">
+          {showRefineNudge && (
+            <p
+              ref={refineNudgeRef}
+              tabIndex={-1}
+              className="text-center text-sm text-on-surface-variant mt-6"
+            >
               Showing {allListings.length} results. Try adjusting your filters
               or zooming into a specific area to find more relevant listings.
             </p>
@@ -1387,13 +1431,15 @@ export function SearchResultsClient({
               the complete set there is intentionally no terminal message; this is a
               deliberate, e2e-asserted UX decision (pagination-core 4.2), so audit
               finding #28 was reverted to respect it. */}
-          {!nextCursor &&
-            allListings.length > 0 &&
-            extraListings.length > 0 && (
-              <p className="text-center text-sm text-on-surface-variant mt-8">
-                You&apos;ve seen all {allListings.length} results
-              </p>
-            )}
+          {showSeenAllMessage && (
+            <p
+              ref={seenAllMessageRef}
+              tabIndex={-1}
+              className="text-center text-sm text-on-surface-variant mt-8"
+            >
+              You&apos;ve seen all {allListings.length} results
+            </p>
+          )}
 
           {/* Expansion suggestions for sparse results (1-5 listings) */}
           {total !== null && total > 0 && total <= 5 && (

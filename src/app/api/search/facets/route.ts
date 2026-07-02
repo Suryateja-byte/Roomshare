@@ -21,6 +21,7 @@ import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@/lib/prisma";
 import { parseSearchParams } from "@/lib/search-params";
 import { unstable_cache } from "next/cache";
+import { SEARCH_FACETS_CACHE_TAG } from "@/lib/search/search-cache";
 import { withRateLimitRedis } from "@/lib/with-rate-limit-redis";
 import {
   createContextFromHeaders,
@@ -30,9 +31,11 @@ import {
 import { crossesAntimeridian } from "@/lib/data";
 import { clampBoundsToMaxSpan } from "@/lib/validation";
 import {
+  BOUNDS_EPSILON,
   MAP_FETCH_MAX_LAT_SPAN,
   MAP_FETCH_MAX_LNG_SPAN,
 } from "@/lib/constants";
+import { getSearchRateLimitIdentifier } from "@/lib/search-rate-limit-identifier";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
 import { features } from "@/lib/env";
@@ -334,6 +337,17 @@ async function getPriceHistogram(
 }
 
 /**
+ * Quantize a coordinate value for cache key consistency.
+ * Uses the shared BOUNDS_EPSILON (~100m precision) so the facets cache key
+ * tolerates the same tiny pans the map/list cache keys do (createSearchDoc*
+ * CacheKey in search-doc-queries.ts). Previously used toFixed(4) (~11m), which
+ * busted the facets cache on ~0.0001° jitter and amplified DB cost (P2-5).
+ */
+function quantizeBound(value: number): number {
+  return Math.round(value / BOUNDS_EPSILON) * BOUNDS_EPSILON;
+}
+
+/**
  * Generate cache key for facets request
  */
 function generateFacetsCacheKey(
@@ -343,7 +357,7 @@ function generateFacetsCacheKey(
   const normalized: Record<string, string | number | boolean> = {
     amenities: [...(filterParams.amenities || [])].sort().join(","),
     bounds: filterParams.bounds
-      ? `${filterParams.bounds.minLng.toFixed(4)},${filterParams.bounds.minLat.toFixed(4)},${filterParams.bounds.maxLng.toFixed(4)},${filterParams.bounds.maxLat.toFixed(4)}`
+      ? `${quantizeBound(filterParams.bounds.minLng)},${quantizeBound(filterParams.bounds.minLat)},${quantizeBound(filterParams.bounds.maxLng)},${quantizeBound(filterParams.bounds.maxLat)}`
       : "",
     houseRules: [...(filterParams.houseRules || [])].sort().join(","),
     languages: [...(filterParams.languages || [])].sort().join(","),
@@ -421,9 +435,12 @@ export async function GET(request: NextRequest) {
   const context = createContextFromHeaders(request.headers);
 
   return runWithRequestContext(context, async () => {
-    // Rate limiting (uses search-count bucket as they serve similar purposes)
+    // Rate limiting (uses search-count bucket as they serve similar purposes).
+    // getSearchRateLimitIdentifier keys by ip:userId (same as v2/list/map) so
+    // authenticated users behind shared NAT aren't starved by IP-only limiting (P2-5).
     const rateLimitResponse = await withRateLimitRedis(request, {
       type: "search-count",
+      getIdentifier: getSearchRateLimitIdentifier,
     });
     if (rateLimitResponse) {
       return rateLimitResponse;
@@ -579,7 +596,7 @@ export async function GET(request: NextRequest) {
         unstable_cache(
           async () => getFacetsInternal(effectiveFilterParams),
           ["search-facets", cacheKey],
-          { revalidate: CACHE_TTL }
+          { revalidate: CACHE_TTL, tags: [SEARCH_FACETS_CACHE_TAG] }
         )(),
         DEFAULT_TIMEOUTS.DATABASE,
         "search-facets-getFacetsInternal"

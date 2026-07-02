@@ -19,6 +19,11 @@ import {
   generateSearchQueryHash,
   type HashableSearchQuery,
 } from "@/lib/search/query-hash";
+import {
+  parseSearchParams,
+  buildRawParamsFromSearchParams,
+  type RawSearchParams,
+} from "@/lib/search-params";
 
 const FUTURE_MOVE_IN_DATE = "2027-02-01";
 const CFM_604_URL_PARITY_CASES = [
@@ -140,6 +145,69 @@ describe("query-hash semantic equivalence (CFM-403)", () => {
         expect(canonicalize(legacy)).toBe(canonicalize(canonical));
       }
     );
+
+    it.each([
+      ["occupants=3", "minSlots=3"],
+      ["guests=3", "minSlots=3"],
+      ["requested_occupants=3", "minSlots=3"],
+      ["requestedOccupants=3", "minSlots=3"],
+    ])(
+      "occupants alias %s hashes identically to canonical %s (P2-4)",
+      (alias, canonical) => {
+        expect(hashOf(alias)).toBe(hashOf(canonical));
+      }
+    );
+  });
+
+  describe("cross-surface hash parity — service vs client (P1-5)", () => {
+    // The service used to fold embeddingVersion into meta.queryHash for semantic
+    // searches; the client hashes bare filters, so every semantic response was
+    // discarded as a hash mismatch. The service now hashes the SAME bare filter
+    // set the client does. Rebuild the service-side hash input here (bare, no
+    // version tokens) and assert it equals the client's getSearchQueryHash.
+    function serviceQueryHash(url: string): string {
+      const params = new URLSearchParams(url.startsWith("?") ? url : `?${url}`);
+      const parsed = parseSearchParams(
+        buildRawParamsFromSearchParams(params) as RawSearchParams
+      );
+      return generateSearchQueryHash({
+        query: parsed.filterParams.query,
+        vibeQuery: parsed.filterParams.vibeQuery,
+        minPrice: parsed.filterParams.minPrice,
+        maxPrice: parsed.filterParams.maxPrice,
+        amenities: parsed.filterParams.amenities,
+        houseRules: parsed.filterParams.houseRules,
+        languages: parsed.filterParams.languages,
+        roomType: parsed.filterParams.roomType,
+        leaseDuration: parsed.filterParams.leaseDuration,
+        moveInDate: parsed.filterParams.moveInDate,
+        endDate: parsed.filterParams.endDate,
+        genderPreference: parsed.filterParams.genderPreference,
+        householdGender: parsed.filterParams.householdGender,
+        bookingMode: parsed.filterParams.bookingMode,
+        minAvailableSlots: parsed.filterParams.minAvailableSlots,
+        bounds: parsed.filterParams.bounds,
+        nearMatches: parsed.filterParams.nearMatches,
+      });
+    }
+
+    it.each([
+      "what=cozy+sunlit+loft&minLat=37.7&maxLat=37.85&minLng=-122.52&maxLng=-122.35",
+      "q=boston&minPrice=1000&roomType=private&minLat=42.3&maxLat=42.4&minLng=-71.1&maxLng=-71.0",
+      "occupants=2&minLat=37.7&maxLat=37.85&minLng=-122.52&maxLng=-122.35",
+    ])("service hash equals client getSearchQueryHash for %s", (url) => {
+      expect(serviceQueryHash(url)).toBe(hashOf(url));
+    });
+
+    it("an embeddingVersion token would change the hash (so the service must not add it)", () => {
+      const base: HashableSearchQuery = {
+        vibeQuery: "cozy loft",
+        bounds: { minLat: 37.7, maxLat: 37.85, minLng: -122.52, maxLng: -122.35 },
+      };
+      expect(generateSearchQueryHash(base)).not.toBe(
+        generateSearchQueryHash({ ...base, embeddingVersion: "embed-v1" })
+      );
+    });
   });
 
   describe("counter cases — MUST hash differently", () => {

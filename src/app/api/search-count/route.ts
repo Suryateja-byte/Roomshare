@@ -33,12 +33,45 @@ import {
   MAP_FETCH_MAX_LNG_SPAN,
 } from "@/lib/constants";
 import { isPhase04ProjectionReadsEnabled } from "@/lib/flags/phase04";
-import { getProjectionSearchCount } from "@/lib/search/projection-search";
+import {
+  getProjectionSearchCount,
+  hasProjectionFreshnessHoles,
+} from "@/lib/search/projection-search";
 import { getProjectionReadEligibility } from "@/lib/search/projection-read-eligibility";
 import { buildPublicCacheHeaders } from "@/lib/public-cache/headers";
 
 // Disable static caching - counts must be fresh
 export const dynamic = "force-dynamic";
+
+/**
+ * Freshness guard for the projection count, mirroring the list path in
+ * search-v2-service.ts (:672-690). A projection-eligible query whose bounds
+ * contain freshness holes is served by the SearchDoc engine on the list, so
+ * the count must fall back to the SearchDoc count as well. If the guard query
+ * itself throws, we match the list path's catch branch and stay on the
+ * projection engine (returns true).
+ */
+async function canUseProjectionCount(
+  parsed: ReturnType<typeof parseSearchParams>,
+  requestId: string | undefined
+): Promise<boolean> {
+  try {
+    if (await hasProjectionFreshnessHoles({ parsed })) {
+      logger.sync.warn("phase04_projection_count_freshness_fallback", {
+        requestId,
+        reason: "projection_freshness_hole",
+      });
+      return false;
+    }
+    return true;
+  } catch (err) {
+    logger.sync.warn("phase04_projection_count_freshness_guard_failed", {
+      requestId,
+      error: sanitizeErrorMessage(err),
+    });
+    return true;
+  }
+}
 
 export async function GET(request: NextRequest) {
   const context = createContextFromHeaders(request.headers);
@@ -94,40 +127,55 @@ export async function GET(request: NextRequest) {
         );
       }
 
+      // Use the SAME sort-aware eligibility gate the list path uses
+      // (search-v2-service.ts) so the count is produced by the same engine the
+      // list will render. Previously this passed { ignoreSort: true }, which
+      // diverged the engines: under the default "recommended" sort the list is
+      // projection-INELIGIBLE (served by SearchDoc, counting listings) but
+      // ignoreSort forced the count onto the projection engine (counting
+      // units) — so "Show N listings" mismatched the rendered list for
+      // multi-inventory units (review P1-2).
       if (
         isPhase04ProjectionReadsEnabled() &&
-        // Count is sort-independent — don't let the recommended/rating/newest
-        // sort gate (ordering-only) disable the projection count fast-path,
-        // which would otherwise be dead for the default "recommended" sort (#2 review).
-        getProjectionReadEligibility(parsed, { ignoreSort: true }).supported
+        getProjectionReadEligibility(parsed).supported
       ) {
-        const projectionCount = await getProjectionSearchCount({
-          parsed,
-          rawParams,
-        });
-        if (!projectionCount.ok) {
+        // Mirror the list path's freshness guard: a projection-eligible query
+        // with freshness holes is served by SearchDoc, so the count must be too
+        // (search-v2-service.ts:672-690). When there are no holes (or the guard
+        // itself throws — matching the list path's catch), stay on projection;
+        // otherwise fall through to the SearchDoc count below.
+        if (await canUseProjectionCount(parsed, requestId)) {
+          const projectionCount = await getProjectionSearchCount({
+            parsed,
+            rawParams,
+          });
+          if (!projectionCount.ok) {
+            return NextResponse.json(
+              {
+                error: "admission_rejected",
+                admissionError: projectionCount.error,
+              },
+              {
+                status: projectionCount.error.status,
+                headers: {
+                  "Cache-Control": "private, no-store",
+                },
+              }
+            );
+          }
           return NextResponse.json(
+            { count: projectionCount.count },
             {
-              error: "admission_rejected",
-              admissionError: projectionCount.error,
-            },
-            {
-              status: projectionCount.error.status,
               headers: {
-                "Cache-Control": "private, no-store",
+                "Cache-Control":
+                  "public, s-maxage=15, stale-while-revalidate=30",
+                ...buildPublicCacheHeaders(),
               },
             }
           );
         }
-        return NextResponse.json(
-          { count: projectionCount.count },
-          {
-            headers: {
-              "Cache-Control": "public, s-maxage=15, stale-while-revalidate=30",
-              ...buildPublicCacheHeaders(),
-            },
-          }
-        );
+        // Projection freshness holes → fall back to the SearchDoc count below,
+        // the same engine the list will use for this query.
       }
 
       // Clamp oversized bounds for consistency with /api/search/facets and /api/map-listings.
@@ -145,6 +193,9 @@ export async function GET(request: NextRequest) {
 
       // Get count using existing getLimitedCount function
       // Returns exact count if ≤100, null if >100
+      // Dedup parity: getLimitedCount dispatches to getSearchDocLimitedCount,
+      // which counts distinct canonical groups when searchListingDedup is on
+      // (review P2-6), so this count matches the list's rendered total.
       const count = await getLimitedCount(effectiveFilterParams);
 
       logger.debug("Search count request", {

@@ -3,6 +3,7 @@ jest.mock("@/lib/prisma", () => ({
     querySnapshot: {
       create: jest.fn(),
       findUnique: jest.fn(),
+      deleteMany: jest.fn(),
     },
   },
 }));
@@ -10,6 +11,7 @@ jest.mock("@/lib/prisma", () => ({
 import { prisma } from "@/lib/prisma";
 import {
   createQuerySnapshot,
+  deleteExpiredQuerySnapshots,
   loadValidQuerySnapshot,
   PHASE04_SNAPSHOT_VERSION,
   QUERY_SNAPSHOT_MAX_LISTING_IDS,
@@ -19,6 +21,7 @@ import {
 
 const mockCreate = (prisma.querySnapshot.create as jest.Mock);
 const mockFindUnique = (prisma.querySnapshot.findUnique as jest.Mock);
+const mockDeleteMany = (prisma.querySnapshot.deleteMany as jest.Mock);
 
 describe("query snapshots", () => {
   beforeEach(() => {
@@ -152,6 +155,20 @@ describe("query snapshots", () => {
     await expect(loadValidQuerySnapshot("expired")).resolves.toEqual({
       ok: false,
       reason: "snapshot_expired",
+    });
+  });
+
+  it("reaps only snapshots whose TTL has elapsed, keeping unexpired rows (P2-19)", async () => {
+    const now = new Date("2026-07-02T00:00:00.000Z");
+    mockDeleteMany.mockResolvedValue({ count: 3 });
+
+    const deleted = await deleteExpiredQuerySnapshots(now);
+
+    expect(deleted).toBe(3);
+    // `expiresAt < now` deletes expired rows and leaves any row whose expiry is
+    // still in the future (expiresAt >= now) untouched.
+    expect(mockDeleteMany).toHaveBeenCalledWith({
+      where: { expiresAt: { lt: now } },
     });
   });
 });

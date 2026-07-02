@@ -42,6 +42,22 @@ const mockExecuteRawUnsafe = prisma.$executeRawUnsafe as jest.Mock;
 
 // Note: HYBRID_COUNT_THRESHOLD = 100 in source (see file header for details)
 
+// This suite validates the raw LIMIT-101 count contract — the dedup-off path
+// prod runs. Pin FEATURE_SEARCH_LISTING_DEDUP off so the dev-default dedup-aware
+// count (canonical grouping) doesn't reshape the raw counts under test. Dedup
+// counting is covered separately in search-doc-queries.test.ts.
+const ORIGINAL_DEDUP_FLAG = process.env.FEATURE_SEARCH_LISTING_DEDUP;
+beforeAll(() => {
+  process.env.FEATURE_SEARCH_LISTING_DEDUP = "false";
+});
+afterAll(() => {
+  if (ORIGINAL_DEDUP_FLAG === undefined) {
+    delete process.env.FEATURE_SEARCH_LISTING_DEDUP;
+  } else {
+    process.env.FEATURE_SEARCH_LISTING_DEDUP = ORIGINAL_DEDUP_FLAG;
+  }
+});
+
 describe("hybrid-count-threshold", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -316,5 +332,70 @@ describe("hybrid-count-threshold", () => {
       expect(queryCall).toContain("LIMIT 101");
       expect(queryCall).toContain("SELECT COUNT(*)");
     });
+  });
+});
+
+describe("dedup-aware limited count (P2-6)", () => {
+  const validBounds = {
+    minLat: 37.7,
+    maxLat: 37.8,
+    minLng: -122.5,
+    maxLng: -122.4,
+  };
+
+  function dedupCountRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: "row-1",
+      ownerId: "owner-1",
+      normalizedAddress: "123 main st, sf, ca 94102",
+      price: 1500,
+      title: "Bright Room",
+      roomType: "private",
+      address: "123 Main St",
+      city: "San Francisco",
+      state: "CA",
+      zip: "94102",
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env.FEATURE_SEARCH_LISTING_DEDUP = "true";
+  });
+
+  afterEach(() => {
+    process.env.FEATURE_SEARCH_LISTING_DEDUP = "false";
+  });
+
+  it("counts distinct canonicals — total is <= raw row count when siblings collapse", async () => {
+    // Three raw rows, two of which share owner+address+price+title+roomType
+    // (canonical + sibling) → two distinct canonical groups.
+    (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue([
+      dedupCountRow({ id: "a" }),
+      dedupCountRow({ id: "b" }),
+      dedupCountRow({ id: "c", ownerId: "owner-2", title: "Loft", price: 2400 }),
+    ]);
+
+    const result = await getSearchDocLimitedCount({ bounds: validBounds });
+
+    expect(result).toBe(2);
+
+    // Confirms it took the dedup path, not the raw COUNT(*) subquery.
+    const sql = (prisma.$queryRawUnsafe as jest.Mock).mock.calls[0][0];
+    expect(sql).not.toContain("SELECT COUNT(*)");
+    expect(sql).toContain('l."ownerId"');
+    expect(sql).toContain("LIMIT 101");
+  });
+
+  it("returns null (100+) when raw rows exceed the threshold", async () => {
+    const overflow = Array.from({ length: 101 }, (_, i) =>
+      dedupCountRow({ id: `row-${i}`, ownerId: `owner-${i}`, title: `T${i}` })
+    );
+    (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue(overflow);
+
+    const result = await getSearchDocLimitedCount({ bounds: validBounds });
+
+    expect(result).toBeNull();
   });
 });

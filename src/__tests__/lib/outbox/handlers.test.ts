@@ -418,6 +418,227 @@ describe("HANDLERS.IDENTITY_MUTATION", () => {
   });
 });
 
+describe("HANDLERS.IDENTITY_MUTATION reprojection (P2-8)", () => {
+  // Seed the post-mutation stranded state: physical_units already at `newEpoch`
+  // (recordIdentityMutation bumped it) while the inventory + projection rows are
+  // still at `oldEpoch`. When oldEpoch === newEpoch the unit is fully consistent.
+  async function seedStrandedUnit(opts: {
+    unitId: string;
+    newEpoch: number;
+    oldEpoch: number;
+    sourceVersion?: bigint;
+  }): Promise<string> {
+    const { unitId, newEpoch, oldEpoch } = opts;
+    const sourceVersion = opts.sourceVersion ?? BigInt(5);
+    const canonHash = `hash-${unitId}`;
+    await fixture.insertPhysicalUnit({
+      id: unitId,
+      canonicalAddressHash: canonHash,
+      unitIdentityEpoch: newEpoch,
+    });
+    const invId = await fixture.insertListingInventory({
+      unitId,
+      canonicalAddressHash: canonHash,
+      roomCategory: "PRIVATE_ROOM",
+      capacityGuests: 2,
+    });
+    await fixture.query(
+      `UPDATE listing_inventories
+         SET publish_status = 'PUBLISHED',
+             source_version = $2,
+             unit_identity_epoch_written_at = $3
+       WHERE id = $1`,
+      [invId, Number(sourceVersion), oldEpoch]
+    );
+    await fixture.insertInventorySearchProjection({
+      id: invId,
+      inventoryId: invId,
+      unitId,
+      unitIdentityEpoch: oldEpoch,
+      publishStatus: "PUBLISHED",
+      sourceVersion,
+    });
+    await fixture.insertUnitPublicProjection({
+      unitId,
+      unitIdentityEpoch: oldEpoch,
+      fromPrice: 1000,
+      roomCategories: ["PRIVATE_ROOM"],
+      matchingInventoryCount: 1,
+      sourceVersion,
+    });
+    return invId;
+  }
+
+  function mergeEvent(opts: {
+    id: string;
+    fromUnitIds: string[];
+    toUnitIds: string[];
+    epoch: number;
+  }): OutboxRow {
+    return makeEvent({
+      kind: "IDENTITY_MUTATION",
+      aggregateType: "IDENTITY_MUTATION",
+      aggregateId: opts.id,
+      payload: {
+        kind: "MERGE",
+        fromUnitIds: opts.fromUnitIds,
+        toUnitIds: opts.toUnitIds,
+      },
+      unitIdentityEpoch: opts.epoch,
+    });
+  }
+
+  it("re-points a merged unit's inventories to the new epoch and rebuilds its public projection there", async () => {
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const fromUnitId = `unit-rp-from-${suffix}`;
+    const toUnitId = `unit-rp-to-${suffix}`;
+    const fromInv = await seedStrandedUnit({
+      unitId: fromUnitId,
+      newEpoch: 2,
+      oldEpoch: 1,
+    });
+    const toInv = await seedStrandedUnit({
+      unitId: toUnitId,
+      newEpoch: 2,
+      oldEpoch: 1,
+    });
+
+    const result = await withTx((tx) =>
+      HANDLERS.IDENTITY_MUTATION(
+        tx,
+        mergeEvent({
+          id: `mutation-rp-${suffix}`,
+          fromUnitIds: [fromUnitId],
+          toUnitIds: [toUnitId],
+          epoch: 2,
+        })
+      )
+    );
+    expect(result.outcome).toBe("completed");
+
+    const isp = await fixture.getInventorySearchProjections();
+    expect(isp.find((r) => r.inventoryId === fromInv)?.unitIdentityEpoch).toBe(2);
+    expect(isp.find((r) => r.inventoryId === toInv)?.unitIdentityEpoch).toBe(2);
+    // No inventory projection rows left stranded at the old epoch.
+    expect(
+      isp.filter(
+        (r) =>
+          (r.unitId === fromUnitId || r.unitId === toUnitId) &&
+          r.unitIdentityEpoch === 1
+      )
+    ).toHaveLength(0);
+
+    const upp = await fixture.getUnitPublicProjections();
+    const fromRows = upp.filter((r) => r.unitId === fromUnitId);
+    const toRows = upp.filter((r) => r.unitId === toUnitId);
+    // Exactly one unit row each, at the new epoch, aggregating the inventory —
+    // the pre-mutation epoch-1 row is gone (not orphaned).
+    expect(fromRows).toHaveLength(1);
+    expect(fromRows[0].unitIdentityEpoch).toBe(2);
+    expect(fromRows[0].matchingInventoryCount).toBe(1);
+    expect(toRows).toHaveLength(1);
+    expect(toRows[0].unitIdentityEpoch).toBe(2);
+    expect(toRows[0].matchingInventoryCount).toBe(1);
+  });
+
+  it("is idempotent when the identity mutation event is retried", async () => {
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const unitId = `unit-rp-idem-${suffix}`;
+    const invId = await seedStrandedUnit({
+      unitId,
+      newEpoch: 2,
+      oldEpoch: 1,
+      sourceVersion: BigInt(5),
+    });
+    const event = mergeEvent({
+      id: `mutation-idem-${suffix}`,
+      fromUnitIds: [unitId],
+      toUnitIds: [unitId],
+      epoch: 2,
+    });
+
+    await withTx((tx) => HANDLERS.IDENTITY_MUTATION(tx, event));
+    const afterFirst = await fixture.query<{
+      unit_identity_epoch_written_at: number | string;
+      source_version: number | string;
+      row_version: number | string;
+    }>(
+      `SELECT unit_identity_epoch_written_at, source_version, row_version
+       FROM listing_inventories WHERE id = $1`,
+      [invId]
+    );
+
+    // Retry the same event — must not churn versions or duplicate rows.
+    await withTx((tx) => HANDLERS.IDENTITY_MUTATION(tx, event));
+    const afterRetry = await fixture.query<{
+      unit_identity_epoch_written_at: number | string;
+      source_version: number | string;
+      row_version: number | string;
+    }>(
+      `SELECT unit_identity_epoch_written_at, source_version, row_version
+       FROM listing_inventories WHERE id = $1`,
+      [invId]
+    );
+
+    expect(Number(afterRetry[0].unit_identity_epoch_written_at)).toBe(2);
+    // Host-version counter is never bumped by the re-point.
+    expect(Number(afterFirst[0].source_version)).toBe(5);
+    expect(Number(afterRetry[0].source_version)).toBe(5);
+    // row_version advanced once (the re-point) and stays put on retry.
+    expect(Number(afterRetry[0].row_version)).toBe(
+      Number(afterFirst[0].row_version)
+    );
+
+    const isp = (await fixture.getInventorySearchProjections()).filter(
+      (r) => r.unitId === unitId
+    );
+    expect(isp).toHaveLength(1);
+    expect(isp[0].unitIdentityEpoch).toBe(2);
+    expect(isp[0].sourceVersion).toBe(BigInt(5));
+
+    const upp = (await fixture.getUnitPublicProjections()).filter(
+      (r) => r.unitId === unitId
+    );
+    expect(upp).toHaveLength(1);
+    expect(upp[0].unitIdentityEpoch).toBe(2);
+    expect(upp[0].matchingInventoryCount).toBe(1);
+  });
+
+  it("skips a unit that has already advanced past the event epoch", async () => {
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const unitId = `unit-rp-stale-${suffix}`;
+    // Unit + projections already consistent at epoch 3 (a later mutation ran).
+    await seedStrandedUnit({ unitId, newEpoch: 3, oldEpoch: 3 });
+
+    // A stale IDENTITY_MUTATION event from the earlier epoch-2 mutation.
+    const result = await withTx((tx) =>
+      HANDLERS.IDENTITY_MUTATION(
+        tx,
+        mergeEvent({
+          id: `mutation-stale-${suffix}`,
+          fromUnitIds: [unitId],
+          toUnitIds: [unitId],
+          epoch: 2,
+        })
+      )
+    );
+    expect(result.outcome).toBe("completed");
+
+    // Nothing re-pointed: no epoch-2 rows created, epoch-3 state untouched.
+    const isp = (await fixture.getInventorySearchProjections()).filter(
+      (r) => r.unitId === unitId
+    );
+    expect(isp).toHaveLength(1);
+    expect(isp[0].unitIdentityEpoch).toBe(3);
+
+    const upp = (await fixture.getUnitPublicProjections()).filter(
+      (r) => r.unitId === unitId
+    );
+    expect(upp).toHaveLength(1);
+    expect(upp[0].unitIdentityEpoch).toBe(3);
+  });
+});
+
 describe("HANDLERS error branches", () => {
   it("INVENTORY_UPSERTED returns transient_error when DB throws", async () => {
     // Use a broken tx that throws

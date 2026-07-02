@@ -149,3 +149,19 @@ export async function loadValidQuerySnapshot(
 
   return { ok: true, snapshot };
 }
+
+/**
+ * Reap query snapshots whose TTL has elapsed (P2-19). Snapshots are written per
+ * first-page projection / snapshot-contract search with a short TTL and are only
+ * ever read by id with an expiry check (`loadValidQuerySnapshot`), so expired
+ * rows are dead weight. The daily-maintenance cron calls this to bound table
+ * growth. Deletes rows with `expiresAt < now`; unexpired rows are kept.
+ */
+export async function deleteExpiredQuerySnapshots(
+  now: Date = new Date()
+): Promise<number> {
+  const result = await prisma.querySnapshot.deleteMany({
+    where: { expiresAt: { lt: now } },
+  });
+  return result.count;
+}

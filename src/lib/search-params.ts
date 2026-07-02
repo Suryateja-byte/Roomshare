@@ -130,6 +130,13 @@ export interface RawSearchParams {
   bookingMode?: string | string[];
   minAvailableSlots?: string | string[];
   minSlots?: string | string[];
+  // Occupants aliases — capacity synonyms honored by the projection admission
+  // path; resolved here into minAvailableSlots so the SearchDoc filter and the
+  // query hash see the same canonical capacity value (P2-4).
+  occupants?: string | string[];
+  guests?: string | string[];
+  requestedOccupants?: string | string[];
+  requested_occupants?: string | string[];
   minLat?: string | string[];
   maxLat?: string | string[];
   minLng?: string | string[];
@@ -865,7 +872,15 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
       householdGender: getFirstValue(raw.householdGender),
       bookingMode: getFirstValue(raw.bookingMode),
       bounds,
-      minAvailableSlots: getFirstValue(raw.minAvailableSlots),
+      // Occupants aliases resolve to the canonical capacity value (P2-4).
+      // Precedence mirrors the projection admission read; minSlots stays the
+      // final fallback via normalizeSearchFilters (minAvailableSlots ?? minSlots).
+      minAvailableSlots:
+        getFirstValue(raw.requested_occupants) ??
+        getFirstValue(raw.requestedOccupants) ??
+        getFirstValue(raw.occupants) ??
+        getFirstValue(raw.guests) ??
+        getFirstValue(raw.minAvailableSlots),
       minSlots: getFirstValue(raw.minSlots),
       nearMatches: getFirstValue(raw.nearMatches),
       sort: getFirstValue(raw.sort),
