@@ -28,7 +28,10 @@ import { normalizeStringList } from "@/lib/utils";
 import { z } from "zod";
 import { features } from "@/lib/env";
 import { syncListingEmbedding } from "@/lib/embeddings/sync";
-import { getHostModerationWriteLockResult } from "@/lib/listings/moderation-write-lock";
+import {
+  getHostModerationWriteLockResult,
+  type ModerationWriteLockResult,
+} from "@/lib/listings/moderation-write-lock";
 import { normalizeAddress } from "@/lib/search/normalize-address";
 import { verifyAddressSuggestionToken } from "@/lib/geocoding/address-suggestion-token";
 import {
@@ -410,6 +413,10 @@ export async function DELETE(
           action: "suppressed";
           ownerId: string;
           reportCount: number;
+        }
+      | {
+          action: "locked";
+          lock: ModerationWriteLockResult;
         };
 
     try {
@@ -420,15 +427,28 @@ export async function DELETE(
             ownerId: string;
             images: string[];
             version: number;
+            statusReason: string | null;
           }>
         >`
-                    SELECT "ownerId", "images", "version" FROM "Listing"
+                    SELECT "ownerId", "images", "version", "statusReason" FROM "Listing"
                     WHERE "id" = ${id}
                     FOR UPDATE
                 `;
 
         if (!listing || listing.ownerId !== session.user.id) {
           throw new Error("NOT_FOUND_OR_UNAUTHORIZED");
+        }
+
+        // A listing frozen by moderation (admin pause / suppression) must not be
+        // hard-deleted or re-suppressed by the host: deleting it would destroy
+        // evidence and defeat the moderation hold. Every other listing mutation
+        // (PATCH profile/availability) enforces this write-lock; DELETE must too.
+        const writeLock = getHostModerationWriteLockResult({
+          statusReason: listing.statusReason,
+          moderationWriteLocksEnabled: features.moderationWriteLocks,
+        });
+        if (writeLock) {
+          return { action: "locked", lock: writeLock } as const;
         }
 
         const reportCount = await tx.report.count({ where: { listingId: id } });
@@ -472,6 +492,17 @@ export async function DELETE(
         }
       }
       throw error;
+    }
+
+    if (deleteResult.action === "locked") {
+      return NextResponse.json(
+        {
+          error: deleteResult.lock.error,
+          code: deleteResult.lock.code,
+          lockReason: deleteResult.lock.lockReason,
+        },
+        { status: deleteResult.lock.httpStatus }
+      );
     }
 
     if (deleteResult.action === "suppressed") {

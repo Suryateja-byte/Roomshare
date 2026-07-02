@@ -11,10 +11,12 @@ jest.mock("@/lib/logger", () => ({
 }));
 
 const mockCreateRefund = jest.fn();
+const mockListRefunds = jest.fn();
 jest.mock("@/lib/payments/stripe", () => ({
   getStripeClient: () => ({
     refunds: {
       create: (...args: unknown[]) => mockCreateRefund(...args),
+      list: (...args: unknown[]) => mockListRefunds(...args),
     },
   }),
 }));
@@ -88,6 +90,8 @@ describe("processRefundQueueOnce", () => {
       payment_intent: "pi_123",
       charge: "ch_123",
     });
+    // Default: no pre-existing refund on the intent → the create path runs.
+    mockListRefunds.mockResolvedValue({ data: [] });
   });
 
   it("creates a Stripe refund with deterministic idempotency and completes the queue item", async () => {
@@ -372,6 +376,127 @@ describe("processRefundQueueOnce", () => {
     expect(tx.payment.updateMany).toHaveBeenCalledWith({
       where: { id: "payment-123", userId: "user-123" },
       data: { autoRefundStatus: "MANUAL_REVIEW_BANNED_USER" },
+    });
+  });
+
+  describe("idempotency-window reconciliation", () => {
+    // Regression for PR #164 review (P1): Stripe retains idempotency keys for
+    // only ~24h, so a row reclaimed by the reaper after that window could create
+    // a DUPLICATE refund. The worker must reconcile against an existing refund
+    // (matched on paymentId + reason metadata) before issuing a new one.
+    it("reuses an existing Stripe refund instead of issuing a duplicate", async () => {
+      mockListRefunds.mockResolvedValue({
+        data: [
+          {
+            id: "re_existing",
+            amount: 499,
+            currency: "usd",
+            status: "succeeded",
+            reason: null,
+            payment_intent: "pi_123",
+            charge: "ch_123",
+            metadata: {
+              paymentId: "payment-123",
+              reason: "banned_user_inflight",
+            },
+          },
+        ],
+      });
+
+      const result = await processRefundQueueOnce({ maxBatch: 1 });
+
+      expect(result).toMatchObject({
+        processed: 1,
+        refunded: 1,
+        manualReview: 0,
+      });
+      // No duplicate refund — the pre-existing one is reused.
+      expect(mockCreateRefund).not.toHaveBeenCalled();
+      expect(mockListRefunds).toHaveBeenCalledWith({
+        payment_intent: "pi_123",
+        limit: 100,
+      });
+      expect(tx.refund.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { stripeRefundId: "re_existing" },
+          create: expect.objectContaining({
+            paymentId: "payment-123",
+            status: "SUCCEEDED",
+            source: "AUTO_REFUND_QUEUE",
+          }),
+        })
+      );
+      expect(tx.refundQueueItem.update).toHaveBeenCalledWith({
+        where: { id: "queue-1" },
+        data: expect.objectContaining({
+          status: "COMPLETED",
+          stripeRefundId: "re_existing",
+        }),
+      });
+    });
+
+    it("ignores refunds on the intent not created by this queue item", async () => {
+      mockListRefunds.mockResolvedValue({
+        data: [
+          {
+            id: "re_unrelated",
+            status: "succeeded",
+            payment_intent: "pi_123",
+            metadata: {
+              paymentId: "other-payment",
+              reason: "banned_user_inflight",
+            },
+          },
+        ],
+      });
+
+      await processRefundQueueOnce({ maxBatch: 1 });
+
+      // Metadata does not match → a fresh refund is created (with the key).
+      expect(mockCreateRefund).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("stale-PROCESSING reaper (crash recovery)", () => {
+    // Regression: a worker that dies between the Stripe refund and the local
+    // commit leaves the row stuck in PROCESSING forever (money moved, never
+    // recorded, never retried). Every tick must first reclaim stale PROCESSING
+    // rows back to PENDING. The deterministic idempotency key makes re-claim
+    // safe. See full-site review 2026-06-26, top risk #2.
+    it("reclaims rows stranded in PROCESSING before claiming new work", async () => {
+      tx.$queryRaw.mockResolvedValue([]); // nothing new to claim this tick
+      const fixedNow = new Date("2026-06-26T12:00:00.000Z");
+
+      await processRefundQueueOnce({
+        maxBatch: 5,
+        staleProcessingMs: 5 * 60_000,
+        now: () => fixedNow,
+      });
+
+      // The reaper runs as a single top-level $executeRaw (outside the claim tx).
+      expect(prisma.$executeRaw as jest.Mock).toHaveBeenCalledTimes(1);
+      const [strings, cutoff] = (prisma.$executeRaw as jest.Mock).mock.calls[0];
+      const sql = (strings as TemplateStringsArray).join("?");
+      expect(sql).toContain("UPDATE refund_queue_items");
+      expect(sql).toContain("status = 'PENDING'");
+      expect(sql).toContain("status = 'PROCESSING'");
+      expect(sql).toContain("GREATEST(attempt_count - 1, 0)");
+      // Cutoff is exactly `now - staleProcessingMs`.
+      expect(cutoff).toBeInstanceOf(Date);
+      expect((cutoff as Date).toISOString()).toBe("2026-06-26T11:55:00.000Z");
+    });
+
+    it("honors a custom staleProcessingMs window for the reaper cutoff", async () => {
+      tx.$queryRaw.mockResolvedValue([]);
+      const fixedNow = new Date("2026-06-26T12:00:00.000Z");
+
+      await processRefundQueueOnce({
+        staleProcessingMs: 60_000,
+        now: () => fixedNow,
+      });
+
+      const [, cutoff] = (prisma.$executeRaw as jest.Mock).mock.calls[0];
+      expect((cutoff as Date).toISOString()).toBe("2026-06-26T11:59:00.000Z");
     });
   });
 });
