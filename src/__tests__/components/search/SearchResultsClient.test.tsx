@@ -1087,6 +1087,74 @@ describe("SearchResultsClient", () => {
     });
   });
 
+  describe("load-more terminal focus (P2-15, WCAG 2.4.3)", () => {
+    it("moves focus to the end-of-results message when the focused button unmounts", async () => {
+      const mockFetch = fetchMoreListings as jest.Mock;
+      mockFetch.mockResolvedValueOnce({
+        items: [createMockListing("3")],
+        nextCursor: null,
+        hasNextPage: false,
+      });
+
+      render(<SearchResultsClient {...defaultProps} />);
+
+      const loadMoreButton = screen.getByRole("button", { name: /show more/i });
+      loadMoreButton.focus();
+      expect(loadMoreButton).toHaveFocus();
+
+      fireEvent.click(loadMoreButton);
+
+      const terminal = await screen.findByText(/you've seen all/i);
+      expect(terminal).toHaveFocus();
+    });
+
+    it("moves focus to the refine nudge when the cap is reached with the button focused", async () => {
+      const initialListings = Array.from({ length: 55 }, (_, i) =>
+        createMockListing(`initial-${i}`)
+      );
+      const mockFetch = fetchMoreListings as jest.Mock;
+      mockFetch.mockResolvedValueOnce({
+        items: Array.from({ length: 10 }, (_, i) => createMockListing(`new-${i}`)),
+        nextCursor: "cursor-2",
+        hasNextPage: true,
+      });
+
+      render(
+        <SearchResultsClient
+          {...defaultProps}
+          initialListings={initialListings}
+          initialTotal={100}
+        />
+      );
+
+      const loadMoreButton = screen.getByRole("button", { name: /show more/i });
+      loadMoreButton.focus();
+      fireEvent.click(loadMoreButton);
+
+      const nudge = await screen.findByText(/adjusting your filters/i);
+      expect(nudge).toHaveFocus();
+    });
+
+    it("does not move focus when the button was not the active element", async () => {
+      const mockFetch = fetchMoreListings as jest.Mock;
+      mockFetch.mockResolvedValueOnce({
+        items: [createMockListing("3")],
+        nextCursor: null,
+        hasNextPage: false,
+      });
+
+      render(<SearchResultsClient {...defaultProps} />);
+
+      // Simulate a mouse user: click without the button holding keyboard focus.
+      const loadMoreButton = screen.getByRole("button", { name: /show more/i });
+      expect(loadMoreButton).not.toHaveFocus();
+      fireEvent.click(loadMoreButton);
+
+      const terminal = await screen.findByText(/you've seen all/i);
+      expect(terminal).not.toHaveFocus();
+    });
+  });
+
   describe("loading state", () => {
     it("shows loading indicator while fetching", async () => {
       const mockFetch = fetchMoreListings as jest.Mock;

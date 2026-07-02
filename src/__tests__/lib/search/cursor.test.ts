@@ -67,6 +67,24 @@ describe("search/cursor", () => {
       expect(decoded).toEqual(cursor);
     });
 
+    it("should round-trip a V2 cursor carrying a filter-bound qh (P2-20)", () => {
+      const cursor: KeysetCursor = {
+        v: 2,
+        s: "recommended",
+        k: ["85.50", "2024-01-15T10:00:00.000Z"],
+        id: "clxqh",
+        snapshot: { ...snapshot, qh: "abcdef1234567890" },
+      };
+
+      const encoded = encodeKeysetCursor(cursor);
+      const decoded = decodeKeysetCursor(encoded);
+
+      expect(decoded).toEqual(cursor);
+      expect(decoded?.v === 2 ? decoded.snapshot.qh : undefined).toBe(
+        "abcdef1234567890"
+      );
+    });
+
     it("should encode and decode snapshot cursor", () => {
       const cursor = {
         v: 3 as const,

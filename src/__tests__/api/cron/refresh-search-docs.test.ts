@@ -180,7 +180,10 @@ describe("GET /api/cron/refresh-search-docs", () => {
   });
 
   it("returns zero counters when there is no dirty or rescan work", async () => {
-    mockQueryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    mockQueryRaw
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
 
     const response = await getRefreshSearchDocs(createRequest("Bearer valid"));
     const data = await response.json();
@@ -216,6 +219,7 @@ describe("GET /api/cron/refresh-search-docs", () => {
         buildDirtyEntry("listing-b", new Date(now - 20_000)),
         buildDirtyEntry("listing-c", new Date(now - 30_000)),
       ])
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
     mockProjectSearchDocument
       .mockResolvedValueOnce({
@@ -278,6 +282,7 @@ describe("GET /api/cron/refresh-search-docs", () => {
         buildDirtyEntry("host-1", new Date(now - 10_000)),
         buildDirtyEntry("gone-1", new Date(now - 20_000)),
       ])
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
     mockProjectSearchDocument
       .mockResolvedValueOnce({
@@ -326,6 +331,7 @@ describe("GET /api/cron/refresh-search-docs", () => {
       .mockResolvedValueOnce([
         buildDirtyEntry("listing-1", new Date(now - 10_000)),
       ])
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
     mockProjectSearchDocument.mockResolvedValue({
       listingId: "listing-1",
@@ -365,6 +371,7 @@ describe("GET /api/cron/refresh-search-docs", () => {
         buildDirtyEntry("suppress-1", new Date(now - 30_000)),
         buildDirtyEntry("error-1", new Date(now - 40_000)),
       ])
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
     mockProjectSearchDocument
       .mockResolvedValueOnce({
@@ -431,7 +438,8 @@ describe("GET /api/cron/refresh-search-docs", () => {
         buildDirtyEntry("stale-1", new Date(now - 20_000)),
         buildDirtyEntry("skew-1", new Date(now - 100_000)),
       ])
-      .mockResolvedValueOnce([{ id: "rescan-1" }]);
+      .mockResolvedValueOnce([{ id: "rescan-1" }])
+      .mockResolvedValueOnce([]);
     mockProjectSearchDocument
       .mockResolvedValueOnce({
         listingId: "missing-1",
@@ -614,10 +622,13 @@ describe("GET /api/cron/refresh-search-docs", () => {
   it("tracks CAS-suppressed writes by reason and exposes the counter series", async () => {
     const now = Date.parse("2026-04-17T18:00:00.000Z");
     jest.spyOn(Date, "now").mockReturnValue(now);
-    mockQueryRaw.mockResolvedValueOnce([
-      buildDirtyEntry("projection-1", new Date(now - 10_000)),
-      buildDirtyEntry("source-1", new Date(now - 20_000)),
-    ]);
+    mockQueryRaw
+      .mockResolvedValueOnce([
+        buildDirtyEntry("projection-1", new Date(now - 10_000)),
+        buildDirtyEntry("source-1", new Date(now - 20_000)),
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
     mockProjectSearchDocument
       .mockResolvedValueOnce({
         listingId: "projection-1",
@@ -772,7 +783,8 @@ describe("GET /api/cron/refresh-search-docs", () => {
         { id: "rescan-8" },
         { id: "rescan-9" },
         { id: "rescan-10" },
-      ]);
+      ])
+      .mockResolvedValueOnce([]);
     mockProjectSearchDocument
       .mockResolvedValueOnce({
         listingId: "dirty-1",
@@ -822,5 +834,87 @@ describe("GET /api/cron/refresh-search-docs", () => {
       })
     );
     expect(getSearchDocCronTelemetrySnapshot().lastRunPartial).toBe(true);
+  });
+
+  it("clears dirty flags conditionally on the observed marked_at so a concurrent re-mark survives (P1-1)", async () => {
+    const now = Date.parse("2026-04-17T18:00:00.000Z");
+    jest.spyOn(Date, "now").mockReturnValue(now);
+    const observedMarkedAt = new Date(now - 10_000);
+    mockQueryRaw
+      .mockResolvedValueOnce([buildDirtyEntry("listing-1", observedMarkedAt)])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    mockProjectSearchDocument.mockResolvedValueOnce({
+      listingId: "listing-1",
+      outcome: "upsert",
+      divergenceReason: "stale_doc",
+      casSuppressionReason: null,
+      hadExistingDoc: true,
+      listingVersion: 4,
+      docSourceVersion: 3,
+      docProjectionVersion: 3,
+      writeApplied: true,
+    });
+
+    await getRefreshSearchDocs(createRequest("Bearer valid"));
+
+    // The clear must bind the marked_at observed at queue-read time and gate the
+    // DELETE on `marked_at <= observed`. A writer that re-marks the row with a
+    // newer NOW() between the read and this delete lands a strictly greater
+    // marked_at, so the predicate skips it and the mark survives to the next run
+    // instead of being deleted with a version that was never projected.
+    expect(mockExecuteRaw).toHaveBeenCalledTimes(1);
+    const clearCall = mockExecuteRaw.mock.calls[0];
+    expect(clearCall[1]).toEqual(["listing-1"]);
+    expect(clearCall[2]).toEqual([observedMarkedAt.toISOString()]);
+
+    const clearSql = getQueryText(mockExecuteRaw, 0);
+    expect(clearSql).toContain("unnest");
+    expect(clearSql).toContain("marked_at <=");
+    // The old unconditional clear used `WHERE listing_id = ANY(...)`.
+    expect(clearSql).not.toContain("= ANY(");
+  });
+
+  it("repairs listings that have no search doc via the missing-doc backstop (P2-9)", async () => {
+    const now = Date.parse("2026-04-17T18:00:00.000Z");
+    jest.spyOn(Date, "now").mockReturnValue(now);
+    // No dirty work, empty TABLESAMPLE rescan, one listing with no doc at all.
+    mockQueryRaw
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: "no-doc-1" }]);
+    mockProjectSearchDocument.mockResolvedValueOnce({
+      listingId: "no-doc-1",
+      outcome: "upsert",
+      divergenceReason: "missing_doc",
+      casSuppressionReason: null,
+      hadExistingDoc: false,
+      listingVersion: 2,
+      docSourceVersion: null,
+      docProjectionVersion: null,
+      writeApplied: true,
+    });
+
+    const response = await getRefreshSearchDocs(createRequest("Bearer valid"));
+    const data = await response.json();
+
+    expect(data).toMatchObject({
+      success: true,
+      processed: 1,
+      repaired: 1,
+      divergentMissingDoc: 1,
+      errors: 0,
+    });
+    expect(
+      mockProjectSearchDocument.mock.calls.map(([listingId]) => listingId)
+    ).toEqual(["no-doc-1"]);
+
+    // The backstop is the third query: an anti-join over Listing/Location that
+    // finds publishable listings with no listing_search_docs row.
+    const backstopSql = getQueryText(mockQueryRaw, 2);
+    expect(backstopSql).toContain("listing_search_docs");
+    expect(backstopSql).toContain("NOT EXISTS");
+    expect(backstopSql).toContain('"Listing"');
+    expect(backstopSql).toContain('"Location"');
   });
 });

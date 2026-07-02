@@ -18,6 +18,7 @@ import {
 import {
   buildPhase04SearchSpec,
   getPhase04SearchSpecHash,
+  PHASE04_MAX_GAP_DAYS,
   type SearchAdmissionError,
   type SearchSpec,
 } from "@/lib/search/search-spec";
@@ -44,9 +45,9 @@ import {
 } from "./transform";
 import { toPublicSearchListings } from "./public-listing-payload";
 import {
-  buildPublicAvailability,
+  resolvePublicAvailability,
   STALE_THRESHOLD_DAYS,
-  type PublicAvailability,
+  type ResolvedPublicAvailability,
 } from "./public-availability";
 import {
   isPhase04ForceClustersOnlyActive,
@@ -113,6 +114,9 @@ interface ProjectionUnitRow {
   displaySubtitle: string | null;
   heroImageUrl: string | null;
   hostIdentityStatus: HostIdentityStatus;
+  representativeStatus: string;
+  representativeStatusReason: string | null;
+  lastConfirmedAt: Date | null;
   projectionEpoch: bigint;
   sourceVersion: bigint;
 }
@@ -134,6 +138,9 @@ interface RawProjectionUnitRow {
   display_subtitle: string | null;
   hero_image_url: string | null;
   host_identity_status?: string | null;
+  representative_status?: string | null;
+  representative_status_reason?: string | null;
+  last_confirmed_at?: Date | string | null;
   projection_epoch: bigint | number | string;
   source_version: bigint | number | string;
 }
@@ -202,6 +209,15 @@ function normalizeProjectionRow(row: RawProjectionUnitRow): ProjectionUnitRow {
     displaySubtitle: row.display_subtitle,
     heroImageUrl: row.hero_image_url,
     hostIdentityStatus: normalizeHostIdentityStatus(row.host_identity_status),
+    representativeStatus:
+      typeof row.representative_status === "string" && row.representative_status
+        ? row.representative_status
+        : "ACTIVE",
+    representativeStatusReason:
+      typeof row.representative_status_reason === "string"
+        ? row.representative_status_reason
+        : null,
+    lastConfirmedAt: parseDate(row.last_confirmed_at ?? null),
     projectionEpoch: BigInt(row.projection_epoch ?? 1),
     sourceVersion: BigInt(row.source_version ?? 1),
   };
@@ -262,13 +278,22 @@ function parseUnitKeys(unitKeys: string[]): ParsedUnitKey[] {
 
 function buildPublicAvailabilityForRow(
   row: ProjectionUnitRow
-): PublicAvailability {
-  return buildPublicAvailability({
+): ResolvedPublicAvailability {
+  // Resolve the full freshness/status read-model (freshnessBucket, publicStatus,
+  // searchEligible, staleAt, …) the same way the SearchDoc engine does, so the
+  // projection (dev/preview) and SearchDoc (prod) paths render identical
+  // freshness UI (P2-11). Every projection row already satisfies l.status =
+  // 'ACTIVE' via the eligibility WHERE; lastConfirmedAt drives the bucket.
+  return resolvePublicAvailability({
+    id: row.representativeInventoryId,
+    status: row.representativeStatus,
+    statusReason: row.representativeStatusReason,
     openSlots: row.matchingInventoryCount,
     availableSlots: row.matchingInventoryCount,
     totalSlots: row.matchingInventoryCount,
     moveInDate: row.earliestAvailableFrom ?? undefined,
     minStayMonths: 1,
+    lastConfirmedAt: row.lastConfirmedAt ?? undefined,
   });
 }
 
@@ -467,11 +492,14 @@ async function queryProjectionUnitRows(
     spec.filterParams.genderPreference &&
     spec.filterParams.genderPreference !== "any"
   ) {
+    // Strict equality matches the SearchDoc engine (cross-engine parity): a row
+    // with an unspecified (NULL) gender preference does NOT match a specific
+    // filter, so membership can't flip when only the sort changes engines.
     where.push(
-      `(isp.gender_preference IS NULL OR isp.gender_preference = ${addParam(
+      `isp.gender_preference = ${addParam(
         params,
         spec.filterParams.genderPreference
-      )})`
+      )}`
     );
   }
   if (
@@ -479,16 +507,22 @@ async function queryProjectionUnitRows(
     spec.filterParams.householdGender !== "any"
   ) {
     where.push(
-      `(isp.household_gender IS NULL OR isp.household_gender = ${addParam(
+      `isp.household_gender = ${addParam(
         params,
         spec.filterParams.householdGender
-      )})`
+      )}`
     );
   }
 
   if (spec.filterParams.moveInDate) {
     const moveIn = addParam(params, spec.filterParams.moveInDate);
-    const gapDays = addParam(params, spec.maxGapDays);
+    // SearchDoc parity: the default move-in match is exact (available on/before
+    // the requested date). search-spec.ts collapses an absent max_gap_days to
+    // PHASE04_MAX_GAP_DAYS, so treat that sentinel default as a 0-day gap; an
+    // explicitly supplied (sub-cap) max_gap_days is honored as a near-match window.
+    const effectiveGapDays =
+      spec.maxGapDays >= PHASE04_MAX_GAP_DAYS ? 0 : spec.maxGapDays;
+    const gapDays = addParam(params, effectiveGapDays);
     where.push(
       `isp.available_from <= (${moveIn}::DATE + (${gapDays}::INTEGER * INTERVAL '1 day'))`
     );
@@ -553,6 +587,9 @@ async function queryProjectionUnitRows(
       upp.display_subtitle,
       upp.hero_image_url,
       (array_agg(CASE WHEN u."isVerified" THEN 'verified' ELSE 'unverified' END ORDER BY isp.price ASC, isp.available_from ASC, isp.inventory_id ASC))[1] AS host_identity_status,
+      (array_agg(l.status ORDER BY isp.price ASC, isp.available_from ASC, isp.inventory_id ASC))[1] AS representative_status,
+      (array_agg(l."statusReason" ORDER BY isp.price ASC, isp.available_from ASC, isp.inventory_id ASC))[1] AS representative_status_reason,
+      (array_agg(l."lastConfirmedAt" ORDER BY isp.price ASC, isp.available_from ASC, isp.inventory_id ASC))[1] AS last_confirmed_at,
       GREATEST(upp.projection_epoch, MAX(isp.projection_epoch)) AS projection_epoch,
       GREATEST(upp.source_version, MAX(isp.source_version)) AS source_version
     FROM inventory_search_projection isp
@@ -671,6 +708,9 @@ async function fetchProjectionRowsByUnitKeys(
       upp.display_subtitle,
       upp.hero_image_url,
       (array_agg(CASE WHEN u."isVerified" THEN 'verified' ELSE 'unverified' END ORDER BY isp.price ASC, isp.available_from ASC, isp.inventory_id ASC))[1] AS host_identity_status,
+      (array_agg(l.status ORDER BY isp.price ASC, isp.available_from ASC, isp.inventory_id ASC))[1] AS representative_status,
+      (array_agg(l."statusReason" ORDER BY isp.price ASC, isp.available_from ASC, isp.inventory_id ASC))[1] AS representative_status_reason,
+      (array_agg(l."lastConfirmedAt" ORDER BY isp.price ASC, isp.available_from ASC, isp.inventory_id ASC))[1] AS last_confirmed_at,
       GREATEST(upp.projection_epoch, MAX(isp.projection_epoch)) AS projection_epoch,
       GREATEST(upp.source_version, MAX(isp.source_version)) AS source_version
     FROM unit_public_projection upp
@@ -963,6 +1003,13 @@ export async function executeProjectionSearchV2(input: {
     };
   }
   const spec = specResult.spec;
+  // KNOWN SEAM (review P1-5, deferred pre-cutover gate): this spec hash folds
+  // version tokens (projectionEpoch/embeddingVersion/rankerProfileVersion/
+  // unitIdentityEpochFloor) and is used BOTH as the snapshot/cursor staleness
+  // fence AND as meta.queryHash. The client computes the bare filters hash, so
+  // if phase04 projection reads ship together with the unified V2 client, the
+  // meta hash must be split from the fence hash (bare hash in meta; spec hash
+  // stays inside the cursor/snapshot) before cutover.
   const queryHash = getPhase04SearchSpecHash(spec);
   const eligibility = getProjectionReadEligibility(input.parsed);
   if (!eligibility.supported) {

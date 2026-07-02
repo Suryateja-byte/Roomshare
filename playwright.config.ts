@@ -2,6 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 import dns from "node:dns";
 import dotenv from "dotenv";
 import path from "path";
+import { PROD_EFFECTIVE_FLAG_ENV } from "./tests/e2e/helpers/prod-flags-env";
 
 // Node.js >=17 defaults to IPv6-first DNS resolution.
 // GitHub Actions runners resolve "localhost" to ::1 (IPv6) but Next.js
@@ -31,6 +32,18 @@ process.env.CURSOR_SECRET =
 const runningDedupeSuite = process.argv.some(
   (arg) => arg.includes("tests/e2e/dedupe") || arg.includes("/dedupe/")
 );
+
+// Prod-flag parity run (docs/multislot-review-2026-07-02.md · P2-13): launch the
+// server with prod-effective feature flags so the smoke validates the engine +
+// card shape prod actually serves. Triggered by E2E_PROD_FLAGS=true or by
+// scoping to the prod-flags-smoke project. Normalize both into the env var so the
+// spec's runtime guard (isProdFlagsRun) agrees with this process.
+const runningProdFlagsSuite =
+  process.env.E2E_PROD_FLAGS === "true" ||
+  process.argv.some((arg) => arg.includes("prod-flags-smoke"));
+if (runningProdFlagsSuite) {
+  process.env.E2E_PROD_FLAGS = "true";
+}
 const enableDedupeFeatures =
   runningDedupeSuite ||
   process.env.CI === "true" ||
@@ -54,6 +67,13 @@ webServerEnv.NEXT_PUBLIC_SUPABASE_URL =
   webServerEnv.NEXT_PUBLIC_SUPABASE_URL || "https://fake.supabase.co";
 webServerEnv.TURNSTILE_ENABLED = "false";
 webServerEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY = "";
+
+// Pin every CFM cutover flag to its prod-effective value (applied last so it
+// wins over the dev-default dedupe overrides above). Single source of truth:
+// tests/e2e/helpers/prod-flags-env.ts.
+if (runningProdFlagsSuite) {
+  Object.assign(webServerEnv, PROD_EFFECTIVE_FLAG_ENV);
+}
 
 /**
  * Playwright configuration for RoomShare E2E tests
@@ -245,6 +265,19 @@ export default defineConfig({
         ...devices["Desktop Safari"],
       },
     },
+
+    /* Prod-flag parity smoke (anonymous). Runs the critical search/listing flows
+       against a server launched with prod-effective feature flags — see
+       docs/multislot-review-2026-07-02.md P2-13 and tests/e2e/helpers/prod-flags-env.ts.
+       Dedicated run only: E2E_PROD_FLAGS=true pnpm exec playwright test --project=prod-flags-smoke
+       (the spec self-skips under any dev-default invocation). */
+    {
+      name: "prod-flags-smoke",
+      testMatch: /prod-flags-smoke\.anon\.spec\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+    },
   ],
 
   /* Start dev server locally; skip in CI where server is started manually */
@@ -253,7 +286,8 @@ export default defineConfig({
     : {
         command: "pnpm run dev",
         url: "http://localhost:3000/api/health/ready",
-        reuseExistingServer: !runningDedupeSuite,
+        // Never reuse a dev-flag server for the flag-sensitive dedupe / prod-flag runs.
+        reuseExistingServer: !runningDedupeSuite && !runningProdFlagsSuite,
         timeout: 180000,
         stdout: "pipe",
         stderr: "pipe",

@@ -5,7 +5,10 @@ import {
   toPublicSearchListing,
 } from "@/lib/search/public-listing-payload";
 import type { ListingData, MapListingData } from "@/lib/search-types";
-import { buildPublicAvailability } from "@/lib/search/public-availability";
+import {
+  buildHostManagedPublicAvailability,
+  buildPublicAvailability,
+} from "@/lib/search/public-availability";
 
 function makeListing(overrides: Partial<ListingData> = {}): ListingData {
   const listing: ListingData = {
@@ -155,5 +158,84 @@ describe("public listing payload sanitizer", () => {
     expect(publicMapListing.groupKey).not.toContain("unit-secret-map");
     expect(publicMapListing.hostIdentityStatus).toBe("unverified");
     expect(publicMapListing.statusReason).toBeNull();
+  });
+
+  describe("public availability payload boundary (P2-12)", () => {
+    const PUBLIC_AVAILABILITY_KEYS = [
+      "availabilitySource",
+      "openSlots",
+      "totalSlots",
+      "availableFrom",
+      "availableUntil",
+      "minStayMonths",
+      "lastConfirmedAt",
+      "freshnessBucket",
+      "publicStatus",
+    ];
+    const INTERNAL_AVAILABILITY_KEYS = [
+      "staleAt",
+      "autoPauseAt",
+      "searchEligible",
+      "isValid",
+      "isPubliclyAvailable",
+      "effectiveAvailableSlots",
+    ];
+
+    const resolvedAvailability = () =>
+      buildHostManagedPublicAvailability(
+        {
+          status: "ACTIVE",
+          statusReason: null,
+          availabilitySource: "HOST_MANAGED",
+          openSlots: 2,
+          totalSlots: 4,
+          moveInDate: "2026-06-01",
+          availableUntil: "2026-12-01",
+          minStayMonths: 3,
+          lastConfirmedAt: "2026-04-15T12:30:00.000Z",
+        },
+        new Date("2026-04-20T00:00:00.000Z")
+      );
+
+    it("keeps only public availability fields on browser-visible search cards", () => {
+      const serialized = JSON.parse(
+        JSON.stringify(
+          toPublicSearchListing(
+            makeListing({ publicAvailability: resolvedAvailability() })
+          )
+        )
+      );
+
+      expect(Object.keys(serialized.publicAvailability).sort()).toEqual(
+        [...PUBLIC_AVAILABILITY_KEYS].sort()
+      );
+      for (const key of INTERNAL_AVAILABILITY_KEYS) {
+        expect(serialized.publicAvailability[key]).toBeUndefined();
+      }
+    });
+
+    it("keeps only public availability fields on map listings", () => {
+      const mapListing: MapListingData = {
+        id: "map-resolved-1",
+        title: "Map resolved",
+        price: 1400,
+        availableSlots: 2,
+        totalSlots: 4,
+        images: ["map.jpg"],
+        location: { lat: 30.26721, lng: -97.74312 },
+        publicAvailability: resolvedAvailability(),
+      };
+
+      const serialized = JSON.parse(
+        JSON.stringify(toPublicMapListing(mapListing))
+      );
+
+      expect(Object.keys(serialized.publicAvailability).sort()).toEqual(
+        [...PUBLIC_AVAILABILITY_KEYS].sort()
+      );
+      for (const key of INTERNAL_AVAILABILITY_KEYS) {
+        expect(serialized.publicAvailability[key]).toBeUndefined();
+      }
+    });
   });
 });

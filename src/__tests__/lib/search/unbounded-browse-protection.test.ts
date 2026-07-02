@@ -50,6 +50,22 @@ import {
 
 const mockExecuteRawUnsafe = prisma.$executeRawUnsafe as jest.Mock;
 
+// These tests validate the raw count/list contract (the dedup-off path prod
+// runs). Pin FEATURE_SEARCH_LISTING_DEDUP off so the dev-default dedup-aware
+// count query doesn't consume the raw-count mock. Dedup counting is covered in
+// search-doc-queries.test.ts.
+const ORIGINAL_DEDUP_FLAG = process.env.FEATURE_SEARCH_LISTING_DEDUP;
+beforeAll(() => {
+  process.env.FEATURE_SEARCH_LISTING_DEDUP = "false";
+});
+afterAll(() => {
+  if (ORIGINAL_DEDUP_FLAG === undefined) {
+    delete process.env.FEATURE_SEARCH_LISTING_DEDUP;
+  } else {
+    process.env.FEATURE_SEARCH_LISTING_DEDUP = ORIGINAL_DEDUP_FLAG;
+  }
+});
+
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const freshLastConfirmedAt = () => new Date(Date.now() - ONE_DAY_MS);
 

@@ -210,7 +210,7 @@ import { loadValidQuerySnapshot } from "@/lib/search/query-snapshots";
 import { parseSearchParams } from "@/lib/search-params";
 import { clampBoundsToMaxSpan } from "@/lib/validation";
 import { features } from "@/lib/env";
-import { logger } from "@/lib/logger";
+import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { withTimeout } from "@/lib/timeout-wrapper";
 import type { ListingData, MapListingData } from "@/lib/data";
 import { buildPublicAvailability } from "@/lib/search/public-availability";
@@ -317,6 +317,8 @@ const mockClampBoundsToMaxSpan = clampBoundsToMaxSpan as jest.MockedFunction<
   typeof clampBoundsToMaxSpan
 >;
 const mockWithTimeout = withTimeout as jest.MockedFunction<typeof withTimeout>;
+const mockSanitizeErrorMessage =
+  sanitizeErrorMessage as jest.MockedFunction<typeof sanitizeErrorMessage>;
 const mockPrismaListingFindMany = prisma.listing
   .findMany as jest.MockedFunction<typeof prisma.listing.findMany>;
 const mockGetAvailabilityForListings =
@@ -1199,7 +1201,7 @@ describe("search-v2-service", () => {
       expect(result.response?.meta.embeddingVersion).toBeUndefined();
     });
 
-    it("adds embeddingVersion to meta when semantic search powers the list response", async () => {
+    it("adds embeddingVersion to the meta field — but NOT the query hash — when semantic search powers the list response", async () => {
       (features as Record<string, unknown>).semanticSearch = true;
       setupDefaultMocks({ useSearchDoc: false });
       mockParseSearchParams.mockReturnValue(
@@ -1268,16 +1270,17 @@ describe("search-v2-service", () => {
       expect(result.response?.meta.projectionVersion).toBe(
         SEARCH_DOC_PROJECTION_VERSION
       );
+      // The version token still surfaces in the dedicated meta field...
       expect(result.response?.meta.embeddingVersion).toBe(
         "gemini-embedding-2.search-result.nosensitive-v1.d768"
       );
       expect(result.response?.list.items[0]?.id).toBe("semantic-1");
       expect(mockGetListingsPaginated).not.toHaveBeenCalled();
-      expect(mockGetReadEmbeddingVersion).toHaveBeenCalled();
+      // ...but P1-5 requires the client-facing query hash to stay bare so the
+      // client doesn't discard every semantic response as a hash mismatch.
       expect(mockGenerateQueryHash).toHaveBeenCalledWith(
-        expect.objectContaining({
-          embeddingVersion:
-            "gemini-embedding-2.search-result.nosensitive-v1.d768",
+        expect.not.objectContaining({
+          embeddingVersion: expect.anything(),
         })
       );
     });
@@ -1934,6 +1937,15 @@ describe("search-v2-service", () => {
         })
       );
 
+      // P2-10: the raw rejection reason is routed through sanitizeErrorMessage
+      // (which redacts PII in prod) rather than logged verbatim.
+      expect(
+        mockSanitizeErrorMessage.mock.calls.some(
+          ([arg]) =>
+            arg instanceof Error && arg.message === "search-map-query timed out"
+        )
+      ).toBe(true);
+
       // Response should have warnings about map failure (spread dynamically, not in TS type)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect((result.response!.meta as any).warnings).toContain(
@@ -1976,6 +1988,16 @@ describe("search-v2-service", () => {
           error: expect.any(String),
         })
       );
+
+      // P2-10: the raw rejection reason is routed through sanitizeErrorMessage
+      // (which redacts PII in prod) rather than logged verbatim.
+      expect(
+        mockSanitizeErrorMessage.mock.calls.some(
+          ([arg]) =>
+            arg instanceof Error &&
+            arg.message === "search-list-query timed out"
+        )
+      ).toBe(true);
     });
 
     it("returns list results even when map query fails (C1.1)", async () => {
@@ -2638,6 +2660,151 @@ describe("search-v2-service", () => {
         },
       });
       expect(mockGetSearchDocListingsWithKeyset).not.toHaveBeenCalled();
+    });
+
+    it("returns snapshotExpired when a keyset cursor's filter hash (qh) no longer matches (P2-20)", async () => {
+      (features as Record<string, unknown>).searchKeyset = true;
+      setupDefaultMocks({ useSearchDoc: true });
+      mockIsSearchDocEnabled.mockReturnValue(true);
+
+      // Cursor matches engine/version snapshot but was minted under a DIFFERENT
+      // filter set (mockGenerateQueryHash returns "abcdef1234567890").
+      mockDecodeCursorAny.mockReturnValue({
+        type: "keyset" as const,
+        cursor: {
+          v: 2 as const,
+          s: "recommended" as const,
+          k: ["85.50", "2024-01-15T10:00:00.000Z"],
+          id: "abc",
+          snapshot: {
+            engine: "searchdoc-keyset" as const,
+            responseVersion: `${SEARCH_RESPONSE_VERSION}.searchdoc-keyset`,
+            projectionVersion: SEARCH_DOC_PROJECTION_VERSION,
+            embeddingVersion: null,
+            qh: "filter-set-a-hash",
+          },
+        },
+      });
+
+      const result = await executeSearchV2({
+        rawParams: {
+          minLat: "37.7",
+          maxLat: "37.85",
+          minLng: "-122.52",
+          maxLng: "-122.35",
+          cursor: "keyset-cursor-token",
+        },
+      });
+
+      expect(result.snapshotExpired).toEqual({
+        queryHash: "abcdef1234567890",
+        reason: "search_contract_changed",
+      });
+      expect(mockGetSearchDocListingsWithKeyset).not.toHaveBeenCalled();
+    });
+
+    it("applies a keyset cursor whose filter hash (qh) matches the current request (P2-20)", async () => {
+      (features as Record<string, unknown>).searchKeyset = true;
+      setupDefaultMocks({ useSearchDoc: true });
+      mockIsSearchDocEnabled.mockReturnValue(true);
+
+      const keysetCursor = {
+        v: 2 as const,
+        s: "recommended" as const,
+        k: ["85.50", "2024-01-15T10:00:00.000Z"],
+        id: "abc",
+        snapshot: {
+          engine: "searchdoc-keyset" as const,
+          responseVersion: `${SEARCH_RESPONSE_VERSION}.searchdoc-keyset`,
+          projectionVersion: SEARCH_DOC_PROJECTION_VERSION,
+          embeddingVersion: null,
+          qh: "abcdef1234567890",
+        },
+      };
+      mockDecodeCursorAny.mockReturnValue({
+        type: "keyset" as const,
+        cursor: keysetCursor,
+      });
+      mockGetSearchDocListingsWithKeyset.mockResolvedValue({
+        items: [makeListingData()],
+        total: 10,
+        page: 1,
+        limit: 12,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPrevPage: false,
+        nextCursor: null,
+      });
+
+      await executeSearchV2({
+        rawParams: {
+          minLat: "37.7",
+          maxLat: "37.85",
+          minLng: "-122.52",
+          maxLng: "-122.35",
+          cursor: "keyset-cursor-token",
+        },
+      });
+
+      // Matching qh => cursor honored (not rejected as a contract change).
+      expect(mockGetSearchDocListingsWithKeyset).toHaveBeenCalledWith(
+        expect.any(Object),
+        keysetCursor,
+        expect.objectContaining({ qh: "abcdef1234567890" })
+      );
+    });
+  });
+
+  describe("admission caps (P2-3)", () => {
+    it("rejects occupants>20 on the non-projection path with a 400 admissionError", async () => {
+      setupDefaultMocks({ useSearchDoc: true });
+      mockIsSearchDocEnabled.mockReturnValue(true);
+
+      const result = await executeSearchV2({
+        rawParams: {
+          minLat: "37.7",
+          maxLat: "37.85",
+          minLng: "-122.52",
+          maxLng: "-122.35",
+          occupants: "21",
+        },
+      });
+
+      expect(result.admissionError).toEqual({
+        code: "requested_occupants_too_high",
+        message: "requested_occupants must be <= 20",
+        status: 400,
+      });
+      expect(result.response).toBeNull();
+      // Rejected ahead of the engine branch — no SearchDoc query runs.
+      expect(mockGetSearchDocListingsPaginated).not.toHaveBeenCalled();
+      expect(mockGetSearchDocListingsFirstPage).not.toHaveBeenCalled();
+    });
+
+    it("rejects deep paging (page>20) on the non-projection path with a 400 admissionError", async () => {
+      setupDefaultMocks({ useSearchDoc: true });
+      mockIsSearchDocEnabled.mockReturnValue(true);
+      mockParseSearchParams.mockReturnValue(
+        defaultParsedSearchParams({ requestedPage: 21 })
+      );
+
+      const result = await executeSearchV2({
+        rawParams: {
+          minLat: "37.7",
+          maxLat: "37.85",
+          minLng: "-122.52",
+          maxLng: "-122.35",
+          page: "21",
+        },
+      });
+
+      expect(result.admissionError).toEqual({
+        code: "deep_paging_capped",
+        message: "page must be <= 20",
+        status: 400,
+      });
+      expect(result.response).toBeNull();
+      expect(mockGetSearchDocListingsPaginated).not.toHaveBeenCalled();
     });
   });
 });

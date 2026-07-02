@@ -26,6 +26,7 @@ jest.mock("@/lib/prisma", () => ({
     rateLimitEntry: { deleteMany: jest.fn() },
     idempotencyKey: { deleteMany: jest.fn() },
     typingStatus: { deleteMany: jest.fn() },
+    querySnapshot: { deleteMany: jest.fn() },
   },
 }));
 
@@ -89,6 +90,7 @@ describe("GET /api/cron/daily-maintenance", () => {
     (prisma.rateLimitEntry.deleteMany as jest.Mock).mockResolvedValue({ count: 1 });
     (prisma.idempotencyKey.deleteMany as jest.Mock).mockResolvedValue({ count: 2 });
     (prisma.typingStatus.deleteMany as jest.Mock).mockResolvedValue({ count: 3 });
+    (prisma.querySnapshot.deleteMany as jest.Mock).mockResolvedValue({ count: 4 });
     fetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({ success: true }),
@@ -198,6 +200,49 @@ describe("GET /api/cron/daily-maintenance", () => {
     expect(cleanupTerminalOutboxEventsOnce).toHaveBeenCalledTimes(1);
     expect(compactSupersededOutboxEventsOnce).toHaveBeenCalledTimes(1);
     expect(cleanupConsumedCacheInvalidationsOnce).toHaveBeenCalledTimes(1);
+  });
+
+  it("reaps expired query snapshots inside the daily window (P2-19)", async () => {
+    jest.setSystemTime(new Date("2026-04-17T09:03:00.000Z"));
+    (prisma.querySnapshot.deleteMany as jest.Mock).mockResolvedValue({
+      count: 7,
+    });
+
+    const response = await GET(createRequest() as any);
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(prisma.querySnapshot.deleteMany).toHaveBeenCalledWith({
+      where: { expiresAt: { lt: expect.any(Date) } },
+    });
+    expect(payload.tasks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          task: "cleanup-query-snapshots",
+          success: true,
+          detail: { deleted: 7 },
+        }),
+      ])
+    );
+  });
+
+  it("skips the query-snapshot reaper outside the daily window", async () => {
+    jest.setSystemTime(new Date("2026-04-17T15:00:00.000Z"));
+
+    const response = await GET(createRequest() as any);
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(prisma.querySnapshot.deleteMany).not.toHaveBeenCalled();
+    expect(payload.tasks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          task: "cleanup-query-snapshots",
+          skipped: true,
+          detail: { skipped: true, reason: "outside_daily_window" },
+        }),
+      ])
+    );
   });
 
   it("marks outbox retention skipped outside the daily window", async () => {

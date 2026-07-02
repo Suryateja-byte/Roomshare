@@ -1,262 +1,158 @@
-# Host-Managed Listing PATCH Contract
+# Host-Managed Availability & Status Contract
 
-Authoritative reference for `PATCH /api/listings/:id` when the listing's
-`availabilitySource` is `HOST_MANAGED`. The route has **two** branches under
-one endpoint:
+**Last verified: 2026-07-02** (against current `main`). Uses stable anchors
+(function / schema names) rather than line numbers — the route is under active
+edit. If types / tests and this doc conflict, types win.
 
-1. **Dedicated host-managed branch** — narrow schema, optimistic CAS,
-   server-derived status transitions. Triggered when the listing is
-   `HOST_MANAGED` **and** the payload is "pure" (only host-managed keys).
-2. **Generic PATCH branch** — used for legacy listings, and for content-only
-   edits (title/description/images) on host-managed listings. Refuses to
-   touch inventory fields on host-managed rows.
+Post contact-first cutover, **every** listing is host-managed; there is no
+`availabilitySource` dispatch and no legacy-booking write path. Availability and
+status are edited through **two independent server surfaces**, each with its own
+authorization, optimistic-lock, and validation rules:
 
-Source of truth: `src/app/api/listings/[id]/route.ts` and the helper at
-`src/lib/listings/host-managed-write.ts`. If types / tests and this doc
-conflict, types win.
+| Surface | Entry point | Mutates | Auth model |
+|---|---|---|---|
+| **Availability PATCH** | `PATCH /api/listings/:id` — availability branch (`isHostManagedAvailabilityPatch`) | Inventory numbers (`openSlots`, `totalSlots`, `moveInDate`, `availableUntil`, `minStayMonths`) + a caller-supplied `status` | Owner-only, in-tx `FOR UPDATE` + version CAS |
+| **Status server action** | `updateListingStatus` / `recoverHostManagedListing` in `src/app/actions/listing-status.ts` | `status` + `statusReason` only (recovery also refreshes freshness timestamps) | Owner-only, in-tx `FOR UPDATE` + version CAS |
 
-Ticket history: CFM-301 (helper), CFM-302 (this contract), CFM-504 (extended
-mixed-state guard). See `docs/plans/cfm-migration-plan.md`.
-
----
-
-## 1. Dispatch
-
-### 1.1 `isPureHostManagedPatchPayload`
-
-Defined at `src/app/api/listings/[id]/route.ts:198-210`. Returns true when:
-
-- The body is a plain object (not an array, not null).
-- It contains `expectedVersion`.
-- Every key is in `HOST_MANAGED_PATCH_KEYS` (`route.ts:184-192`):
-  `expectedVersion`, `openSlots`, `totalSlots`, `moveInDate`, `availableUntil`,
-  `minStayMonths`, `status`.
-
-Any extra key (e.g., `title`, `amenities`) falls to the generic branch.
-
-### 1.2 Branch selection
-
-`route.ts:469-471`:
-
-```ts
-const useDedicatedHostManagedPatch =
-  listing.availabilitySource === "HOST_MANAGED" &&
-  isPureHostManagedPatchPayload(rawBody);
-```
-
-Both conditions required. A legacy listing that happens to send a pure
-host-managed payload falls through to `prepareHostManagedListingWrite`, which
-rejects at `host-managed-write.ts:194-196` with
-`HOST_MANAGED_WRITE_PATH_REQUIRED`.
+Source of truth: `src/app/api/listings/[id]/route.ts` (PATCH dispatch + schema)
+and `src/app/actions/listing-status.ts` (status transitions). There is **no**
+`src/lib/listings/host-managed-write.ts` helper — it was removed; all logic is
+inline in those two files.
 
 ---
 
-## 2. Request schema — dedicated branch
+## 1. PATCH dispatch — payload shape, not `availabilitySource`
 
-`hostManagedPatchSchema` at `src/app/api/listings/[id]/route.ts:167-177` (Zod
-`.strict()`):
+`PATCH /api/listings/:id` picks a branch purely from the request body shape:
+
+- **Availability branch** — `isHostManagedAvailabilityPatch(rawBody)` is true
+  when the body is a plain object (not array/null) containing **`openSlots` or
+  `status`**. Parsed by `hostManagedAvailabilityPatchSchema`.
+- **Profile branch** — everything else. Parsed by `listingProfilePatchSchema`
+  (title/description/price/amenities/location/etc.). Rejects any
+  availability-adjacent key (see §4, mixed-write guard).
+
+The two branches are mutually exclusive and both schemas are Zod `.strict()`, so
+a body cannot straddle them: a `title` sent alongside `openSlots` lands in the
+availability branch and is rejected as an unknown key (400); a bare inventory
+key sent without `openSlots`/`status` lands in the profile branch and is
+rejected by the mixed-write guard (409).
+
+---
+
+## 2. Availability branch — schema is a full snapshot, not a partial patch
+
+`hostManagedAvailabilityPatchSchema` (Zod `.strict()` + `.superRefine`). Every
+core field is **required** — this is a whole-availability replacement, not a
+sparse merge:
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `expectedVersion` | non-negative integer | ✅ | Optimistic-lock CAS token. |
-| `openSlots` | integer \| null | — | `null` clears; 0 is a valid "full" count. |
-| `totalSlots` | positive integer | — | Capacity. Helper requires ≥ 1. |
-| `moveInDate` | `YYYY-MM-DD` \| null | — | Earliest accepted move-in. |
-| `availableUntil` | `YYYY-MM-DD` \| null | — | Last day marketed. Must not be before `moveInDate`. |
-| `minStayMonths` | positive integer | — | Helper requires ≥ 1. |
-| `status` | `"ACTIVE"` \| `"PAUSED"` \| `"RENTED"` | — | Explicit override; omit to let the server auto-derive. |
+| `expectedVersion` | coerced int ≥ 1 | ✅ | Optimistic-lock CAS token. |
+| `openSlots` | coerced int, 0–20 | ✅ | 0 is a valid "full" count. Also written to `availableSlots`. |
+| `totalSlots` | coerced int, 1–20 | ✅ | Capacity. |
+| `moveInDate` | `YYYY-MM-DD` \| null | ✅ (key required; value nullable) | Earliest accepted move-in. |
+| `availableUntil` | `YYYY-MM-DD` \| null | — (optional key) | Omit ⇒ keep existing; `null` ⇒ clear. |
+| `minStayMonths` | coerced int ≥ 1 | ✅ | |
+| `status` | `"ACTIVE"` \| `"PAUSED"` \| `"RENTED"` | ✅ | Caller-supplied; **not** server-derived. |
 
-Because the schema is `.strict()`, extra keys produce a 400 with Zod errors
-in `{ fields: ... }`.
+Calendar-date strings are pre-validated (`getHostManagedDateOnlyErrors`) →
+400 `{ error: "Validation failed", fields }` before Zod runs. Because the schema
+is `.strict()`, unknown keys also produce 400 with `fields`.
 
-### 2.1 "Empty" payload
+### Invariants enforced (verified in code)
 
-A payload containing only `{ expectedVersion }` passes the gate
-(`isPureHostManagedPatchPayload`) and runs the helper. The helper computes
-`availabilityAffecting = false` (see `host-managed-write.ts:277-282`) and the
-only data mutation is `version` + `status` (unchanged) + `statusReason`
-(recomputed from the existing row). This is effectively a no-op version bump
-and is harmless.
+- **`openSlots ≤ totalSlots`** — `.superRefine`, field error on `openSlots`.
+- **`ACTIVE ⇒ openSlots > 0` and `moveInDate` present** — `.superRefine`.
+- **`availableUntil` not in the past, and `≥ moveInDate`** — enforced twice:
+  in `.superRefine` on the request, and re-checked inside the transaction
+  against the resolved `nextAvailableUntil`/`nextMoveInDate` (since `availableUntil`
+  may be omitted and inherited from the row).
+- **`availableSlots` is kept equal to `openSlots`** on write.
+- On success the write also stamps `lastConfirmedAt = now` and clears the
+  freshness timers (`freshnessReminderSentAt`, `freshnessWarningSentAt`,
+  `autoPausedAt`) — an availability edit counts as a reconfirmation.
 
----
+### `statusReason` handling on the availability branch
 
-## 3. Optimistic locking (version CAS)
-
-Callers read `listing.version`, send it as `expectedVersion`, and the helper
-compares at `host-managed-write.ts:198-200`:
-
-```ts
-if (input.expectedVersion !== current.version) {
-  return makeWriteError("VERSION_CONFLICT", 409);
-}
-```
-
-On success the helper sets `nextVersion = current.version + 1` and includes
-it in the update payload (`host-managed-write.ts:288-293`). Clients must
-refresh their cached version after each successful PATCH.
-
-Test coverage for the CAS path:
-
-- Unit: `src/__tests__/lib/listings/host-managed-write.test.ts`.
-- API integration: the host-managed PATCH tests at
-  `src/__tests__/api/listings-host-managed-patch.test.ts` cover the happy
-  path; the mixed-write test at `src/__tests__/api/listings-idor.test.ts`
-  covers `HOST_MANAGED_WRITE_PATH_REQUIRED` dispatches.
+`status` is taken as given; only `statusReason` is derived: `PAUSED` ⇒
+`HOST_PAUSED`; a currently host-cleared reason (`HOST_PAUSED`,
+`STALE_AUTO_PAUSE`, `FRESHNESS_WARNING`) is cleared to `null`; otherwise the
+existing `statusReason` is preserved. There is **no** server auto-derivation of
+`RENTED` from `openSlots === 0` (that behavior was removed).
 
 ---
 
-## 4. Machine error codes
+## 3. Status server action — transitions only
 
-All codes defined at `src/lib/listings/host-managed-write.ts:19-36`. HTTP
-status is returned via `WriteError.httpStatus`.
+`updateListingStatus(listingId, status, expectedVersion)` changes `status` +
+`statusReason` without touching inventory. `expectedVersion` here is validated as
+int ≥ 0 (note: the PATCH branch requires ≥ 1). Ordering inside the `FOR UPDATE`
+transaction:
 
-| Code | HTTP | Trigger | Caller recovery |
-|---|---|---|---|
-| `VERSION_CONFLICT` | 409 | `expectedVersion !== listing.version` | Re-fetch the listing, re-apply the edit, retry. |
-| `HOST_MANAGED_WRITE_PATH_REQUIRED` | 409 | Legacy listing received a host-managed payload (helper rejects at L194-196) **OR** host-managed listing received a mixed payload via the generic path (CFM-504 guard at `route.ts:803-822`). | Reload the listing and use the dedicated availability editor. |
-| `HOST_MANAGED_ACTIVE_REQUIRES_OPEN_SLOTS` | 400 | Explicit `status=ACTIVE` with `openSlots` null or `<= 0`. | Set a positive `openSlots` or drop the explicit `status`. |
-| `HOST_MANAGED_INVALID_DATE_RANGE` | 400 | `availableUntil < moveInDate` (day-only comparison); or `ACTIVE` status with missing `moveInDate` / past `availableUntil`. | Fix the date pair before retrying. |
-| `HOST_MANAGED_INVALID_MIN_STAY` | 400 | `minStayMonths < 1`. | Use an integer ≥ 1. |
-| `HOST_MANAGED_INVALID_TOTAL_SLOTS` | 400 | `totalSlots < 1`. | Use a positive total. |
-| `HOST_MANAGED_INVALID_OPEN_SLOTS` | 400 | `openSlots < 0`, `openSlots > totalSlots`, or `openSlots=null` on an availability-affecting write. | Clamp to `[0, totalSlots]`. |
-| `HOST_MANAGED_MIGRATION_REVIEW_REQUIRED` | 400 | Explicit `status=ACTIVE` while `needsMigrationReview = true`. | Complete the migration-review workflow (CFM-503) first. |
+1. Ownership (`ownerId` mismatch ⇒ "You can only update your own listings").
+2. Moderation write-lock (§4).
+3. Version CAS ⇒ `VERSION_CONFLICT`.
+4. `ACTIVE` while `statusReason ∈ {STALE_AUTO_PAUSE, FRESHNESS_WARNING}` ⇒
+   `LISTING_REQUIRES_RECONFIRMATION` (must reconfirm availability first).
+5. `ACTIVE` requires effective open slots > 0
+   (`openSlots ?? availableSlots ?? totalSlots`) ⇒ else
+   `HOST_MANAGED_ACTIVE_REQUIRES_OPEN_SLOTS`.
+6. `resolveHostStatusReason`: `PAUSED` ⇒ `HOST_PAUSED`; `ACTIVE` clears a prior
+   `HOST_PAUSED`; otherwise preserved.
 
-Codes are surfaced in the JSON body as `{ error, code }`. The host-managed
-PATCH branch does NOT include Zod `fields` on helper errors — field-level
-errors are only returned on the upstream Zod step (schema parse) where the
-shape is well-defined.
+Then `markListingDirtyInTx(..., "status_changed")` +
+`syncListingLifecycleProjectionInTx` in the same tx.
 
----
+`recoverHostManagedListing(listingId, expectedVersion, mode)` (`RECONFIRM` |
+`REOPEN`) is the reconfirmation companion: same CAS/lock guards, refreshes
+`lastConfirmedAt` and clears freshness timers, and on `REOPEN` flips to `ACTIVE`
+(also gated by `HOST_MANAGED_ACTIVE_REQUIRES_OPEN_SLOTS`).
 
-## 5. Server-derived status transitions
-
-When `input.status` is **omitted**, the helper picks the next status from
-row state (`host-managed-write.ts:243-250`):
-
-| Condition | Resulting status | `statusReason` |
-|---|---|---|
-| `nextOpenSlots === 0` | `RENTED` | `NO_OPEN_SLOTS` |
-| `availableUntilPast` (today past `availableUntil`) | `RENTED` | `AVAILABLE_UNTIL_PASSED` |
-| Otherwise | keep `current.status` | keep `current.statusReason` |
-
-When `input.status` is **explicit**, the helper validates and normalizes the
-reason via `statusReasonForExplicitStatus` (`host-managed-write.ts:252-255`).
-Explicit `ACTIVE` additionally:
-
-- Rejects if `needsMigrationReview` — see `HOST_MANAGED_MIGRATION_REVIEW_REQUIRED`.
-- Requires `openSlots > 0` and a valid date window.
-- Clears `statusReason` to `null`.
-
-Allowed `statusReason` values (`host-managed-write.ts:6-17`):
-`NO_OPEN_SLOTS`, `AVAILABLE_UNTIL_PASSED`, `HOST_PAUSED`, `ADMIN_PAUSED`,
-`MIGRATION_REVIEW`, `STALE_AUTO_PAUSE`, `MANUAL_CLOSED`.
+`reviewListingMigration` is a **retired stub** — it now returns
+`MIGRATION_REVIEW_RETIRED` unconditionally. The old migration-review gate
+(`HOST_MANAGED_MIGRATION_REVIEW_REQUIRED`) no longer exists.
 
 ---
 
-## 6. Invalid field combinations rejected deterministically
+## 4. Surviving error codes
 
-| Case | Code | Where enforced |
-|---|---|---|
-| Extra key in payload (e.g., `title`) | 400 (Zod) | `hostManagedPatchSchema.strict()` |
-| `availableUntil < moveInDate` | `HOST_MANAGED_INVALID_DATE_RANGE` | `host-managed-write.ts:232-238` |
-| `ACTIVE` + `openSlots == null` | `HOST_MANAGED_ACTIVE_REQUIRES_OPEN_SLOTS` | `host-managed-write.ts:263-268` |
-| `ACTIVE` + missing `moveInDate` / past `availableUntil` | `HOST_MANAGED_INVALID_DATE_RANGE` | `host-managed-write.ts:270-272` |
-| Availability-affecting write with `openSlots=null` | `HOST_MANAGED_INVALID_OPEN_SLOTS` | `host-managed-write.ts:284-286` |
-| Host-managed row receives mixed payload on generic path (touches `moveInDate` / `bookingMode` / `totalSlots` / `availableUntil` / `minStayMonths`) | `HOST_MANAGED_WRITE_PATH_REQUIRED` | `route.ts:803-822` (CFM-504) |
-| Legacy row receives pure host-managed payload | `HOST_MANAGED_WRITE_PATH_REQUIRED` | `host-managed-write.ts:194-196` |
-| `expectedVersion` stale | `VERSION_CONFLICT` | `host-managed-write.ts:198-200` |
+The old `HOST_MANAGED_INVALID_*` taxonomy is gone. Slot/date validation failures
+now return generic `400 { error: "Validation failed", fields }` (Zod field
+errors, **no machine `code`**). The codes that remain:
 
----
+| Code | Surface | HTTP / return | Trigger | Recovery |
+|---|---|---|---|---|
+| `VERSION_CONFLICT` | both | 409 (PATCH) / action error | `expectedVersion !== listing.version` | Re-fetch, re-apply, retry. |
+| `HOST_MANAGED_WRITE_PATH_REQUIRED` | PATCH profile branch | 409 | Profile PATCH carries a retired availability key (`totalSlots`, `moveInDate`, `availableUntil`, `minStayMonths`) with no `openSlots`/`status` | Reload; use the availability editor. |
+| `LISTING_LOCKED` | both | 423 (PATCH) / action error | `statusReason ∈ {ADMIN_PAUSED, SUPPRESSED}` — computed **before** the `moderationWriteLocks` flag, so enforced regardless of flag state; includes `lockReason` | Locked under review; no host edit. |
+| `HOST_MANAGED_ACTIVE_REQUIRES_OPEN_SLOTS` | status action | action error | Transition to `ACTIVE` with effective open slots ≤ 0 | Add an open slot or don't go ACTIVE. |
+| `LISTING_REQUIRES_RECONFIRMATION` | status action | action error | `ACTIVE` while stale/freshness-paused | Reconfirm via `recoverHostManagedListing`. |
+| `MIGRATION_REVIEW_RETIRED` | status action | action error | `reviewListingMigration` (retired) | N/A — call removed. |
+| `INVALID_VERSION` | status action | action error | `expectedVersion` fails int-≥0 parse | Send a valid version. |
 
-## 7. What the generic PATCH branch can do to host-managed rows
+Non-code failures: PATCH availability branch also returns `404 "Listing not
+found"` (missing row or non-owner) and `409 "Listing location is missing"`.
 
-The generic branch (L566-924) covers content-only edits. On host-managed
-rows it can safely change: `title`, `description`, `price`, `amenities`,
-`houseRules`, `householdLanguages`, `genderPreference`, `householdGender`,
-`primaryHomeLanguage`, `leaseDuration`, `roomType`, `images`, and location
-fields (`address`, `city`, `state`, `zip`).
-
-Inventory / availability fields are gated by the CFM-504 extended
-mixed-state guard at `route.ts:803-822`: `moveInDateChanged`,
-`bookingModeChanged`, `totalSlotsChanged`, `availableUntilChanged`,
-`minStayMonthsChanged` — any one on a `HOST_MANAGED` row throws
-`HOST_MANAGED_WRITE_PATH_REQUIRED`.
+The mixed-write guard, version CAS under `FOR UPDATE`, and the in-tx
+`markListingDirtyInTx` mark were each verified present in the live code.
 
 ---
 
-## 8. UI payload audit — `EditListingForm.tsx`
+## 5. Tests
 
-Audited at `src/app/listings/[id]/edit/EditListingForm.tsx` during CFM-302.
-Findings:
-
-- The top-level `EditListingForm` component at `L1681-1687` dispatches by
-  `availabilitySource`:
-  ```ts
-  if (props.listing.availabilitySource === "HOST_MANAGED") {
-    return <HostManagedEditListingForm {...props} />;
-  }
-  return <LegacyEditListingForm {...props} />;
-  ```
-- `HostManagedEditListingForm`'s PATCH body at `L298-307`:
-  ```ts
-  body: JSON.stringify({
-    expectedVersion: version,
-    openSlots: Number(openSlots),
-    totalSlots: Number(totalSlots),
-    moveInDate: moveInDate || null,
-    availableUntil: availableUntil || null,
-    minStayMonths: Number(minStayMonths),
-    status,
-  })
-  ```
-  — every key is in `HOST_MANAGED_PATCH_KEYS`; payload is "pure" so the
-  server dispatches to the dedicated branch.
-- `LegacyEditListingForm`'s PATCH body at `L979` does not include any of the
-  dedicated-only keys; it flows through the generic schema which allows
-  `moveInDate` / `availableUntil` / `minStayMonths` on LEGACY_BOOKING rows.
-- Client error handling: the form surfaces `code === "VERSION_CONFLICT"` as
-  a reload-required state at `L316-320`, matching the server contract.
-
-**No drift.** The UI is consistent with the server contract as of this
-audit. If the edit form is ever extended with new fields, update both this
-doc and `HOST_MANAGED_PATCH_KEYS`.
+- `src/__tests__/api/listings-host-managed-patch.test.ts` — availability branch
+  happy path, validation, and the in-tx dirty-mark assertion.
+- `src/__tests__/api/listings-idor.test.ts` — ownership/IDOR + the
+  `HOST_MANAGED_WRITE_PATH_REQUIRED` mixed-write rejection.
+- `src/__tests__/actions/listing-status.test.ts` — `updateListingStatus` /
+  `recoverHostManagedListing` transitions, CAS, and
+  `HOST_MANAGED_ACTIVE_REQUIRES_OPEN_SLOTS`.
 
 ---
 
-## 9. Testing
+## Related docs
 
-- Unit tests for the helper: `src/__tests__/lib/listings/host-managed-write.test.ts`
-  — covers version CAS, invalid slots/dates, mixed-payload rejection, and
-  the CFM-504 extended guard (availableUntil/minStayMonths change detection).
-- Host-managed route integration:
-  `src/__tests__/api/listings-host-managed-patch.test.ts`
-  — dedicated branch happy path + `markListingDirtyInTx` assertion.
-- Mixed-write rejection:
-  `src/__tests__/api/listings-idor.test.ts`
-  — 409 + `HOST_MANAGED_WRITE_PATH_REQUIRED` for every tracked inventory
-  field on a `HOST_MANAGED` listing.
-
----
-
-## 10. Changelog
-
-| Date | Change |
-|---|---|
-| 2026-04-16 | Initial doc (CFM-302). Captures the contract as of CFM-504. |
-| 2026-04-16 | CFM-004: cross-link to `docs/migration/cfm-observability.md` for runtime monitoring of non-negotiable invariants #2 and #9. No contract change. |
-
----
-
-## 11. Related docs
-
-- `docs/search-contract.md` — normalized search input + response contract
-  (CFM-002). `PublicAvailability` is the reader counterpart to these writes.
-- `docs/plans/cfm-migration-plan.md` — full migration plan.
-- `docs/migration/cfm-observability.md` — migration observability spec
-  (CFM-004). Defines the host-managed invariant tripwires
-  (`cfm.listing.host_managed_invariant_violation_count`) and the
-  repair-loop clobber guard (`cfm.cron.host_managed_clobber_count`) that
-  enforce non-negotiable invariants #2 and #9 at runtime.
-- Source of truth:
-  `src/app/api/listings/[id]/route.ts` (schema + dispatch),
-  `src/lib/listings/host-managed-write.ts` (helper + error codes).
+- `docs/search-contract.md` — normalized search input/response contract;
+  `PublicAvailability` is the reader counterpart to these writes.
+- `docs/plans/cfm-migration-plan.md` — full contact-first migration plan.

@@ -28,6 +28,7 @@ export const maxDuration = 30;
 
 const DEFAULT_BATCH_SIZE = 100;
 const DEFAULT_RESCAN_SAMPLE_SIZE = 50;
+const DEFAULT_MISSING_DOC_BACKSTOP_SIZE = 25;
 const DEFAULT_TIME_BUDGET_MS = 20_000;
 const MAX_DURATION_MS = maxDuration * 1000;
 const RESCAN_CHUNK_SAFETY_MARGIN_MS = 3_000;
@@ -71,6 +72,13 @@ function getRescanSampleSize(): number {
   return parsePositiveIntEnv(
     process.env.SEARCH_DOC_RESCAN_SAMPLE_SIZE,
     DEFAULT_RESCAN_SAMPLE_SIZE
+  );
+}
+
+function getMissingDocBackstopSize(): number {
+  return parsePositiveIntEnv(
+    process.env.SEARCH_DOC_MISSING_DOC_BACKSTOP_SIZE,
+    DEFAULT_MISSING_DOC_BACKSTOP_SIZE
   );
 }
 
@@ -218,14 +226,84 @@ async function fetchRescanListingIds(
   return rescanEntries.map((entry) => entry.id);
 }
 
-async function clearDirtyFlags(listingIds: string[]): Promise<number> {
-  if (listingIds.length === 0) {
+/**
+ * Backstop for listings that have NO search doc at all (P2-9). The TABLESAMPLE
+ * rescan above only re-evaluates rows that already exist in
+ * listing_search_docs, so a listing whose create-time upsert failed AND whose
+ * dirty mark was later lost (see P1-1) is invisible to search indefinitely.
+ * This anti-join finds publishable listings — ACTIVE, fully addressed, geocoded
+ * (mirrors `canProjectSearchDocument` in search-doc-sync) — that have no doc and
+ * no pending dirty mark, and feeds them through the same projection path so the
+ * cron creates the missing doc. `projectSearchDocument` remains authoritative:
+ * anything not truly projectable defers/suppresses and simply gets re-sampled.
+ */
+async function fetchMissingDocListingIds(
+  limit: number,
+  excludedListingIds: string[]
+): Promise<string[]> {
+  if (limit <= 0) {
+    return [];
+  }
+
+  const excludedListingClause =
+    excludedListingIds.length > 0
+      ? Prisma.sql`AND l.id <> ALL(${excludedListingIds})`
+      : Prisma.empty;
+
+  const rows = await prisma.$queryRaw<{ id: string }[]>(
+    Prisma.sql`
+      SELECT l.id
+      FROM "Listing" l
+      JOIN "Location" loc ON loc."listingId" = l.id
+      WHERE l.status::text = 'ACTIVE'
+        AND loc.address IS NOT NULL
+        AND loc.city IS NOT NULL
+        AND loc.state IS NOT NULL
+        AND loc.zip IS NOT NULL
+        AND loc.coords IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM listing_search_docs sd WHERE sd.id = l.id
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM listing_search_doc_dirty dirty
+          WHERE dirty.listing_id = l.id
+        )
+        ${excludedListingClause}
+      ORDER BY l."createdAt" DESC
+      LIMIT ${limit}
+    `
+  );
+
+  return rows.map((row) => row.id);
+}
+
+async function clearDirtyFlags(
+  entries: { listingId: string; markedAt: Date | null }[]
+): Promise<number> {
+  if (entries.length === 0) {
     return 0;
   }
 
+  const listingIds = entries.map((entry) => entry.listingId);
+  const observedMarkedAt = entries.map((entry) =>
+    entry.markedAt ? entry.markedAt.toISOString() : null
+  );
+
+  // Conditional clear closes the lost-dirty-mark race (P1-1). A writer that
+  // re-marks a listing via `ON CONFLICT ... SET marked_at = NOW()` after the
+  // cron read the queue lands a strictly newer marked_at, so its row is
+  // preserved (dirty.marked_at > observed) and reprocessed next run instead of
+  // being deleted with a version that was never projected. Comparison is
+  // against the marked_at observed at read time, never NOW(). A NULL observed
+  // timestamp (never written — the column is NOT NULL DEFAULT NOW()) degrades to
+  // an unconditional clear for that row.
   return prisma.$executeRaw`
-    DELETE FROM listing_search_doc_dirty
-    WHERE listing_id = ANY(${listingIds})
+    DELETE FROM listing_search_doc_dirty AS dirty
+    USING unnest(${listingIds}::text[], ${observedMarkedAt}::timestamptz[])
+      AS observed(listing_id, marked_at)
+    WHERE dirty.listing_id = observed.listing_id
+      AND (observed.marked_at IS NULL OR dirty.marked_at <= observed.marked_at)
   `;
 }
 
@@ -358,16 +436,30 @@ export async function GET(request: NextRequest) {
     dirtyIds = dirtyEntries.map((entry) => entry.listing_id);
     dirtyQueueAgeSeconds = computeDirtyQueueAgeSeconds(dirtyEntries, Date.now());
 
+    // Capture the marked_at observed at queue-read time so the clear can be
+    // conditional. A concurrent writer that re-marks a listing between now and
+    // the DELETE lands a strictly newer marked_at and must survive (P1-1).
+    const observedMarkedAtByListingId = new Map<string, Date | null>();
+    for (const entry of dirtyEntries) {
+      observedMarkedAtByListingId.set(
+        entry.listing_id,
+        toMarkedAtDate(entry.marked_at)
+      );
+    }
+
     const dirtyPhase = await processWithConcurrency(
       dirtyIds,
       async (listingId) => projectSearchDocument(listingId),
       UPSERT_CONCURRENCY
     );
 
-    const clearableIds = dirtyPhase.fulfilled
+    const clearableEntries = dirtyPhase.fulfilled
       .filter(shouldClearDirtyFlag)
-      .map((result) => result.listingId);
-    await clearDirtyFlags(clearableIds);
+      .map((result) => ({
+        listingId: result.listingId,
+        markedAt: observedMarkedAtByListingId.get(result.listingId) ?? null,
+      }));
+    await clearDirtyFlags(clearableEntries);
 
     const dirtyCounts = countProjectionResults(dirtyPhase.fulfilled);
     addOutcomeCounters(totalOutcomes, dirtyCounts.outcomes);
@@ -390,10 +482,15 @@ export async function GET(request: NextRequest) {
           getRescanSampleSize(),
           dirtyIds
         );
-        rescanned = rescanIds.length;
+        const missingDocIds = await fetchMissingDocListingIds(
+          getMissingDocBackstopSize(),
+          dirtyIds
+        );
+        const backstopIds = rescanIds.concat(missingDocIds);
+        rescanned = backstopIds.length;
 
         const rescanPhase = await processWithConcurrency(
-          rescanIds,
+          backstopIds,
           async (listingId) => projectSearchDocument(listingId),
           RESCAN_CONCURRENCY,
           () =>
@@ -416,7 +513,7 @@ export async function GET(request: NextRequest) {
             event: "search_doc_cron_rescan_truncated",
             processed: rescanPhase.fulfilled.length,
             dropped:
-              rescanIds.length -
+              backstopIds.length -
               rescanPhase.fulfilled.length -
               rescanPhase.rejected.length,
             durationMs: Date.now() - cronStartMs,

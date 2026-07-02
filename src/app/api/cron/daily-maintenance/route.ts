@@ -44,6 +44,7 @@ import {
   compactSupersededOutboxEventsOnce,
 } from "@/lib/outbox/retention";
 import { cleanupExpiredVerificationDocumentsOnce } from "@/lib/verification/retention";
+import { deleteExpiredQuerySnapshots } from "@/lib/search/query-snapshots";
 
 interface TaskResult {
   task: string;
@@ -252,6 +253,14 @@ export async function GET(request: NextRequest) {
       return { deleted: result.count };
     });
 
+    await runTask(results, "cleanup-query-snapshots", async () => {
+      const deleted = await withRetry(() => deleteExpiredQuerySnapshots(), {
+        context: "cleanup-query-snapshots",
+      });
+
+      return { deleted };
+    });
+
     await runTask(results, "cleanup-typing-status", async () => {
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
       const result = await withRetry(
@@ -316,6 +325,11 @@ export async function GET(request: NextRequest) {
     markSkippedTask(
       results,
       "cleanup-idempotency-keys",
+      "outside_daily_window"
+    );
+    markSkippedTask(
+      results,
+      "cleanup-query-snapshots",
       "outside_daily_window"
     );
     markSkippedTask(results, "cleanup-typing-status", "outside_daily_window");

@@ -55,10 +55,14 @@ import type {
 } from "./cursor";
 import { buildCursorFromRow, encodeKeysetCursor } from "./cursor";
 import {
-  buildPublicAvailability,
   isListingEligibleForPublicSearch,
   resolvePublicAvailability,
 } from "./public-availability";
+import {
+  SEARCH_COUNT_CACHE_TAG,
+  SEARCH_MAP_CACHE_TAG,
+  SEARCH_RESULTS_CACHE_TAG,
+} from "./search-cache";
 import { toPublicCoordinates } from "./public-coordinates";
 import pgvector from "pgvector";
 import { getCachedQueryEmbedding } from "@/lib/embeddings/query-cache";
@@ -286,6 +290,12 @@ function quantizeBound(value: number): number {
 export function buildBaseCacheFields(params: FilterParams) {
   return {
     q: params.query?.toLowerCase().trim() || "",
+    // vibeQuery is user-visible text input. It does not reach the cached
+    // SearchDoc SQL today (semantic path is uncached; soft-vibe rerank runs
+    // outside unstable_cache), but omitting it here would silently collide
+    // distinct vibe searches the day a refactor lets vibeQuery influence the
+    // cached query — so key on it defensively, matching buildSearchQueryHashPrefix8.
+    vibeQuery: params.vibeQuery?.toLowerCase().trim() || "",
     minPrice: params.minPrice ?? "",
     maxPrice: params.maxPrice ?? "",
     amenities: [...(params.amenities || [])].sort().join(","),
@@ -1093,6 +1103,65 @@ export function buildOrderByClause(
 // Limited Count Query (Hybrid Pagination)
 // ============================================
 
+/**
+ * Narrow row shape for dedup-aware counting. Carries exactly the fields the
+ * dedup group key derives from (owner + address + price + title + roomType),
+ * plus the address components used when `normalizedAddress` is absent.
+ */
+interface DedupCountRow {
+  id: string;
+  ownerId: string | null;
+  normalizedAddress: string | null;
+  price: number | string;
+  title: string;
+  roomType: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+}
+
+function toDedupCountSearchRow(row: DedupCountRow): SearchRowForDedup {
+  return {
+    id: row.id,
+    ownerId: row.ownerId ?? "",
+    title: row.title,
+    price: Number(row.price),
+    roomType: row.roomType ?? null,
+    // Non-key fields — irrelevant to the group key, so left empty/zero.
+    moveInDate: null,
+    availableUntil: null,
+    openSlots: null,
+    totalSlots: 0,
+    normalizedAddress: row.normalizedAddress ?? null,
+    location: {
+      address: row.address ?? null,
+      city: row.city,
+      state: row.state,
+      zip: row.zip ?? null,
+    },
+  };
+}
+
+/**
+ * Count DISTINCT canonical dedup groups among raw rows, reusing the exact
+ * grouping the list path applies (`applyServerDedup`). Input is bounded to
+ * ≤ HYBRID_COUNT_THRESHOLD + 1 rows, so the JS grouping is cheap.
+ */
+export function countDedupCanonicalGroups(rows: DedupCountRow[]): number {
+  if (rows.length === 0) {
+    return 0;
+  }
+
+  const { canonicals } = applyServerDedup(rows.map(toDedupCountSearchRow), {
+    enabled: true,
+    limit: rows.length,
+    lookAhead: SEARCH_DEDUP_LOOK_AHEAD,
+  });
+
+  return canonicals.length;
+}
+
 async function getSearchDocLimitedCountInternal(
   params: FilterParams
 ): Promise<number | null> {
@@ -1108,6 +1177,43 @@ async function getSearchDocLimitedCountInternal(
     conditions,
     SEARCH_DOC_ALLOWED_SQL_LITERALS
   );
+
+  // Dedup-aware total: when dedup is active the rendered page shows canonical
+  // groups, so the reported total must count DISTINCT canonicals — not raw
+  // listings (P2-6). Fetch up to HYBRID_COUNT_THRESHOLD+1 raw rows with the
+  // dedup-key fields and collapse them with the same grouping the list path
+  // uses. Bounded to ≤101 rows, so the JS grouping is cheap. If raw rows exceed
+  // the threshold we still return null ("100+"), matching the non-dedup cap;
+  // this can only over-report precision, never overcount the fixed page.
+  if (features.searchListingDedup) {
+    const dedupCountRows = await queryWithTimeout<DedupCountRow>(
+      `
+        SELECT
+          d.id,
+          l."ownerId" as "ownerId",
+          l."normalizedAddress" as "normalizedAddress",
+          d.price,
+          d.title,
+          d.room_type as "roomType",
+          d.address,
+          d.city,
+          d.state,
+          d.zip
+        FROM listing_search_docs d
+        JOIN "Listing" l ON l.id = d.id
+        JOIN "User" u ON u.id = l."ownerId"
+        WHERE ${whereClause}
+        LIMIT ${HYBRID_COUNT_THRESHOLD + 1}
+      `,
+      queryParams
+    );
+
+    if (dedupCountRows.length > HYBRID_COUNT_THRESHOLD) {
+      return null;
+    }
+
+    return countDedupCanonicalGroups(dedupCountRows);
+  }
 
   // Use subquery with LIMIT 101 to efficiently check if count > threshold
   const limitedCountQuery = `
@@ -1147,7 +1253,9 @@ export async function getSearchDocLimitedCount(
   const cachedFn = unstable_cache(
     async () => getSearchDocLimitedCountInternal(params),
     ["searchdoc-limited-count", cacheKey],
-    { revalidate: 60 }
+    // Tag so invalidateSearchCaches (search-cache.ts) can event-invalidate on
+    // capacity-affecting mutations instead of relying on TTL alone (P2-18).
+    { revalidate: 60, tags: [SEARCH_COUNT_CACHE_TAG] }
   );
 
   return cachedFn();
@@ -1491,7 +1599,9 @@ export async function getSearchDocMapListings(
   const cachedFn = unstable_cache(
     async () => getSearchDocMapListingsInternal(params),
     ["searchdoc-map-listings", cacheKey],
-    { revalidate: 60 }
+    // Tag so invalidateSearchCaches (search-cache.ts) can event-invalidate on
+    // capacity-affecting mutations instead of relying on TTL alone (P2-18).
+    { revalidate: 60, tags: [SEARCH_MAP_CACHE_TAG] }
   );
 
   return cachedFn();
@@ -1755,7 +1865,9 @@ export async function getSearchDocListingsPaginated(
   const cachedFn = unstable_cache(
     async () => getSearchDocListingsPaginatedInternal(params),
     ["searchdoc-listings-paginated", cacheKey],
-    { revalidate: 60 }
+    // Tag so invalidateSearchCaches (search-cache.ts) can event-invalidate on
+    // capacity-affecting mutations instead of relying on TTL alone (P2-18).
+    { revalidate: 60, tags: [SEARCH_RESULTS_CACHE_TAG] }
   );
 
   return cachedFn();
@@ -2402,44 +2514,61 @@ export function mapSemanticRowsToListingData(
 ): ListingData[] {
   return rows
     .filter((row) => hasValidCoordinates(row.lat, row.lng))
-    .map((row) => ({
-      id: row.id,
-      title: row.title,
-      description: row.description,
-      price: Number(row.price),
-      images: row.images,
-      roomType: row.room_type ?? undefined,
-      leaseDuration: row.lease_duration ?? undefined,
-      availableSlots: row.available_slots,
-      totalSlots: row.total_slots,
-      amenities: row.amenities,
-      houseRules: row.house_rules,
-      householdLanguages: row.household_languages,
-      primaryHomeLanguage: row.primary_home_language ?? undefined,
-      genderPreference: row.gender_preference ?? undefined,
-      householdGender: row.household_gender ?? undefined,
-      moveInDate: row.move_in_date ?? undefined,
-      publicAvailability: buildPublicAvailability({
+    .map((row) => {
+      // Mirror the main SearchDoc path's availability resolution so semantic
+      // items carry the full freshness read model (freshnessBucket, publicStatus,
+      // searchEligible) instead of the narrow 7-field shape (P2-11). The semantic
+      // SQL function only selects docs where sd.status = 'ACTIVE', and the doc's
+      // available_slots is the host-managed open-slot count. The function does
+      // not return lastConfirmedAt/availableUntil, so those stay null.
+      const { moveInDate, resolvedAvailability } = resolveRawPublicAvailability({
+        id: row.id,
+        availabilitySource: "HOST_MANAGED",
         availableSlots: row.available_slots,
         totalSlots: row.total_slots,
-        moveInDate: row.move_in_date ?? undefined,
-      }),
-      // ownerId intentionally omitted — @deprecated, S3 security fix (types/listing.ts:28)
-      // Match mapRawListingsToPublic: include rating/review/view/createdAt fields
-      // for ListingCard rendering (star ratings, review counts, recency)
-      avgRating: Number(row.avg_rating) || 0,
-      reviewCount: Number(row.review_count) || 0,
-      viewCount: Number(row.view_count) || 0,
-      createdAt: row.listing_created_at ?? new Date(),
-      hostIdentityStatus: "unknown",
-      location: {
-        // address and zip intentionally omitted — "only included in listing detail, not search" (search-types.ts:37)
-        city: row.city,
-        state: row.state,
-        ...toPublicCoordinates({
-          lat: row.lat!,
-          lng: row.lng!,
-        }),
-      },
-    }));
+        openSlots: row.available_slots,
+        availableUntil: null,
+        lastConfirmedAt: null,
+        moveInDate: row.move_in_date ?? null,
+        status: "ACTIVE",
+        statusReason: null,
+      });
+
+      return {
+        id: row.id,
+        title: row.title,
+        description: row.description,
+        price: Number(row.price),
+        images: row.images,
+        roomType: row.room_type ?? undefined,
+        leaseDuration: row.lease_duration ?? undefined,
+        availableSlots: resolvedAvailability.effectiveAvailableSlots,
+        totalSlots: resolvedAvailability.totalSlots,
+        amenities: row.amenities,
+        houseRules: row.house_rules,
+        householdLanguages: row.household_languages,
+        primaryHomeLanguage: row.primary_home_language ?? undefined,
+        genderPreference: row.gender_preference ?? undefined,
+        householdGender: row.household_gender ?? undefined,
+        moveInDate,
+        publicAvailability: resolvedAvailability,
+        // ownerId intentionally omitted — @deprecated, S3 security fix (types/listing.ts:28)
+        // Match mapRawListingsToPublic: include rating/review/view/createdAt fields
+        // for ListingCard rendering (star ratings, review counts, recency)
+        avgRating: Number(row.avg_rating) || 0,
+        reviewCount: Number(row.review_count) || 0,
+        viewCount: Number(row.view_count) || 0,
+        createdAt: row.listing_created_at ?? new Date(),
+        hostIdentityStatus: "unknown",
+        location: {
+          // address and zip intentionally omitted — "only included in listing detail, not search" (search-types.ts:37)
+          city: row.city,
+          state: row.state,
+          ...toPublicCoordinates({
+            lat: row.lat!,
+            lng: row.lng!,
+          }),
+        },
+      };
+    });
 }

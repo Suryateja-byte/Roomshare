@@ -15,7 +15,10 @@ import {
 } from "@/lib/search/transform";
 import { CLUSTER_THRESHOLD } from "@/lib/search/types";
 import type { ListingData, MapListingData } from "@/lib/data";
-import { buildPublicAvailability } from "@/lib/search/public-availability";
+import {
+  buildHostManagedPublicAvailability,
+  buildPublicAvailability,
+} from "@/lib/search/public-availability";
 
 // Mock marker-utils to control pin limit
 jest.mock("@/lib/maps/marker-utils", () => ({
@@ -749,6 +752,154 @@ describe("search/transform", () => {
       );
       expect(response.geojson.features[0].properties.availableSlots).toBe(2);
       expect(response.pins?.[0].publicAvailability).toEqual(publicAvailability);
+    });
+  });
+
+  describe("public availability payload boundary (P2-12)", () => {
+    const PUBLIC_AVAILABILITY_KEYS = [
+      "availabilitySource",
+      "openSlots",
+      "totalSlots",
+      "availableFrom",
+      "availableUntil",
+      "minStayMonths",
+      "lastConfirmedAt",
+      "freshnessBucket",
+      "publicStatus",
+    ];
+    const INTERNAL_AVAILABILITY_KEYS = [
+      "staleAt",
+      "autoPauseAt",
+      "searchEligible",
+      "isValid",
+      "isPubliclyAvailable",
+      "effectiveAvailableSlots",
+    ];
+
+    const resolvedAvailability = () =>
+      buildHostManagedPublicAvailability(
+        {
+          status: "ACTIVE",
+          statusReason: null,
+          availabilitySource: "HOST_MANAGED",
+          openSlots: 2,
+          totalSlots: 4,
+          moveInDate: "2026-06-01",
+          availableUntil: "2026-12-01",
+          minStayMonths: 3,
+          lastConfirmedAt: "2026-04-15T12:30:00.000Z",
+        },
+        new Date("2026-04-20T00:00:00.000Z")
+      );
+
+    const listItemListing = (
+      publicAvailability: ListingData["publicAvailability"]
+    ): ListingData => ({
+      id: "resolved-1",
+      title: "Resolved listing",
+      description: "",
+      price: 1500,
+      images: ["img.jpg"],
+      availableSlots: 2,
+      totalSlots: 4,
+      amenities: [],
+      houseRules: [],
+      householdLanguages: [],
+      location: {
+        address: "123 Test St",
+        city: "San Francisco",
+        state: "CA",
+        zip: "94102",
+        lat: 37.7749,
+        lng: -122.4194,
+      },
+      isNearMatch: false,
+      publicAvailability,
+    });
+
+    const mapListing = (
+      publicAvailability: MapListingData["publicAvailability"]
+    ): MapListingData => ({
+      id: "resolved-map-1",
+      title: "Resolved map listing",
+      price: 1500,
+      images: ["img.jpg"],
+      location: { lat: 37.7749, lng: -122.4194 },
+      availableSlots: 2,
+      totalSlots: 4,
+      publicAvailability,
+    });
+
+    it("serializes exactly the nine public fields for list items", () => {
+      const resolved = resolvedAvailability();
+      // Sanity: the resolved object really does carry the internal fields.
+      expect(Object.keys(resolved)).toEqual(
+        expect.arrayContaining(INTERNAL_AVAILABILITY_KEYS)
+      );
+
+      const serialized = JSON.parse(
+        JSON.stringify(transformToListItem(listItemListing(resolved)))
+      );
+
+      expect(Object.keys(serialized.publicAvailability).sort()).toEqual(
+        [...PUBLIC_AVAILABILITY_KEYS].sort()
+      );
+      for (const key of INTERNAL_AVAILABILITY_KEYS) {
+        expect(serialized.publicAvailability[key]).toBeUndefined();
+      }
+      expect(serialized.publicAvailability.freshnessBucket).toBe("NORMAL");
+      expect(serialized.publicAvailability.publicStatus).toBe("AVAILABLE");
+    });
+
+    it("serializes exactly the nine public fields in geojson feature properties", () => {
+      const serialized = JSON.parse(
+        JSON.stringify(transformToGeoJSON([mapListing(resolvedAvailability())]))
+      );
+      const props = serialized.features[0].properties;
+
+      expect(Object.keys(props.publicAvailability).sort()).toEqual(
+        [...PUBLIC_AVAILABILITY_KEYS].sort()
+      );
+      for (const key of INTERNAL_AVAILABILITY_KEYS) {
+        expect(props.publicAvailability[key]).toBeUndefined();
+      }
+    });
+
+    it("serializes exactly the nine public fields on pins", () => {
+      const serialized = JSON.parse(
+        JSON.stringify(transformToPins([mapListing(resolvedAvailability())]))
+      );
+
+      expect(Object.keys(serialized[0].publicAvailability).sort()).toEqual(
+        [...PUBLIC_AVAILABILITY_KEYS].sort()
+      );
+      for (const key of INTERNAL_AVAILABILITY_KEYS) {
+        expect(serialized[0].publicAvailability[key]).toBeUndefined();
+      }
+    });
+
+    it("passes a narrow seven-field availability through with undefined freshness fields", () => {
+      const narrow = buildPublicAvailability({
+        availableSlots: 1,
+        totalSlots: 2,
+      });
+      const serialized = JSON.parse(
+        JSON.stringify(transformToListItem(listItemListing(narrow)))
+      );
+
+      expect(Object.keys(serialized.publicAvailability).sort()).toEqual(
+        [
+          "availabilitySource",
+          "openSlots",
+          "totalSlots",
+          "availableFrom",
+          "availableUntil",
+          "minStayMonths",
+          "lastConfirmedAt",
+        ].sort()
+      );
+      expect(serialized.publicAvailability.freshnessBucket).toBeUndefined();
+      expect(serialized.publicAvailability.publicStatus).toBeUndefined();
     });
   });
 });

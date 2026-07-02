@@ -10,8 +10,10 @@ import {
   buildOrderByClause,
   buildSearchDocListWhereConditions,
   buildSearchDocWhereConditions,
+  countDedupCanonicalGroups,
   mapRawListingsToPublic,
   mapRawMapListingsToPublic,
+  mapSemanticRowsToListingData,
 } from "@/lib/search/search-doc-queries";
 import { buildPublicAvailability } from "@/lib/search/public-availability";
 import { joinWhereClauseWithSecurityInvariant } from "@/lib/sql-safety";
@@ -683,5 +685,118 @@ describe("search-doc-queries", () => {
         expect(isSearchDocEnabled(" ")).toBe(true);
       });
     });
+  });
+});
+
+describe("countDedupCanonicalGroups (P2-6 dedup-aware total)", () => {
+  function dedupCountRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: "row-1",
+      ownerId: "owner-1",
+      normalizedAddress: "123 main st, springfield, il 62704",
+      price: 1000,
+      title: "Cozy Room",
+      roomType: "private",
+      address: "123 Main St",
+      city: "Springfield",
+      state: "IL",
+      zip: "62704",
+      ...overrides,
+    };
+  }
+
+  it("returns 0 for empty input", () => {
+    expect(countDedupCanonicalGroups([])).toBe(0);
+  });
+
+  it("counts distinct canonical groups, not raw rows (never exceeds raw count)", () => {
+    const rows = [
+      dedupCountRow({ id: "a" }),
+      // Same owner + address + price + title + roomType → sibling of `a`.
+      dedupCountRow({ id: "b" }),
+      // Distinct owner → its own canonical group.
+      dedupCountRow({ id: "c", ownerId: "owner-2", title: "Sunny Loft", price: 1800 }),
+    ];
+
+    const count = countDedupCanonicalGroups(rows);
+
+    expect(count).toBe(2);
+    expect(count).toBeLessThanOrEqual(rows.length);
+  });
+
+  it("counts each row as its own group when nothing collapses", () => {
+    const rows = [
+      dedupCountRow({ id: "a", ownerId: "o1", title: "A", price: 1000 }),
+      dedupCountRow({ id: "b", ownerId: "o2", title: "B", price: 2000 }),
+      dedupCountRow({ id: "c", ownerId: "o3", title: "C", price: 3000 }),
+    ];
+
+    expect(countDedupCanonicalGroups(rows)).toBe(rows.length);
+  });
+});
+
+describe("mapSemanticRowsToListingData (P2-11 resolved availability)", () => {
+  function semanticRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: "listing-1",
+      title: "Semantic Room",
+      description: "Cozy",
+      price: 1200,
+      images: ["img-1.jpg"],
+      room_type: "private",
+      lease_duration: "6_months",
+      available_slots: 2,
+      total_slots: 4,
+      amenities: ["wifi"],
+      house_rules: ["no smoking"],
+      household_languages: ["english"],
+      primary_home_language: "english",
+      gender_preference: null,
+      household_gender: null,
+      booking_mode: "SHARED",
+      move_in_date: new Date("2026-09-01T00:00:00.000Z"),
+      address: "1 Market St",
+      city: "San Francisco",
+      state: "CA",
+      zip: "94105",
+      lat: 37.7749,
+      lng: -122.4194,
+      owner_id: "owner-1",
+      avg_rating: 4.5,
+      review_count: 8,
+      view_count: 10,
+      listing_created_at: new Date("2026-01-15T00:00:00.000Z"),
+      recommended_score: 12.4,
+      semantic_similarity: 0.9,
+      keyword_rank: 0.1,
+      combined_score: 0.7,
+      ...overrides,
+    };
+  }
+
+  it("emits the resolved freshness read model, not the narrow 7-field shape", () => {
+    const [result] = mapSemanticRowsToListingData([semanticRow()]);
+
+    // Fields that only exist on ResolvedPublicAvailability — proof the mapper
+    // no longer emits the narrow buildPublicAvailability shape. Asserted via
+    // toHaveProperty(key, value) because ListingData types publicAvailability as
+    // the narrow PublicAvailability, so direct `.publicStatus` access would not
+    // type-check.
+    expect(result.publicAvailability).toHaveProperty("publicStatus", "AVAILABLE");
+    expect(result.publicAvailability).toHaveProperty("searchEligible", true);
+    // No lastConfirmedAt is returned by the semantic SQL function.
+    expect(result.publicAvailability).toHaveProperty(
+      "freshnessBucket",
+      "UNCONFIRMED"
+    );
+    expect(result.publicAvailability.lastConfirmedAt).toBeNull();
+  });
+
+  it("carries effective slots consistent with the resolved availability", () => {
+    const [result] = mapSemanticRowsToListingData([semanticRow()]);
+
+    expect(result.availableSlots).toBe(result.publicAvailability.openSlots);
+    expect(result.totalSlots).toBe(result.publicAvailability.totalSlots);
+    expect(result.availableSlots).toBe(2);
   });
 });
