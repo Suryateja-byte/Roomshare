@@ -40,6 +40,10 @@ jest.mock("@/lib/outbox/retention", () => ({
   cleanupConsumedCacheInvalidationsOnce: jest.fn(),
 }));
 
+jest.mock("@/lib/listings/seed-freshness", () => ({
+  refreshSeedListingFreshness: jest.fn(),
+}));
+
 jest.mock("next/headers", () => ({
   headers: jest.fn(async () => new Headers({ host: "localhost:3000" })),
 }));
@@ -60,6 +64,7 @@ jest.mock("next/server", () => ({
 import { GET } from "@/app/api/cron/daily-maintenance/route";
 import { validateCronAuth } from "@/lib/cron-auth";
 import { features } from "@/lib/env";
+import { refreshSeedListingFreshness } from "@/lib/listings/seed-freshness";
 import {
   cleanupConsumedCacheInvalidationsOnce,
   cleanupTerminalOutboxEventsOnce,
@@ -86,6 +91,11 @@ describe("GET /api/cron/daily-maintenance", () => {
     Object.defineProperty(features, "freshnessNotifications", {
       value: true,
       writable: true,
+    });
+    Object.defineProperty(features, "seedFreshnessRefresh", {
+      value: false,
+      writable: true,
+      configurable: true,
     });
     (prisma.rateLimitEntry.deleteMany as jest.Mock).mockResolvedValue({ count: 1 });
     (prisma.idempotencyKey.deleteMany as jest.Mock).mockResolvedValue({ count: 2 });
@@ -141,6 +151,76 @@ describe("GET /api/cron/daily-maintenance", () => {
         expect.objectContaining({
           task: "freshness-reminders",
           success: true,
+        }),
+      ])
+    );
+  });
+
+  it("re-stamps seed listing freshness inside the daily window when enabled", async () => {
+    jest.setSystemTime(new Date("2026-04-17T09:03:00.000Z"));
+    Object.defineProperty(features, "seedFreshnessRefresh", {
+      value: true,
+      writable: true,
+      configurable: true,
+    });
+    (refreshSeedListingFreshness as jest.Mock).mockResolvedValue({
+      refreshed: 15,
+    });
+
+    const response = await GET(createRequest() as any);
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(refreshSeedListingFreshness).toHaveBeenCalledTimes(1);
+    expect(payload.tasks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          task: "refresh-seed-listing-freshness",
+          success: true,
+          detail: { refreshed: 15 },
+        }),
+      ])
+    );
+  });
+
+  it("marks the seed-freshness task skipped when the flag is off (default)", async () => {
+    jest.setSystemTime(new Date("2026-04-17T09:03:00.000Z"));
+
+    const response = await GET(createRequest() as any);
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(refreshSeedListingFreshness).not.toHaveBeenCalled();
+    expect(payload.tasks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          task: "refresh-seed-listing-freshness",
+          skipped: true,
+          detail: { skipped: true, reason: "feature_disabled" },
+        }),
+      ])
+    );
+  });
+
+  it("marks the seed-freshness task skipped outside the daily window", async () => {
+    jest.setSystemTime(new Date("2026-04-17T15:00:00.000Z"));
+    Object.defineProperty(features, "seedFreshnessRefresh", {
+      value: true,
+      writable: true,
+      configurable: true,
+    });
+
+    const response = await GET(createRequest() as any);
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(refreshSeedListingFreshness).not.toHaveBeenCalled();
+    expect(payload.tasks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          task: "refresh-seed-listing-freshness",
+          skipped: true,
+          detail: { skipped: true, reason: "outside_daily_window" },
         }),
       ])
     );

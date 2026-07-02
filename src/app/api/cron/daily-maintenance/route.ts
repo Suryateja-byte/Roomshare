@@ -45,6 +45,7 @@ import {
 } from "@/lib/outbox/retention";
 import { cleanupExpiredVerificationDocumentsOnce } from "@/lib/verification/retention";
 import { deleteExpiredQuerySnapshots } from "@/lib/search/query-snapshots";
+import { refreshSeedListingFreshness } from "@/lib/listings/seed-freshness";
 
 interface TaskResult {
   task: string;
@@ -261,6 +262,22 @@ export async function GET(request: NextRequest) {
       return { deleted };
     });
 
+    if (features.seedFreshnessRefresh) {
+      await runTask(results, "refresh-seed-listing-freshness", async () => {
+        const result = await withRetry(() => refreshSeedListingFreshness(), {
+          context: "refresh-seed-listing-freshness",
+        });
+
+        return { refreshed: result.refreshed };
+      });
+    } else {
+      markSkippedTask(
+        results,
+        "refresh-seed-listing-freshness",
+        "feature_disabled"
+      );
+    }
+
     await runTask(results, "cleanup-typing-status", async () => {
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
       const result = await withRetry(
@@ -330,6 +347,11 @@ export async function GET(request: NextRequest) {
     markSkippedTask(
       results,
       "cleanup-query-snapshots",
+      "outside_daily_window"
+    );
+    markSkippedTask(
+      results,
+      "refresh-seed-listing-freshness",
       "outside_daily_window"
     );
     markSkippedTask(results, "cleanup-typing-status", "outside_daily_window");

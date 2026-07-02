@@ -792,6 +792,12 @@ export const features = {
   get staleAutoPause() {
     return process.env.ENABLE_STALE_AUTO_PAUSE === "on";
   },
+  // Demo/staging only: keep seed-owned listings inside the 21-day freshness
+  // window so search never silently empties on deployments running seed data.
+  // Explicit opt-in; never defaults on (real hosts must confirm themselves).
+  get seedFreshnessRefresh() {
+    return process.env.ENABLE_SEED_FRESHNESS_REFRESH === "true";
+  },
   get searchListingDedup() {
     return phaseCutoverDefault(process.env.FEATURE_SEARCH_LISTING_DEDUP);
   },
