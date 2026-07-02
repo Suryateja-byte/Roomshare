@@ -86,7 +86,7 @@ jobs:
       CRON_SECRET: 'ci-e2e-cron-secret-minimum-32-characters-long'
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install pgvector extension in PostgreSQL
         run: |
@@ -175,7 +175,7 @@ jobs:
     if: ${{ !cancelled() }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: pnpm/action-setup@v6
 

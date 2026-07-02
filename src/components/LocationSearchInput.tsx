@@ -418,6 +418,14 @@ export default function LocationSearchInput({
     ? visibleFallbackItems.length
     : suggestions.length;
 
+  const isPopupOpen =
+    showSuggestions &&
+    (suggestions.length > 0 ||
+      serviceUnavailable ||
+      showRecentList ||
+      (noResults && !isLoading) ||
+      showTypeMoreHint);
+
   const clearTransientState = useCallback(() => {
     setNoResults(false);
     setServiceUnavailable(false);
@@ -546,6 +554,14 @@ export default function LocationSearchInput({
       const target = event.target as Node;
 
       if (suggestionsRef.current?.contains(target)) {
+        // Interactive elements inside the popup complete their own click; a
+        // press on dead chrome (padding, headers) dismisses instead of
+        // silently swallowing a tap aimed at controls underneath the popup.
+        if (target instanceof Element && target.closest("button")) {
+          return;
+        }
+        setShowSuggestions(false);
+        setSelectedIndex(-1);
         return;
       }
 
@@ -558,6 +574,22 @@ export default function LocationSearchInput({
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // The popup is a fixed-position portal that can sit over the form's own
+  // submit button; if it outlives a submit it swallows the next tap. Close it
+  // whenever the surrounding form submits (Enter key or Search button).
+  useEffect(() => {
+    const form = inputRef.current?.form;
+    if (!form) return;
+
+    const dismissOnSubmit = () => {
+      setShowSuggestions(false);
+      setSelectedIndex(-1);
+    };
+
+    form.addEventListener("submit", dismissOnSubmit);
+    return () => form.removeEventListener("submit", dismissOnSubmit);
   }, []);
 
   const handleCompositionStart = useCallback(() => {
@@ -726,9 +758,15 @@ export default function LocationSearchInput({
           break;
 
         case "Escape":
-          event.preventDefault();
-          setShowSuggestions(false);
-          setSelectedIndex(-1);
+          // Progressive dismissal: with the popup open, Escape closes only the
+          // popup and must not bubble to an enclosing dialog (e.g. the mobile
+          // search overlay). With no popup, let the dialog handle it.
+          if (isPopupOpen) {
+            event.preventDefault();
+            event.stopPropagation();
+            setShowSuggestions(false);
+            setSelectedIndex(-1);
+          }
           break;
       }
     },
@@ -736,6 +774,7 @@ export default function LocationSearchInput({
       availableOptionCount,
       handleSelectFallback,
       handleSelectSuggestion,
+      isPopupOpen,
       showFallbackOptions,
       showSuggestions,
       selectedIndex,
@@ -825,14 +864,6 @@ export default function LocationSearchInput({
     if (placeTypes.includes("region")) return "text-purple-500";
     return "text-on-surface-variant";
   };
-
-  const isPopupOpen =
-    showSuggestions &&
-    (suggestions.length > 0 ||
-      serviceUnavailable ||
-      showRecentList ||
-      (noResults && !isLoading) ||
-      showTypeMoreHint);
 
   // True only when an actual listbox element (id="${listboxId}-listbox") is
   // rendered in the portal — i.e. the suggestions branch, the recent/fallback
@@ -931,7 +962,9 @@ export default function LocationSearchInput({
                 role="status"
                 aria-live="polite"
                 data-location-search-popup="true"
-                className="fixed z-[9999] overflow-hidden rounded-2xl bg-surface-container-lowest shadow-ghost backdrop-blur-xl animate-in fade-in-0 slide-in-from-top-2"
+                // pointer-events-none: purely informational — taps must reach
+                // the controls underneath (e.g. the Search button).
+                className="pointer-events-none fixed z-[9999] overflow-hidden rounded-2xl bg-surface-container-lowest shadow-ghost backdrop-blur-xl animate-in fade-in-0 slide-in-from-top-2"
                 style={{
                   top: dropdownPos.top,
                   left: dropdownPos.left,
@@ -1182,7 +1215,9 @@ export default function LocationSearchInput({
                   role="status"
                   aria-live="polite"
                   data-location-search-popup="true"
-                  className="fixed z-[9999] overflow-hidden rounded-2xl bg-surface-container-lowest shadow-ghost backdrop-blur-xl animate-in fade-in-0 slide-in-from-top-2"
+                  // pointer-events-none: purely informational — taps must reach
+                  // the controls underneath (e.g. the Search button).
+                  className="pointer-events-none fixed z-[9999] overflow-hidden rounded-2xl bg-surface-container-lowest shadow-ghost backdrop-blur-xl animate-in fade-in-0 slide-in-from-top-2"
                   style={{
                     top: dropdownPos.top,
                     left: dropdownPos.left,

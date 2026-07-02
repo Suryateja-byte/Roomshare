@@ -66,7 +66,7 @@ jobs:
       SEARCH_RELEASE_GATE_SKIP_BUILD: "true"
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install pgvector extension in PostgreSQL
         run: |
