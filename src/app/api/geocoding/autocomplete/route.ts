@@ -201,6 +201,11 @@ export async function GET(request: Request) {
     recordPublicAutocompleteFallbackUsed("address_like_query_blocked");
   }
 
+  // Mapbox/Google results are intentionally NOT cached server-side: Mapbox
+  // Temporary Geocoding and Google Places terms prohibit storing response data
+  // (only Google place IDs are cacheable). Spend on these providers is bounded
+  // by the Redis-backed monthly caps checked below, behind the first-party
+  // local index + public-inventory cache above.
   if (!isAddressLikeQuery && providers.has("mapbox")) {
     if (!features.mapboxGeocoding) {
       recordGeocodingProviderSkipped({
@@ -209,7 +214,7 @@ export async function GET(request: Request) {
         reason: "missing_key",
       });
     } else if (
-      isProviderMonthlyCapReached({
+      await isProviderMonthlyCapReached({
         provider: "mapbox",
         surface: "public_autocomplete",
         monthlyCap: parseMonthlyCap(
@@ -255,7 +260,7 @@ export async function GET(request: Request) {
         reason: "disabled",
       });
     } else if (
-      isProviderMonthlyCapReached({
+      await isProviderMonthlyCapReached({
         provider: "google",
         surface: "public_autocomplete",
         monthlyCap: parseMonthlyCap(
