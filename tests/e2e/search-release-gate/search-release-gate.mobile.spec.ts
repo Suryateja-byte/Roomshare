@@ -78,6 +78,11 @@ test.describe("Search release gate - mobile", () => {
 
     await dialog.getByLabel(/minimum budget/i).fill("1000");
     await dialog.getByLabel(/maximum budget/i).fill("1500");
+
+    // Regression coverage for the popup-intercepts-Search bug: submit directly,
+    // WITHOUT dismissing the location autocomplete popup first. The component
+    // now closes the popup on blur without the overlay re-stealing focus, and
+    // dismisses it on form submit, so the Search button must be tappable here.
     await dialog.getByRole("button", { name: /^search$/i }).click();
 
     await waitForSearchResolution(page);

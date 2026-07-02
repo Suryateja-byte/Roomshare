@@ -154,7 +154,7 @@ describe("/api/geocoding/autocomplete", () => {
     delete process.env.GOOGLE_PUBLIC_AUTOCOMPLETE_MONTHLY_CAP;
     mockSearchLocalDestinationIndex.mockReturnValue([]);
     mockSearchMapboxDestinations.mockResolvedValue([]);
-    mockIsProviderMonthlyCapReached.mockReturnValue(false);
+    mockIsProviderMonthlyCapReached.mockResolvedValue(false);
     mockGetCachedResults.mockResolvedValue(null);
     mockSetCachedResults.mockResolvedValue(undefined);
     mockWithRateLimit.mockResolvedValue(null);

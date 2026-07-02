@@ -203,7 +203,7 @@ export async function searchMapboxDestinations(
       );
     }
 
-    recordGeocodingProviderUsage({
+    await recordGeocodingProviderUsage({
       provider: "mapbox",
       surface: "public_autocomplete",
       operation: "temporary_geocoding_forward",
