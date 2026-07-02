@@ -1,50 +1,95 @@
-# /search Feature Audit — Fix Plan (2026-06-18)
+# Fix critical issues from search & map review (2026-07-01)
 
-Source: docs/search-audit-2026-06-18.md (49 confirmed defects; 0 critical/0 high; 10 medium, 23 low, 16 nit)
-Baseline before work: lint PASS, typecheck PASS, search jest suites 2106 pass / 0 fail.
+## Goal + acceptance criteria
+Fix the 3 critical findings from the search/map discovery review:
 
-## Acceptance criteria
-- All actioned fixes implemented surgically (no unrelated refactors).
-- Regression test added for every behavioral change.
-- Global verify green: `pnpm lint`, `pnpm typecheck`, search jest suites.
-- Deferred items documented with rationale.
+1. **Redis-backed geocoding cost caps** — monthly provider caps live in an in-memory
+   Map (`src/lib/geocoding/provider-cost-controls.ts`) and reset on every serverless
+   cold start. AC: counters persist in Redis (Upstash, already wired in
+   `geocoding-cache.ts`) via INCR+EXPIRE per provider:surface:month; graceful
+   in-memory fallback when Redis unavailable; unit tests cover cap + fallback.
+2. **Cache paid autocomplete provider results** — Mapbox/Google branches in
+   `src/app/api/geocoding/autocomplete/route.ts` call billable APIs with no cache.
+   AC: results cached via existing geocoding cache keyed by provider+normalized
+   query; cache consulted before the billable call; test proves second identical
+   query skips the provider adapter.
+3. **Location popup intercepts mobile Search tap** — autocomplete popup
+   (`LocationSearchInput.tsx`, fixed portal, z-9999) is never dismissed on submit
+   and can swallow the tap aimed at the Search button.
+   AC: non-interactive popup states cannot swallow taps; popup closes on form
+   submit; E2E workaround from commit 3dfb9031 reverted so the gate test covers
+   the real flow.
 
-## Parallel fix groups (disjoint files)
-- [ ] G1 sorting: projection-search.ts, projection-read-eligibility.ts, data.ts -> #3,#4,#16
-- [ ] G2 ssr/seo: app/search/page.tsx, circuit-breaker.ts, app/search/actions.ts -> #2,#7,#45,#25
-- [ ] G3 results-client: SearchResultsClient.tsx -> #5,#9,#17,#18,#19,#28,#33,U1
-- [ ] G4 headings/wrapper/strip: SearchResultsMobileHeading.tsx, SearchResultsLoadingWrapper.tsx, InlineFilterStrip.tsx -> #48,#31,#1
-- [ ] G5 map: Map.tsx, DynamicMap.tsx -> #20,#21,#22,#38,#39,#40
-- [ ] G6 mobile sheet: SearchViewToggle.tsx, MobileBottomSheet.tsx, FloatingMapButton.tsx -> #6,#10,#43,#49,#42
-- [ ] G7 filters: FilterModal.tsx, filter-chip-utils.ts, useBatchedFilters.ts, useDebouncedFilterCount.ts, useFacets.ts -> #15,#36,#37,#35,(#1 chip)
-- [ ] G8 saved-search/fav: saved-search-canonical.ts, actions/saved-search.ts, api/favorites/route.ts -> #8,#30,#29
-- [ ] G9 url/cache/const: SearchUrlCanonicalizer.tsx, PersistentMapWrapper.tsx, constants.ts -> #24,#23,#41
-- [ ] G10 cards: SplitStayCard.tsx, ListingCardCarousel.tsx, ListingCardSkeleton.tsx, ListScrollBridge.tsx -> #27,#46,#47,#32
-- [ ] G11 searchbar: DatePills.tsx, search-intent.ts, LocationSearchInput.tsx -> #11,#12,#13
-- [ ] G12 telemetry: search-telemetry.ts, api/metrics/ops/route.ts -> #26
+## Scope (files/modules)
+- src/lib/geocoding/provider-cost-controls.ts (+ all call sites)
+- src/app/api/geocoding/autocomplete/route.ts
+- src/components/LocationSearchInput.tsx + search submit path
+- tests: unit tests for cost controls + autocomplete caching; e2e search gate spec
 
-## Deferred (rationale)
-- #44 redundant lat/lng+bounds -- cosmetic, center vs viewport both used -> WONTFIX
-- #34 budget min>max swap -- intentional forgiving behavior (documented)
-- #14 bookingMode UI -- half-wired; product decision. SEO over-count fixed via #2.
-- U2 UTM stripping -- no analytics layer consumes UTM yet; revisit when added.
+## Risks
+- Fix 1 may turn sync functions async → ripple to call sites (must find all).
+- Fix 2: Google Places ToS limits caching of predictions — keep TTL short.
+- Fix 3: popup dismissal risks breaking suggestion click-selection (blur-vs-click
+  ordering) — keep surgical: submit-time dismissal + pointer-events on
+  non-interactive states only; no blur refactor.
 
-## Verification
-- [x] Global lint (exit 0) / typecheck (exit 0)
-- [x] Search jest suites: 7447 passed / 0 failed (467 suites; ~30 new regression tests)
-- [x] Diff review per group (reviewed #7 cursor, sort eligibility, #18 loop, map viewedIds/popup)
-- [x] EOL pollution fixed byte-level (data.ts 8/4, SplitStayCard 4/4)
+## Checklist
+- [x] Read involved files + find call sites
+- [x] Fix 1: Redis-backed caps + fallback + tests
+- [x] Fix 2: REJECTED as proposed — provider ToS prohibits caching (see below)
+- [x] Fix 3: popup dismissal on submit + pointer-events + revert e2e workaround
+- [x] lint + typecheck + affected unit tests
+- [x] Results + verification story
 
 ## Results + verification story
-All 12 groups landed (45 of 49 confirmed findings fixed; 4 deferred per rationale above).
-Two integration issues caught by the global gate and fixed:
-1. #25 (circuit-breaker threshold 3→1) broke `actions.test.ts` isolation (singleton trips after
-   the V2-timeout test) AND was aggressive for prod → reverted threshold to 3, kept the
-   per-lambda-instance doc comment.
-2. #48 heading-id rename left the old id in `DesktopHeaderSearch.test.tsx` fixture + the
-   `filter-chip-utils` endDate test used past dates (dropped by date normalization) → fixed
-   the fixture id and added the fake-clock the sibling date tests use.
-Deleted dead code: ListingCardCarousel.tsx, DatePills.tsx (+ orphaned doc refs).
-NOT run locally: Playwright e2e (needs prod build + DB per project memory); the 6 e2e spec
-edits are mechanical `#search-results-heading` → `-desktop`/`-mobile` selector updates.
-NOT committed (on `main`; awaiting user go-ahead to branch + PR).
+
+**Fix 1 (Redis-backed cost caps) — DONE.**
+`provider-cost-controls.ts` now uses Upstash Redis (INCRBY + first-write EXPIRE,
+month-scoped `geo-usage:` keys) with the old Map demoted to per-instance
+fallback. All callers made async: autocomplete route (2 cap checks),
+google-places (5 usage records + 1 cap check), mapbox (1 record), smarty
+(assert → async + 2 records). New suite
+`src/__tests__/lib/geocoding/provider-cost-controls.test.ts` (7 tests): INCRBY
+key shape, expire-once, cross-instance cap reads, string counter tolerance,
+no-cap short-circuit, Redis-error fallback, no-Redis fallback. `.env.example`
+cap section documents the Redis requirement.
+
+**Fix 2 (cache paid autocomplete results) — REJECTED as proposed, documented.**
+Mapbox Temporary Geocoding terms prohibit storing results (adapter operation is
+literally `temporary_geocoding_forward`; existing route test "does not cache
+temporary results" pins this deliberately) and Google Places terms only allow
+caching place IDs — not predictions. Caching provider payloads in Redis would
+trade a cost bug for a ToS violation. The compliant cost bound is Fix 1 (caps
+now actually enforce) + the existing first-party local-index/public-inventory
+cache in front of paid providers. Decision recorded as a comment in
+`autocomplete/route.ts` above the Mapbox branch.
+
+**Fix 3 (popup intercepts mobile Search tap) — DONE, root causes fixed.**
+- `LocationSearchInput`: popup closes on surrounding form submit (native
+  capture listener on `input.form`); Escape now closes only the popup and
+  stops propagation (progressive dismissal — no longer closes the whole
+  mobile dialog); mousedown on popup dead chrome dismisses instead of
+  swallowing; status-only popups (type-more hint, no-results) are
+  `pointer-events-none` so taps pass through to the Search button.
+- `MobileSearchOverlay`: the 250ms initial-focus enforcement no longer steals
+  focus from a control the user already moved to (this was what deterministically
+  re-opened the popup over the Search button on Mobile Safari).
+- Reverted the test-only workaround from commit 3dfb9031 — the gate spec now
+  submits with the popup open, i.e. it is the regression test for the bug.
+- New suite `LocationSearchInput.popup-dismissal.test.tsx` (5 tests) + updated
+  the one integration test that pinned the old swallow-the-tap behavior.
+
+**Verification:** `pnpm lint` 0 errors (18 pre-existing warnings, none in
+changed lines); `pnpm typecheck` clean; 38 affected suites / 386 tests pass
+(all of `lib/geocoding`, `api/geocoding`, `components/search`,
+`components/LocationSearchInput`, SearchHeaderWrapper, MobileSearchOverlay).
+NOT run locally: Playwright e2e (needs prod build + DB per project memory) —
+the reverted gate spec must be watched in CI.
+NOT committed — awaiting user go-ahead.
+
+---
+
+# ARCHIVED: /search Feature Audit — Fix Plan (2026-06-18) [COMPLETE]
+
+All 12 groups landed (45/49 findings fixed, 4 deferred). Lint/typecheck green,
+7447 jest tests passed. Full record in git history and docs/search-audit-2026-06-18.md.
