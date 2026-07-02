@@ -744,3 +744,78 @@ describe("eligibility parity with list search (H1)", () => {
     expect(amenitiesQuery).toContain("(d.move_in_date IS NULL OR d.move_in_date <=");
   });
 });
+
+describe("cache key regression (gender filters)", () => {
+  const boundsParams = {
+    minLng: "-97.8",
+    maxLng: "-97.6",
+    minLat: "30.2",
+    maxLat: "30.4",
+  };
+
+  function queueEmptyFacetResults() {
+    // 4 queries when no price data (histogram skipped on null min/max):
+    // amenities, houseRules, roomTypes, priceRanges
+    mockQueryRawUnsafe
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ min: null, max: null, median: null }]);
+  }
+
+  // Runs one GET and returns the serialized filter portion of the
+  // unstable_cache key (["search-facets", <key>]) it was invoked with.
+  async function cacheKeyFor(params: Record<string, string>): Promise<string> {
+    const { unstable_cache } = await import("next/cache");
+    const mockUnstableCache = jest.mocked(unstable_cache);
+    const callsBefore = mockUnstableCache.mock.calls.length;
+    queueEmptyFacetResults();
+    await GET(createRequest(params));
+    const call = mockUnstableCache.mock.calls[callsBefore];
+    expect(call).toBeDefined();
+    const keyParts = call[1] as unknown as string[];
+    return keyParts[1];
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockExecuteRawUnsafe.mockResolvedValue(undefined);
+  });
+
+  it("varies by genderPreference (regression: searches differing only by gender filter shared one cache entry)", async () => {
+    const female = await cacheKeyFor({
+      ...boundsParams,
+      genderPreference: "FEMALE_ONLY",
+    });
+    const male = await cacheKeyFor({
+      ...boundsParams,
+      genderPreference: "MALE_ONLY",
+    });
+    const none = await cacheKeyFor(boundsParams);
+
+    expect(female).toContain("FEMALE_ONLY");
+    expect(new Set([female, male, none]).size).toBe(3);
+  });
+
+  it("varies by householdGender", async () => {
+    const allFemale = await cacheKeyFor({
+      ...boundsParams,
+      householdGender: "ALL_FEMALE",
+    });
+    const none = await cacheKeyFor(boundsParams);
+
+    expect(allFemale).toContain("ALL_FEMALE");
+    expect(allFemale).not.toBe(none);
+  });
+
+  it("treats any as no gender filter, matching the WHERE-builder semantics", async () => {
+    const explicitAny = await cacheKeyFor({
+      ...boundsParams,
+      genderPreference: "any",
+      householdGender: "any",
+    });
+    const none = await cacheKeyFor(boundsParams);
+
+    expect(explicitAny).toBe(none);
+  });
+});

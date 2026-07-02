@@ -352,6 +352,18 @@ function generateFacetsCacheKey(
     minPrice: filterParams.minPrice ?? "",
     moveInDate: filterParams.moveInDate || "",
     endDate: filterParams.endDate || "",
+    // Mirror buildFacetWhereConditions: "any" applies no WHERE filter, so it
+    // must share a key with the absent case — but real values must NOT share
+    // a key with each other (omitting these served one user's counts to
+    // another whose search differed only by gender filter).
+    genderPreference:
+      filterParams.genderPreference && filterParams.genderPreference !== "any"
+        ? filterParams.genderPreference
+        : "",
+    householdGender:
+      filterParams.householdGender && filterParams.householdGender !== "any"
+        ? filterParams.householdGender
+        : "",
     q: filterParams.query?.toLowerCase().trim() || "",
     roomType: filterParams.roomType?.toLowerCase() || "",
     bookingMode: filterParams.bookingMode || "",
