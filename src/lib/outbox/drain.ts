@@ -17,9 +17,13 @@
  */
 
 import { prisma } from "@/lib/prisma";
-import { withActor } from "@/lib/db/with-actor";
+import { withActor, type TransactionClient } from "@/lib/db/with-actor";
 import type { OutboxKind } from "@/lib/outbox/append";
-import { HANDLERS, type OutboxRow } from "@/lib/outbox/handlers";
+import {
+  HANDLERS,
+  SELF_TRANSACTIONAL_KINDS,
+  type OutboxRow,
+} from "@/lib/outbox/handlers";
 import { routeToDlq } from "@/lib/outbox/dlq";
 import {
   recordStaleEventSkip,
@@ -183,11 +187,17 @@ export async function drainOutboxOnce(
 
     let result;
     try {
-      result = await withActor(
-        { role: "system", id: null },
-        (tx) => handler(tx, event),
-        { client: prisma }
-      );
+      // Self-transactional handlers (email/network I/O) get the root client
+      // and manage their own short actor transactions — wrapping them here
+      // would hold a SERIALIZABLE transaction (and its pooled connection)
+      // open across outbound HTTP retries.
+      result = SELF_TRANSACTIONAL_KINDS.has(event.kind as OutboxKind)
+        ? await handler(prisma as unknown as TransactionClient, event)
+        : await withActor(
+            { role: "system", id: null },
+            (tx) => handler(tx, event),
+            { client: prisma }
+          );
     } catch (err) {
       result = {
         outcome: "transient_error" as const,

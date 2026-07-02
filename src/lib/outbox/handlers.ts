@@ -6,7 +6,7 @@
  * uses to determine what to do with the outbox row (complete, retry, DLQ).
  */
 
-import type { TransactionClient } from "@/lib/db/with-actor";
+import type { TransactionClient, TransactionHost } from "@/lib/db/with-actor";
 import { features } from "@/lib/env";
 import type { OutboxKind } from "@/lib/outbox/append";
 import { rebuildInventorySearchProjection } from "@/lib/projections/inventory-projection";
@@ -485,7 +485,13 @@ async function handleAlertDeliverEvent(
       typeof event.payload.deliveryId === "string"
         ? event.payload.deliveryId
         : event.aggregateId;
-    const result = await deliverQueuedSearchAlert(tx, deliveryId);
+    // ALERT_DELIVER is in SELF_TRANSACTIONAL_KINDS, so the drain passes the
+    // root prisma client here (not an open transaction) — the delivery flow
+    // manages its own short actor transactions and sends email outside them.
+    const result = await deliverQueuedSearchAlert(
+      tx as unknown as TransactionHost,
+      deliveryId
+    );
 
     if (result.status === "retry") {
       return {
@@ -509,6 +515,19 @@ async function handleAlertDeliverEvent(
 // ─────────────────────────────────────────────────────────────────────────────
 // Handler routing table
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Kinds whose handlers perform outbound network I/O (email) or run their own
+ * multi-step sweeps. The drain must NOT wrap these in its long-lived
+ * SERIALIZABLE withActor transaction: holding a pooled connection open across
+ * HTTP calls with retry/backoff starves unrelated writes (bookings/holds).
+ * These handlers receive the root prisma client and open their own short
+ * actor transactions for the DB phases.
+ */
+export const SELF_TRANSACTIONAL_KINDS: ReadonlySet<OutboxKind> = new Set<OutboxKind>([
+  "ALERT_MATCH",
+  "ALERT_DELIVER",
+]);
 
 export const HANDLERS: Record<OutboxKind, OutboxHandler> = {
   UNIT_UPSERTED: handleUnitUpserted,

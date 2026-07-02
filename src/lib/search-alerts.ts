@@ -12,7 +12,11 @@ import { parseLocalDate } from "./utils";
 import { getUsersWithUnlockedSearchAlerts } from "@/lib/payments/search-alert-paywall";
 import { resolvePublicListingVisibilityState } from "@/lib/listings/public-contact-contract";
 import { appendOutboxEvent } from "@/lib/outbox/append";
-import type { TransactionClient } from "@/lib/db/with-actor";
+import {
+  withActor,
+  type TransactionClient,
+  type TransactionHost,
+} from "@/lib/db/with-actor";
 
 /**
  * Validate alert filters from DB. Uses validateSearchFilters for common fields
@@ -396,14 +400,83 @@ async function countCurrentlyDeliverableTargets(
   return listings.filter(isDeliverableAlertListing).length;
 }
 
+const SYSTEM_ACTOR = { role: "system", id: null } as const;
+
+/** Everything phase 2/3 need after the eligibility transaction commits. */
+interface PreparedAlertSend {
+  deliveryId: string;
+  savedSearchId: string;
+  subscriptionId: string;
+  deliveryKind: string;
+  targetListingId: string | null;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  searchName: string;
+  newListingsCount: number;
+  notificationLink: string;
+  payloadListingTitle: string | null;
+}
+
+/**
+ * Deliver one queued search alert.
+ *
+ * Runs in three phases so the outbound email is NEVER sent while a database
+ * transaction is open: Resend retries with backoff can take seconds, and
+ * holding a SERIALIZABLE transaction (and its pooled connection) that long
+ * starves unrelated writes (bookings/holds). Idempotency is unchanged: a
+ * crash between send and record leaves the delivery QUEUED and the outbox
+ * retry re-runs the phase-1 status check — the same duplicate-email window
+ * the single-transaction version had when it aborted after a successful send.
+ *
+ * `client` must be a transaction-capable client (the root prisma client),
+ * not an already-open transaction.
+ */
 export async function deliverQueuedSearchAlert(
-  client: TransactionClient,
+  client: TransactionHost,
   deliveryId: string
 ): Promise<AlertDeliveryOutcome> {
-  const db = client as unknown as typeof prisma;
   if (features.disableAlerts) {
     return { status: "retry", error: "Search alerts disabled" };
   }
+
+  // Phase 1 — eligibility checks and drops in a short actor transaction.
+  const prep = await withActor(
+    SYSTEM_ACTOR,
+    (tx) => prepareAlertDeliveryForSend(tx, deliveryId),
+    { client }
+  );
+  if ("outcome" in prep) {
+    return prep.outcome;
+  }
+  const send = prep.send;
+
+  // Phase 2 — email send, outside any transaction.
+  const emailResult = await sendNotificationEmail("searchAlert", send.userEmail, {
+    userName: send.userName,
+    searchName: send.searchName,
+    listingTitle:
+      send.newListingsCount === 1
+        ? "a matching listing"
+        : `${send.newListingsCount} matching listings`,
+    listingId: send.targetListingId ?? undefined,
+    ctaHref: send.notificationLink,
+    ctaLabel: send.targetListingId ? "View Listing" : "View Matches",
+  });
+
+  // Phase 3 — record the outcome in a second short actor transaction.
+  return withActor(
+    SYSTEM_ACTOR,
+    (tx) => recordAlertDeliveryOutcome(tx, send, emailResult),
+    { client }
+  );
+}
+
+async function prepareAlertDeliveryForSend(
+  client: TransactionClient,
+  deliveryId: string
+): Promise<{ outcome: AlertDeliveryOutcome } | { send: PreparedAlertSend }> {
+  const db = client as unknown as typeof prisma;
 
   const delivery = await db.alertDelivery.findUnique({
     where: { id: deliveryId },
@@ -425,15 +498,15 @@ export async function deliverQueuedSearchAlert(
   });
 
   if (!delivery) {
-    return { status: "dropped", reason: "TARGET_MISSING" };
+    return { outcome: { status: "dropped", reason: "TARGET_MISSING" } };
   }
 
   if (delivery.status === "DELIVERED" || delivery.status === "DROPPED") {
-    return { status: "noop" };
+    return { outcome: { status: "noop" } };
   }
 
   if (delivery.expiresAt.getTime() <= Date.now()) {
-    return dropAlertDelivery(db, delivery.id, "EXPIRED");
+    return { outcome: await dropAlertDelivery(db, delivery.id, "EXPIRED") };
   }
 
   if (
@@ -441,12 +514,16 @@ export async function deliverQueuedSearchAlert(
     !delivery.savedSearch.active ||
     !delivery.savedSearch.alertEnabled
   ) {
-    return dropAlertDelivery(db, delivery.id, "SUBSCRIPTION_INACTIVE");
+    return {
+      outcome: await dropAlertDelivery(db, delivery.id, "SUBSCRIPTION_INACTIVE"),
+    };
   }
 
   const user = delivery.savedSearch.user;
   if (!user.email || !isSearchAlertsEnabled(user.notificationPreferences)) {
-    return dropAlertDelivery(db, delivery.id, "PREFERENCE_DISABLED");
+    return {
+      outcome: await dropAlertDelivery(db, delivery.id, "PREFERENCE_DISABLED"),
+    };
   }
 
   const unlockedIds = await getUsersWithUnlockedSearchAlerts(
@@ -454,12 +531,16 @@ export async function deliverQueuedSearchAlert(
     db as Parameters<typeof getUsersWithUnlockedSearchAlerts>[1]
   );
   if (!unlockedIds.has(user.id)) {
-    return dropAlertDelivery(db, delivery.id, "PAYWALL_LOCKED");
+    return {
+      outcome: await dropAlertDelivery(db, delivery.id, "PAYWALL_LOCKED"),
+    };
   }
 
   const filters = parseFiltersForAlerts(delivery.savedSearch.filters);
   if (!filters) {
-    return dropAlertDelivery(db, delivery.id, "TARGET_MISSING");
+    return {
+      outcome: await dropAlertDelivery(db, delivery.id, "TARGET_MISSING"),
+    };
   }
 
   const payload = getPayloadObject(delivery.payload);
@@ -476,7 +557,9 @@ export async function deliverQueuedSearchAlert(
     });
 
     if (!listing) {
-      return dropAlertDelivery(db, delivery.id, "TARGET_MISSING");
+      return {
+        outcome: await dropAlertDelivery(db, delivery.id, "TARGET_MISSING"),
+      };
     }
 
     if (
@@ -484,11 +567,15 @@ export async function deliverQueuedSearchAlert(
       listing.physicalUnitId &&
       delivery.targetUnitId !== listing.physicalUnitId
     ) {
-      return dropAlertDelivery(db, delivery.id, "STALE_EPOCH");
+      return {
+        outcome: await dropAlertDelivery(db, delivery.id, "STALE_EPOCH"),
+      };
     }
 
     if (!isDeliverableAlertListing(listing)) {
-      return dropAlertDelivery(db, delivery.id, "TARGET_NOT_PUBLIC");
+      return {
+        outcome: await dropAlertDelivery(db, delivery.id, "TARGET_NOT_PUBLIC"),
+      };
     }
 
     newListingsCount = 1;
@@ -500,28 +587,44 @@ export async function deliverQueuedSearchAlert(
       targetListingIds
     );
     if (targetListingIds.length > 0 && deliverableCount === 0) {
-      return dropAlertDelivery(db, delivery.id, "TARGET_NOT_PUBLIC");
+      return {
+        outcome: await dropAlertDelivery(db, delivery.id, "TARGET_NOT_PUBLIC"),
+      };
     }
     if (deliverableCount > 0) {
       newListingsCount = deliverableCount;
     }
   }
 
-  const emailResult = await sendNotificationEmail("searchAlert", user.email, {
-    userName: user.name || "User",
-    searchName: delivery.savedSearch.name,
-    listingTitle:
-      newListingsCount === 1
-        ? "a matching listing"
-        : `${newListingsCount} matching listings`,
-    listingId: delivery.targetListingId ?? undefined,
-    ctaHref: notificationLink,
-    ctaLabel: delivery.targetListingId ? "View Listing" : "View Matches",
-  });
+  return {
+    send: {
+      deliveryId: delivery.id,
+      savedSearchId: delivery.savedSearchId,
+      subscriptionId: delivery.subscriptionId,
+      deliveryKind: delivery.deliveryKind,
+      targetListingId: delivery.targetListingId,
+      userId: user.id,
+      userName: user.name || "User",
+      userEmail: user.email,
+      searchName: delivery.savedSearch.name,
+      newListingsCount,
+      notificationLink,
+      payloadListingTitle:
+        typeof payload.listingTitle === "string" ? payload.listingTitle : null,
+    },
+  };
+}
+
+async function recordAlertDeliveryOutcome(
+  client: TransactionClient,
+  send: PreparedAlertSend,
+  emailResult: Awaited<ReturnType<typeof sendNotificationEmail>>
+): Promise<AlertDeliveryOutcome> {
+  const db = client as unknown as typeof prisma;
 
   if (!emailResult.success) {
     await db.alertDelivery.update({
-      where: { id: delivery.id },
+      where: { id: send.deliveryId },
       data: {
         status: "PENDING",
         lastError: emailResult.error || "Email failed",
@@ -533,23 +636,22 @@ export async function deliverQueuedSearchAlert(
 
   await db.notification.create({
     data: {
-      userId: user.id,
+      userId: send.userId,
       type: "SEARCH_ALERT",
       title:
-        delivery.deliveryKind === "INSTANT"
+        send.deliveryKind === "INSTANT"
           ? "New listing matches your search!"
           : "New listings match your search!",
       message:
-        delivery.deliveryKind === "INSTANT" &&
-        typeof payload.listingTitle === "string"
-          ? `"${payload.listingTitle}" matches your saved search "${delivery.savedSearch.name}"`
-          : `${newListingsCount} new listing${newListingsCount > 1 ? "s" : ""} match your saved search "${delivery.savedSearch.name}"`,
-      link: notificationLink,
+        send.deliveryKind === "INSTANT" && send.payloadListingTitle !== null
+          ? `"${send.payloadListingTitle}" matches your saved search "${send.searchName}"`
+          : `${send.newListingsCount} new listing${send.newListingsCount > 1 ? "s" : ""} match your saved search "${send.searchName}"`,
+      link: send.notificationLink,
     },
   });
 
   await db.alertDelivery.update({
-    where: { id: delivery.id },
+    where: { id: send.deliveryId },
     data: {
       status: "DELIVERED",
       deliveredAt: new Date(),
@@ -558,12 +660,12 @@ export async function deliverQueuedSearchAlert(
   });
 
   await db.savedSearch.update({
-    where: { id: delivery.savedSearchId },
+    where: { id: send.savedSearchId },
     data: { lastAlertAt: new Date() },
   });
 
   await db.alertSubscription.update({
-    where: { id: delivery.subscriptionId },
+    where: { id: send.subscriptionId },
     data: { lastDeliveredAt: new Date() },
   });
 

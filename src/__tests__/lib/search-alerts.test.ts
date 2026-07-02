@@ -7,6 +7,9 @@ jest.mock("@/lib/prisma", () => ({
     $transaction: jest.fn(async (callback: (tx: unknown) => unknown) =>
       callback((jest.requireMock("@/lib/prisma") as { prisma: unknown }).prisma)
     ),
+    // withActor's setActorContext runs set_config via $executeRaw inside the
+    // short per-phase transactions that deliverQueuedSearchAlert opens.
+    $executeRaw: jest.fn(),
     savedSearch: {
       findMany: jest.fn(),
       update: jest.fn(),
