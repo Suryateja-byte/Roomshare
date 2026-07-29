@@ -556,4 +556,48 @@ describe("checkSuspension", () => {
       secret: "fallback-secret",
     });
   });
+
+  // Regression: GHSA-xmf8-cvqr-rfgj — getToken() throws (not returns null) on a
+  // malformed `Authorization: Bearer %` header, and throws MissingSecret when no
+  // secret is configured. Unguarded, either propagates out of proxy() as a 500 on
+  // every request. checkSuspension must degrade to "anonymous" instead.
+  describe("getToken failure handling (GHSA-xmf8-cvqr-rfgj)", () => {
+    it("returns null instead of throwing when getToken rejects with URIError", async () => {
+      (getToken as jest.Mock).mockRejectedValue(new URIError("URI malformed"));
+
+      await expect(
+        checkSuspension(createMockRequest("/dashboard"))
+      ).resolves.toBeNull();
+    });
+
+    it("returns null instead of throwing when getToken rejects for a missing secret", async () => {
+      (getToken as jest.Mock).mockRejectedValue(
+        new Error("Must pass `secret` if not set to JWT getToken()")
+      );
+
+      await expect(
+        checkSuspension(createMockRequest("/api/bookings", "POST"))
+      ).resolves.toBeNull();
+    });
+
+    // Pins the ordering: isProtectedRoute is evaluated BEFORE getToken, so
+    // unprotected paths never reach the decode and cannot be made to throw.
+    it("does not call getToken for a non-public, non-protected route", async () => {
+      (getToken as jest.Mock).mockRejectedValue(new URIError("URI malformed"));
+
+      await expect(
+        checkSuspension(createMockRequest("/some-unknown-page"))
+      ).resolves.toBeNull();
+      expect(getToken).not.toHaveBeenCalled();
+    });
+
+    it("does not call getToken for a public route", async () => {
+      (getToken as jest.Mock).mockRejectedValue(new URIError("URI malformed"));
+
+      await expect(
+        checkSuspension(createMockRequest("/login"))
+      ).resolves.toBeNull();
+      expect(getToken).not.toHaveBeenCalled();
+    });
+  });
 });
