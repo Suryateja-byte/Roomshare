@@ -167,12 +167,35 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      // P0-2: /listings/* must NEVER be shared-cacheable. The detail page swaps in
+      // getListingWithLocation (full Location row = exact street address) for owners and
+      // admins, and /create + /[id]/edit are session-gated. A `public` Cache-Control here
+      // let any shared cache (Vercel Edge, corporate/ISP proxy) serve one viewer's render
+      // to another, and froze a per-request CSP nonce into cached HTML so 'strict-dynamic'
+      // blocked hydration on cache hits. Removing the rule restores Next's dynamic-page
+      // default (private, no-cache, no-store, max-age=0, must-revalidate).
+      //
+      // Do NOT reintroduce edge caching here. The repo convention is per-route: set
+      // `public, s-maxage=...` inside the handler, gated on an anonymous session, with
+      // `Vary: Cookie` (see src/app/api/search/listings/route.ts).
+      //
+      // The two rules below are redundant with that default — they exist so a future
+      // config edit cannot silently re-break the invariant on the auth-gated pages.
       {
-        source: "/listings/:path*",
+        source: "/listings/create",
         headers: [
           {
             key: "Cache-Control",
-            value: "public, max-age=30, stale-while-revalidate=120",
+            value: "private, no-store",
+          },
+        ],
+      },
+      {
+        source: "/listings/:id/edit",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "private, no-store",
           },
         ],
       },

@@ -62,6 +62,27 @@ test.describe("Security Headers", () => {
     expect(csp).toContain("form-action 'self'");
   });
 
+  // P0-2 regression.
+  //
+  // next.config.ts used to apply `Cache-Control: public, max-age=30` to the whole
+  // /listings/* subtree with no `Vary: Cookie`. The detail page swaps in the full
+  // Location row (exact street address) for owners and admins, and /create + /[id]/edit
+  // are session-gated — so any shared cache could serve one viewer's render to another.
+  // This project runs authenticated (storageState: playwright/.auth/user.json), which is
+  // required: /listings/create redirects anonymous users to /login, and asserting on the
+  // login page's headers would prove nothing.
+  for (const path of ["/listings/create", "/listings/does-not-exist"]) {
+    test(`does not mark ${path} publicly cacheable`, async ({ page }) => {
+      const response = await page.goto(path);
+      expect(response).not.toBeNull();
+
+      // next.config header rules key off the URL path, so this holds for the 404 page too.
+      const cacheControl = response!.headers()["cache-control"] ?? "";
+      expect(cacheControl).not.toContain("public");
+      expect(cacheControl).not.toContain("stale-while-revalidate");
+    });
+  }
+
   test("no mixed content warnings on homepage", async ({ page }) => {
     const mixedContentWarnings: string[] = [];
     page.on("console", (msg) => {
