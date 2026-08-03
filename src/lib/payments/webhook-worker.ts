@@ -3,7 +3,6 @@ import "server-only";
 import { Prisma, type PaymentStatus } from "@prisma/client";
 import Stripe from "stripe";
 import { features } from "@/lib/env";
-import { prisma } from "@/lib/prisma";
 import type { TransactionClient } from "@/lib/db/with-actor";
 import { recordAuditEvent } from "@/lib/audit/events";
 import { handleDisputeEvent, handleRefundEvent } from "@/lib/payments/entitlement-adjustments";
@@ -547,6 +546,14 @@ export async function processCapturedStripeEvent(
   client: PaymentWebhookClient,
   stripeEventRowId: string
 ) {
+  // Take the advisory lock BEFORE reading processedAt. Reading first and locking later is
+  // a TOCTOU: a concurrent worker could read processedAt = null, block on the lock, then
+  // proceed on that stale read once the holder committed — processing the same event
+  // twice. Keyed on the row id, which is known without a read.
+  await client.$executeRaw`
+    SELECT pg_advisory_xact_lock(hashtext(${`payment-webhook-row:${stripeEventRowId}`}))
+  `;
+
   const stripeEvent = await client.stripeEvent.findUnique({
     where: { id: stripeEventRowId },
     select: {
@@ -563,6 +570,7 @@ export async function processCapturedStripeEvent(
     throw new Error(`Stripe event row not found: ${stripeEventRowId}`);
   }
 
+  // Now safe: the read happened under the lock, so a committed peer is visible here.
   if (stripeEvent.processedAt) {
     return;
   }
@@ -578,9 +586,6 @@ export async function processCapturedStripeEvent(
   });
 
   try {
-    await client.$executeRaw`
-      SELECT pg_advisory_xact_lock(hashtext(${`payment-webhook:${stripeEvent.stripeEventId}`}))
-    `;
     await processStripeEventObject(client, stripeEvent, event);
     await client.stripeEvent.update({
       where: { id: stripeEvent.id },
@@ -607,10 +612,4 @@ export async function processCapturedStripeEvent(
     });
     throw error;
   }
-}
-
-export async function processCapturedStripeEventById(stripeEventRowId: string) {
-  await prisma.$transaction((tx) =>
-    processCapturedStripeEvent(tx, stripeEventRowId)
-  );
 }

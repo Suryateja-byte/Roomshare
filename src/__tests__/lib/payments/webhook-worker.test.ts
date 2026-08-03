@@ -172,6 +172,41 @@ describe("processCapturedStripeEvent", () => {
     });
   });
 
+  // ── P0-3: double-grant protection ──
+
+  it("takes the advisory lock before reading processedAt", async () => {
+    // Reading processedAt first and locking afterwards is a TOCTOU: a concurrent worker
+    // reads null, blocks on the lock, then proceeds on that stale read once the holder
+    // commits — granting the same entitlement twice. The lock must come first so the
+    // read observes any committed peer.
+    const client = buildClient(succeededIntent());
+
+    await processCapturedStripeEvent(client, "stripe-row-1");
+
+    expect(client.$executeRaw).toHaveBeenCalled();
+    expect(client.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      client.stripeEvent.findUnique.mock.invocationCallOrder[0]
+    );
+  });
+
+  it("grants nothing when the event was already processed", async () => {
+    const client = buildClient(succeededIntent());
+    client.stripeEvent.findUnique.mockResolvedValue({
+      id: "stripe-row-1",
+      stripeEventId: "evt_1",
+      eventType: "payment_intent.succeeded",
+      payload: succeededIntent(),
+      livemode: true,
+      processedAt: new Date("2026-08-03T00:00:00Z"),
+    });
+
+    await processCapturedStripeEvent(client, "stripe-row-1");
+
+    expect(client.payment.create).not.toHaveBeenCalled();
+    expect(client.entitlementGrant.create).not.toHaveBeenCalled();
+    expect(client.stripeEvent.update).not.toHaveBeenCalled();
+  });
+
   it("grants phone reveal payments against the REVEAL_PHONE ledger", async () => {
     const client = buildClient(
       succeededIntent({
