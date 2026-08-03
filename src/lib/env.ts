@@ -248,6 +248,33 @@ const serverEnvSchema = z
           path: ["ENABLE_SEARCH_TEST_SCENARIOS"],
         });
       }
+
+      // Taking money requires a working outbox retry net.
+      //
+      // The Stripe webhook fulfils grants inline, but its durable fallback — the
+      // PAYMENT_WEBHOOK outbox row — is only drained when phase02 projection writes are
+      // enabled (daily-maintenance gates drainOutboxOnce on that flag). With the paywall
+      // on and phase02 off, any inline attempt that fails is never retried: Stripe gets a
+      // 200, the StripeEvent row accumulates, and the customer is charged with no grant
+      // and no alert. Fail the boot instead of failing silently.
+      //
+      // Compared as resolved booleans, never raw strings: these flags run through
+      // phaseCutoverDefault, where "unset" means enabled outside production.
+      const paywallTakesMoney =
+        phaseCutoverDefault(data.ENABLE_CONTACT_PAYWALL) ||
+        phaseCutoverDefault(data.ENABLE_SEARCH_ALERT_PAYWALL);
+      if (
+        paywallTakesMoney &&
+        !phaseCutoverDefault(process.env.FEATURE_PHASE02_PROJECTION_WRITES)
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "FEATURE_PHASE02_PROJECTION_WRITES must be 'true' when a paywall is enabled — " +
+            "the outbox drain is the retry net for Stripe fulfilment",
+          path: ["FEATURE_PHASE02_PROJECTION_WRITES"],
+        });
+      }
     }
 
     // Multi-slot booking feature flag cross-validation
