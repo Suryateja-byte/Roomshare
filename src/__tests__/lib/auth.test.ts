@@ -309,6 +309,131 @@ describe("auth.ts NextAuth configuration", () => {
       expect(result).toBe(true);
     });
 
+    // ── P0-1: account pre-hijacking ──
+    //
+    // Threat: an attacker registers with the victim's email and never verifies it, so the
+    // row carries an attacker-chosen password and emailVerified: null. The victim's first
+    // Google sign-in would otherwise be auto-linked onto that row by
+    // allowDangerousEmailAccountLinking, leaving the attacker with permanent password
+    // access to the victim's account.
+
+    it("revokes the squatted password when Google claims an unverified credential account", async () => {
+      (isGoogleEmailVerified as jest.Mock).mockReturnValue(true);
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        id: "user-squatted",
+        email: "victim@example.com",
+        isSuspended: false,
+        emailVerified: null,
+        password: "$2a$12$attacker-chosen-hash",
+      });
+      (prisma.user.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+
+      const result = await config.callbacks.signIn({
+        user: { email: "victim@example.com" },
+        account: { provider: "google" },
+        profile: { email_verified: true },
+      });
+
+      expect(result).toBe(true);
+      expect(prisma.user.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: "user-squatted",
+          emailVerified: null,
+          password: { not: null },
+        },
+        data: {
+          password: null,
+          passwordChangedAt: expect.any(Date),
+          emailVerified: expect.any(Date),
+        },
+      });
+    });
+
+    it("leaves an already-verified account untouched on Google sign-in", async () => {
+      (isGoogleEmailVerified as jest.Mock).mockReturnValue(true);
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        id: "user-legit",
+        email: "legit@example.com",
+        isSuspended: false,
+        emailVerified: new Date("2026-01-01"),
+        password: "$2a$12$owner-hash",
+      });
+
+      const result = await config.callbacks.signIn({
+        user: { email: "legit@example.com" },
+        account: { provider: "google" },
+        profile: { email_verified: true },
+      });
+
+      expect(result).toBe(true);
+      expect(prisma.user.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("blocks the link without mutating when normalisation disagrees with the raw Google email", async () => {
+      // Our lookup normalises; the Prisma adapter's getUserByEmail does not. If they
+      // resolve differently we would revoke a password on a row the adapter will not
+      // link, locking out an innocent user.
+      (isGoogleEmailVerified as jest.Mock).mockReturnValue(true);
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        id: "user-other",
+        email: "victim@example.com",
+        isSuspended: false,
+        emailVerified: null,
+        password: "$2a$12$some-hash",
+      });
+
+      const result = await config.callbacks.signIn({
+        user: { email: "Victim@Example.com" },
+        account: { provider: "google" },
+        profile: { email_verified: true },
+      });
+
+      expect(result).toBe("/login?error=OAuthAccountNotLinked");
+      expect(prisma.user.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("blocks the link when the guarded update matches no rows", async () => {
+      // A concurrent password reset (or a second Google sign-in) changed the row between
+      // our read and the write. Fail closed rather than proceed on a stale read.
+      (isGoogleEmailVerified as jest.Mock).mockReturnValue(true);
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        id: "user-raced",
+        email: "raced@example.com",
+        isSuspended: false,
+        emailVerified: null,
+        password: "$2a$12$some-hash",
+      });
+      (prisma.user.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
+
+      const result = await config.callbacks.signIn({
+        user: { email: "raced@example.com" },
+        account: { provider: "google" },
+        profile: { email_verified: true },
+      });
+
+      expect(result).toBe("/login?error=OAuthAccountNotLinked");
+    });
+
+    it("does not revoke a credentials sign-in against an unverified account", async () => {
+      // Only the Google path proves control of the address; credentials must not trigger
+      // eviction or a legitimate unverified user would lose their own password.
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        id: "user-unverified",
+        email: "unverified@example.com",
+        isSuspended: false,
+        emailVerified: null,
+        password: "$2a$12$owner-hash",
+      });
+
+      const result = await config.callbacks.signIn({
+        user: { email: "unverified@example.com" },
+        account: { provider: "credentials" },
+      });
+
+      expect(result).toBe(true);
+      expect(prisma.user.updateMany).not.toHaveBeenCalled();
+    });
+
     it("blocks suspended users (Google provider)", async () => {
       (isGoogleEmailVerified as jest.Mock).mockReturnValue(true);
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
@@ -477,6 +602,47 @@ describe("auth.ts NextAuth configuration", () => {
           id_token: null,
         },
       });
+    });
+
+    // ── P0-1b ──
+    //
+    // @auth/core hardcodes createUser({ ...profile, emailVerified: null }), and the only
+    // other writer of emailVerified is the emailed verification token, which a Google user
+    // never receives. Without this the account is permanently blocked from creating
+    // listings, messaging, reviewing and reporting.
+
+    it("marks a Google account's email verified when the profile claims it", async () => {
+      (isGoogleEmailVerified as jest.Mock).mockReturnValue(true);
+      (prisma.user.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+
+      await config.events.linkAccount({
+        user: { id: "user-google" },
+        account: { provider: "google", providerAccountId: "goog-1" },
+        profile: { email_verified: true },
+      });
+
+      expect(prisma.user.updateMany).toHaveBeenCalledWith({
+        where: { id: "user-google", emailVerified: null },
+        data: { emailVerified: expect.any(Date) },
+      });
+    });
+
+    it("does not mark email verified when Google does not assert it", async () => {
+      (isGoogleEmailVerified as jest.Mock).mockReturnValue(false);
+
+      await config.events.linkAccount({
+        user: { id: "user-google" },
+        account: { provider: "google", providerAccountId: "goog-1" },
+        profile: { email_verified: false },
+      });
+
+      // jest.setup.js spreads one shared mockPrismaModel into every model, so
+      // prisma.user.updateMany and prisma.account.updateMany are the SAME jest.fn() —
+      // the token-clearing write above lands on it too. Assert on call shape, not count.
+      const emailVerifiedWrites = (
+        prisma.user.updateMany as jest.Mock
+      ).mock.calls.filter(([args]) => args?.data?.emailVerified !== undefined);
+      expect(emailVerifiedWrites).toHaveLength(0);
     });
 
     it("logs OAuth account link event", async () => {
