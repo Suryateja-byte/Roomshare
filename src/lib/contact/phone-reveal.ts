@@ -11,7 +11,10 @@ import { prisma } from "@/lib/prisma";
 import { features } from "@/lib/env";
 import { evaluateListingContactable } from "@/lib/messaging/listing-contactable";
 import { HOST_NOT_ACCEPTING_CONTACT_MESSAGE } from "@/lib/contact/contact-attempts";
-import { consumeContactEntitlement } from "@/lib/payments/contact-paywall";
+import {
+  consumeContactEntitlement,
+  type ContactConsumptionDecision,
+} from "@/lib/payments/contact-paywall";
 
 type TransactionClient = Parameters<
   Parameters<typeof prisma.$transaction>[0]
@@ -41,6 +44,20 @@ interface HostContactChannelRow {
 
 export const PHONE_REVEAL_UNAVAILABLE_MESSAGE =
   "Phone reveal is unavailable right now.";
+
+/**
+ * HTTP status per paywall denial code. Explicit rather than a ternary so a new code
+ * cannot silently inherit 503 — which would tell the client to retry a request that can
+ * never succeed. IDEMPOTENCY_KEY_REUSED is a client error (400), not a transient one.
+ */
+const PAYWALL_DENIAL_STATUS = {
+  PAYWALL_REQUIRED: 402,
+  PAYWALL_UNAVAILABLE: 503,
+  IDEMPOTENCY_KEY_REUSED: 400,
+} as const satisfies Record<
+  Extract<ContactConsumptionDecision, { ok: false }>["code"],
+  number
+>;
 
 function resolvePhoneRevealKey(explicitKey?: string | null): Buffer | null {
   const raw = explicitKey ?? process.env.PHONE_REVEAL_ENCRYPTION_KEY;
@@ -420,7 +437,7 @@ async function revealHostPhoneForListingInTransaction(
     });
     return {
       ok: false as const,
-      status: consumption.code === "PAYWALL_REQUIRED" ? 402 : 503,
+      status: PAYWALL_DENIAL_STATUS[consumption.code],
       code: consumption.code,
       error: consumption.message,
     };
