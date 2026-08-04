@@ -11,7 +11,7 @@
  * Every invocation:
  * 1. Refresh dirty search documents
  *
- * Daily window only (09:02-09:04 UTC):
+ * Daily lane (at most once per ~20h, see claimDailyLane):
  * 3. Cleanup expired rate limit entries
  * 4. Cleanup expired idempotency keys
  * 5. Cleanup stale typing status indicators
@@ -23,9 +23,17 @@
  * Delegated tasks are called via internal fetch to avoid duplicating complex
  * logic (SQL, geospatial, etc.). Simple DB cleanup tasks stay inlined here.
  *
- * The daily-only gate is time-based rather than persisted. That keeps the
- * dispatcher compatible with Vercel Hobby while preserving a once-daily
- * cadence for low-priority maintenance tasks.
+ * The daily lane is gated on a PERSISTED last-run marker (cron_runs), not on
+ * the wall clock. Vercel Hobby dispatches anywhere inside the scheduled hour,
+ * so the previous 09:02-09:04 UTC window was missed on most days and the miss
+ * was never made up — while the route still returned success: true.
+ *
+ * The marker is claimed BEFORE the daily tasks run, which trades "a crashed
+ * run loses that day" for "a duplicate delivery cannot double-run". That is
+ * the right way round here: Vercel documents duplicate cron delivery, the
+ * daily tasks are idempotent cleanups that self-heal on the next day, and
+ * search-alerts additionally carries its own enqueueAlertDelivery idempotency
+ * key.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -57,12 +65,64 @@ interface TaskResult {
 
 type TaskRunner = () => Promise<Record<string, unknown>>;
 
-function isDailyWindow(nowUtc: Date): boolean {
-  return (
-    nowUtc.getUTCHours() === 9 &&
-    nowUtc.getUTCMinutes() >= 2 &&
-    nowUtc.getUTCMinutes() <= 4
+const DAILY_LANE_TASK = "daily-maintenance";
+
+/**
+ * How recently the daily lane must have run for this invocation to skip it.
+ *
+ * Consecutive real invocations are at least ~23h apart (worst case 09:59 one
+ * day to 09:00 the next), so 20h always admits the next day's run while still
+ * rejecting a duplicate delivery minutes later.
+ */
+const DAILY_LANE_MIN_INTERVAL_HOURS = 20;
+
+type DailyLaneClaim = {
+  ran: boolean;
+  reason: string;
+  lastRunAt: string | null;
+};
+
+/**
+ * Atomically claim the daily lane for this invocation.
+ *
+ * Replaces the old wall-clock gate (09:02-09:04 UTC). Vercel's Hobby plan "may
+ * invoke these cron jobs at any point within the specified hour", so a
+ * 3-minute window was missed on most days and the miss was never made up —
+ * while the route still reported success. Asking "has this lane run recently"
+ * instead is immune to dispatch jitter.
+ *
+ * One statement, so overlapping invocations serialise on the row: the second
+ * one's UPDATE sees the first's committed timestamp and matches no rows. That
+ * covers both failure modes Vercel documents for cron delivery — a missed run
+ * is picked up by the next invocation, and a duplicate run claims nothing.
+ *
+ * Timestamps are computed here rather than with the database clock so the gate
+ * is deterministic under fake timers in tests; atomicity is unaffected because
+ * the comparison still happens inside the statement.
+ */
+async function claimDailyLane(now: Date): Promise<DailyLaneClaim> {
+  const threshold = new Date(
+    now.getTime() - DAILY_LANE_MIN_INTERVAL_HOURS * 60 * 60 * 1000
   );
+
+  try {
+    const claimed = await prisma.$executeRaw`
+      INSERT INTO cron_runs (task, last_run_at)
+      VALUES (${DAILY_LANE_TASK}, ${now})
+      ON CONFLICT (task) DO UPDATE SET last_run_at = ${now}
+      WHERE cron_runs.last_run_at < ${threshold}
+    `;
+
+    return claimed === 1
+      ? { ran: true, reason: "claimed", lastRunAt: now.toISOString() }
+      : { ran: false, reason: "already_ran_recently", lastRunAt: null };
+  } catch (error) {
+    // A failed claim must not take the per-tick tasks down with it.
+    Sentry.captureException(error, {
+      tags: { cron: "daily-maintenance", task: "claim-daily-lane" },
+    });
+    return { ran: false, reason: "claim_failed", lastRunAt: null };
+  }
 }
 
 async function runTask(
@@ -168,7 +228,8 @@ export async function GET(request: NextRequest) {
 
   const cronSecret = process.env.CRON_SECRET ?? "";
   const nowUtc = new Date();
-  const shouldRunDailyTasks = isDailyWindow(nowUtc);
+  const dailyLane = await claimDailyLane(nowUtc);
+  const shouldRunDailyTasks = dailyLane.ran;
   const startTime = Date.now();
   const results: TaskResult[] = [];
 
@@ -321,27 +382,27 @@ export async function GET(request: NextRequest) {
       markSkippedTask(results, "stale-auto-pause", "feature_disabled");
     }
   } else {
-    markSkippedTask(results, "cleanup-rate-limits", "outside_daily_window");
+    markSkippedTask(results, "cleanup-rate-limits", dailyLane.reason);
     markSkippedTask(
       results,
       "cleanup-idempotency-keys",
-      "outside_daily_window"
+      dailyLane.reason
     );
     markSkippedTask(
       results,
       "cleanup-query-snapshots",
-      "outside_daily_window"
+      dailyLane.reason
     );
-    markSkippedTask(results, "cleanup-typing-status", "outside_daily_window");
+    markSkippedTask(results, "cleanup-typing-status", dailyLane.reason);
     markSkippedTask(
       results,
       "cleanup-verification-documents",
-      "outside_daily_window"
+      dailyLane.reason
     );
-    markSkippedTask(results, "outbox-retention", "outside_daily_window");
-    markSkippedTask(results, "search-alerts", "outside_daily_window");
-    markSkippedTask(results, "freshness-reminders", "outside_daily_window");
-    markSkippedTask(results, "stale-auto-pause", "outside_daily_window");
+    markSkippedTask(results, "outbox-retention", dailyLane.reason);
+    markSkippedTask(results, "search-alerts", dailyLane.reason);
+    markSkippedTask(results, "freshness-reminders", dailyLane.reason);
+    markSkippedTask(results, "stale-auto-pause", dailyLane.reason);
   }
 
   // --- Summary ---
@@ -353,7 +414,8 @@ export async function GET(request: NextRequest) {
   logger.sync.info(
     `[daily-maintenance] Completed: ${succeeded} ok, ${failed} failed, ${skipped} skipped, ${totalDurationMs}ms`,
     {
-      dailyWindow: shouldRunDailyTasks,
+      dailyLaneRan: dailyLane.ran,
+      dailyLaneReason: dailyLane.reason,
       timestampUtc: nowUtc.toISOString(),
       results: results.map(({ task, success, skipped, durationMs }) => ({
         task,
@@ -371,7 +433,10 @@ export async function GET(request: NextRequest) {
       succeeded,
       failed,
       skipped,
-      dailyWindow: shouldRunDailyTasks,
+      // Distinguishes "the daily lane ran" from "it was skipped, and why", so a
+      // dispatcher that is permanently skipping is visible rather than looking
+      // identical to a healthy run. `claim_failed` in particular is a fault.
+      dailyLane,
       timestampUtc: nowUtc.toISOString(),
       totalDurationMs,
     },

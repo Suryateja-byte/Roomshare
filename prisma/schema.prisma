@@ -513,6 +513,24 @@ model RateLimitEntry {
   @@index([expiresAt])
 }
 
+/// Last-run marker for cron lanes that must fire roughly once per day.
+///
+/// Vercel Hobby dispatches a cron anywhere inside its scheduled HOUR and makes
+/// no delivery guarantee — a run can be missed, or delivered twice. Gating
+/// daily work on the wall clock therefore skips it on most days. A persisted
+/// marker turns the question into "has this lane run recently", which is
+/// immune to dispatch jitter and idempotent under duplicate delivery.
+model CronRun {
+  task String @id
+  /// Timestamptz, not the schema-default timestamp(3): this marker is an
+  /// absolute instant compared against a JS-computed threshold in raw SQL, so
+  /// it must not depend on the session time zone. Matches the Phase 01 infra
+  /// tables, which are also TIMESTAMPTZ.
+  lastRunAt DateTime @map("last_run_at") @db.Timestamptz(3)
+
+  @@map("cron_runs")
+}
+
 // User Blocking
 model BlockedUser {
   id        String   @id @default(cuid())
