@@ -49,6 +49,7 @@ function buildClient() {
       count: jest.fn().mockResolvedValue(0),
       groupBy: jest.fn().mockResolvedValue([]),
       findUnique: jest.fn().mockResolvedValue(null),
+      findFirst: jest.fn().mockResolvedValue(null),
       create: jest.fn().mockResolvedValue({ id: "reveal-consumption-1" }),
     },
     entitlementGrant: {

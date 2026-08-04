@@ -58,13 +58,38 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   // Audit logging for security-sensitive events
   events: {
-    async linkAccount({ user, account }) {
+    async linkAccount({ user, account, profile }) {
       // Log when OAuth account is linked to existing user (for audit trail)
       // Never log providerAccountId (PII)
       logger.sync.info("OAuth account linked", {
         userId: user.id,
         provider: account.provider,
       });
+
+      // P0-1b: @auth/core hardcodes createUser({ ...profile, emailVerified: null })
+      // (handle-login.js:259), and the only other writer of emailVerified is the emailed
+      // verification token — which a Google user never receives. Without this, every
+      // Google-only account stays permanently unverified and is blocked from creating
+      // listings, messaging, reviewing and reporting.
+      //
+      // linkAccount is used rather than createUser because only it receives `profile`,
+      // which carries the email_verified claim. `user` here is the persisted row.
+      if (
+        account.provider === "google" &&
+        isGoogleEmailVerified(profile as { email_verified?: boolean })
+      ) {
+        try {
+          await prisma.user.updateMany({
+            where: { id: user.id, emailVerified: null },
+            data: { emailVerified: new Date() },
+          });
+        } catch (error) {
+          logger.sync.warn("Failed to mark Google email as verified", {
+            userId: user.id,
+            error: sanitizeErrorMessage(error),
+          });
+        }
+      }
 
       // Minimize token retention: this app does not call provider APIs after sign-in.
       // Clearing OAuth tokens reduces impact if database records are exposed.
@@ -203,11 +228,83 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user?.email) {
         const dbUser = await prisma.user.findUnique({
           where: { email: normalizeEmail(user.email) },
-          select: { isSuspended: true },
+          select: {
+            id: true,
+            email: true,
+            isSuspended: true,
+            emailVerified: true,
+            password: true,
+          },
         });
 
         if (dbUser?.isSuspended) {
           return "/login?error=AccountSuspended";
+        }
+
+        // P0-1: account pre-hijacking defence.
+        //
+        // allowDangerousEmailAccountLinking lets the adapter bind this Google identity to
+        // ANY existing row with a matching email. An attacker can create that row first by
+        // registering with the victim's address and never verifying it — /api/register
+        // accepts a caller-chosen password and writes emailVerified: null. The victim's
+        // first real Google sign-in would then land on the attacker's row, and the
+        // attacker's password would keep working against the victim's account forever.
+        //
+        // Google has just proven control of this address, so the unverified password on
+        // that row cannot belong to its rightful owner. Revoke it before the link.
+        // passwordChangedAt is what evicts the attacker: getPasswordRevocationState
+        // compares it against the JWT's authTime on every round-trip, so their existing
+        // sessions stop resolving. Note that check is fail-open on DB error, and eviction
+        // lands on the attacker's next request rather than instantly.
+        //
+        // This runs BEFORE the link: @auth/core calls handleAuthorized (this callback) at
+        // callback/index.js:63, and handleLoginOrRegister (which links) only at :70.
+        if (
+          account?.provider === "google" &&
+          dbUser &&
+          dbUser.emailVerified === null &&
+          dbUser.password !== null
+        ) {
+          // The adapter's getUserByEmail does NOT normalise, so it will look this row up
+          // by the raw Google address. If our normalised lookup found a row the adapter
+          // would not, revoking its password would lock out an innocent user for nothing.
+          if (dbUser.email !== user.email) {
+            logger.sync.error("Google link blocked: email normalisation mismatch", {
+              userId: dbUser.id,
+            });
+            return `${AUTH_ROUTES.signIn}?error=OAuthAccountNotLinked`;
+          }
+
+          // Guarded update, not a blind one: re-assert the preconditions in the WHERE so
+          // this is atomic against a concurrent password reset by the squatter. A second
+          // concurrent Google sign-in simply matches 0 rows and no-ops.
+          const evicted = await prisma.user.updateMany({
+            where: {
+              id: dbUser.id,
+              emailVerified: null,
+              password: { not: null },
+            },
+            data: {
+              password: null,
+              passwordChangedAt: new Date(),
+              // Google asserted email_verified above, so control is proven.
+              emailVerified: new Date(),
+            },
+          });
+
+          if (evicted.count !== 1) {
+            logger.sync.error("Google link blocked: account state changed mid-sign-in", {
+              userId: dbUser.id,
+            });
+            return `${AUTH_ROUTES.signIn}?error=OAuthAccountNotLinked`;
+          }
+
+          // High severity: the victim is about to inherit whatever this row already
+          // contains (listings, profile, saved searches) from whoever created it.
+          logger.sync.error("Unverified password account claimed via Google sign-in", {
+            userId: dbUser.id,
+            provider: account.provider,
+          });
         }
       }
 

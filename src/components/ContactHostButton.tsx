@@ -128,8 +128,17 @@ export default function ContactHostButton({
           "code" in result && result.code === "PAYWALL_REQUIRED";
         const paywallUnavailable =
           "code" in result && result.code === "PAYWALL_UNAVAILABLE";
+        // Server rejected a request whose idempotency key was already spent on a different
+        // listing. This client mints a fresh key per attempt (see the finally block), so a
+        // plain retry recovers; only a stale tab or a tampered client can reach here.
+        const idempotencyKeyReused =
+          "code" in result && result.code === "IDEMPOTENCY_KEY_REUSED";
         if (result.error === "Unauthorized") {
           router.push("/login");
+        } else if (idempotencyKeyReused) {
+          toast.error(
+            "That request was already used. Please refresh the page and try again."
+          );
         } else if (paywallUnavailable) {
           toast.error("Contact is temporarily unavailable. Please try again shortly.");
         } else if (paywallRequired && paywallSummary?.requiresPurchase) {

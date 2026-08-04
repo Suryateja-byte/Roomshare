@@ -786,7 +786,8 @@ model ContactConsumption {
   restorations       ContactRestoration[]
 
   @@unique([userId, unitId, unitIdentityEpoch, contactKind], map: "contact_consumption_user_unit_epoch_kind_idx")
-  @@unique([userId, clientIdempotencyKey], map: "contact_consumption_user_idempotency_idx")
+  @@unique([userId, contactKind, clientIdempotencyKey], map: "contact_consumption_user_kind_idempotency_idx")
+  @@index([userId, clientIdempotencyKey], map: "contact_consumption_user_idempotency_lookup_idx")
   @@index([userId, contactKind, consumedAt], map: "contact_consumption_user_kind_consumed_at_idx")
   @@index([entitlementGrantId], map: "contact_consumption_grant_id_idx")
   @@index([conversationId], map: "contact_consumption_conversation_id_idx")

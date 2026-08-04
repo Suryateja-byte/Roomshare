@@ -84,7 +84,10 @@ type StartConversationTxResult =
   | {
       kind: "paywall_error";
       error: string;
-      code: "PAYWALL_REQUIRED" | "PAYWALL_UNAVAILABLE";
+      code:
+        | "PAYWALL_REQUIRED"
+        | "PAYWALL_UNAVAILABLE"
+        | "IDEMPOTENCY_KEY_REUSED";
       unitId: string | null;
     };
 

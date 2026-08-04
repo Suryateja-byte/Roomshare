@@ -43,6 +43,13 @@ export interface DrainOptions {
   priorityMax?: number;
   /** Event kinds to leave pending for a later, more specific drain window. */
   excludedKinds?: readonly OutboxKind[];
+  /**
+   * Allowlist: claim ONLY these kinds. Implemented by excluding every other registered
+   * kind, so the claim query is unchanged. Use when a caller must provably not touch
+   * other lanes — e.g. the Stripe webhook drains PAYMENT_WEBHOOK inline and must not
+   * perform projection writes that a phase flag has deliberately switched off.
+   */
+  kinds?: readonly OutboxKind[];
   /** Clock override for testing */
   now?: () => Date;
   /** Reset IN_FLIGHT rows older than this age before claiming (default: 5 minutes) */
@@ -85,10 +92,18 @@ export async function drainOutboxOnce(
     maxTickMs = 9000,
     priorityMax = 100,
     excludedKinds = [],
+    kinds,
     now = () => new Date(),
     staleInFlightMs = STALE_IN_FLIGHT_MS,
   } = opts;
-  const excludedOutboxKinds = Array.from(new Set(excludedKinds));
+  const allowlistExclusions = kinds
+    ? (Object.keys(HANDLERS) as OutboxKind[]).filter(
+        (kind) => !kinds.includes(kind)
+      )
+    : [];
+  const excludedOutboxKinds = Array.from(
+    new Set([...excludedKinds, ...allowlistExclusions])
+  );
 
   const tickStart = Date.now();
   let processed = 0;

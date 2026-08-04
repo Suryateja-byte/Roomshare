@@ -1,13 +1,17 @@
 import { Prisma } from "@prisma/client";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { features } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { appendOutboxEvent } from "@/lib/outbox/append";
+import { drainOutboxOnce } from "@/lib/outbox/drain";
+import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { getStripeClient } from "@/lib/payments/stripe";
 import { recordStripeEventReplayIgnored } from "@/lib/payments/telemetry";
 
 export const runtime = "nodejs";
+// The post-response drain tick needs headroom beyond the request itself.
+export const maxDuration = 60;
 
 function getStripeObjectId(event: Stripe.Event): string | null {
   return event.data.object &&
@@ -141,6 +145,34 @@ export async function POST(request: Request) {
       recordStripeEventReplayIgnored({
         stripeEventId: event.id,
         eventType: event.type,
+      });
+    } else {
+      // Fulfil now instead of waiting for the daily cron. Without this the grant is only
+      // created when daily-maintenance drains the outbox, so a paying customer waits up
+      // to ~24h for credits they already bought (vercel.json registers one daily cron).
+      //
+      // Gated on alreadyProcessed, NOT alreadyCaptured: a Stripe retry after a failed
+      // attempt is captured-but-unprocessed, which is exactly when the kick matters.
+      //
+      // Deliberately NOT phase02-gated — fulfilment must not depend on a projection flag.
+      // Scoped to PAYMENT_WEBHOOK so this can never perform projection writes that the
+      // flag has switched off. The outbox row remains the durable retry net: after() is
+      // best-effort, and drainOutboxOnce leases rows with FOR UPDATE SKIP LOCKED plus a
+      // stale-IN_FLIGHT reaper, so a crash mid-tick is recovered by the cron.
+      after(async () => {
+        try {
+          await drainOutboxOnce({
+            kinds: ["PAYMENT_WEBHOOK"],
+            maxBatch: 5,
+            maxTickMs: 5000,
+          });
+        } catch (error) {
+          logger.sync.error("stripe.inline_fulfilment_failed", {
+            stripeEventId: event.id,
+            eventType: event.type,
+            error: sanitizeErrorMessage(error),
+          });
+        }
       });
     }
 

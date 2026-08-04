@@ -24,6 +24,7 @@ jest.mock("@/lib/prisma", () => {
       count: jest.fn(),
       groupBy: jest.fn(),
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
     },
@@ -79,6 +80,7 @@ describe("contact paywall evaluator", () => {
     (prisma.contactConsumption.count as jest.Mock).mockResolvedValue(0);
     (prisma.contactConsumption.groupBy as jest.Mock).mockResolvedValue([]);
     (prisma.contactConsumption.findUnique as jest.Mock).mockResolvedValue(null);
+    (prisma.contactConsumption.findFirst as jest.Mock).mockResolvedValue(null);
     (prisma.contactConsumption.create as jest.Mock).mockResolvedValue({
       id: "consumption-123",
     });
@@ -218,6 +220,8 @@ describe("contact paywall evaluator", () => {
   });
 
   it("does not consume twice for the same unit identity", async () => {
+    // findFirst stays null (beforeEach) so this exercises the unit-identity branch
+    // specifically, not the idempotency-key branch.
     (prisma.contactConsumption.findUnique as jest.Mock).mockResolvedValue({
       id: "consumption-existing",
     });
@@ -232,6 +236,78 @@ describe("contact paywall evaluator", () => {
       ok: true,
       source: "EXISTING_CONSUMPTION",
       consumptionId: "consumption-existing",
+    });
+    expect(prisma.contactConsumption.create).not.toHaveBeenCalled();
+  });
+
+  it("replays an idempotency key that matches the same unit, epoch and contact kind", async () => {
+    (prisma.contactConsumption.findFirst as jest.Mock).mockResolvedValue({
+      id: "consumption-existing",
+      unitId: "unit-123",
+      unitIdentityEpoch: 4,
+      contactKind: "MESSAGE_START",
+    });
+
+    const result = await consumeMessageStartEntitlement(prisma as any, {
+      userId: "user-123",
+      listingId: "listing-123",
+      physicalUnitId: "unit-123",
+      clientIdempotencyKey: "key-1",
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      source: "EXISTING_CONSUMPTION",
+      consumptionId: "consumption-existing",
+    });
+    expect(prisma.contactConsumption.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects an idempotency key already spent on a different unit", async () => {
+    // P0-4 regression: the key was consumed for another listing. Replaying it must not
+    // hand out a free contact, and must not silently spend a credit either.
+    (prisma.contactConsumption.findFirst as jest.Mock).mockResolvedValue({
+      id: "consumption-other-listing",
+      unitId: "unit-999",
+      unitIdentityEpoch: 4,
+      contactKind: "MESSAGE_START",
+    });
+
+    const result = await consumeMessageStartEntitlement(prisma as any, {
+      userId: "user-123",
+      listingId: "listing-123",
+      physicalUnitId: "unit-123",
+      clientIdempotencyKey: "key-1",
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      code: "IDEMPOTENCY_KEY_REUSED",
+    });
+    expect(prisma.contactConsumption.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects an idempotency key already spent on a different contact kind", async () => {
+    // The key crossed contactKind: a MESSAGE_START consumption must not authorise a
+    // REVEAL_PHONE, which is what let one purchase harvest unlimited host phone numbers.
+    (prisma.contactConsumption.findFirst as jest.Mock).mockResolvedValue({
+      id: "consumption-message-start",
+      unitId: "unit-123",
+      unitIdentityEpoch: 4,
+      contactKind: "MESSAGE_START",
+    });
+
+    const result = await consumeContactEntitlement(prisma as any, {
+      userId: "user-123",
+      listingId: "listing-123",
+      physicalUnitId: "unit-123",
+      clientIdempotencyKey: "key-1",
+      contactKind: "REVEAL_PHONE",
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      code: "IDEMPOTENCY_KEY_REUSED",
     });
     expect(prisma.contactConsumption.create).not.toHaveBeenCalled();
   });

@@ -78,7 +78,10 @@ export type ContactConsumptionDecision =
       summary: PaywallSummary;
       unitId: string | null;
       unitIdentityEpoch: number | null;
-      code: "PAYWALL_REQUIRED" | "PAYWALL_UNAVAILABLE";
+      code:
+        | "PAYWALL_REQUIRED"
+        | "PAYWALL_UNAVAILABLE"
+        | "IDEMPOTENCY_KEY_REUSED";
       message: string;
     };
 
@@ -560,17 +563,42 @@ export async function consumeContactEntitlement(
   `;
 
   const idempotencyKey = input.clientIdempotencyKey?.trim() || `legacy:${randomUUID()}`;
-  const existingByIdempotency = await tx.contactConsumption.findUnique({
+
+  // P0-4: clientIdempotencyKey is chosen by the client, so a key alone does not identify
+  // an operation. Look the row up across every contact kind and verify it describes THIS
+  // (unit, epoch, kind) before treating it as a replay — otherwise one key consumed on
+  // listing A would satisfy every later message-start and phone-reveal for any other
+  // listing, and across contact kinds. Mismatched reuse is rejected rather than silently
+  // charged, mirroring withIdempotency's requestHash check (src/lib/idempotency.ts).
+  const existingByIdempotency = await tx.contactConsumption.findFirst({
     where: {
-      userId_clientIdempotencyKey: {
-        userId: input.userId,
-        clientIdempotencyKey: idempotencyKey,
-      },
+      userId: input.userId,
+      clientIdempotencyKey: idempotencyKey,
     },
-    select: { id: true },
+    select: {
+      id: true,
+      unitId: true,
+      unitIdentityEpoch: true,
+      contactKind: true,
+    },
   });
 
   if (existingByIdempotency) {
+    const matchesOperation =
+      existingByIdempotency.unitId === evaluation.unitId &&
+      existingByIdempotency.unitIdentityEpoch === evaluation.unitIdentityEpoch &&
+      existingByIdempotency.contactKind === input.contactKind;
+
+    if (!matchesOperation) {
+      return {
+        ok: false,
+        ...evaluation,
+        code: "IDEMPOTENCY_KEY_REUSED",
+        message:
+          "This request was already used for a different listing. Please refresh and try again.",
+      };
+    }
+
     return {
       ok: true,
       ...evaluation,

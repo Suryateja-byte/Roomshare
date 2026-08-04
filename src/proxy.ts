@@ -1,5 +1,6 @@
 import { checkSuspension } from "@/lib/auth-helpers";
 import { applySecurityHeaders } from "@/lib/csp-middleware";
+import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
@@ -10,7 +11,20 @@ import { NextResponse } from "next/server";
  * in one place without wrapping every request in auth().
  */
 export async function proxy(request: NextRequest) {
-  const suspensionResponse = await checkSuspension(request);
+  // Defence in depth: if suspension enforcement throws, do NOT let it propagate.
+  // An uncaught throw here returns a 500 that skips applySecurityHeaders below,
+  // stripping CSP/HSTS/X-Frame-Options — next.config.ts deliberately does not
+  // emit CSP, so this proxy is the only place it is set. A logged, header-bearing
+  // degradation beats a bare 500 with no security headers. Logged at `error`
+  // because a silent enforcement failure is worse than the outage it replaces.
+  let suspensionResponse: NextResponse | null = null;
+  try {
+    suspensionResponse = await checkSuspension(request);
+  } catch (error) {
+    logger.sync.error("[Proxy] checkSuspension threw; continuing unauthenticated", {
+      error: sanitizeErrorMessage(error),
+    });
+  }
   if (suspensionResponse) {
     return suspensionResponse;
   }

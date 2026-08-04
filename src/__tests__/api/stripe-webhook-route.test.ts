@@ -1,4 +1,9 @@
 jest.mock("next/server", () => ({
+  // The route schedules its inline fulfilment drain with after(). Run the callback
+  // synchronously so tests can assert on what it does (and so it cannot silently no-op).
+  after: (fn: () => unknown) => {
+    void fn();
+  },
   NextResponse: {
     json: (
       data: unknown,

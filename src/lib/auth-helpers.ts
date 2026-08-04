@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { prisma } from "@/lib/prisma";
 import { getPasswordRevocationState } from "@/lib/password-revocation";
+import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import {
   isPrivatePagePath,
   isProtectedApiPath,
@@ -181,18 +182,37 @@ export async function checkSuspension(
     return null;
   }
 
-  // Get token to check suspension status
-  // Pass secret explicitly — Edge Runtime may not see process.env reliably
-  const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
-  const token = await getToken({ req: request, secret });
-
-  // No token means unauthenticated - let the route handler deal with it
-  if (!token) {
+  // Only enforce suspension rules on protected routes.
+  // Checked before getToken so unprotected paths skip the decode entirely and
+  // are never exposed to a token-parsing failure.
+  if (!isProtectedRoute(pathname)) {
     return null;
   }
 
-  // Only enforce suspension rules on protected routes
-  if (!isProtectedRoute(pathname)) {
+  // Get token to check suspension status
+  // Pass secret explicitly — Edge Runtime may not see process.env reliably
+  const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
+  let token: Awaited<ReturnType<typeof getToken>>;
+  try {
+    token = await getToken({ req: request, secret });
+  } catch (error) {
+    // GHSA-xmf8-cvqr-rfgj: a malformed `Authorization: Bearer %` makes getToken
+    // throw URIError, which would propagate out of proxy() as a 500 on every
+    // request that carries it. A missing AUTH_SECRET throws MissingSecret here too.
+    //
+    // Returning null is NOT a suspension bypass: @auth/core reads the Bearer
+    // header ONLY when no session cookie is present, so a throw means the request
+    // carried no session credential — identical to the `!token` path below.
+    // Decode failures are already caught inside @auth/core and return null, so a
+    // rotated AUTH_SECRET never reaches this catch.
+    logger.sync.warn("[Auth] getToken failed; treating request as anonymous", {
+      error: sanitizeErrorMessage(error),
+    });
+    return null;
+  }
+
+  // No token means unauthenticated - let the route handler deal with it
+  if (!token) {
     return null;
   }
 
