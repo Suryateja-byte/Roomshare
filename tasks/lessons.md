@@ -149,3 +149,46 @@
 - Follow-up: the same pass surfaced that positive controls also protect against
   over-correction — e.g. in the P1-2 dispute fix, "still revokes on a genuine loss" is what
   stops `warning_closed → WON` from becoming "never revoke".
+
+## 2026-08-04 — A mocked helper made a dead security fix look tested
+
+- Date: 2026-08-04
+- Mistake / failure mode: The P0-1b fix (2026-08-03) marked Google accounts
+  `emailVerified` from the `linkAccount` event by reading `profile.email_verified`.
+  It never ran once. `@auth/core` passes `linkAccount` the NORMALIZED profile —
+  Google declares no custom `profile()`, so `defaultProfile`
+  (`lib/utils/providers.js:78-84`) returns only `{id,name,email,image}` and strips
+  the OIDC claim before the event fires. Two tests asserted the behaviour and both
+  passed, because `src/__tests__/lib/auth.test.ts:14` mocks
+  `isGoogleEmailVerified` as `jest.fn().mockReturnValue(true)` — the mock, not the
+  code, was what returned true. Combined with every email CTA 404'ing, the result
+  was that NO user could reach `emailVerified`, and messaging/reviews/reports —
+  gated on it — were unreachable in production.
+- Detection signal: none from the test suite; it stayed green throughout. Found
+  only by reading the installed `@auth/core` source to answer "what exactly is in
+  `profile` here?". The tell in hindsight: a test whose subject is a *helper's
+  return value* while the helper is mocked to a constant asserts nothing about the
+  branch it guards.
+- Root cause: two compounding habits. (1) Mocking a pure, cheap predicate instead
+  of using its real implementation, which turned a behavioural assertion into a
+  tautology. (2) Trusting a callback parameter's shape from its NAME (`profile`)
+  rather than from the library source — `signIn` and `linkAccount` both receive a
+  parameter called `profile` and they are DIFFERENT objects (raw OIDC claims vs.
+  normalized user).
+- Prevention rule: three things.
+  (1) Never mock a pure predicate that the code under test branches on. Give it
+      real semantics (`mockImplementation` mirroring the real function) or use
+      `jest.requireActual`. If the mock's return value is what makes the assertion
+      pass, the test measures the mock.
+  (2) When a fix depends on the shape of a third-party callback argument, read the
+      installed source in `node_modules` and cite file:line in a comment. Do not
+      infer it from the parameter name or from docs.
+  (3) Any template or message that produces a user-facing URL needs a test that
+      asserts the RENDERED output. `src/lib/email-templates.ts` had 12 templates
+      and zero rendering tests; `email.test.ts` covered only transport, and both
+      auth e2e specs read the token from the dev-mode JSON instead of traversing
+      the link, so nothing in CI ever looked at an `<a href>`.
+- Follow-up: fixed in `src/__tests__/lib/email-templates.test.ts` (21 cases,
+  8 of which were RED against the old `buildAppHref`) and the rewritten
+  `linkAccount` block in `src/__tests__/lib/auth.test.ts`. Full analysis in
+  `docs/full-project-review-2026-08-03-round2.md`.
