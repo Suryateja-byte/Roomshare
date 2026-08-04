@@ -193,6 +193,26 @@ jobs:
       - name: Run performance tests
         run: pnpm jest --ci --testPathPatterns="src/__tests__/performance/" --testTimeout=60000
 
+  # Catch-all for every suite not claimed by a job above. This is a DENY-list
+  # on purpose: a new test directory is covered by default instead of by
+  # opt-in, which is what let 78 files (security, middleware, db, schema,
+  # edge-cases, scripts, launch, colocated src/lib) go unrun. The
+  # ci-test-coverage test enforces that this stays exhaustive.
+  test-rest:
+    name: Remaining Tests
+    runs-on: ubuntu-latest
+    env:
+      NODE_OPTIONS: '--experimental-vm-modules --max-old-space-size=4096'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm jest --ci --maxWorkers=2 --testPathIgnorePatterns="/node_modules/" "/.next/" "/.worktrees/" "/.claude/worktrees/" "src/__tests__/utils/" "src/__tests__/fixtures/" "tests/e2e/" "collision-detector-test-utils" "src/__tests__/lib/" "src/__tests__/hooks/" "src/__tests__/components/" "src/__tests__/pages/" "src/__tests__/api/" "src/__tests__/actions/" "src/__tests__/integration/" "src/__tests__/property/" "src/__tests__/e2e/" "src/__tests__/performance/"
+
   privacy-pii-scan:
     name: Public Payload PII Scan
     runs-on: ubuntu-latest
@@ -211,7 +231,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, migrate-check, test-unit, test-components, test-api, test-filters, test-filter-regression, test-performance, privacy-pii-scan]
+    needs: [lint, typecheck, migrate-check, test-unit, test-components, test-api, test-filters, test-filter-regression, test-performance, test-rest, privacy-pii-scan]
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     steps:
       - uses: actions/checkout@v7
