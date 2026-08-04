@@ -36,7 +36,13 @@ export interface SearchFilters {
   city?: string;
 }
 
-function buildBoundsFromFilters(
+/**
+ * Assemble a complete viewport from the FLAT minLat/maxLat/minLng/maxLng keys
+ * that SearchFilters (and SavedSearch.filters) carry. Returns undefined unless
+ * all four edges are finite. minLng > maxLng is left as-is on purpose: that is
+ * a legal antimeridian-crossing box, not an inverted one.
+ */
+export function buildBoundsFromFilters(
   filters: SearchFilters
 ): NormalizedSearchQuery["bounds"] {
   if (

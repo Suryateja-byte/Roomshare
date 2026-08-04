@@ -13,6 +13,11 @@ import { getUsersWithUnlockedSearchAlerts } from "@/lib/payments/search-alert-pa
 import { resolvePublicListingVisibilityState } from "@/lib/listings/public-contact-contract";
 import { appendOutboxEvent } from "@/lib/outbox/append";
 import {
+  boundsFromAlertFilters,
+  findListingIdsWithinBounds,
+  isWithinAlertBounds,
+} from "@/lib/search/alert-bounds";
+import {
   withActor,
   type TransactionClient,
   type TransactionHost,
@@ -49,10 +54,24 @@ function parseFiltersForAlerts(raw: Prisma.JsonValue): SearchFilters | null {
       ? (raw as Record<string, unknown>).city
       : undefined;
 
-  return validateAlertFilters({
+  const validated = validateAlertFilters({
     ...parsed,
     ...(typeof city === "string" ? { city } : {}),
   });
+
+  // validateSearchFilters models the viewport as a NESTED `bounds` object, so
+  // it drops the FLAT keys parseSavedSearchFilters emits — the same shape
+  // mismatch as P1-4, one layer up. Re-attach them; they are already validated
+  // and clamped by the parser, and alert matching needs them (P1-5).
+  return {
+    ...validated,
+    minLat: parsed.minLat,
+    maxLat: parsed.maxLat,
+    minLng: parsed.minLng,
+    maxLng: parsed.maxLng,
+    lat: parsed.lat,
+    lng: parsed.lng,
+  };
 }
 
 // Type for new listing data used in instant alerts
@@ -72,6 +91,12 @@ export interface NewListingForAlert {
   householdGender?: string | null;
   moveInDate?: Date | string | null;
   availableUntil?: Date | string | null;
+  /**
+   * Listing coordinates, used to honour a saved search's viewport (P1-5).
+   * Absent coordinates cannot satisfy a bounded search.
+   */
+  lat?: number | null;
+  lng?: number | null;
 }
 
 interface ProcessResult {
@@ -896,6 +921,18 @@ export async function processSearchAlerts(): Promise<ProcessResult> {
             };
           }
 
+          // Geographic scope (P1-5). Bounds cannot be expressed as a Prisma
+          // `where` — Location.coords is Unsupported("geometry") and there are
+          // no scalar lat/lng columns — so the viewport is applied as a PostGIS
+          // prefilter and the match query is constrained to the ids it returns.
+          // A saved search with no viewport stays unscoped, as before.
+          const alertBounds = boundsFromAlertFilters(filters);
+          if (alertBounds) {
+            whereClause.id = {
+              in: await findListingIdsWithinBounds(alertBounds, sinceDate),
+            };
+          }
+
           // Count matching listings
           const candidateListingsCount = await prisma.listing.count({
             where: whereClause,
@@ -996,6 +1033,14 @@ function matchesFilters(
     filters.city &&
     !listing.city.toLowerCase().includes(filters.city.toLowerCase())
   ) {
+    return false;
+  }
+
+  // Geographic scope (P1-5): honour the saved viewport. A listing without
+  // coordinates cannot be shown to satisfy a bounded search, so it does not
+  // match. Searches with no viewport are unaffected.
+  const bounds = boundsFromAlertFilters(filters);
+  if (bounds && !isWithinAlertBounds(listing, bounds)) {
     return false;
   }
 

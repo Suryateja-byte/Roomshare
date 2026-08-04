@@ -45,6 +45,41 @@ const savedSearchFiltersSchema = z
   })
   .passthrough();
 
+/**
+ * SavedSearch.filters persists the map viewport as FLAT keys — see
+ * `savedSearchFiltersWriteSchema` in app/actions/saved-search.ts — but
+ * `normalizeSearchFilters` from @/lib/search-params reads only a NESTED
+ * `bounds` object. Assemble one here so the existing validation, clamping and
+ * inverted-range handling in `normalizeBoundsInput` applies rather than being
+ * reimplemented. A row that already carries a nested `bounds` wins.
+ */
+function resolveStoredBounds(stored: Record<string, unknown>): unknown {
+  if (stored.bounds && typeof stored.bounds === "object") {
+    return stored.bounds;
+  }
+
+  return {
+    minLat: stored.minLat,
+    maxLat: stored.maxLat,
+    minLng: stored.minLng,
+    maxLng: stored.maxLng,
+  };
+}
+
+/**
+ * Clamp a stored point coordinate to its valid range. `normalizeSearchFilters`
+ * has no lat/lng passthrough, so these are carried across directly; clamping
+ * matches how the live URL path treats them (safeParseFloat with ±90 / ±180 in
+ * parseSearchParams).
+ */
+function clampCoordinate(value: unknown, limit: number): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return undefined;
+  }
+
+  return Math.max(-limit, Math.min(limit, value));
+}
+
 /** Safely parse filters JSON from DB, returning null on invalid data. */
 export function parseSavedSearchFilters(raw: unknown): SearchFilters | null {
   if (raw && typeof raw === "object" && !Array.isArray(raw)) {
@@ -80,6 +115,7 @@ export function parseSavedSearchFilters(raw: unknown): SearchFilters | null {
       minAvailableSlots:
         legacyCompatibleInput.minAvailableSlots ??
         legacyCompatibleInput.minSlots,
+      bounds: resolveStoredBounds(legacyCompatibleInput),
     },
     {
       invalidRange: "drop",
@@ -104,6 +140,8 @@ export function parseSavedSearchFilters(raw: unknown): SearchFilters | null {
     householdGender: normalized.householdGender,
     bookingMode: normalized.bookingMode,
     minSlots: normalized.minAvailableSlots,
+    lat: clampCoordinate(legacyCompatibleInput.lat, 90),
+    lng: clampCoordinate(legacyCompatibleInput.lng, 180),
     bounds: normalized.bounds,
     sort: normalized.sort,
     nearMatches: normalized.nearMatches,
