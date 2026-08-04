@@ -623,6 +623,9 @@ export async function POST(request: Request) {
         houseRules: listing.houseRules,
         moveInDate: listing.moveInDate,
         availableUntil: listing.availableUntil,
+        // Needed so a saved search's viewport can be honoured (P1-5).
+        lat: coords.lat,
+        lng: coords.lng,
       }).catch((err) => {
         logger.sync.warn("Instant alerts trigger failed", {
           route: "/api/listings",

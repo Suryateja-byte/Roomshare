@@ -122,3 +122,30 @@
   `open(...,'rb')` + `bytes.replace` with a count assertion) so non-edited bytes/EOLs are
   preserved. Don't commit wholesale EOL flips.
 - Follow-up: none required; consider adding `.gitattributes` (`* text=auto`) repo-wide later.
+
+## 2026-08-03 — A regression test that passes against the buggy code proves nothing
+
+- Date: 2026-08-03
+- Mistake / failure mode: While fixing P1-5 (search alerts applied no geographic
+  predicate), the headline test — "an Austin-bounded saved search is not alerted about a
+  Seattle listing" — PASSED against the unfixed code. It looked like a green regression
+  test. It was measuring nothing: my `deliverableListing` fixture omitted
+  `needsMigrationReview` / `availabilitySource` and used a stale `lastConfirmedAt`, so
+  `resolvePublicListingVisibilityState` judged the listing not publicly visible and
+  `sent` was 0 for a reason unrelated to geography.
+- Detection signal: the POSITIVE control failed. "An Austin listing DOES alert an
+  Austin-bounded search" expected `sent: 1` and got `0`. A negative assertion passing while
+  its positive twin fails means the code path never ran.
+- Root cause: asserting only absence (`sent === 0`, `not.toHaveBeenCalled()`). Absence is
+  satisfied by any early return anywhere upstream, so an incomplete fixture is
+  indistinguishable from a working fix.
+- Prevention rule: two things, both cheap.
+  (1) Always pair a negative assertion with a positive control that exercises the same path
+      and must pass BOTH before and after the fix. If the control fails, the fixture is
+      broken, not the code.
+  (2) Run every new regression test against the PRE-FIX source and confirm it is RED —
+      `git stash push <source files only>`, leaving the tests in place, then `git stash pop`.
+      A test never observed failing is not a regression test.
+- Follow-up: the same pass surfaced that positive controls also protect against
+  over-correction — e.g. in the P1-2 dispute fix, "still revokes on a genuine loss" is what
+  stops `warning_closed → WON` from becoming "never revoke".
