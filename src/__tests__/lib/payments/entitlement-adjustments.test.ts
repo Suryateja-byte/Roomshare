@@ -24,6 +24,7 @@ import {
   recordPaymentAdjustmentMissingLink,
   recordWebhookAdjustmentReplayIgnored,
 } from "@/lib/payments/telemetry";
+import { recordAuditEvent } from "@/lib/audit/events";
 
 function buildTx() {
   return {
@@ -355,6 +356,141 @@ describe("entitlement adjustments", () => {
     expect(tx.entitlementGrant.update).toHaveBeenNthCalledWith(3, {
       where: { id: "grant-123" },
       data: { status: "REVOKED" },
+    });
+  });
+
+  /**
+   * P1-2 regression. resolveDisputeStatus mapped every closed dispute that was
+   * not exactly status==='won' to LOST, and the LOST path revokes the grant.
+   * Stripe closes an inquiry/retrieval request with status 'warning_closed' and
+   * NO money movement — per the Stripe SDK, charge.dispute.closed fires for
+   * 'lost', 'warning_closed' or 'won'. The buyer keeps paying nothing back, the
+   * merchant keeps the money, and the buyer permanently loses the pass they
+   * paid for, with only the WON branch able to restore it.
+   */
+  describe("charge.dispute.closed outcomes (P1-2)", () => {
+    function freezeThenClose(status: string) {
+      jest.useFakeTimers({ now: new Date("2026-04-15T00:00:00.000Z") });
+
+      const tx = buildTx();
+      tx.payment.findFirst.mockResolvedValue({
+        id: "payment-123",
+        userId: "user-123",
+        productCode: "MOVERS_PASS_30D",
+        amount: new Prisma.Decimal("9.99"),
+        currency: "usd",
+        metadata: { stripeLatestChargeId: "ch_123" },
+      });
+      tx.paymentDispute.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: "dispute-row-123", status: "OPEN" });
+      tx.paymentDispute.create.mockResolvedValue({
+        id: "dispute-row-123",
+        status: "OPEN",
+      });
+      tx.paymentDispute.update.mockResolvedValue({
+        id: "dispute-row-123",
+        status: "WON",
+      });
+
+      const grant = (grantStatus: string) => ({
+        id: "grant-123",
+        status: grantStatus,
+        grantType: "PASS",
+        creditCount: null,
+        activeFrom: new Date("2026-04-01T00:00:00.000Z"),
+        activeUntil: new Date("2026-05-01T00:00:00.000Z"),
+        paymentId: "payment-123",
+        productCode: "MOVERS_PASS_30D",
+        contactKind: "MESSAGE_START",
+      });
+      tx.entitlementGrant.findUnique
+        .mockResolvedValueOnce(grant("ACTIVE"))
+        .mockResolvedValueOnce(grant("FROZEN"));
+
+      const dispute = (disputeStatus: string) =>
+        ({
+          id: "dp_123",
+          amount: 999,
+          currency: "usd",
+          charge: "ch_123",
+          payment_intent: null,
+          status: disputeStatus,
+          reason: "fraudulent",
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any;
+
+      return {
+        tx,
+        run: async () => {
+          await handleDisputeEvent(tx, {
+            eventType: "charge.dispute.created",
+            dispute: dispute("warning_needs_response"),
+          });
+          await handleDisputeEvent(tx, {
+            eventType: "charge.dispute.closed",
+            dispute: dispute(status),
+          });
+        },
+      };
+    }
+
+    it("restores the grant when an inquiry closes with warning_closed", async () => {
+      const { tx, run } = freezeThenClose("warning_closed");
+
+      await run();
+
+      expect(tx.entitlementGrant.update).toHaveBeenNthCalledWith(1, {
+        where: { id: "grant-123" },
+        data: { status: "FROZEN" },
+      });
+      // No money moved, so the paid entitlement must come back — not be revoked.
+      expect(tx.entitlementGrant.update).toHaveBeenNthCalledWith(2, {
+        where: { id: "grant-123" },
+        data: { status: "ACTIVE" },
+      });
+      expect(tx.entitlementGrant.update).toHaveBeenCalledTimes(2);
+    });
+
+    it("records the true Stripe status on the resolution audit event", async () => {
+      const { run } = freezeThenClose("warning_closed");
+
+      await run();
+
+      // The lifecycle column says WON; the audit trail must not imply a
+      // chargeback that never happened.
+      expect(recordAuditEvent).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          kind: "DISPUTE_RESOLVED",
+          details: expect.objectContaining({
+            status: "WON",
+            stripeStatus: "warning_closed",
+          }),
+        })
+      );
+    });
+
+    it("still revokes the grant on a genuine loss", async () => {
+      const { tx, run } = freezeThenClose("lost");
+
+      await run();
+
+      expect(tx.entitlementGrant.update).toHaveBeenNthCalledWith(2, {
+        where: { id: "grant-123" },
+        data: { status: "REVOKED" },
+      });
+    });
+
+    it("still restores the grant on a genuine win", async () => {
+      const { tx, run } = freezeThenClose("won");
+
+      await run();
+
+      expect(tx.entitlementGrant.update).toHaveBeenNthCalledWith(2, {
+        where: { id: "grant-123" },
+        data: { status: "ACTIVE" },
+      });
     });
   });
 
