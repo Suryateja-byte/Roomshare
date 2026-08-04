@@ -119,7 +119,21 @@ function resolveDisputeStatus(
     return "OPEN";
   }
 
-  return dispute.status === "won" ? "WON" : "LOST";
+  // charge.dispute.closed fires for exactly three statuses: 'won',
+  // 'warning_closed' and 'lost'. 'warning_closed' is an inquiry / retrieval
+  // request that closed WITHOUT becoming a chargeback — no funds were
+  // withdrawn — so the frozen entitlement must be restored, not revoked.
+  // Mapping it to LOST permanently revoked a legitimately paid grant, and only
+  // the WON branch can restore one.
+  //
+  // 'prevented' is deliberately left on the LOST path: under Rapid Dispute
+  // Resolution the charge IS refunded, so revocation (or the refund webhook)
+  // is the correct outcome there.
+  if (dispute.status === "won" || dispute.status === "warning_closed") {
+    return "WON";
+  }
+
+  return "LOST";
 }
 
 export function calculatePackGrantAfterRefund(input: {
@@ -699,6 +713,11 @@ export async function handleDisputeEvent(
       details: {
         paymentId: payment.id,
         status: disputeStatus,
+        // PaymentDisputeStatus has no state for an inquiry, so a
+        // 'warning_closed' resolution is stored as WON. Record the raw Stripe
+        // status alongside it so the audit trail never implies a chargeback
+        // that never happened.
+        stripeStatus: input.dispute.status ?? null,
       },
     });
   }
