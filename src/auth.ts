@@ -58,7 +58,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   // Audit logging for security-sensitive events
   events: {
-    async linkAccount({ user, account, profile }) {
+    // `profile` is deliberately not destructured: it is the normalized profile here, not
+    // the OIDC claims, and reading email_verified off it is the P0-R2 defect. See below.
+    async linkAccount({ user, account }) {
       // Log when OAuth account is linked to existing user (for audit trail)
       // Never log providerAccountId (PII)
       logger.sync.info("OAuth account linked", {
@@ -66,18 +68,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         provider: account.provider,
       });
 
-      // P0-1b: @auth/core hardcodes createUser({ ...profile, emailVerified: null })
-      // (handle-login.js:259), and the only other writer of emailVerified is the emailed
+      // P0-R2: @auth/core hardcodes createUser({ ...profile, emailVerified: null })
+      // (handle-login.js:260), and the only other writer of emailVerified is the emailed
       // verification token — which a Google user never receives. Without this, every
-      // Google-only account stays permanently unverified and is blocked from creating
-      // listings, messaging, reviewing and reporting.
+      // Google-only account stays permanently unverified and is blocked from messaging,
+      // reviewing and reporting.
       //
-      // linkAccount is used rather than createUser because only it receives `profile`,
-      // which carries the email_verified claim. `user` here is the persisted row.
-      if (
-        account.provider === "google" &&
-        isGoogleEmailVerified(profile as { email_verified?: boolean })
-      ) {
+      // Do NOT gate this on `profile.email_verified`. This event receives the NORMALIZED
+      // profile: Google declares no custom profile(), so @auth/core's defaultProfile
+      // (lib/utils/providers.js:78-84) returns only {id, name, email, image} and strips the
+      // OIDC claim before the event fires. The first version of this fix checked it here
+      // and was therefore dead code — the write never ran once in production.
+      //
+      // The claim is asserted one step earlier instead: the signIn callback below hard-
+      // returns `${AUTH_ROUTES.signIn}?error=EmailNotVerified` for any Google profile
+      // without email_verified === true, and @auth/core runs handleAuthorized
+      // (callback/index.js:63) BEFORE handleLoginOrRegister (:70) — which is what links the
+      // account and emits this event. Reaching here with provider "google" IS the proof.
+      if (account.provider === "google") {
         try {
           await prisma.user.updateMany({
             where: { id: user.id, emailVerified: null },
@@ -273,6 +281,33 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               userId: dbUser.id,
             });
             return `${AUTH_ROUTES.signIn}?error=OAuthAccountNotLinked`;
+          }
+
+          // FL-3: a row that ALREADY carries a linked Google account cannot be a squat —
+          // the rightful owner would have had to link it themselves. Without this
+          // discriminator, a Google-first user who later adds a password via
+          // forgot-password (which does not require an existing one, see
+          // forgot-password/route.ts:97-99) looks identical to a squat, and has that
+          // password silently nulled on their next Google sign-in.
+          let linkedGoogleAccounts: number;
+          try {
+            linkedGoogleAccounts = await prisma.account.count({
+              where: { userId: dbUser.id, provider: "google" },
+            });
+          } catch (error) {
+            // Fail closed WITHOUT mutating. Refusing one sign-in is recoverable; nulling a
+            // legitimate password, or admitting a squat, is not.
+            logger.sync.error("Google link blocked: linked-account lookup failed", {
+              userId: dbUser.id,
+              error: sanitizeErrorMessage(error),
+            });
+            return `${AUTH_ROUTES.signIn}?error=OAuthAccountNotLinked`;
+          }
+
+          if (linkedGoogleAccounts > 0) {
+            // Returning user who added a password to their own Google account. The
+            // remainder of this callback is just `return true`.
+            return true;
           }
 
           // Guarded update, not a blind one: re-assert the preconditions in the WHERE so

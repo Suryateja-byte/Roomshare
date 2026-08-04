@@ -424,7 +424,10 @@ const clientEnvSchema = z
     // Cloudflare Turnstile (bot protection - required in production)
     NEXT_PUBLIC_TURNSTILE_SITE_KEY: z.string().optional(),
 
-    // App URL (used for metadataBase, sitemap, robots, structured data)
+    // App URL (used for metadataBase, sitemap, robots, structured data, and every
+    // transactional email CTA — see src/lib/email-templates.ts). Optional by design:
+    // instrumentation.ts calls getServerEnv() at boot, so making it required would brick
+    // any deploy where it is unset. logStartupWarnings() reports an unset value instead.
     NEXT_PUBLIC_APP_URL: z.string().url().optional(),
   })
   .superRefine((data, ctx) => {
@@ -962,6 +965,17 @@ export function logStartupWarnings(): void {
   if (features.semanticSearch && !process.env.GEMINI_API_KEY) {
     warnings.push(
       "GEMINI_API_KEY not set - semantic search enabled but unavailable"
+    );
+  }
+  // Every transactional email CTA is built from this. It is deliberately a warning and
+  // not a hard schema requirement: instrumentation.ts calls getServerEnv() at boot, so
+  // promoting it would brick the app on any deploy where it is not already set. The
+  // consumers all fall back to the production origin, so an unset value is recoverable —
+  // but it is silent on every observable surface (sitemap, robots and metadataBase keep
+  // working), which is why it needs to be said out loud here.
+  if (!process.env.NEXT_PUBLIC_APP_URL) {
+    warnings.push(
+      "NEXT_PUBLIC_APP_URL not set - falling back to the default origin for email links, metadataBase, sitemap and robots"
     );
   }
 

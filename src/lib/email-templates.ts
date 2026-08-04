@@ -1,6 +1,10 @@
 // Email templates (client-safe, no 'use server')
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+// Falls back to the production origin, matching every other NEXT_PUBLIC_APP_URL
+// consumer (src/app/layout.tsx:36, sitemap.ts:40, robots.ts:4). A localhost
+// fallback here was invisible on every observable surface while silently
+// shipping unreachable links to real inboxes.
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://roomshare.app";
 const HTML_ESCAPE_MAP: Record<string, string> = {
   "&": "&amp;",
   "<": "&lt;",
@@ -17,8 +21,27 @@ function sanitizeSubject(value: string): string {
   return value.replace(/[\r\n]+/g, " ").trim();
 }
 
-function buildAppHref(path: string): string {
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+function buildAppHref(pathOrUrl: string): string {
+  // Callers pass either an app-relative path (most templates) or an already
+  // fully-qualified URL — password reset and email verification build theirs from
+  // AUTH_URL/NEXTAUTH_URL, which need not equal APP_URL. Prefixing an absolute URL
+  // produced `${APP_URL}/https://host/...`, whose pathname is `/https://host/...`,
+  // so every reset and verification link 404'd and no user could ever reach
+  // emailVerified. Absolute input is therefore passed through as-is.
+  if (/^https?:\/\//i.test(pathOrUrl)) {
+    return escapeHtml(pathOrUrl);
+  }
+
+  // Any other scheme (javascript:, data:, vbscript:, mailto:) is refused rather
+  // than prefixed into an href. Nothing passes one today; passing absolute URLs
+  // through means that has to be enforced deliberately instead of falling out of
+  // the prefixing. A relative path cannot match this: the `/` in `listings/a:b`
+  // precedes the colon, so the scheme pattern fails.
+  if (/^[a-z][a-z0-9+.-]*:/i.test(pathOrUrl)) {
+    return escapeHtml(APP_URL);
+  }
+
+  const normalizedPath = pathOrUrl.startsWith("/") ? pathOrUrl : `/${pathOrUrl}`;
   return escapeHtml(`${APP_URL}${normalizedPath}`);
 }
 
