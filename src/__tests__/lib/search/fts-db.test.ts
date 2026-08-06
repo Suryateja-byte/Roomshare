@@ -14,7 +14,9 @@
 
 import { prisma } from "@/lib/prisma";
 
-const runDbTests = process.env.RUN_DB_ASSERTIONS === "1";
+// Accept both spellings: CI sets "1", and ".env.example" documented "true" for
+// long enough that following the docs silently disabled these seven assertions.
+const runDbTests = ["1", "true"].includes(process.env.RUN_DB_ASSERTIONS ?? "");
 const describeDb = runDbTests ? describe : describe.skip;
 
 // Unique prefix to identify test rows for cleanup

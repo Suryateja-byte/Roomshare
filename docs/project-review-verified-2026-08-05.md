@@ -859,6 +859,26 @@ artifact — pre-launch dummy data mutes the data-loss angle but the code-level 
 
 ### CI & test integrity
 
+> ### ✅ Fixed (2026-08-06) — branch `fix/ci-real-db-gap`
+>
+> `migrate-check` (renamed **Migrations & DB tests**) now runs the four env-gated suites against the
+> PostGIS+pgvector service it already stands up, with `REAL_DB_URL` / `DATABASE_URL` / `RUN_DB_ASSERTIONS`
+> set — so they execute against the schema those very migrations just produced. It is already in
+> `build.needs`, and `build` feeds the required `CI` check, so a failure now blocks merge.
+>
+> **The report's suggested fix was wrong** and was not followed: these suites cannot be ported to PGlite.
+> `payment-webhook-concurrency.test.ts` documents in its own header that PGlite is single-connection and
+> so cannot prove the advisory-lock behaviour, and `alert-bounds-postgis.test.ts` needs real PostGIS.
+> A real Postgres service was the only workable route — and `ci.yml` already had one.
+>
+> `ci-test-coverage.test.ts` gains the guard for the *class*: a suite that gates itself on an env var must
+> be run by a build-gated job that actually provides it. Enumeration is not execution. Verified RED against
+> the pre-fix `ci.yml` (it names all four files and their gates) and green after. FE-6 drift fixed too:
+> the gate now accepts `1` or `true`, and `.env.example` documents `1`.
+>
+> ⚠️ These suites had **never executed in CI**, so their first real run is this PR. Typecheck rules out API
+> drift, but SQL/runtime semantics are unproven until CI reports.
+
 **V-P2-35. The real-Postgres regression proofs for P0-3/P0-4/P1-5 are describe.skip in every CI run because REAL_DB_URL is set in no workflow**  
 <sub>was `R2-FL-4-FE-1` · `.github/workflows/`, `src/__tests__/db/contact-paywall-idempotency.test.ts:27`</sub>
 
