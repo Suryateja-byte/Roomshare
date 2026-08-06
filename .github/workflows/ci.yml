@@ -40,8 +40,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
 
+  # Also runs the database-backed suites. They live here rather than in a job of
+  # their own so they exercise the schema these very migrations just produced,
+  # and because the PostGIS + pgvector service is already stood up.
   migrate-check:
-    name: Migration Validation
+    name: Migrations & DB tests
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -74,6 +77,23 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/roomshare_migrate_test
         run: pnpm exec prisma migrate deploy
+      # These suites gate themselves on REAL_DB_URL / RUN_DB_ASSERTIONS and are
+      # `describe.skip` without them. They are the only proofs of SQL semantics
+      # that unit tests cannot reach: the contact-paywall idempotency scope, the
+      # alert-bounds PostGIS predicate, and the Stripe webhook concurrency lock
+      # (which needs two real connections, so it cannot be a PGlite test).
+      # ci-test-coverage.test.ts fails if this step stops providing a gate, so a
+      # newly added env-gated suite must be listed here or CI goes red.
+      # Listed explicitly rather than by directory: the rest of src/__tests__/db
+      # needs no database and already runs in test-rest.
+      # Serial: they share one database and clean up by fixed ids.
+      - name: Run database-backed suites
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/roomshare_migrate_test
+          REAL_DB_URL: postgresql://postgres:postgres@localhost:5432/roomshare_migrate_test
+          RUN_DB_ASSERTIONS: '1'
+          NODE_OPTIONS: '--experimental-vm-modules'
+        run: pnpm jest --ci --maxWorkers=1 src/__tests__/db/alert-bounds-postgis.test.ts src/__tests__/db/contact-paywall-idempotency.test.ts src/__tests__/db/payment-webhook-concurrency.test.ts src/__tests__/lib/search/fts-db.test.ts
 
   # Unit tests - fast, isolated tests
   test-unit:

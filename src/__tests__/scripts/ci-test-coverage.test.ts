@@ -88,6 +88,127 @@ function toArgv(command: string): string[] {
   return tokens.map((token) => token.replace(/"/g, ""));
 }
 
+/**
+ * Extract each job's raw text block, keyed by job name. Same deliberate
+ * line-scanner tradeoff as parseJestInvocations. Top-level keys under `on:` land
+ * in here too ("push"), which is harmless: lookups only ever use real job names
+ * taken from the build gate's `needs`.
+ */
+function parseJobBlocks(workflow: string): Map<string, string> {
+  const blocks = new Map<string, string>();
+  let currentJob = "";
+  let buffer: string[] = [];
+
+  const flush = () => {
+    if (currentJob) blocks.set(currentJob, buffer.join("\n"));
+  };
+
+  for (const line of workflow.split("\n")) {
+    const jobMatch = /^ {2}([A-Za-z0-9_-]+):\s*$/.exec(line);
+    if (jobMatch) {
+      flush();
+      currentJob = jobMatch[1];
+      buffer = [];
+      continue;
+    }
+    if (currentJob) buffer.push(line);
+  }
+  flush();
+
+  return blocks;
+}
+
+/** Does this job's block define `VAR:` anywhere (job-level or step-level env)? */
+function jobProvidesEnv(block: string, varName: string): boolean {
+  return new RegExp(`^\\s+${varName}:`, "m").test(block);
+}
+
+/**
+ * Env vars a suite reads to decide whether to run at all. Matched on the
+ * assignment form these gates use — `const X = process.env.FOO`, optionally
+ * wrapped (`Boolean(...)`) or compared (`=== "1"`) — and only for files that
+ * actually contain a `describe.skip`, so an ordinary `process.env` read is not
+ * mistaken for a gate.
+ *
+ * A bare `describe.skip` with no env var (a deliberately retired suite, e.g.
+ * create-listing.test.ts) yields no gates and is intentionally not flagged.
+ */
+const ENV_GATE_ASSIGNMENT = /(?:const|let)\s+\w+\s*=\s*[^;\n]*process\.env\.([A-Za-z0-9_]+)/g;
+const NON_GATE_ENV = new Set(["NODE_ENV", "CI"]);
+
+/**
+ * Comments are stripped before scanning: a gate that only appears in prose is
+ * not a gate. (Without this, this very file self-reports, because the doc above
+ * spells out the pattern it looks for.) The `[^:]` guard keeps `https://` URLs
+ * from being read as line comments.
+ */
+function stripComments(source: string): string {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+}
+
+function envGatesFor(file: string): string[] {
+  const source = stripComments(
+    fs.readFileSync(path.join(REPO_ROOT, file), "utf8")
+  );
+  if (!source.includes("describe.skip")) return [];
+
+  const gates = new Set<string>();
+  for (const match of source.matchAll(ENV_GATE_ASSIGNMENT)) {
+    if (!NON_GATE_ENV.has(match[1])) gates.add(match[1]);
+  }
+  return [...gates];
+}
+
+/**
+ * `jest.setup.js` mocks this module for every suite in the repo, so a test that
+ * imports it never touches a database no matter what it is pointed at.
+ */
+const MOCKED_PRISMA_MODULE = "@/lib/prisma";
+const DB_SUITE_DIR = "src/__tests__/db/";
+
+/**
+ * A suite that gates itself on an env var, or lives in the db directory, is
+ * talking to a real database and is held to the two rules below.
+ */
+function isDatabaseBacked(file: string): boolean {
+  return file.startsWith(DB_SUITE_DIR) || envGatesFor(file).length > 0;
+}
+
+/**
+ * Narrower than isDatabaseBacked: a suite that actually opens a client. Some
+ * files under src/__tests__/db only read migration SQL as text through `fs` and
+ * never connect, so they are held to no environment requirement.
+ */
+function connectsToDatabase(file: string): boolean {
+  const source = stripComments(
+    fs.readFileSync(path.join(REPO_ROOT, file), "utf8")
+  );
+  return /new\s+PrismaClient\s*\(/.test(source) || /new\s+PGlite\s*\(/.test(source);
+}
+
+/**
+ * jest.config.js sets jsdom for the whole repo, and jsdom has no `setImmediate`,
+ * which Prisma's engine calls during `$disconnect()`. A database suite without
+ * this pragma fails to run even when every assertion in it passes.
+ */
+function declaresNodeEnvironment(file: string): boolean {
+  const source = fs.readFileSync(path.join(REPO_ROOT, file), "utf8");
+  const firstDocblock = /^\s*\/\*\*[\s\S]*?\*\//.exec(source)?.[0] ?? "";
+  return /@jest-environment\s+node/.test(firstDocblock);
+}
+
+function importsMockedPrisma(file: string): boolean {
+  const source = stripComments(
+    fs.readFileSync(path.join(REPO_ROOT, file), "utf8")
+  );
+  return (
+    new RegExp(`from\\s+["']${MOCKED_PRISMA_MODULE}["']`).test(source) ||
+    new RegExp(`require\\(\\s*["']${MOCKED_PRISMA_MODULE}["']`).test(source)
+  );
+}
+
 async function listTestsFor(command: string): Promise<string[]> {
   // Drop the `pnpm` prefix and run jest directly; --listTests resolves the file
   // set without executing anything.
@@ -113,30 +234,138 @@ async function listTestsFor(command: string): Promise<string[]> {
     .map((absolute) => path.relative(REPO_ROOT, absolute));
 }
 
-describe("CI test coverage", () => {
-  // Spawns ~12 short-lived jest --listTests processes in parallel.
-  jest.setTimeout(120_000);
+interface Resolution {
+  buildNeeds: string[];
+  gatedInvocations: JestInvocation[];
+  /** Files each gated invocation would run, positionally aligned with it. */
+  perInvocation: string[][];
+  allTests: string[];
+  jobBlocks: Map<string, string>;
+}
 
-  it("runs every test file in at least one build-gated job", async () => {
+/**
+ * Resolving the file set costs ~12 jest processes; both tests need the same
+ * answer, so do it once.
+ */
+let resolution: Promise<Resolution> | undefined;
+
+function resolveCiCoverage(): Promise<Resolution> {
+  resolution ??= (async () => {
     const workflow = readWorkflow();
     const buildNeeds = parseBuildNeeds(workflow);
     const gatedInvocations = parseJestInvocations(workflow).filter(
       (invocation) => buildNeeds.includes(invocation.job)
     );
 
-    expect(gatedInvocations.length).toBeGreaterThan(0);
-
-    const [allTests, ...coveredPerJob] = await Promise.all([
+    const [allTests, ...perInvocation] = await Promise.all([
       listTestsFor("pnpm jest"),
       ...gatedInvocations.map((invocation) => listTestsFor(invocation.command)),
     ]);
 
-    const covered = new Set(coveredPerJob.flat());
+    return {
+      buildNeeds,
+      gatedInvocations,
+      perInvocation,
+      allTests,
+      jobBlocks: parseJobBlocks(workflow),
+    };
+  })();
+
+  return resolution;
+}
+
+describe("CI test coverage", () => {
+  // Spawns ~12 short-lived jest --listTests processes in parallel.
+  jest.setTimeout(120_000);
+
+  it("runs every test file in at least one build-gated job", async () => {
+    const { gatedInvocations, perInvocation, allTests } =
+      await resolveCiCoverage();
+
+    expect(gatedInvocations.length).toBeGreaterThan(0);
+
+    const covered = new Set(perInvocation.flat());
     const uncovered = allTests.filter((file) => !covered.has(file)).sort();
 
     expect({ count: uncovered.length, files: uncovered }).toEqual({
       count: 0,
       files: [],
     });
+  });
+
+  /**
+   * Enumeration is not execution (FL-4 regression).
+   *
+   * The assertion above proves every file is *listed* by some build-gated job.
+   * It cannot see that a suite gated on `process.env.REAL_DB_URL` resolves to
+   * `describe.skip` in every one of those jobs, because no workflow set that
+   * variable — so the real-Postgres proofs for the contact-paywall idempotency
+   * scope, the alert-bounds PostGIS predicate and the Stripe webhook concurrency
+   * lock contributed nothing to the merge gate while appearing covered.
+   *
+   * This asserts the stronger property: a suite that gates itself on an env var
+   * must be run by a build-gated job that actually provides it.
+   */
+  it("provides the env gate for every suite that would otherwise skip entirely", async () => {
+    const { gatedInvocations, perInvocation, allTests, jobBlocks } =
+      await resolveCiCoverage();
+
+    const dark: Array<{ file: string; gate: string }> = [];
+
+    for (const file of allTests) {
+      for (const gate of envGatesFor(file)) {
+        const runsWithGate = gatedInvocations.some(
+          (invocation, index) =>
+            perInvocation[index].includes(file) &&
+            jobProvidesEnv(jobBlocks.get(invocation.job) ?? "", gate)
+        );
+        if (!runsWithGate) dark.push({ file, gate });
+      }
+    }
+
+    expect(dark.sort((a, b) => a.file.localeCompare(b.file))).toEqual([]);
+  });
+
+  /**
+   * Running is not testing.
+   *
+   * `fts-db.test.ts` imported the prisma singleton from `@/lib/prisma`, which
+   * jest.setup.js mocks for every suite in the repo. Its seven "database
+   * assertions" therefore ran against a mock whose `$queryRaw` resolves to `[]`
+   * — they could not have passed even once the gate above was provided, and the
+   * first CI run reported `Expected length: 1, Received array: []` with no SQL
+   * error anywhere in the Postgres log.
+   *
+   * A suite that talks to a real database must construct its own client (as the
+   * three suites in src/__tests__/db already do). If a genuine exception ever
+   * arises, add it here with the reason rather than weakening the rule.
+   */
+  it("keeps database-backed suites off the globally mocked prisma singleton", async () => {
+    const { allTests } = await resolveCiCoverage();
+
+    const offenders = allTests
+      .filter(isDatabaseBacked)
+      .filter(importsMockedPrisma)
+      .sort();
+
+    expect(offenders).toEqual([]);
+  });
+
+  /**
+   * The third way a suite can look covered without being covered: it runs, it
+   * talks to a real database, every assertion passes — and the suite still fails
+   * to run, because `$disconnect()` needs `setImmediate` and the default jsdom
+   * environment has none. That is how fts-db failed after both other defects in
+   * it were fixed.
+   */
+  it("runs database-backed suites in the node environment", async () => {
+    const { allTests } = await resolveCiCoverage();
+
+    const offenders = allTests
+      .filter(connectsToDatabase)
+      .filter((file) => !declaresNodeEnvironment(file))
+      .sort();
+
+    expect(offenders).toEqual([]);
   });
 });

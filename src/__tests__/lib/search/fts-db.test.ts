@@ -1,4 +1,12 @@
 /**
+ * @jest-environment node
+ *
+ * Required, not decorative: jest.config.js sets jsdom globally, and jsdom has no
+ * `setImmediate`, which Prisma's engine calls during $disconnect. Without this the
+ * suite fails to run with `ReferenceError: setImmediate is not defined` even when
+ * every assertion in it passes. The three sibling suites in src/__tests__/db all
+ * declare it for the same reason.
+ *
  * Full-Text Search (FTS) Database Assertions
  *
  * Self-contained tests that verify FTS infrastructure directly against PostgreSQL.
@@ -12,15 +20,26 @@
  * @see prisma/migrations/20260116000000_search_doc_fts/migration.sql
  */
 
-import { prisma } from "@/lib/prisma";
+import { PrismaClient } from "@prisma/client";
 
-const runDbTests = process.env.RUN_DB_ASSERTIONS === "1";
+// Deliberately NOT `@/lib/prisma`: jest.setup.js mocks that module globally
+// (jest.setup.js:230), so every assertion below used to run against a jest mock
+// whose $queryRaw resolves to []. These seven checks could not have passed even
+// with the gate set — they were dead twice over. The three sibling suites in
+// src/__tests__/db construct their own client for exactly this reason.
+const DB_URL = process.env.REAL_DB_URL ?? process.env.DATABASE_URL;
+
+// Accept both spellings: CI sets "1", and ".env.example" documented "true" for
+// long enough that following the docs silently disabled these seven assertions.
+const runDbTests = ["1", "true"].includes(process.env.RUN_DB_ASSERTIONS ?? "");
 const describeDb = runDbTests ? describe : describe.skip;
 
 // Unique prefix to identify test rows for cleanup
 const TEST_PREFIX = `fts-test-${Date.now()}`;
 
 describeDb("FTS Database Assertions", () => {
+  const prisma = new PrismaClient({ datasourceUrl: DB_URL });
+
   // Track created IDs for cleanup
   const createdListingIds: string[] = [];
   const createdUserIds: string[] = [];
@@ -176,9 +195,10 @@ describeDb("FTS Database Assertions", () => {
   describe("CHECK 3: Null-safe tsvector build", () => {
     it("row with empty description still has valid search_tsv", async () => {
       const userId = await createTestUser("nullsafe-1");
-      const listingId = await createTestListing("nullsafe-1", userId, {
-        description: "",
-      });
+      // The parent Listing keeps a valid description — chk_description_length
+      // requires 10-1000 chars. The empty description under test belongs on the
+      // listing_search_docs row below, which is the one the tsvector trigger reads.
+      const listingId = await createTestListing("nullsafe-1", userId);
 
       await createTestSearchDoc(listingId, userId, {
         title: "Sunny Beach House",
@@ -199,9 +219,10 @@ describeDb("FTS Database Assertions", () => {
 
     it("row with empty description matches on title", async () => {
       const userId = await createTestUser("nullsafe-2");
+      // As above: the empty description under test is on the search doc, not the
+      // Listing, which must satisfy chk_description_length.
       const listingId = await createTestListing("nullsafe-2", userId, {
         title: "Cozy Mountain Cabin",
-        description: "",
       });
 
       await createTestSearchDoc(listingId, userId, {
