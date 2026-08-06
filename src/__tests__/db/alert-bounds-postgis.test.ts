@@ -47,8 +47,11 @@ describeRealDb("alert bounds predicate — real PostGIS", () => {
       INSERT INTO "Listing" (id, "ownerId", title, description, price, status,
                              "totalSlots", "availableSlots", "createdAt", "updatedAt",
                              amenities, "houseRules", images)
-      VALUES (${id}, ${OWNER_ID}, 'Test', 'Test', 1000, 'ACTIVE',
-              1, 1, now(), now(), '{}', '{}', '{}')
+      -- description must be 10-1000 chars: chk_description_length, added in
+      -- 20260301000000_add_check_constraints. 'Test' violated it, which is what
+      -- kept this suite red the first time it ever executed in CI.
+      VALUES (${id}, ${OWNER_ID}, 'Test', 'Seeded for the alert-bounds PostGIS predicate test.',
+              1000, 'ACTIVE', 1, 1, now(), now(), '{}', '{}', '{}')
       ON CONFLICT (id) DO NOTHING
     `;
     // coords is a PostGIS geometry column: Prisma cannot write it, so raw SQL.

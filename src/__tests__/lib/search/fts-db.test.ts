@@ -12,7 +12,14 @@
  * @see prisma/migrations/20260116000000_search_doc_fts/migration.sql
  */
 
-import { prisma } from "@/lib/prisma";
+import { PrismaClient } from "@prisma/client";
+
+// Deliberately NOT `@/lib/prisma`: jest.setup.js mocks that module globally
+// (jest.setup.js:230), so every assertion below used to run against a jest mock
+// whose $queryRaw resolves to []. These seven checks could not have passed even
+// with the gate set — they were dead twice over. The three sibling suites in
+// src/__tests__/db construct their own client for exactly this reason.
+const DB_URL = process.env.REAL_DB_URL ?? process.env.DATABASE_URL;
 
 // Accept both spellings: CI sets "1", and ".env.example" documented "true" for
 // long enough that following the docs silently disabled these seven assertions.
@@ -23,6 +30,8 @@ const describeDb = runDbTests ? describe : describe.skip;
 const TEST_PREFIX = `fts-test-${Date.now()}`;
 
 describeDb("FTS Database Assertions", () => {
+  const prisma = new PrismaClient({ datasourceUrl: DB_URL });
+
   // Track created IDs for cleanup
   const createdListingIds: string[] = [];
   const createdUserIds: string[] = [];
