@@ -1,4 +1,12 @@
 /**
+ * @jest-environment node
+ *
+ * Required, not decorative: jest.config.js sets jsdom globally, and jsdom has no
+ * `setImmediate`, which Prisma's engine calls during $disconnect. Without this the
+ * suite fails to run with `ReferenceError: setImmediate is not defined` even when
+ * every assertion in it passes. The three sibling suites in src/__tests__/db all
+ * declare it for the same reason.
+ *
  * Full-Text Search (FTS) Database Assertions
  *
  * Self-contained tests that verify FTS infrastructure directly against PostgreSQL.

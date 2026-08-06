@@ -168,6 +168,37 @@ function envGatesFor(file: string): string[] {
 const MOCKED_PRISMA_MODULE = "@/lib/prisma";
 const DB_SUITE_DIR = "src/__tests__/db/";
 
+/**
+ * A suite that gates itself on an env var, or lives in the db directory, is
+ * talking to a real database and is held to the two rules below.
+ */
+function isDatabaseBacked(file: string): boolean {
+  return file.startsWith(DB_SUITE_DIR) || envGatesFor(file).length > 0;
+}
+
+/**
+ * Narrower than isDatabaseBacked: a suite that actually opens a client. Some
+ * files under src/__tests__/db only read migration SQL as text through `fs` and
+ * never connect, so they are held to no environment requirement.
+ */
+function connectsToDatabase(file: string): boolean {
+  const source = stripComments(
+    fs.readFileSync(path.join(REPO_ROOT, file), "utf8")
+  );
+  return /new\s+PrismaClient\s*\(/.test(source) || /new\s+PGlite\s*\(/.test(source);
+}
+
+/**
+ * jest.config.js sets jsdom for the whole repo, and jsdom has no `setImmediate`,
+ * which Prisma's engine calls during `$disconnect()`. A database suite without
+ * this pragma fails to run even when every assertion in it passes.
+ */
+function declaresNodeEnvironment(file: string): boolean {
+  const source = fs.readFileSync(path.join(REPO_ROOT, file), "utf8");
+  const firstDocblock = /^\s*\/\*\*[\s\S]*?\*\//.exec(source)?.[0] ?? "";
+  return /@jest-environment\s+node/.test(firstDocblock);
+}
+
 function importsMockedPrisma(file: string): boolean {
   const source = stripComments(
     fs.readFileSync(path.join(REPO_ROOT, file), "utf8")
@@ -313,10 +344,26 @@ describe("CI test coverage", () => {
     const { allTests } = await resolveCiCoverage();
 
     const offenders = allTests
-      .filter(
-        (file) => file.startsWith(DB_SUITE_DIR) || envGatesFor(file).length > 0
-      )
+      .filter(isDatabaseBacked)
       .filter(importsMockedPrisma)
+      .sort();
+
+    expect(offenders).toEqual([]);
+  });
+
+  /**
+   * The third way a suite can look covered without being covered: it runs, it
+   * talks to a real database, every assertion passes — and the suite still fails
+   * to run, because `$disconnect()` needs `setImmediate` and the default jsdom
+   * environment has none. That is how fts-db failed after both other defects in
+   * it were fixed.
+   */
+  it("runs database-backed suites in the node environment", async () => {
+    const { allTests } = await resolveCiCoverage();
+
+    const offenders = allTests
+      .filter(connectsToDatabase)
+      .filter((file) => !declaresNodeEnvironment(file))
       .sort();
 
     expect(offenders).toEqual([]);
