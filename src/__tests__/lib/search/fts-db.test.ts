@@ -187,9 +187,10 @@ describeDb("FTS Database Assertions", () => {
   describe("CHECK 3: Null-safe tsvector build", () => {
     it("row with empty description still has valid search_tsv", async () => {
       const userId = await createTestUser("nullsafe-1");
-      const listingId = await createTestListing("nullsafe-1", userId, {
-        description: "",
-      });
+      // The parent Listing keeps a valid description — chk_description_length
+      // requires 10-1000 chars. The empty description under test belongs on the
+      // listing_search_docs row below, which is the one the tsvector trigger reads.
+      const listingId = await createTestListing("nullsafe-1", userId);
 
       await createTestSearchDoc(listingId, userId, {
         title: "Sunny Beach House",
@@ -210,9 +211,10 @@ describeDb("FTS Database Assertions", () => {
 
     it("row with empty description matches on title", async () => {
       const userId = await createTestUser("nullsafe-2");
+      // As above: the empty description under test is on the search doc, not the
+      // Listing, which must satisfy chk_description_length.
       const listingId = await createTestListing("nullsafe-2", userId, {
         title: "Cozy Mountain Cabin",
-        description: "",
       });
 
       await createTestSearchDoc(listingId, userId, {

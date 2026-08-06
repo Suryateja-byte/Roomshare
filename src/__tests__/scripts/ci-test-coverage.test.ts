@@ -161,6 +161,23 @@ function envGatesFor(file: string): string[] {
   return [...gates];
 }
 
+/**
+ * `jest.setup.js` mocks this module for every suite in the repo, so a test that
+ * imports it never touches a database no matter what it is pointed at.
+ */
+const MOCKED_PRISMA_MODULE = "@/lib/prisma";
+const DB_SUITE_DIR = "src/__tests__/db/";
+
+function importsMockedPrisma(file: string): boolean {
+  const source = stripComments(
+    fs.readFileSync(path.join(REPO_ROOT, file), "utf8")
+  );
+  return (
+    new RegExp(`from\\s+["']${MOCKED_PRISMA_MODULE}["']`).test(source) ||
+    new RegExp(`require\\(\\s*["']${MOCKED_PRISMA_MODULE}["']`).test(source)
+  );
+}
+
 async function listTestsFor(command: string): Promise<string[]> {
   // Drop the `pnpm` prefix and run jest directly; --listTests resolves the file
   // set without executing anything.
@@ -276,5 +293,32 @@ describe("CI test coverage", () => {
     }
 
     expect(dark.sort((a, b) => a.file.localeCompare(b.file))).toEqual([]);
+  });
+
+  /**
+   * Running is not testing.
+   *
+   * `fts-db.test.ts` imported the prisma singleton from `@/lib/prisma`, which
+   * jest.setup.js mocks for every suite in the repo. Its seven "database
+   * assertions" therefore ran against a mock whose `$queryRaw` resolves to `[]`
+   * — they could not have passed even once the gate above was provided, and the
+   * first CI run reported `Expected length: 1, Received array: []` with no SQL
+   * error anywhere in the Postgres log.
+   *
+   * A suite that talks to a real database must construct its own client (as the
+   * three suites in src/__tests__/db already do). If a genuine exception ever
+   * arises, add it here with the reason rather than weakening the rule.
+   */
+  it("keeps database-backed suites off the globally mocked prisma singleton", async () => {
+    const { allTests } = await resolveCiCoverage();
+
+    const offenders = allTests
+      .filter(
+        (file) => file.startsWith(DB_SUITE_DIR) || envGatesFor(file).length > 0
+      )
+      .filter(importsMockedPrisma)
+      .sort();
+
+    expect(offenders).toEqual([]);
   });
 });
