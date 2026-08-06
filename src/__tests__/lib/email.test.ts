@@ -164,6 +164,56 @@ describe("sendEmail retry and circuit breaker (D2.2)", () => {
     expect(mockFetchWithTimeout).toHaveBeenCalledTimes(2);
   });
 
+  // Regression: Resend 4xx bodies echo the recipient address. Email-send
+  // logging must route through the redacting logger so the recipient never
+  // lands in logs (CLAUDE.md #1 non-negotiable: no raw PII in logs).
+  it("never logs the recipient address when Resend rejects it (PII redaction)", async () => {
+    const recipient = "leaked.user@example.com";
+    mockFetchWithTimeout.mockResolvedValueOnce({
+      ok: false,
+      status: 422,
+      text: async () =>
+        JSON.stringify({
+          statusCode: 422,
+          name: "validation_error",
+          message: `Invalid \`to\` field. ${recipient} is not a valid email address.`,
+        }),
+    });
+
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+    const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+
+    try {
+      const result = await sendEmail({
+        to: recipient,
+        subject: "Test",
+        html: "<p>Hi</p>",
+      });
+
+      expect(result.success).toBe(false);
+
+      const logged = [
+        ...errorSpy.mock.calls,
+        ...warnSpy.mock.calls,
+        ...logSpy.mock.calls,
+      ]
+        .flat()
+        .map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg)))
+        .join(" ");
+
+      // The recipient PII must never reach the logs.
+      expect(logged).not.toContain(recipient);
+      expect(logged).not.toContain("@example.com");
+      // The failure is still recorded, with the address redacted.
+      expect(logged).toContain("[REDACTED]");
+    } finally {
+      errorSpy.mockRestore();
+      warnSpy.mockRestore();
+      logSpy.mockRestore();
+    }
+  });
+
   // IMPORTANT: This test MUST be last — jest.isolateModules corrupts the outer circuit-breaker mock
   it("returns success in dev mode when RESEND_API_KEY is not set", async () => {
     const originalKey = process.env.RESEND_API_KEY;
