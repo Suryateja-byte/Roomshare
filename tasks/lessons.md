@@ -192,3 +192,49 @@
   8 of which were RED against the old `buildAppHref`) and the rewritten
   `linkAccount` block in `src/__tests__/lib/auth.test.ts`. Full analysis in
   `docs/full-project-review-2026-08-03-round2.md`.
+
+## 2026-08-05 — Replacing a dead guard with no guard at all
+
+- Date: 2026-08-05
+- Mistake / failure mode: #184 correctly deleted the unreachable
+  `profile.email_verified` check from `events.linkAccount` (see 2026-08-04) and put
+  **nothing** in its place. The write became `if (account.provider === "google")` →
+  stamp `emailVerified` on `user.id`, with no check that the Google identity owns
+  that row's address. `@auth/core` links an OAuth account to whatever row the
+  CURRENT SESSION resolves to (`handle-login.js:206-212`), so a squatter signed in
+  on an unverified row they registered for the victim could link their OWN Google
+  account and have it stamp `emailVerified` on the victim's address — forging the
+  trust signal and disarming the P0-1 revoke precondition in one move. The
+  account-takeover P0 that two reports and two PRs recorded as closed was live
+  again, reachable by clicking "Continue with Google" on `/signup` while signed in.
+- Detection signal: a full re-verification pass (`docs/project-review-verified-2026-08-05.md`)
+  re-derived every "fixed" claim from source instead of trusting the PR
+  descriptions. Two agents plus a tie-breaker independently reconstructed the chain.
+- Root cause: the fix was scoped to "make the write execute" rather than to "make
+  the write correct". Removing the condition made it *run*; nobody asked what it was
+  supposed to *discriminate*. The justifying comment ("Reaching here with provider
+  'google' IS the proof") is true of the profile and false of the row.
+- Prevention rule: three things.
+  (1) When you delete a guard because it is dead, state in the diff what now
+      enforces the property. "The check was unreachable" is a reason to replace it,
+      never a reason to drop it. A guard has two obligations — it must RUN and it
+      must DISCRIMINATE. Prove both.
+  (2) Any write keyed on an id supplied by a framework callback must assert that the
+      id and the *evidence* refer to the same subject. Here: `profile.email` vs the
+      linked row's email. Ask "what binds these two values together?" and if the
+      answer is "nothing", that is the bug.
+  (3) Before writing a comment that asserts what a library passes you, read the
+      installed source and cite file:line. An earlier draft of this fix justified
+      omitting `email` from a WHERE clause with "a Google-created row may be
+      mixed-case" — false: `@auth/core` lowercases at `oauth/callback.js:225`. The
+      decision was right, the stated reason was wrong, and a wrong reason in a
+      comment is what the next person acts on. (`src/auth.ts:276-278` still carries
+      an incorrect claim of the same kind about `getUserByEmail`.)
+- Follow-up: fixed on `fix/p0-google-link-takeover` — email-ownership check in
+  `events.linkAccount` (mismatch also deletes the mislinked `Account` row), a
+  containment check in the `signIn` callback for mislinks that survive, and the FL-3
+  discriminator narrowed from "any linked google account" to *this*
+  `providerAccountId`. 7 new cases in `src/__tests__/lib/auth.test.ts`, 5 of them RED
+  against the pre-fix code. Note the ~12 existing tests whose fixtures omitted
+  `profile.email`/`user.email` entirely: the cheapest way to green them would have
+  been to make the missing-value case fail open, which nullifies the whole fix.
