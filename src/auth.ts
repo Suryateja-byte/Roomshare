@@ -58,9 +58,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   // Audit logging for security-sensitive events
   events: {
-    // `profile` is deliberately not destructured: it is the normalized profile here, not
-    // the OIDC claims, and reading email_verified off it is the P0-R2 defect. See below.
-    async linkAccount({ user, account }) {
+    // `profile` here is the NORMALIZED profile, not the OIDC claims. `email_verified` is
+    // stripped from it — reading that was the P0-R2 defect — but `email` survives, and it
+    // is load-bearing for the P0-V1 ownership check below.
+    async linkAccount({ user, account, profile }) {
       // Log when OAuth account is linked to existing user (for audit trail)
       // Never log providerAccountId (PII)
       logger.sync.info("OAuth account linked", {
@@ -84,18 +85,85 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // returns `${AUTH_ROUTES.signIn}?error=EmailNotVerified` for any Google profile
       // without email_verified === true, and @auth/core runs handleAuthorized
       // (callback/index.js:63) BEFORE handleLoginOrRegister (:70) — which is what links the
-      // account and emits this event. Reaching here with provider "google" IS the proof.
+      // account and emits this event. So reaching here with provider "google" proves the
+      // claim for `profile.email` — and for that address ONLY, which is why the ownership
+      // check below exists.
       if (account.provider === "google") {
-        try {
-          await prisma.user.updateMany({
-            where: { id: user.id, emailVerified: null },
-            data: { emailVerified: new Date() },
-          });
-        } catch (error) {
-          logger.sync.warn("Failed to mark Google email as verified", {
+        // P0-V1: the claim above proves Google controls the address in `profile.email`. It
+        // says NOTHING about `user.id`, which @auth/core sets to whatever row the CURRENT
+        // SESSION resolves to (handle-login.js:206-212 links to the signed-in user with no
+        // email comparison of its own). Without the comparison below, a squatter signed in
+        // on an unverified row they registered for the victim can link their OWN Google
+        // account and have it stamp emailVerified on the victim's address — forging the
+        // trust signal and disarming the P0-1 revoke precondition in one move.
+        //
+        // `profile.email` IS readable here. defaultProfile (lib/utils/providers.js:78-84)
+        // keeps {id, name, email, image}; only `email_verified` is stripped. Note that
+        // `profile.id` is crypto.randomUUID() (oauth/callback.js:224), NOT the Google sub —
+        // do not reach for it to correlate with providerAccountId.
+        const linkedEmail = profile?.email;
+        const emailsMatch =
+          typeof linkedEmail === "string" &&
+          typeof user.email === "string" &&
+          normalizeEmail(linkedEmail) === normalizeEmail(user.email);
+
+        if (emailsMatch) {
+          try {
+            // The email is compared above, not in the WHERE: @auth/core lowercases the
+            // profile before anyone sees it (oauth/callback.js:225), so a normalized WHERE
+            // would be redundant — and would silently match zero rows, reinstating the
+            // P0-R2 "no Google user is ever verified" defect, if a stored address ever
+            // diverged from that form.
+            await prisma.user.updateMany({
+              where: { id: user.id, emailVerified: null },
+              data: { emailVerified: new Date() },
+            });
+          } catch (error) {
+            logger.sync.warn("Failed to mark Google email as verified", {
+              userId: user.id,
+              error: sanitizeErrorMessage(error),
+            });
+          }
+        } else {
+          // Undo the adapter's link. `linkAccount` is a bare account.create that is already
+          // committed, so this is a separate statement in a separate transaction and CANNOT
+          // be best-effort: a surviving mislink lets that Google identity sign straight into
+          // this row with no password and no session cookie (handle-login.js:190-198).
+          // deleteMany is idempotent and matches at most one row —
+          // @@unique([provider, providerAccountId]) — and that row is necessarily the one
+          // just created, since a pre-existing one would have been caught by
+          // getUserByAccount before the link.
+          logger.sync.error("Google link mismatch: profile email is not this account's", {
             userId: user.id,
-            error: sanitizeErrorMessage(error),
+            provider: account.provider,
           });
+
+          try {
+            const removed = await prisma.account.deleteMany({
+              where: {
+                provider: account.provider,
+                providerAccountId: account.providerAccountId,
+              },
+            });
+
+            if (removed.count !== 1) {
+              logger.sync.error(
+                "Google link mismatch: mislinked account row not removed",
+                { userId: user.id, provider: account.provider, removed: removed.count }
+              );
+            }
+          } catch (error) {
+            logger.sync.error(
+              "Google link mismatch: mislinked account row not removed",
+              {
+                userId: user.id,
+                provider: account.provider,
+                error: sanitizeErrorMessage(error),
+              }
+            );
+          }
+          // Deliberately no early return: fall through to the token scrub below so that if
+          // the undo failed, the tokens on that row are still cleared.
         }
       }
 
@@ -249,6 +317,37 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return "/login?error=AccountSuspended";
         }
 
+        // P0-V1 containment. When this Google identity is already linked, @auth/core
+        // resolves `user` from the Account row (getUserByAccount, callback/index.js:58-67),
+        // so `user.email` is THIS ROW's address while `profile.email` is the address Google
+        // just proved control of. A mismatch means the link is not ours to trust — one the
+        // linkAccount undo failed to remove, or one predating that guard — and
+        // authenticating would hand the caller someone else's account with no password at
+        // all (handle-login.js:190-198 mints a session for userByAccount).
+        //
+        // This CANNOT stop a mislink from being created: on that request the account is not
+        // linked yet, so `user` is the Google profile itself and the comparison is
+        // self-versus-self. Prevention lives in the linkAccount event.
+        //
+        // Known false positive: a user whose Google-side email changed is blocked from here
+        // on. `sub` is stable, so they sign in fine today, and a Google-only row has no
+        // password to fall back on — forgot-password mails the row's OLD address. Recovery
+        // is admin-side (drop the stale Account row, or correct User.email). Fail-closed is
+        // the right default while this is pre-launch; revisit before real users exist.
+        if (account?.provider === "google") {
+          const claimedEmail = (profile as { email?: string } | undefined)?.email;
+
+          if (
+            typeof claimedEmail !== "string" ||
+            normalizeEmail(claimedEmail) !== normalizeEmail(user.email)
+          ) {
+            logger.sync.error("Google sign-in blocked: possible residual mislink", {
+              userId: dbUser?.id,
+            });
+            return `${AUTH_ROUTES.signIn}?error=OAuthAccountNotLinked`;
+          }
+        }
+
         // P0-1: account pre-hijacking defence.
         //
         // allowDangerousEmailAccountLinking lets the adapter bind this Google identity to
@@ -283,16 +382,41 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             return `${AUTH_ROUTES.signIn}?error=OAuthAccountNotLinked`;
           }
 
-          // FL-3: a row that ALREADY carries a linked Google account cannot be a squat —
-          // the rightful owner would have had to link it themselves. Without this
-          // discriminator, a Google-first user who later adds a password via
-          // forgot-password (which does not require an existing one, see
-          // forgot-password/route.ts:97-99) looks identical to a squat, and has that
-          // password silently nulled on their next Google sign-in.
+          // FL-3: a row that already carries THIS Google identity cannot be a squat — the
+          // rightful owner linked it themselves. Without the discriminator, a Google-first
+          // user who later adds a password via forgot-password (which does not require an
+          // existing one, see forgot-password/route.ts:97-99) looks identical to a squat and
+          // has that password silently nulled on their next Google sign-in.
+          //
+          // P0-V1: it must be keyed on providerAccountId, not on "any linked google
+          // account". A squatter can link their OWN Google account to the row they created
+          // for the victim, and a broad count then reads as "not a squat" — leaving their
+          // password alive through the victim's sign-in. A sub is unforgeable; the victim's
+          // is theirs alone. This is also what closes the window between the adapter's
+          // committed INSERT and the undo in the linkAccount event: a concurrent victim
+          // sign-in reading a broad count would see 1 and skip the eviction.
+          //
+          // Guard the value explicitly — Prisma DROPS an `undefined` filter instead of
+          // matching nothing, which would silently restore the broad, forgeable count. Fail
+          // closed by refusing the sign-in, never by falling through to the eviction.
+          if (
+            typeof account.providerAccountId !== "string" ||
+            account.providerAccountId.length === 0
+          ) {
+            logger.sync.error("Google link blocked: missing providerAccountId", {
+              userId: dbUser.id,
+            });
+            return `${AUTH_ROUTES.signIn}?error=OAuthAccountNotLinked`;
+          }
+
           let linkedGoogleAccounts: number;
           try {
             linkedGoogleAccounts = await prisma.account.count({
-              where: { userId: dbUser.id, provider: "google" },
+              where: {
+                userId: dbUser.id,
+                provider: "google",
+                providerAccountId: account.providerAccountId,
+              },
             });
           } catch (error) {
             // Fail closed WITHOUT mutating. Refusing one sign-in is recoverable; nulling a

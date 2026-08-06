@@ -11,7 +11,7 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react";
-import { signIn } from "next-auth/react";
+import { signIn, signOut, useSession } from "next-auth/react";
 import { useEffect, useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import TurnstileWidget, {
@@ -32,6 +32,7 @@ import PasswordStrengthMeter from "@/components/PasswordStrengthMeter";
 function SignUpForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { data: existingSession } = useSession();
   const urlError = searchParams.get("error");
   const isTurnstileEnabled = Boolean(
     process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
@@ -188,6 +189,14 @@ function SignUpForm() {
           setGoogleLoading(true);
           setError("");
           try {
+            // Sign out first, exactly as /login does. @auth/core links an OAuth account to
+            // whatever row the CURRENT SESSION resolves to (handle-login.js:206-212), so
+            // carrying a live session into this flow is what puts a differing-email Google
+            // identity onto someone else's row. Defence in depth only — the real guards are
+            // in src/auth.ts, since a direct POST to /api/auth/signin/google skips this page.
+            if (existingSession?.user) {
+              await signOut({ redirect: false });
+            }
             await signIn("google", { callbackUrl: "/" });
           } catch (_err) {
             setError(

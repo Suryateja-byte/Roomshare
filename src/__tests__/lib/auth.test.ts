@@ -303,7 +303,7 @@ describe("auth.ts NextAuth configuration", () => {
       const result = await config.callbacks.signIn({
         user: { email: "test@example.com" },
         account: { provider: "google" },
-        profile: { email_verified: true },
+        profile: { email: "test@example.com", email_verified: true },
       });
 
       expect(result).toBe(true);
@@ -330,8 +330,8 @@ describe("auth.ts NextAuth configuration", () => {
 
       const result = await config.callbacks.signIn({
         user: { email: "victim@example.com" },
-        account: { provider: "google" },
-        profile: { email_verified: true },
+        account: { provider: "google", providerAccountId: "goog-victim" },
+        profile: { email: "victim@example.com", email_verified: true },
       });
 
       expect(result).toBe(true);
@@ -355,8 +355,9 @@ describe("auth.ts NextAuth configuration", () => {
     // an existing one (forgot-password/route.ts:97-99). Their row then looks exactly like
     // a squat to the check above — emailVerified null (before P0-R2) and password set — so
     // their own password was silently nulled on the next Google sign-in. A row that
-    // already carries a linked Google account cannot be a squat: the victim would have had
-    // to link it themselves.
+    // already carries THIS Google identity cannot be a squat: the owner linked it
+    // themselves. Keyed on providerAccountId, not on "any linked google account" — see the
+    // P0-V1 block below for why the broad form is forgeable.
 
     it("does not revoke when the row already has a linked Google account", async () => {
       (isGoogleEmailVerified as jest.Mock).mockReturnValue(true);
@@ -371,13 +372,17 @@ describe("auth.ts NextAuth configuration", () => {
 
       const result = await config.callbacks.signIn({
         user: { email: "owner@example.com" },
-        account: { provider: "google" },
-        profile: { email_verified: true },
+        account: { provider: "google", providerAccountId: "goog-owner" },
+        profile: { email: "owner@example.com", email_verified: true },
       });
 
       expect(result).toBe(true);
       expect(prisma.account.count).toHaveBeenCalledWith({
-        where: { userId: "user-google-first", provider: "google" },
+        where: {
+          userId: "user-google-first",
+          provider: "google",
+          providerAccountId: "goog-owner",
+        },
       });
       expect(prisma.user.updateMany).not.toHaveBeenCalled();
     });
@@ -398,8 +403,8 @@ describe("auth.ts NextAuth configuration", () => {
 
       const result = await config.callbacks.signIn({
         user: { email: "victim@example.com" },
-        account: { provider: "google" },
-        profile: { email_verified: true },
+        account: { provider: "google", providerAccountId: "goog-victim" },
+        profile: { email: "victim@example.com", email_verified: true },
       });
 
       expect(result).toBe(true);
@@ -434,8 +439,8 @@ describe("auth.ts NextAuth configuration", () => {
 
       const result = await config.callbacks.signIn({
         user: { email: "victim@example.com" },
-        account: { provider: "google" },
-        profile: { email_verified: true },
+        account: { provider: "google", providerAccountId: "goog-victim" },
+        profile: { email: "victim@example.com", email_verified: true },
       });
 
       expect(result).toBe("/login?error=OAuthAccountNotLinked");
@@ -455,7 +460,7 @@ describe("auth.ts NextAuth configuration", () => {
       const result = await config.callbacks.signIn({
         user: { email: "legit@example.com" },
         account: { provider: "google" },
-        profile: { email_verified: true },
+        profile: { email: "legit@example.com", email_verified: true },
       });
 
       expect(result).toBe(true);
@@ -478,7 +483,7 @@ describe("auth.ts NextAuth configuration", () => {
       const result = await config.callbacks.signIn({
         user: { email: "Victim@Example.com" },
         account: { provider: "google" },
-        profile: { email_verified: true },
+        profile: { email: "Victim@Example.com", email_verified: true },
       });
 
       expect(result).toBe("/login?error=OAuthAccountNotLinked");
@@ -500,8 +505,8 @@ describe("auth.ts NextAuth configuration", () => {
 
       const result = await config.callbacks.signIn({
         user: { email: "raced@example.com" },
-        account: { provider: "google" },
-        profile: { email_verified: true },
+        account: { provider: "google", providerAccountId: "goog-raced" },
+        profile: { email: "raced@example.com", email_verified: true },
       });
 
       expect(result).toBe("/login?error=OAuthAccountNotLinked");
@@ -525,6 +530,127 @@ describe("auth.ts NextAuth configuration", () => {
 
       expect(result).toBe(true);
       expect(prisma.user.updateMany).not.toHaveBeenCalled();
+    });
+
+    // ── P0-V1: a squatter can forge the FL-3 discriminator ──
+    //
+    // @auth/core links an OAuth account to whatever row the CURRENT SESSION resolves to
+    // (handle-login.js:206-212) with no email comparison. So a squatter signed in on the
+    // unverified row they created for the victim can link their OWN Google account to it.
+    // Counting *any* linked google account then reads as "this cannot be a squat" and the
+    // attacker's password survives the victim's sign-in. Count THIS identity only.
+
+    it("still revokes when the row's linked Google account is a different identity", async () => {
+      (isGoogleEmailVerified as jest.Mock).mockReturnValue(true);
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        id: "user-squatted",
+        email: "victim@example.com",
+        isSuspended: false,
+        emailVerified: null,
+        password: "$2a$12$attacker-chosen-hash",
+      });
+      // No Account row for the victim's own sub — the row carries only the attacker's.
+      (prisma.account.count as jest.Mock).mockResolvedValue(0);
+      (prisma.user.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+
+      const result = await config.callbacks.signIn({
+        user: { email: "victim@example.com" },
+        account: { provider: "google", providerAccountId: "goog-victim" },
+        profile: { email: "victim@example.com", email_verified: true },
+      });
+
+      expect(result).toBe(true);
+      expect(prisma.account.count).toHaveBeenCalledWith({
+        where: {
+          userId: "user-squatted",
+          provider: "google",
+          providerAccountId: "goog-victim",
+        },
+      });
+      expect(prisma.user.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: "user-squatted",
+          emailVerified: null,
+          password: { not: null },
+        },
+        data: {
+          password: null,
+          passwordChangedAt: expect.any(Date),
+          emailVerified: expect.any(Date),
+        },
+      });
+    });
+
+    it("fails closed when the account carries no providerAccountId", async () => {
+      // Prisma DROPS an `undefined` filter rather than matching nothing, which would
+      // silently restore the forgeable "any linked google account" count. Refuse the
+      // sign-in instead of relying on the where-clause.
+      (isGoogleEmailVerified as jest.Mock).mockReturnValue(true);
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        id: "user-squatted",
+        email: "victim@example.com",
+        isSuspended: false,
+        emailVerified: null,
+        password: "$2a$12$attacker-chosen-hash",
+      });
+      (prisma.account.count as jest.Mock).mockResolvedValue(0);
+      (prisma.user.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+
+      const result = await config.callbacks.signIn({
+        user: { email: "victim@example.com" },
+        account: { provider: "google", providerAccountId: "" },
+        profile: { email: "victim@example.com", email_verified: true },
+      });
+
+      expect(result).toBe("/login?error=OAuthAccountNotLinked");
+      expect(prisma.user.updateMany).not.toHaveBeenCalled();
+    });
+
+    // ── P0-V1: a mislinked identity must not authenticate into its row ──
+    //
+    // When this Google identity is already linked, @auth/core resolves `user` from the
+    // Account row (getUserByAccount, callback/index.js:58-67), so `user.email` is the ROW's
+    // address while profile.email is the address Google just proved control of. If a bad
+    // link survived — the cleanup in linkAccount failed, or the row predates that fix —
+    // handle-login.js:190-198 would otherwise mint a session for that row with no password
+    // and no session cookie at all.
+
+    it("refuses a Google sign-in whose profile email does not match the resolved row", async () => {
+      (isGoogleEmailVerified as jest.Mock).mockReturnValue(true);
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        id: "user-victim",
+        email: "victim@example.com",
+        isSuspended: false,
+        emailVerified: new Date(),
+        password: null,
+      });
+
+      const result = await config.callbacks.signIn({
+        // getUserByAccount shape: a DB row, not the Google profile.
+        user: { id: "user-victim", email: "victim@example.com" },
+        account: { provider: "google", providerAccountId: "goog-attacker" },
+        profile: { email: "attacker@evil.test", email_verified: true },
+      });
+
+      expect(result).toBe("/login?error=OAuthAccountNotLinked");
+      expect(prisma.user.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("reports suspension before the profile-email mismatch", async () => {
+      // Ordering pin: the mismatch check sits after the suspension gate, so a banned user
+      // still gets AccountSuspended rather than a misleading link error.
+      (isGoogleEmailVerified as jest.Mock).mockReturnValue(true);
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        isSuspended: true,
+      });
+
+      const result = await config.callbacks.signIn({
+        user: { id: "user-banned", email: "banned@example.com" },
+        account: { provider: "google", providerAccountId: "goog-x" },
+        profile: { email: "someone-else@example.com", email_verified: true },
+      });
+
+      expect(result).toBe("/login?error=AccountSuspended");
     });
 
     it("blocks suspended users (Google provider)", async () => {
@@ -739,7 +865,7 @@ describe("auth.ts NextAuth configuration", () => {
       (prisma.user.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
 
       await config.events.linkAccount({
-        user: { id: "user-google" },
+        user: { id: "user-google", email: "ada@example.com" },
         account: { provider: "google", providerAccountId: "goog-1" },
         // Exactly what defaultProfile produces — note the absence of email_verified.
         profile: {
@@ -761,7 +887,7 @@ describe("auth.ts NextAuth configuration", () => {
       (prisma.user.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
 
       await config.events.linkAccount({
-        user: { id: "user-google" },
+        user: { id: "user-google", email: "ada@example.com" },
         account: { provider: "google", providerAccountId: "goog-1" },
         profile: { id: "goog-1", email: "ada@example.com" },
       });
@@ -775,7 +901,7 @@ describe("auth.ts NextAuth configuration", () => {
       (prisma.user.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
 
       await config.events.linkAccount({
-        user: { id: "user-google" },
+        user: { id: "user-google", email: "ada@example.com" },
         account: { provider: "google", providerAccountId: "goog-1" },
         profile: { id: "goog-1", email: "ada@example.com" },
       });
@@ -799,6 +925,73 @@ describe("auth.ts NextAuth configuration", () => {
       expect(emailVerifiedWrites()).toHaveLength(0);
     });
 
+    // ── P0-V1: the linked identity must own the address it verifies ──
+    //
+    // `profile.email` is NOT stripped by defaultProfile — it is the only thing tying this
+    // Google identity to this row, and @auth/core does not compare it to anything. Without
+    // that comparison a squatter signed in on a row they created for the victim can link
+    // their own Google account and have it stamp emailVerified on the victim's address,
+    // forging the trust signal AND disarming the P0-1 revoke precondition.
+    //
+    // Note: `profile.id` here is crypto.randomUUID() (oauth/callback.js:224), NOT the
+    // Google sub — do not reach for it to correlate with providerAccountId.
+
+    it("does not verify the row when the linked profile is a different address", async () => {
+      useRealClaimSemantics();
+      (prisma.account.deleteMany as jest.Mock).mockResolvedValue({ count: 1 });
+
+      await config.events.linkAccount({
+        user: { id: "user-victim", email: "victim@example.com" },
+        account: { provider: "google", providerAccountId: "goog-attacker" },
+        profile: {
+          id: "random-uuid",
+          name: "Attacker",
+          email: "attacker@evil.test",
+          image: null,
+        },
+      });
+
+      expect(emailVerifiedWrites()).toHaveLength(0);
+      expect(prisma.account.deleteMany).toHaveBeenCalledWith({
+        where: { provider: "google", providerAccountId: "goog-attacker" },
+      });
+    });
+
+    it("logs an error when the mislinked account row cannot be removed", async () => {
+      // The adapter's INSERT is already committed (a bare account.create), so this undo is
+      // a separate statement in a separate transaction. A failed undo is a durable mislink
+      // — a security incident, not a degradation.
+      useRealClaimSemantics();
+      (prisma.account.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
+
+      await config.events.linkAccount({
+        user: { id: "user-victim", email: "victim@example.com" },
+        account: { provider: "google", providerAccountId: "goog-attacker" },
+        profile: { id: "random-uuid", email: "attacker@evil.test" },
+      });
+
+      expect(logger.sync.error).toHaveBeenCalledWith(
+        "Google link mismatch: mislinked account row not removed",
+        expect.objectContaining({ userId: "user-victim" })
+      );
+    });
+
+    it("verifies the row when the addresses differ only by case and whitespace", async () => {
+      // Positive control against over-tightening: normalizeEmail is the comparison, so a
+      // case/whitespace difference must NOT be read as a mismatch.
+      useRealClaimSemantics();
+      (prisma.user.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+
+      await config.events.linkAccount({
+        user: { id: "user-google", email: "  Ada@Example.com " },
+        account: { provider: "google", providerAccountId: "goog-1" },
+        profile: { id: "random-uuid", email: "ada@example.com" },
+      });
+
+      expect(emailVerifiedWrites()).toHaveLength(1);
+      expect(prisma.account.deleteMany).not.toHaveBeenCalled();
+    });
+
     it("does not throw when the emailVerified write fails", async () => {
       useRealClaimSemantics();
       (prisma.user.updateMany as jest.Mock).mockRejectedValue(
@@ -807,7 +1000,7 @@ describe("auth.ts NextAuth configuration", () => {
 
       await expect(
         config.events.linkAccount({
-          user: { id: "user-google" },
+          user: { id: "user-google", email: "ada@example.com" },
           account: { provider: "google", providerAccountId: "goog-1" },
           profile: { id: "goog-1", email: "ada@example.com" },
         })

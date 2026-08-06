@@ -4,8 +4,15 @@ import SignUpPage from "@/app/signup/page";
 
 // Mock next-auth/react
 const mockSignIn = jest.fn();
+const mockSignOut = jest.fn();
+let mockSession: { user?: unknown } | null = null;
 jest.mock("next-auth/react", () => ({
   signIn: (...args: any[]) => mockSignIn(...args),
+  signOut: (...args: any[]) => mockSignOut(...args),
+  useSession: () => ({
+    data: mockSession,
+    status: mockSession ? "authenticated" : "unauthenticated",
+  }),
 }));
 
 // Mock next/navigation
@@ -44,6 +51,7 @@ afterAll(() => {
 describe("SignUpPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSession = null;
   });
 
   it("renders signup form", () => {
@@ -221,6 +229,24 @@ describe("SignUpPage", () => {
 
     await userEvent.click(screen.getByText("Continue with Google"));
 
+    expect(mockSignIn).toHaveBeenCalledWith("google", { callbackUrl: "/" });
+    expect(mockSignOut).not.toHaveBeenCalled();
+  });
+
+  // ── P0-V1 ──
+  //
+  // @auth/core links an OAuth account to whatever row the CURRENT SESSION resolves to
+  // (handle-login.js:206-212), so carrying a live session into this flow is what lands a
+  // differing-email Google identity on someone else's row. /login already signs out first;
+  // this page did not. Defence in depth — the enforcing guards live in src/auth.ts.
+  it("signs out an existing session before starting Google sign-up", async () => {
+    mockSession = { user: { email: "squatter@example.com" } };
+
+    render(<SignUpPage />);
+
+    await userEvent.click(screen.getByText("Continue with Google"));
+
+    expect(mockSignOut).toHaveBeenCalledWith({ redirect: false });
     expect(mockSignIn).toHaveBeenCalledWith("google", { callbackUrl: "/" });
   });
 
